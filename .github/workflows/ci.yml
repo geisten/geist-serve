@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        # -std=c23 needs gcc >= 14; force the generic linux target — the
+        # GitHub arm runners otherwise auto-detect as pi5 (cortex-a76).
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: deps
+        run: sudo apt-get update -q && sudo apt-get install -y -q gcc-14
+      - name: build
+        run: make CC=gcc-14 TARGET=linux
+      - name: usage exits 2
+        run: ./geist-serve 2>/dev/null || test $? -eq 2
+
+  build-macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: deps
+        run: brew install libomp
+      - name: build
+        run: make
+      - name: usage exits 2
+        run: ./geist-serve 2>/dev/null || test $? -eq 2

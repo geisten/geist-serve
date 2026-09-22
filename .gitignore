@@ -1,0 +1,6 @@
+/geist-serve
+/geistlib/
+/build/
+*.tar.gz
+__pycache__/
+/tests/results/
