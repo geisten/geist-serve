@@ -1,0 +1,16 @@
+# Socket activation: systemd owns 127.0.0.1:11434 and hands it to the
+# service as fd 3 (LISTEN_FDS), which geist-serve uses as-is. The model
+# loads on the first connection; until then nothing runs.
+#
+#   sudo systemctl enable --now geist-serve.socket
+[Unit]
+Description=geist-serve listener (Ollama/OpenAI-compatible, port 11434)
+
+[Socket]
+ListenStream=127.0.0.1:11434
+# LAN access: replace with 0.0.0.0:11434 — there is no authentication.
+Backlog=16
+NoDelay=true
+
+[Install]
+WantedBy=sockets.target

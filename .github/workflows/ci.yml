@@ -28,6 +28,10 @@ jobs:
         run: ./geist-serve 2>/dev/null || test $? -eq 2
       - name: unit tests (model-free)
         run: make CC=gcc-14 TARGET=linux build/test_template && ./build/test_template
+      - name: systemd units parse
+        run: |
+          sudo install -m 0755 geist-serve /usr/local/bin/geist-serve
+          systemd-analyze verify --man=no deploy/systemd/geist-serve.socket deploy/systemd/geist-serve.service
 
   build-macos:
     runs-on: macos-15

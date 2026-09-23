@@ -1,0 +1,7 @@
+# /etc/default/geist-serve — read by geist-serve.service
+# The GGUF to serve. Any GGUF that carries its own tokenizer; see the
+# engine's docs/MODELS.md. Must be readable by everyone (DynamicUser).
+GEIST_MODEL=/var/lib/geist-serve/model.gguf
+# Extra flags, e.g. --host 0.0.0.0 has no effect under socket activation
+# (the .socket unit decides the address); use this for future options.
+GEIST_ARGS=
