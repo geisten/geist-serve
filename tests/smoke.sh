@@ -122,6 +122,53 @@ check "long chat under cap"   '"prompt_tokens":\([1-3][0-9][0-9][0-9]\|40[0-8][0
 out=$(python3 -c 'import json; print(json.dumps({"messages":[{"role":"user","content":"word "*6000}],"max_tokens":1}))' | curl -s "$CH" -d @-)
 check "oversize message 400"  'does not fit'         "$out"
 
+# --- Ollama API (issue #6) ---------------------------------------------------
+A="http://127.0.0.1:$PORT/api"
+out=$(curl -s -I "http://127.0.0.1:$PORT/" | tr -d '\r')
+check "HEAD / heartbeat"       'HTTP/1.1 200'         "$out"
+out=$(curl -s "$A/tags")
+check "tags name"              '"name":"smollm2-360m-instruct-q8_0:latest"' "$out"
+check "tags quantization"      '"quantization_level":"Q8_0"' "$out"
+check "tags parameter size"    '"parameter_size":"360M"' "$out"
+out=$(curl -s "$A/version")
+check "version"                '"version":"'          "$out"
+out=$(curl -s "$A/ps")
+check "ps lists model"         '"model":"smollm2'     "$out"
+out=$(curl -s "$A/show" -d '{"name":"smollm2-360m-instruct-q8_0"}')
+check "show template"          '<|im_start|>'         "$out"
+check "show capabilities"      '"capabilities":\["completion"\]' "$out"
+check "show context"           '"llama.context_length":8192' "$out"
+out=$(curl -s "$A/generate" -d '{"model":"smollm2-360m-instruct-q8_0","prompt":"What is the capital of France? One word.","stream":false,"options":{"temperature":0,"num_predict":8}}')
+check "generate answer"        '"response":"Paris"'   "$out"
+check "generate done stop"     '"done_reason":"stop"' "$out"
+check "generate stats"         '"eval_count":1,'      "$out"
+out=$(curl -sN "$A/generate" -d '{"prompt":"Say hi","options":{"temperature":0,"num_predict":3}}')
+check "generate ndjson chunk"  '"done":false}'        "$out"
+check "generate ndjson final"  '"done":true'          "$out"
+out=$(curl -s "$A/generate" -d '{"model":"smollm2-360m-instruct-q8_0"}')
+check "generate empty = load"  '"done_reason":"load"' "$out"
+out=$(curl -s "$A/generate" -d '{"prompt":"The capital of France is","raw":true,"stream":false,"options":{"temperature":0,"num_predict":4}}')
+check "generate raw"           '"response":" Paris'   "$out"
+out=$(curl -s "$A/chat" -d '{"model":"smollm2-360m-instruct-q8_0:latest","messages":[{"role":"user","content":"What is the capital of France? One word."}],"stream":false,"options":{"temperature":0}}')
+check "chat answer"            '"content":"Paris"'    "$out"
+out=$(curl -sN "$A/chat" -d '{"messages":[{"role":"user","content":"Say hi"}],"options":{"temperature":0,"num_predict":3}}')
+check "chat ndjson chunk"      '"message":{"role":"assistant","content":"Hello"},"done":false}' "$out"
+check "chat ndjson final"      '"done":true,"done_reason"' "$out"
+out=$(curl -s "$A/chat" -d '{"messages":[]}')
+check "chat empty = load"      '"done_reason":"load"' "$out"
+out=$(curl -s "$A/pull" -d '{"name":"llama3"}')
+check "pull 404 flat error"    '^{"error":"no registry' "$out"
+out=$(curl -s "$A/generate" -d '{"prompt":"hi","options":{"num_predict":"5"}}')
+check "options typed 400"      'wrong type'           "$out"
+out=$(curl -s "$A/chat" -d '{"model":"nope","messages":[{"role":"user","content":"hi"}]}')
+check "chat wrong model 404"   'model not found'      "$out"
+if command -v ollama >/dev/null; then
+    out=$(OLLAMA_HOST=127.0.0.1:$PORT ollama run smollm2-360m-instruct-q8_0 "What is the capital of France? Answer in one word." 2>&1 | tr -d '\033' )
+    check "real ollama CLI run"  'Paris'               "$out"
+    out=$(OLLAMA_HOST=127.0.0.1:$PORT ollama list 2>&1)
+    check "real ollama CLI list" 'smollm2-360m-instruct-q8_0:latest' "$out"
+fi
+
 # --- wire-level critical path + hostile input (tests/test_http.py) ----------
 if command -v python3 >/dev/null; then
     python3 -u tests/test_http.py "$PORT" > /tmp/geist-serve-http.$$.log 2>&1 || fail=1
