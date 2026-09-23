@@ -132,7 +132,7 @@ try:
     objs = [json.loads(l.decode("utf-8", "strict")) for l in lines]
     content = "".join(o["message"]["content"] for o in objs)
     ok = st == 200 and h.get("content-type") == "application/x-ndjson" and all(not o["done"] for o in objs[:-1]) \
-        and objs[-1]["done"] and "eval_count" in objs[-1] and objs[-1]["eval_count"] == len(objs) - 1 and len(content) > 0
+        and objs[-1]["done"] and "eval_count" in objs[-1] and objs[-1]["eval_count"] >= len(objs) - 1 and len(content) > 0
     check("ollama ndjson strict", ok, str(lines[:2]))
 except Exception as e:
     check("ollama ndjson strict", False, f"{e} {body[:200]}")

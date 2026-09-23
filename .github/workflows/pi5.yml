@@ -1,0 +1,40 @@
+# Raspberry Pi 5: build, the full HTTP contract, and one decode number —
+# on the reference board through its self-hosted runner. Manual only: the
+# board is shared and thermally fragile, so every heavy step goes through
+# ~/bin/with-pi-lock (see CLAUDE.local.md in the engine repo).
+name: pi5
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pi5
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: [self-hosted, pi5]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: build (clones the pinned engine)
+        run: ~/bin/with-pi-lock make TARGET=pi5
+      - name: reference model (SHA-gated, cached in the engine tree)
+        run: make TARGET=pi5 fetch-model
+      - name: board must be cool and idle before measuring
+        run: |
+          t=$(cat /sys/class/thermal/thermal_zone0/temp); l=$(cut -d' ' -f1 /proc/loadavg)
+          echo "temp=$t load=$l"; test "$t" -lt 60000
+      - name: smoke + wire-level suite
+        run: OMP_NUM_THREADS=4 ~/bin/with-pi-lock make TARGET=pi5 test
+      - name: decode rate through /api/generate
+        run: |
+          ~/bin/with-pi-lock sh -c '
+            OMP_NUM_THREADS=4 ./geist-serve geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf --port 28090 2>/tmp/gs.log &
+            pid=$!; for i in $(seq 1 60); do grep -q listening /tmp/gs.log && break; sleep 1; done
+            curl -s http://127.0.0.1:28090/api/generate -d "{\"prompt\":\"Write a paragraph about rivers.\",\"stream\":false,\"options\":{\"num_predict\":64,\"temperature\":0}}" \
+              | python3 -c "import json,sys; d=json.load(sys.stdin); print(\"decode tok/s:\", round(d[\"eval_count\"]/(d[\"eval_duration\"]/1e9),1), \"prefill tok/s:\", round(d[\"prompt_eval_count\"]/(d[\"prompt_eval_duration\"]/1e9),1))"
+            kill $pid; wait $pid'

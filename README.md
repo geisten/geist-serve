@@ -7,6 +7,7 @@ Cline, Zed, Cursor, Open WebUI or the `ollama run` terminal chat at it.
 
 ```sh
 make                                   # pins and builds the engine, then ./geist-serve
+make fetch-model && make test          # unit test + 70-odd HTTP checks against SmolLM2-360M
 ./geist-serve model.gguf               # 127.0.0.1:11434, the Ollama port
 ./geist-serve model.gguf --host 0.0.0.0 --port 8080
 ```
@@ -47,9 +48,12 @@ policy lives here: chat templates (fingerprinted from the GGUF's
 Gemma, ChatML/Qwen, Llama 3 and BitNet), sampling defaults, stop strings,
 context truncation, model naming.
 
-Status: skeleton. The build links against the pinned engine and loads a
-model; transport, templates and endpoints are tracked in the
-[v0.1 milestone](https://github.com/geisten/geist-serve/milestones).
+Status: both API families serve, streamed, with chat templates for Gemma 3
+and 4, ChatML (Qwen, SmolLM2), Llama 3 and BitNet. The real `ollama` CLI
+runs against it. Where it runs: [`docs/PLATFORMS.md`](docs/PLATFORMS.md).
+What to type into each editor or chat client: [`docs/CLIENTS.md`](docs/CLIENTS.md).
+Left in the [v0.1 milestone](https://github.com/geisten/geist-serve/milestones):
+systemd units, install script, release binaries.
 
 ## License
 
