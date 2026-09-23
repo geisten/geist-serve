@@ -5,6 +5,16 @@ An Ollama- and OpenAI-compatible HTTP front for the
 one request at a time, no dependencies. Point VS Code Copilot Chat, Continue,
 Cline, Zed, Cursor, Open WebUI or the `ollama run` terminal chat at it.
 
+Install a release binary (Linux x86-64/arm64 static, macOS arm64), checksum
+verified, with the systemd units when run as root on a systemd host:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/geisten/geist-serve/main/install.sh | sh
+sudo systemctl enable --now geist-serve.socket   # after setting GEIST_MODEL in /etc/default/geist-serve
+```
+
+Or build it:
+
 ```sh
 make                                   # pins and builds the engine, then ./geist-serve
 make fetch-model && make test          # unit test + 70-odd HTTP checks against SmolLM2-360M
@@ -52,8 +62,9 @@ Status: both API families serve, streamed, with chat templates for Gemma 3
 and 4, ChatML (Qwen, SmolLM2), Llama 3 and BitNet. The real `ollama` CLI
 runs against it. Where it runs: [`docs/PLATFORMS.md`](docs/PLATFORMS.md).
 What to type into each editor or chat client: [`docs/CLIENTS.md`](docs/CLIENTS.md).
-Left in the [v0.1 milestone](https://github.com/geisten/geist-serve/milestones):
-systemd units, install script, release binaries.
+Deploying: `deploy/systemd/` (socket activation on 11434, hardened service,
+model path in `/etc/default/geist-serve`), `install.sh`, and static release
+binaries from `.github/workflows/release.yml` on every `v*` tag.
 
 ## License
 
