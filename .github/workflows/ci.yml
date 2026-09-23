@@ -26,8 +26,8 @@ jobs:
         run: make CC=gcc-14 TARGET=linux
       - name: usage exits 2
         run: ./geist-serve 2>/dev/null || test $? -eq 2
-      - name: unit tests (model-free; smoke skips without a GGUF until #7)
-        run: make CC=gcc-14 TARGET=linux test
+      - name: unit tests (model-free)
+        run: make CC=gcc-14 TARGET=linux build/test_template && ./build/test_template
 
   build-macos:
     runs-on: macos-15
@@ -39,5 +39,42 @@ jobs:
         run: make
       - name: usage exits 2
         run: ./geist-serve 2>/dev/null || test $? -eq 2
-      - name: unit tests
-        run: make test
+      - name: unit tests (model-free)
+        run: make build/test_template && ./build/test_template
+
+  # The real thing: the HTTP contract against a model, on every runner OS
+  # and CPU we ship for. ~369 MB SmolLM2, cached under the same key the
+  # engine's own CI uses (the key embeds the SHA pin, so a re-pin rotates it).
+  smoke:
+    needs: [build, build-macos]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            make: make CC=gcc-14 TARGET=linux
+          - runner: ubuntu-24.04-arm
+            make: make CC=gcc-14 TARGET=linux
+          - runner: macos-15
+            make: make
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: deps (linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -q && sudo apt-get install -y -q gcc-14 curl python3
+      - name: deps (macos)
+        if: runner.os == 'macOS'
+        run: brew install libomp
+      - name: build
+        run: ${{ matrix.make }}
+      - name: cache reference model
+        uses: actions/cache@v4
+        with:
+          path: geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf
+          key: geist-model-smollm2-360m-q8-48ab3034d0dd
+      - name: fetch reference model (SHA-verified)
+        run: ${{ matrix.make }} fetch-model
+      - name: smoke + wire-level suite
+        run: OMP_NUM_THREADS=3 ${{ matrix.make }} test

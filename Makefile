@@ -9,6 +9,7 @@
 # what the engine was built with.
 #
 #> make               build ./geist-serve (syncs + builds libgeist.a on demand)
+#> make fetch-model   the 369 MB SmolLM2 reference GGUF into the engine tree (SHA-pinned)
 #> make test          model-free unit tests + HTTP smoke against a GGUF (skips without one)
 #> make format        clang-format, shared style file with the engine
 #> make clean         drop the binary; distclean also drops the engine
@@ -49,7 +50,7 @@ CFLAGS  := -std=c23 -O2 -Wall -Wextra -I$(GEISTLIB)/include $(CFLAGS_TARGET) $(G
 LDFLAGS := $(LDFLAGS_TARGET) $(EXTRA_LDFLAGS)
 LDLIBS  := $(LDLIBS_TARGET) $(GEMM_LDLIBS) $(EXTRA_LDLIBS)
 
-.PHONY: all help test format clean distclean FORCE
+.PHONY: all help test fetch-model format clean distclean FORCE
 
 all: geist-serve
 
@@ -73,6 +74,11 @@ $(LIB): FORCE
 		GEMM_PROVIDER=$(GEMM_PROVIDER)
 
 FORCE:
+
+# The CI reference model, fetched and SHA-verified by the engine's own rule
+# into geistlib/gguf_artifacts/, which is where tests/smoke.sh looks.
+fetch-model:
+	$(MAKE) -C $(GEISTLIB) fetch-llama-model
 
 test: geist-serve build/test_template
 	./build/test_template
