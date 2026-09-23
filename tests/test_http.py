@@ -107,6 +107,31 @@ check("sse usage on final", b'"usage"' in datas[-2])
 tot = json.loads(datas[-2])["usage"]
 check("usage sums", tot["prompt_tokens"] + tot["completion_tokens"] == tot["total_tokens"])
 
+# Chat SSE: every chunk strict JSON, role in the first delta, content
+# concatenates to valid text, usage on the final chunk sums.
+resp = request("POST", "/v1/chat/completions", json.dumps({"messages": [{"role": "user", "content": "Write one sentence with emojis 😀"}], "max_tokens": 24, "stream": True, "temperature": 0}).encode())
+st, h, body = split(resp)
+try:
+    cdatas = [e[6:] for e in dechunk(body).split(b"\n\n") if e.startswith(b"data: ")]
+    objs = [json.loads(d.decode("utf-8", "strict")) for d in cdatas[:-1]]
+    first_role = objs[0]["choices"][0]["delta"].get("role") == "assistant"
+    content = "".join(o["choices"][0]["delta"].get("content", "") for o in objs)
+    fin = objs[-1]["choices"][0]["finish_reason"] in ("stop", "length")
+    u = objs[-1]["usage"]
+    check("chat sse strict", st == 200 and first_role and fin and cdatas[-1] == b"[DONE]" and len(content) > 0
+          and u["prompt_tokens"] + u["completion_tokens"] == u["total_tokens"], str(cdatas[:2]))
+except Exception as e:
+    check("chat sse strict", False, f"{e} {body[:200]}")
+
+# Hostile messages: wrong shapes must be 400, never a crash or a run.
+for name, body in [("messages not array", b'{"messages":{"role":"user"}}'),
+                   ("message not object", b'{"messages":["hi"]}'),
+                   ("message without role", b'{"messages":[{"content":"hi"}]}'),
+                   ("content is object", b'{"messages":[{"role":"user","content":{"a":1}}]}'),
+                   ("300 messages", json.dumps({"messages": [{"role": "user", "content": "x"}] * 300, "max_tokens": 1}).encode())]:
+    resp = request("POST", "/v1/chat/completions", body)
+    check(f"chat: {name} → 400", resp.startswith(b"HTTP/1.1 400") and alive(), resp[:100].decode("latin1"))
+
 # Header-injection attempt through the prompt: CRLF must come back escaped.
 st, h, b = post(C, {"prompt": "x\r\nContent-Length: 0\r\n\r\n", "max_tokens": 1})
 check("crlf in prompt stays inside json", st == 200 and b.count(b"\r\n") == 0 and json.loads(b) is not None, b[:200].decode("utf-8","replace"))
