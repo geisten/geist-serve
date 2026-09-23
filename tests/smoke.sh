@@ -68,7 +68,7 @@ check "tcp health"            '{"status":"ok"}'      "$out"
 U="http://127.0.0.1:$PORT/v1/completions"
 out=$(curl -s "$U" -d '{"prompt":"The capital of France is","max_tokens":16,"temperature":0}')
 check "completion text"       'Paris'                "$out"
-out2=$(curl -s "$U" -d '{"prompt":"<|im_start|>user\nSay OK<|im_end|>\n<|im_start|>assistant\n","max_tokens":16,"temperature":0}')
+out2=$(curl -s "$U" -d '{"prompt":"<|im_start|>user\nWhat is the capital of France? One word.<|im_end|>\n<|im_start|>assistant\n","max_tokens":40,"temperature":0}')
 check "completion stop at eos" '"finish_reason":"stop"' "$out2"
 check "completion usage"      '"prompt_tokens":[1-9]' "$out"
 check "completion model name" '"model":"smollm2'     "$out"
