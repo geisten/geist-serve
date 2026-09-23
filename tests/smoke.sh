@@ -92,6 +92,12 @@ check "oversize prompt 400"   'does not fit'         "$out"
 curl -sN "$U" -d '{"prompt":"Write a long story:","max_tokens":300,"stream":true}' | head -c 100 >/dev/null
 out=$(curl -s "http://127.0.0.1:$PORT/health")
 check "survives client cancel" '{"status":"ok"}'     "$out"
+
+# --- wire-level critical path + hostile input (tests/test_http.py) ----------
+if command -v python3 >/dev/null; then
+    python3 -u tests/test_http.py "$PORT" > /tmp/geist-serve-http.$$.log 2>&1 || fail=1
+    grep -v '^ok' /tmp/geist-serve-http.$$.log; rm -f /tmp/geist-serve-http.$$.log
+fi
 kill -TERM $pid
 wait $pid; rc=$?
 check "sigterm exit 0"        '^0$'                  "$rc"

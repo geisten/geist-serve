@@ -9,7 +9,7 @@
 # what the engine was built with.
 #
 #> make               build ./geist-serve (syncs + builds libgeist.a on demand)
-#> make test          model-free unit tests + --stdio smoke against the CI GGUF
+#> make test          model-free unit tests + HTTP smoke against a GGUF (skips without one)
 #> make format        clang-format, shared style file with the engine
 #> make clean         drop the binary; distclean also drops the engine
 #>
@@ -56,8 +56,15 @@ all: geist-serve
 help:
 	@grep "^#>" Makefile | cut -c4-
 
-geist-serve: src/serve.c $(LIB)
-	$(CC) $(CFLAGS) -o $@ $< $(LIB) $(LDFLAGS) $(LDLIBS)
+SRC := src/serve.c src/template.c
+
+geist-serve: $(SRC) src/template.h src/jsmn.h $(LIB)
+	$(CC) $(CFLAGS) -o $@ $(SRC) $(LIB) $(LDFLAGS) $(LDLIBS)
+
+# Model-free unit test of the chat renderers; no engine needed.
+build/test_template: tests/test_template.c src/template.c src/template.h
+	@mkdir -p build
+	$(CC) -std=c23 -O1 -g -Wall -Wextra -fsanitize=address,undefined -o $@ tests/test_template.c src/template.c
 
 # Always delegate: the engine's own make is incremental, and a plain file
 # target goes stale on a GEIST_REF bump.
@@ -67,14 +74,15 @@ $(LIB): FORCE
 
 FORCE:
 
-test: geist-serve
+test: geist-serve build/test_template
+	./build/test_template
 	sh tests/smoke.sh
 
 format:
 	clang-format -i $(wildcard src/*.c tests/*.c)
 
 clean:
-	rm -f geist-serve
+	rm -rf geist-serve build
 
 # The engine checkout is build input, not source.
 distclean: clean

@@ -26,6 +26,10 @@ jobs:
         run: make CC=gcc-14 TARGET=linux
       - name: usage exits 2
         run: ./geist-serve 2>/dev/null || test $? -eq 2
+      - name: unit tests
+        run: make test
+      - name: unit tests (model-free; smoke skips without a GGUF until #7)
+        run: make CC=gcc-14 TARGET=linux test
 
   build-macos:
     runs-on: macos-15
@@ -37,3 +41,5 @@ jobs:
         run: make
       - name: usage exits 2
         run: ./geist-serve 2>/dev/null || test $? -eq 2
+      - name: unit tests
+        run: make test
