@@ -201,27 +201,30 @@ int main(void) {
         fwrite(v4, 1, len, f);
         fclose(f);
 
-        char *tpl     = nullptr;
-        bool  add_bos = true;
-        eq_int("gguf scan ok", 1, gguf_read_chat_meta(path, &tpl, &add_bos));
-        eq("gguf template", v4, tpl);
-        eq_int("gguf add_bos false", 0, add_bos);
-        eq_int("gguf → chatml", CHAT_CHATML, chat_family_from_template(tpl));
-        free(tpl);
+        struct gguf_meta g;
+        eq_int("gguf scan ok", 1, gguf_read_meta(path, &g));
+        eq("gguf template", v4, g.tpl);
+        eq_int("gguf add_bos false", 0, g.add_bos);
+        eq("gguf arch", "llama", g.arch);
+        eq_int("gguf → chatml", CHAT_CHATML, chat_family_from_template(g.tpl));
+        gguf_meta_free(&g);
+        eq("ftype 15", "Q4_K_M", gguf_file_type_name(15));
+        eq("ftype 37", "TQ2_0", gguf_file_type_name(37));
+        eq("ftype 99", "unknown", gguf_file_type_name(99));
 
         /* Truncated file: must fail cleanly, not read garbage. */
         f = fopen(path, "wb");
         fwrite("GGUF", 1, 4, f);
         fwrite(&v, 4, 1, f);
         fclose(f);
-        eq_int("gguf truncated → false", 0, gguf_read_chat_meta(path, &tpl, &add_bos));
-        eq_int("gguf truncated → no template", 0, (long) (tpl != nullptr));
+        eq_int("gguf truncated → false", 0, gguf_read_meta(path, &g));
+        eq_int("gguf truncated → no template", 0, (long) (g.tpl != nullptr));
         /* Not a GGUF at all. */
         f = fopen(path, "wb");
         fwrite("NOPE1234", 1, 8, f);
         fclose(f);
-        eq_int("not gguf → false", 0, gguf_read_chat_meta(path, &tpl, &add_bos));
-        eq_int("missing file → false", 0, gguf_read_chat_meta("/nonexistent.gguf", &tpl, &add_bos));
+        eq_int("not gguf → false", 0, gguf_read_meta(path, &g));
+        eq_int("missing file → false", 0, gguf_read_meta("/nonexistent.gguf", &g));
         remove(path);
     }
 

@@ -123,6 +123,28 @@ try:
 except Exception as e:
     check("chat sse strict", False, f"{e} {body[:200]}")
 
+# Ollama NDJSON: every line strict JSON, content concatenates, final line
+# carries the stats, chunk framing intact.
+resp = request("POST", "/api/chat", json.dumps({"messages": [{"role": "user", "content": "One sentence with emojis 😀"}], "options": {"num_predict": 24, "temperature": 0}}).encode())
+st, h, body = split(resp)
+try:
+    lines = [l for l in dechunk(body).split(b"\n") if l]
+    objs = [json.loads(l.decode("utf-8", "strict")) for l in lines]
+    content = "".join(o["message"]["content"] for o in objs)
+    ok = st == 200 and h.get("content-type") == "application/x-ndjson" and all(not o["done"] for o in objs[:-1]) \
+        and objs[-1]["done"] and "eval_count" in objs[-1] and objs[-1]["eval_count"] == len(objs) - 1 and len(content) > 0
+    check("ollama ndjson strict", ok, str(lines[:2]))
+except Exception as e:
+    check("ollama ndjson strict", False, f"{e} {body[:200]}")
+resp = request("POST", "/api/generate", json.dumps({"prompt": "Say OK", "stream": False, "options": {"num_predict": 4, "temperature": 0}}).encode())
+st, h, b = split(resp)
+check("ollama non-stream exact length", st == 200 and int(h["content-length"]) == len(b) and json.loads(b)["done"], str(h))
+for name, body in [("options is array", b'{"prompt":"hi","options":[1]}'),
+                   ("messages is string", b'{"messages":"hi"}'),
+                   ("generate trailing garbage", b'{"prompt":"hi"}x')]:
+    resp = request("POST", "/api/chat" if b"messages" in body else "/api/generate", body)
+    check(f"ollama: {name} → 400", resp.startswith(b"HTTP/1.1 400") and alive(), resp[:100].decode("latin1"))
+
 # Hostile messages: wrong shapes must be 400, never a crash or a run.
 for name, body in [("messages not array", b'{"messages":{"role":"user"}}'),
                    ("message not object", b'{"messages":["hi"]}'),

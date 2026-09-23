@@ -32,6 +32,7 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <time.h>
 #include <libgen.h>
@@ -94,6 +95,7 @@ static bool parse_args(int argc, char **argv, struct args *a) {
 struct conn {
     int  in, out;
     bool stdio;  /* fd 0/1: a closed stdin is normal, not a cancel */
+    bool head;   /* HEAD request: headers only (the ollama CLI heartbeat) */
     bool broken; /* client went away: the decode loop must stop */
 };
 
@@ -113,7 +115,10 @@ struct server {
     geist_token_t         eot[6]; /* end-of-turn tokens by family */
     int                   n_eot;
     enum chat_family      family;
-    char *template;                /* tokenizer.chat_template, for /api/show */
+    struct gguf_meta      meta; /* template, arch, size label, file type */
+    const char           *path; /* the GGUF as given on the command line */
+    off_t                 file_size;
+    time_t                file_mtime;
     bool                  add_bos; /* tokenizer prepends BOS in set_prompt */
     struct geist_session *tok;     /* tiny session kept for tokenize-only counting */
     time_t                loaded_at;
@@ -133,6 +138,8 @@ static bool send_all(struct conn *c, size_t n, const char buf[static n]) {
     }
     return !c->broken;
 }
+
+static void iso_time(time_t t, char out[static 40]);
 
 static bool send_str(struct conn *c, const char *s) {
     return send_all(c, strlen(s), s);
@@ -285,7 +292,7 @@ respond(struct conn *c, int status, const char *content_type, size_t n, const ch
                       content_type,
                       n);
     send_all(c, (size_t) k, head);
-    if (n > 0)
+    if (n > 0 && !c->head)
         send_all(c, n, body);
 }
 
@@ -793,7 +800,7 @@ struct sse_ctx {
     const char  *id;
     time_t       created;
     struct sb   *text; /* non-stream: collect; stream: nullptr */
-    bool         chat; /* chat.completion.chunk deltas instead of text */
+    enum emit_kind { EMIT_OAI_TEXT, EMIT_OAI_CHAT, EMIT_OLLAMA_GEN, EMIT_OLLAMA_CHAT } kind;
 };
 
 static bool emit_completion(void *vctx, size_t n, const char text[static n]) {
@@ -803,17 +810,29 @@ static bool emit_completion(void *vctx, size_t n, const char text[static n]) {
         return true;
     }
     struct sb ev = {};
-    sb_printf(&ev,
-              "data: "
-              "{\"id\":\"%s\",\"object\":\"%s\",\"created\":%lld,\"model\":\"%s\",\"choices\":[{"
-              "\"index\":0,",
-              x->id,
-              x->chat ? "chat.completion.chunk" : "text_completion",
-              (long long) x->created,
-              x->model);
-    sb_puts(&ev, x->chat ? "\"delta\":{\"content\":" : "\"text\":");
-    sb_json_str(&ev, n, text);
-    sb_puts(&ev, x->chat ? "},\"finish_reason\":null}]}\n\n" : ",\"finish_reason\":null}]}\n\n");
+    if (x->kind == EMIT_OLLAMA_GEN || x->kind == EMIT_OLLAMA_CHAT) {
+        char now[40];
+        iso_time(time(nullptr), now);
+        sb_printf(&ev, "{\"model\":\"%s\",\"created_at\":\"%s\",", x->model, now);
+        sb_puts(&ev,
+                x->kind == EMIT_OLLAMA_CHAT ? "\"message\":{\"role\":\"assistant\",\"content\":"
+                                            : "\"response\":");
+        sb_json_str(&ev, n, text);
+        sb_puts(&ev, x->kind == EMIT_OLLAMA_CHAT ? "},\"done\":false}\n" : ",\"done\":false}\n");
+    } else {
+        bool chat = x->kind == EMIT_OAI_CHAT;
+        sb_printf(&ev,
+                  "data: "
+                  "{\"id\":\"%s\",\"object\":\"%s\",\"created\":%lld,\"model\":\"%s\",\"choices\":["
+                  "{\"index\":0,",
+                  x->id,
+                  chat ? "chat.completion.chunk" : "text_completion",
+                  (long long) x->created,
+                  x->model);
+        sb_puts(&ev, chat ? "\"delta\":{\"content\":" : "\"text\":");
+        sb_json_str(&ev, n, text);
+        sb_puts(&ev, chat ? "},\"finish_reason\":null}]}\n\n" : ",\"finish_reason\":null}]}\n\n");
+    }
     bool ok = stream_write(x->c, ev.len, ev.p);
     sb_free(&ev);
     return ok;
@@ -964,7 +983,7 @@ static void route_v1_chat(struct server *sv, struct conn *c, struct req *r) {
                            .id      = id,
                            .created = time(nullptr),
                            .text    = stream ? nullptr : &text,
-                           .chat    = true};
+                           .kind    = EMIT_OAI_CHAT};
     if (stream) {
         if (!stream_begin(c, "text/event-stream")) {
             free(prompt);
@@ -1145,6 +1164,340 @@ static void route_v1_completions(struct server *sv, struct conn *c, struct req *
     sb_free(&text);
 }
 
+/* ====================================================================== */
+/* Ollama API — /api/tags, /api/version, /api/show, /api/generate, /api/chat */
+/* ====================================================================== */
+
+/* Ollama's error shape is flat, unlike OpenAI's. */
+static void respond_ollama_error(struct conn *c, int status, const char *msg) {
+    char json[512];
+    snprintf(json, sizeof json, "{\"error\":\"%s\"}", msg);
+    respond_json(c, status, json);
+}
+
+/* RFC 3339 with nanoseconds in UTC, as Ollama prints timestamps. */
+static void iso_time(time_t t, char out[static 40]) {
+    struct tm tm;
+    gmtime_r(&t, &tm);
+    strftime(out, 40, "%Y-%m-%dT%H:%M:%S.000000000Z", &tm);
+}
+
+static uint64_t now_ns(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t) ts.tv_sec * 1000000000ull + (uint64_t) ts.tv_nsec;
+}
+
+/* A stable 64-hex "digest" from name and size. Clients only display it;
+ * hashing a multi-GB file at startup would buy nothing. */
+static void fake_digest(const struct server *sv, char out[static 65]) {
+    uint64_t h = 1469598103934665603ull;
+    for (const char *p = sv->name; *p; p++)
+        h = (h ^ (unsigned char) *p) * 1099511628211ull;
+    h ^= (uint64_t) sv->file_size;
+    for (int i = 0; i < 4; i++) {
+        h = (h ^ (h >> 29)) * 0xbf58476d1ce4e5b9ull;
+        snprintf(out + 16 * i, 17, "%016llx", (unsigned long long) h);
+    }
+}
+
+static void sb_details(struct sb *b, const struct server *sv) {
+    const char *arch = sv->meta.arch ? sv->meta.arch : geist_model_arch(sv->m);
+    sb_printf(b,
+              "{\"parent_model\":\"\",\"format\":\"gguf\",\"family\":\"%s\",\"families\":[\"%s\"],"
+              "\"parameter_size\":\"%s\",\"quantization_level\":\"%s\"}",
+              arch,
+              arch,
+              sv->meta.size_label ? sv->meta.size_label : "",
+              gguf_file_type_name(sv->meta.file_type));
+}
+
+static void route_api_tags(struct server *sv, struct conn *c) {
+    char      digest[65], mtime[40];
+    struct sb b = {};
+    fake_digest(sv, digest);
+    iso_time(sv->file_mtime, mtime);
+    sb_printf(&b,
+              "{\"models\":[{\"name\":\"%s:latest\",\"model\":\"%s:latest\",\"modified_at\":\"%s\","
+              "\"size\":%lld,\"digest\":\"%s\",\"details\":",
+              sv->name,
+              sv->name,
+              mtime,
+              (long long) sv->file_size,
+              digest);
+    sb_details(&b, sv);
+    sb_puts(&b, "}]}");
+    respond_json(c, 200, b.p);
+    sb_free(&b);
+}
+
+static void route_api_ps(struct server *sv, struct conn *c) {
+    char      digest[65], now[40];
+    struct sb b = {};
+    fake_digest(sv, digest);
+    iso_time(time(nullptr) + 3600, now); /* "expires_at": never, in effect */
+    sb_printf(&b,
+              "{\"models\":[{\"name\":\"%s:latest\",\"model\":\"%s:latest\",\"size\":%lld,"
+              "\"digest\":\"%s\","
+              "\"details\":",
+              sv->name,
+              sv->name,
+              (long long) sv->file_size,
+              digest);
+    sb_details(&b, sv);
+    sb_printf(&b, ",\"expires_at\":\"%s\",\"size_vram\":0}]}", now);
+    respond_json(c, 200, b.p);
+    sb_free(&b);
+}
+
+static void route_api_show(struct server *sv, struct conn *c, struct req *r) {
+    struct json j;
+    if (r->body_len > 0 && json_parse(&j, r->body_len, r->body) >= 0 && !model_name_ok(sv, &j, 0) &&
+        json_get(&j, 0, "name") < 0) {
+        respond_ollama_error(c, 404, "model not found");
+        return;
+    }
+    const char *arch = sv->meta.arch ? sv->meta.arch : geist_model_arch(sv->m);
+    char        mtime[40];
+    iso_time(sv->file_mtime, mtime);
+    struct sb b = {};
+    sb_puts(&b, "{\"license\":\"\",\"modelfile\":");
+    struct sb mf = {};
+    sb_printf(&mf, "# served by geist-serve\nFROM %s\n", sv->path);
+    sb_json_str(&b, mf.len, mf.p);
+    sb_free(&mf);
+    sb_printf(&b, ",\"parameters\":\"num_ctx %d\",\"template\":", CTX_CAP);
+    sb_json_str(&b, sv->meta.tpl ? strlen(sv->meta.tpl) : 0, sv->meta.tpl ? sv->meta.tpl : "");
+    sb_puts(&b, ",\"details\":");
+    sb_details(&b, sv);
+    sb_printf(&b,
+              ",\"model_info\":{\"general.architecture\":\"%s\",\"general.file_type\":%u,"
+              "\"%s.context_length\":%u,\"geist.context_length\":%d},"
+              "\"capabilities\":[\"completion\"],\"modified_at\":\"%s\"}",
+              arch,
+              sv->meta.file_type,
+              arch,
+              sv->meta.context_length,
+              CTX_CAP,
+              mtime);
+    respond_json(c, 200, b.p);
+    sb_free(&b);
+}
+
+/* Ollama's request shape: sampling under "options", num_predict for the
+ * token budget, stream defaulting to true. */
+static bool ollama_opts(const struct json *j, struct gen_opts *o, bool *stream) {
+    int  opts = json_get(j, 0, "options");
+    bool ok = true, bad = false;
+    if (opts >= 0 && j->tok[opts].type == JSMN_OBJECT) {
+        ok            = gen_opts_from_json(o, j, opts);
+        o->max_tokens = (int) json_clamp(j, json_get(j, opts, "num_predict"), 0, -2, CTX_CAP, &bad);
+        if (o->max_tokens < 0)
+            o->max_tokens = 0; /* -1 infinite, -2 fill context: both = budget */
+    } else if (opts >= 0) {
+        bad = true;
+    }
+    *stream = json_bool(j, json_get(j, 0, "stream"), true);
+    return ok && !bad;
+}
+
+/* The done:true object. `text` is the whole reply for a non-stream answer
+ * and empty for the final streamed line. */
+static void ollama_final(struct sb               *b,
+                         const struct server     *sv,
+                         bool                     chat,
+                         size_t                   n,
+                         const char               text[static n],
+                         const struct gen_result *res,
+                         const char              *done_reason,
+                         uint64_t                 total_ns) {
+    char now[40];
+    iso_time(time(nullptr), now);
+    sb_printf(b, "{\"model\":\"%s\",\"created_at\":\"%s\",", sv->name, now);
+    if (chat) {
+        sb_puts(b, "\"message\":{\"role\":\"assistant\",\"content\":");
+        sb_json_str(b, n, text);
+        sb_puts(b, "},");
+    } else {
+        sb_puts(b, "\"response\":");
+        sb_json_str(b, n, text);
+        sb_puts(b, ",");
+    }
+    sb_printf(b, "\"done\":true,\"done_reason\":\"%s\"", done_reason);
+    if (res != nullptr)
+        sb_printf(b,
+                  ",\"total_duration\":%llu,\"load_duration\":0,\"prompt_eval_count\":%d,"
+                  "\"prompt_eval_duration\":%llu,\"eval_count\":%d,\"eval_duration\":%llu",
+                  (unsigned long long) total_ns,
+                  res->prompt_tokens,
+                  (unsigned long long) res->prefill_ns,
+                  res->completion_tokens,
+                  (unsigned long long) res->decode_ns);
+    sb_puts(b, "}\n");
+}
+
+/* Shared tail of /api/generate and /api/chat once the prompt is rendered. */
+static void ollama_run(struct server         *sv,
+                       struct conn           *c,
+                       bool                   chat,
+                       bool                   stream,
+                       const struct gen_opts *o,
+                       const char            *prompt) {
+    struct sb      text = {};
+    struct sse_ctx x    = {.c     = c,
+                           .model = sv->name,
+                           .text  = stream ? nullptr : &text,
+                           .kind  = chat ? EMIT_OLLAMA_CHAT : EMIT_OLLAMA_GEN};
+    if (stream && !stream_begin(c, "application/x-ndjson"))
+        return;
+    uint64_t          t0 = now_ns();
+    struct gen_result res;
+    char              err[256];
+    int               st = generate(sv, c, o, prompt, emit_completion, &x, &res, err);
+    if (st != 0) {
+        if (stream)
+            stream_end(c);
+        else
+            respond_ollama_error(c, st, err);
+        sb_free(&text);
+        return;
+    }
+    struct sb b = {};
+    ollama_final(
+            &b, sv, chat, text.len, text.p ? text.p : "", &res, res.finish_reason, now_ns() - t0);
+    if (stream) {
+        stream_write(c, b.len, b.p);
+        stream_end(c);
+    } else {
+        respond_json(c, 200, b.p);
+    }
+    sb_free(&b);
+    sb_free(&text);
+}
+
+static void route_api_generate(struct server *sv, struct conn *c, struct req *r) {
+    struct json j;
+    if (r->body_len == 0 || json_parse(&j, r->body_len, r->body) < 0) {
+        respond_ollama_error(c, 400, "body is not a JSON object");
+        return;
+    }
+    if (!model_name_ok(sv, &j, 0)) {
+        respond_ollama_error(c, 404, "model not found; GET /api/tags lists the one served");
+        return;
+    }
+    struct gen_opts o = gen_opts_default();
+    bool            stream;
+    if (!ollama_opts(&j, &o, &stream)) {
+        respond_ollama_error(c, 400, "options: a field has the wrong type");
+        return;
+    }
+    char *prompt = json_strdup(&j, json_get(&j, 0, "prompt"));
+    char *system = json_strdup(&j, json_get(&j, 0, "system"));
+    if (prompt == nullptr || prompt[0] == '\0') {
+        /* Ollama's "load the model" call: answer done at once. */
+        struct sb b = {};
+        ollama_final(&b, sv, false, 0, "", nullptr, "load", 0);
+        respond_json(c, 200, b.p);
+        sb_free(&b);
+        free(prompt);
+        free(system);
+        return;
+    }
+    /* raw:true (or no known template) sends the prompt as-is; otherwise it
+     * is one user turn rendered like /api/chat would. */
+    char *rendered = nullptr;
+    if (!json_bool(&j, json_get(&j, 0, "raw"), false) && sv->family != CHAT_UNKNOWN) {
+        struct chat_msg msgs[2];
+        size_t          n = 0;
+        if (system && system[0])
+            msgs[n++] = (struct chat_msg) {"system", system};
+        msgs[n++] = (struct chat_msg) {"user", prompt};
+        rendered  = chat_render(sv->family, n, msgs);
+    }
+    ollama_run(sv, c, false, stream, &o, rendered ? rendered : prompt);
+    free(rendered);
+    free(prompt);
+    free(system);
+}
+
+static void route_api_chat(struct server *sv, struct conn *c, struct req *r) {
+    struct json j;
+    if (r->body_len == 0 || json_parse(&j, r->body_len, r->body) < 0) {
+        respond_ollama_error(c, 400, "body is not a JSON object");
+        return;
+    }
+    if (!model_name_ok(sv, &j, 0)) {
+        respond_ollama_error(c, 404, "model not found; GET /api/tags lists the one served");
+        return;
+    }
+    struct gen_opts o = gen_opts_default();
+    bool            stream;
+    if (!ollama_opts(&j, &o, &stream)) {
+        respond_ollama_error(c, 400, "options: a field has the wrong type");
+        return;
+    }
+    struct chat_msg msgs[MSG_CAP];
+    size_t          n_msgs = 0;
+    int             arr    = json_get(&j, 0, "messages");
+    if (arr >= 0 && parse_messages(&j, arr, MSG_CAP, msgs, &n_msgs) != 0) {
+        free_messages(n_msgs, msgs);
+        respond_ollama_error(c, 400, "messages must be an array of {role, content}");
+        return;
+    }
+    if (n_msgs == 0) { /* the "load" call */
+        struct sb b = {};
+        ollama_final(&b, sv, true, 0, "", nullptr, "load", 0);
+        respond_json(c, 200, b.p);
+        sb_free(&b);
+        return;
+    }
+    if (sv->family == CHAT_UNKNOWN) {
+        free_messages(n_msgs, msgs);
+        respond_ollama_error(
+                c, 501, "no chat template known for this model; use /api/generate with raw:true");
+        return;
+    }
+    size_t reserve = o.max_tokens > 0 ? (size_t) o.max_tokens : 512;
+    if (reserve > CTX_CAP / 2)
+        reserve = CTX_CAP / 2;
+    char *prompt =
+            chat_render_fit(sv->family, n_msgs, msgs, CTX_CAP, reserve, count_tokens, sv, nullptr);
+    free_messages(n_msgs, msgs);
+    if (prompt == nullptr) {
+        respond_ollama_error(c, 400, "the last message alone does not fit the context");
+        return;
+    }
+    ollama_run(sv, c, true, stream, &o, prompt);
+    free(prompt);
+}
+
+static void route_api(struct server *sv, struct conn *c, struct req *r) {
+    const char *p    = r->path + 4; /* past "/api" */
+    bool        post = strcmp(r->method, "POST") == 0;
+    if (strcmp(p, "/tags") == 0)
+        route_api_tags(sv, c);
+    else if (strcmp(p, "/ps") == 0)
+        route_api_ps(sv, c);
+    else if (strcmp(p, "/version") == 0)
+        respond_json(c, 200, "{\"version\":\"0.1.0\"}");
+    else if (strcmp(p, "/show") == 0)
+        route_api_show(sv, c, r);
+    else if (strcmp(p, "/generate") == 0 && post)
+        route_api_generate(sv, c, r);
+    else if (strcmp(p, "/chat") == 0 && post)
+        route_api_chat(sv, c, r);
+    else if (strcmp(p, "/generate") == 0 || strcmp(p, "/chat") == 0)
+        respond_ollama_error(c, 405, "POST only");
+    else if (strcmp(p, "/pull") == 0 || strcmp(p, "/push") == 0 || strcmp(p, "/create") == 0 ||
+             strcmp(p, "/copy") == 0 || strcmp(p, "/delete") == 0 || strncmp(p, "/blobs", 6) == 0)
+        respond_ollama_error(
+                c, 404, "no registry: geist-serve serves the one GGUF given on its command line");
+    else if (strcmp(p, "/embed") == 0 || strcmp(p, "/embeddings") == 0)
+        respond_ollama_error(c, 404, "embeddings are not served in v1");
+    else
+        respond_ollama_error(c, 404, "no such endpoint");
+}
+
 static void handle(struct server *sv, struct conn *c, struct req *r) {
     if (strcmp(r->method, "OPTIONS") == 0) {
         respond(c, 204, "text/plain", 0, "");
@@ -1155,7 +1508,11 @@ static void handle(struct server *sv, struct conn *c, struct req *r) {
         return;
     }
     if (strcmp(r->path, "/") == 0) {
-        respond(c, 200, "text/plain", 17, "Ollama is running");
+        respond(c, 200, "text/plain", 17, "Ollama is running"); /* HEAD: body suppressed */
+        return;
+    }
+    if (strncmp(r->path, "/api/", 5) == 0) {
+        route_api(sv, c, r);
         return;
     }
     if (strcmp(r->path, "/v1/models") == 0) {
@@ -1191,6 +1548,7 @@ static void serve_conn(struct server *sv, int in, int out) {
     if (st != 0) {
         respond_error(&c, st, reason(st));
     } else {
+        c.head = strcmp(r.method, "HEAD") == 0;
         handle(sv, &c, &r);
     }
     free(r.body);
@@ -1326,8 +1684,15 @@ int main(int argc, char **argv) {
     }
     /* Chat template family: fingerprint the GGUF's own template string
      * (SmolLM2 is arch "llama" but speaks ChatML), fall back to the arch. */
-    gguf_read_chat_meta(a.model, &sv.template, &sv.add_bos);
-    sv.family = chat_family_from_template(sv.template);
+    gguf_read_meta(a.model, &sv.meta);
+    sv.add_bos = sv.meta.add_bos;
+    sv.path    = a.model;
+    struct stat st;
+    if (stat(a.model, &st) == 0) {
+        sv.file_size  = st.st_size;
+        sv.file_mtime = st.st_mtime;
+    }
+    sv.family = chat_family_from_template(sv.meta.tpl);
     if (sv.family == CHAT_UNKNOWN)
         sv.family = chat_family_from_arch(geist_model_arch(sv.m));
     fprintf(stderr,
@@ -1337,7 +1702,7 @@ int main(int argc, char **argv) {
             geist_model_arch(sv.m),
             geist_backend_name(sv.be),
             chat_family_name(sv.family),
-            sv.template ? "" : " (no template in GGUF)",
+            sv.meta.tpl ? "" : " (no template in GGUF)",
             1 + sv.n_eot);
     sv.loaded_at = time(nullptr);
     /* Tokenize-only session for counting: max_seq_len 16 keeps its KV tiny. */
@@ -1368,7 +1733,7 @@ int main(int argc, char **argv) {
     }
 
     geist_session_destroy(sv.tok);
-    free(sv.template);
+    gguf_meta_free(&sv.meta);
     geist_model_destroy(sv.m);
     geist_backend_destroy(sv.be);
     return 0;

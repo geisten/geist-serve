@@ -313,10 +313,14 @@ static char *rd_str(FILE *f, size_t cap) {
     return s;
 }
 
-bool gguf_read_chat_meta(const char *path, char **tpl, bool *add_bos) {
-    *tpl     = nullptr;
-    *add_bos = true;
-    FILE *f  = fopen(path, "rb");
+static bool ends_with(const char *s, const char *suffix) {
+    size_t n = strlen(s), m = strlen(suffix);
+    return n >= m && strcmp(s + n - m, suffix) == 0;
+}
+
+bool gguf_read_meta(const char *path, struct gguf_meta *out) {
+    *out    = (struct gguf_meta) {.add_bos = true};
+    FILE *f = fopen(path, "rb");
     if (f == nullptr)
         return false;
     char     magic[4];
@@ -332,23 +336,55 @@ bool gguf_read_chat_meta(const char *path, char **tpl, bool *add_bos) {
             ok = false;
             break;
         }
-        if (t == GG_STR && strcmp(key, "tokenizer.chat_template") == 0) {
-            free(*tpl);
-            *tpl = rd_str(f, 1u << 20);
-            ok   = *tpl != nullptr;
+        char **str_dst = nullptr;
+        if (t == GG_STR && strcmp(key, "tokenizer.chat_template") == 0)
+            str_dst = &out->tpl;
+        else if (t == GG_STR && strcmp(key, "general.architecture") == 0)
+            str_dst = &out->arch;
+        else if (t == GG_STR && strcmp(key, "general.size_label") == 0)
+            str_dst = &out->size_label;
+
+        if (str_dst != nullptr) {
+            free(*str_dst);
+            *str_dst = rd_str(f, 1u << 20);
+            ok       = *str_dst != nullptr;
         } else if (t == GG_BOOL && strcmp(key, "tokenizer.ggml.add_bos_token") == 0) {
             uint8_t b;
-            ok       = rd(f, 1, &b);
-            *add_bos = b != 0;
+            ok           = rd(f, 1, &b);
+            out->add_bos = b != 0;
+        } else if (t == GG_U32 && strcmp(key, "general.file_type") == 0) {
+            ok = rd_u32(f, &out->file_type);
+        } else if (t == GG_U32 && ends_with(key, ".context_length")) {
+            ok = rd_u32(f, &out->context_length);
         } else {
             ok = skip_val(f, t);
         }
         free(key);
     }
     fclose(f);
-    if (!ok) {
-        free(*tpl);
-        *tpl = nullptr;
-    }
+    if (!ok)
+        gguf_meta_free(out);
     return ok;
+}
+
+void gguf_meta_free(struct gguf_meta *m) {
+    free(m->tpl);
+    free(m->arch);
+    free(m->size_label);
+    *m = (struct gguf_meta) {.add_bos = true};
+}
+
+/* llama_ftype names as Ollama shows them in quantization_level. */
+const char *gguf_file_type_name(uint32_t ft) {
+    static const char *names[] = {
+            [0] = "F32",      [1] = "F16",      [2] = "Q4_0",    [3] = "Q4_1",    [7] = "Q8_0",
+            [8] = "Q5_0",     [9] = "Q5_1",     [10] = "Q2_K",   [11] = "Q3_K_S", [12] = "Q3_K_M",
+            [13] = "Q3_K_L",  [14] = "Q4_K_S",  [15] = "Q4_K_M", [16] = "Q5_K_S", [17] = "Q5_K_M",
+            [18] = "Q6_K",    [19] = "IQ2_XXS", [20] = "IQ2_XS", [21] = "Q2_K_S", [22] = "IQ3_XS",
+            [23] = "IQ3_XXS", [24] = "IQ1_S",   [25] = "IQ4_NL", [26] = "IQ3_S",  [27] = "IQ3_M",
+            [28] = "IQ2_S",   [29] = "IQ2_M",   [30] = "IQ4_XS", [31] = "IQ1_M",  [32] = "BF16",
+            [36] = "TQ1_0",   [37] = "TQ2_0",
+    };
+    size_t n = sizeof names / sizeof names[0];
+    return ft < n && names[ft] != nullptr ? names[ft] : "unknown";
 }
