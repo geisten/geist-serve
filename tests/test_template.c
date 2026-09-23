@@ -3,6 +3,7 @@
  * synthetic file. Framework-free: a failed check prints and exits 1. */
 #include "../src/template.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
