@@ -93,6 +93,35 @@ curl -sN "$U" -d '{"prompt":"Write a long story:","max_tokens":300,"stream":true
 out=$(curl -s "http://127.0.0.1:$PORT/health")
 check "survives client cancel" '{"status":"ok"}'     "$out"
 
+# --- OpenAI chat + model list (issue #5) -------------------------------------
+CH="http://127.0.0.1:$PORT/v1/chat/completions"
+out=$(curl -s "http://127.0.0.1:$PORT/v1/models")
+check "models lists the gguf"  '"id":"smollm2-360m-instruct-q8_0"' "$out"
+out=$(curl -s "$CH" -d '{"model":"smollm2-360m-instruct-q8_0:latest","messages":[{"role":"system","content":"Answer in one word."},{"role":"user","content":"What is the capital of France?"}],"temperature":0,"max_tokens":20}')
+check "chat answer"           '"content":"Paris"'    "$out"
+check "chat finish stop"      '"finish_reason":"stop"' "$out"
+check "chat :latest accepted" '"object":"chat.completion"' "$out"
+out=$(curl -sN "$CH" -d '{"messages":[{"role":"user","content":"Say hello"}],"stream":true,"temperature":0,"max_tokens":6}' | tr -d '\r')
+check "chat sse role first"   '"delta":{"role":"assistant"' "$out"
+check "chat sse chunk object" '"object":"chat.completion.chunk"' "$out"
+check "chat sse done"         '^data: \[DONE\]'      "$out"
+out=$(curl -s "$CH" -d '{"messages":[{"role":"user","content":[{"type":"text","text":"What is 2+2?"},{"type":"image_url","image_url":{"url":"x"}}]}],"temperature":0,"max_tokens":4}')
+check "content parts"         '"object":"chat.completion"' "$out"
+out=$(curl -s "$CH" -d '{"model":"gpt-4","messages":[{"role":"user","content":"hi"}]}')
+check "wrong model 404"       'model not found'      "$out"
+out=$(curl -s "$CH" -d '{"messages":[]}')
+check "empty messages 400"    'non-empty array'      "$out"
+out=$(curl -s "$CH" -d '{"messages":[{"role":"user","content":"hi"}],"max_tokens":"9"}')
+check "chat typed max_tokens 400" 'wrong type'       "$out"
+out=$(python3 -c '
+import json; m=[{"role":"system","content":"Be terse."}]
+for i in range(80): m += [{"role":"user","content":("filler sentence number %d. "%i)*20},{"role":"assistant","content":"ok"}]
+m.append({"role":"user","content":"What is the capital of France? One word."}); print(json.dumps({"messages":m,"temperature":0,"max_tokens":8}))' | curl -s "$CH" -d @-)
+check "long chat truncated, still answers" '"content":"Paris"' "$out"
+check "long chat under cap"   '"prompt_tokens":\([1-3][0-9][0-9][0-9]\|40[0-8][0-9]\),' "$out"
+out=$(python3 -c 'import json; print(json.dumps({"messages":[{"role":"user","content":"word "*6000}],"max_tokens":1}))' | curl -s "$CH" -d @-)
+check "oversize message 400"  'does not fit'         "$out"
+
 # --- wire-level critical path + hostile input (tests/test_http.py) ----------
 if command -v python3 >/dev/null; then
     python3 -u tests/test_http.py "$PORT" > /tmp/geist-serve-http.$$.log 2>&1 || fail=1

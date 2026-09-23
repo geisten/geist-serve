@@ -113,8 +113,10 @@ struct server {
     geist_token_t         eot[6]; /* end-of-turn tokens by family */
     int                   n_eot;
     enum chat_family      family;
-    char *template; /* tokenizer.chat_template, for /api/show */
-    bool add_bos;   /* tokenizer prepends BOS in set_prompt */
+    char *template;                /* tokenizer.chat_template, for /api/show */
+    bool                  add_bos; /* tokenizer prepends BOS in set_prompt */
+    struct geist_session *tok;     /* tiny session kept for tokenize-only counting */
+    time_t                loaded_at;
 };
 
 static bool send_all(struct conn *c, size_t n, const char buf[static n]) {
@@ -791,6 +793,7 @@ struct sse_ctx {
     const char  *id;
     time_t       created;
     struct sb   *text; /* non-stream: collect; stream: nullptr */
+    bool         chat; /* chat.completion.chunk deltas instead of text */
 };
 
 static bool emit_completion(void *vctx, size_t n, const char text[static n]) {
@@ -800,24 +803,261 @@ static bool emit_completion(void *vctx, size_t n, const char text[static n]) {
         return true;
     }
     struct sb ev = {};
-    sb_printf(
-            &ev,
-            "data: {\"id\":\"%s\",\"object\":\"text_completion\",\"created\":%lld,\"model\":\"%s\","
-            "\"choices\":[{\"index\":0,\"text\":",
-            x->id,
-            (long long) x->created,
-            x->model);
+    sb_printf(&ev,
+              "data: "
+              "{\"id\":\"%s\",\"object\":\"%s\",\"created\":%lld,\"model\":\"%s\",\"choices\":[{"
+              "\"index\":0,",
+              x->id,
+              x->chat ? "chat.completion.chunk" : "text_completion",
+              (long long) x->created,
+              x->model);
+    sb_puts(&ev, x->chat ? "\"delta\":{\"content\":" : "\"text\":");
     sb_json_str(&ev, n, text);
-    sb_puts(&ev, ",\"finish_reason\":null}]}\n\n");
+    sb_puts(&ev, x->chat ? "},\"finish_reason\":null}]}\n\n" : ",\"finish_reason\":null}]}\n\n");
     bool ok = stream_write(x->c, ev.len, ev.p);
     sb_free(&ev);
     return ok;
+}
+
+/* The served model's name, with or without Ollama's ":latest"; absent is
+ * fine (Cursor sends whatever was typed into its model box). */
+static bool model_name_ok(const struct server *sv, const struct json *j, int obj) {
+    int t = json_get(j, obj, "model");
+    if (t < 0)
+        return true;
+    char *m = json_strdup(j, t);
+    if (m == nullptr)
+        return false;
+    char *colon = strstr(m, ":latest");
+    if (colon != nullptr && colon[7] == '\0')
+        *colon = '\0';
+    bool ok = strcmp(m, sv->name) == 0;
+    free(m);
+    return ok;
+}
+
+/* Token count of a rendered prompt for chat_render_fit, via the session
+ * kept for that purpose. Over the byte cap counts as "does not fit". */
+static size_t count_tokens(void *vsv, const char *text) {
+    struct server *sv = vsv;
+    if (strlen(text) > PROMPT_BYTES_CAP)
+        return CTX_CAP + 1;
+    static geist_token_t ids[CTX_CAP];
+    size_t               n = 0;
+    if (geist_session_tokenize(sv->tok, text, CTX_CAP, ids, &n) != GEIST_OK)
+        return CTX_CAP + 1;
+    return n + (sv->add_bos ? 1 : 0);
+}
+
+/* messages[] → chat_msg[]. content is a string, or an array of parts of
+ * which the {"type":"text"} ones are concatenated (image parts ignored:
+ * no vision in v1). All strings are malloc'd; free with free_messages. */
+static int parse_messages(
+        const struct json *j, int arr, size_t cap, struct chat_msg out[static cap], size_t *n_out) {
+    *n_out = 0;
+    if (arr < 0 || j->tok[arr].type != JSMN_ARRAY)
+        return 400;
+    for (int i = arr + 1; i < j->n; i++) {
+        if (j->tok[i].parent != arr)
+            continue;
+        if (j->tok[i].type != JSMN_OBJECT || *n_out == cap)
+            return 400;
+        char *role    = json_strdup(j, json_get(j, i, "role"));
+        int   ct      = json_get(j, i, "content");
+        char *content = nullptr;
+        if (json_is_str(j, ct)) {
+            content = json_strdup(j, ct);
+        } else if (ct >= 0 && j->tok[ct].type == JSMN_ARRAY) {
+            struct sb b = {};
+            for (int k = ct + 1; k < j->n; k++) {
+                if (j->tok[k].parent != ct)
+                    continue;
+                char *txt = json_strdup(j, json_get(j, k, "text"));
+                if (txt)
+                    sb_puts(&b, txt);
+                free(txt);
+            }
+            content = b.p ? b.p : strdup("");
+        } else if (ct >= 0 && j->tok[ct].type == JSMN_PRIMITIVE &&
+                   j->src[j->tok[ct].start] == 'n') {
+            content = strdup(""); /* null content (tool-call turns) */
+        }
+        if (role == nullptr || content == nullptr) {
+            free(role);
+            free(content);
+            return 400;
+        }
+        out[(*n_out)++] = (struct chat_msg) {.role = role, .content = content};
+    }
+    return 0;
+}
+
+static void free_messages(size_t n, const struct chat_msg msgs[]) {
+    for (size_t i = 0; i < n; i++) {
+        free((char *) msgs[i].role);
+        free((char *) msgs[i].content);
+    }
+}
+
+#define MSG_CAP 256
+
+/* ---- OpenAI /v1/chat/completions ------------------------------------------ */
+
+static void route_v1_chat(struct server *sv, struct conn *c, struct req *r) {
+    struct json j;
+    if (r->body_len == 0 || json_parse(&j, r->body_len, r->body) < 0) {
+        respond_error(c, 400, "body is not a JSON object");
+        return;
+    }
+    if (!model_name_ok(sv, &j, 0)) {
+        respond_error(c, 404, "model not found; GET /v1/models lists the one served");
+        return;
+    }
+    if (sv->family == CHAT_UNKNOWN) {
+        respond_error(c, 501, "no chat template known for this model; use /v1/completions");
+        return;
+    }
+    struct chat_msg msgs[MSG_CAP];
+    size_t          n_msgs = 0;
+    if (parse_messages(&j, json_get(&j, 0, "messages"), MSG_CAP, msgs, &n_msgs) != 0 ||
+        n_msgs == 0) {
+        free_messages(n_msgs, msgs);
+        respond_error(c, 400, "messages must be a non-empty array of {role, content}");
+        return;
+    }
+    struct gen_opts o   = gen_opts_default();
+    bool            ok  = gen_opts_from_json(&o, &j, 0);
+    bool            bad = false;
+    int             mt  = json_get(&j, 0, "max_completion_tokens");
+    if (mt < 0)
+        mt = json_get(&j, 0, "max_tokens");
+    o.max_tokens = (int) json_clamp(&j, mt, 0, 0, CTX_CAP, &bad);
+    bool stream  = json_bool(&j, json_get(&j, 0, "stream"), false);
+    if (!ok || bad) {
+        free_messages(n_msgs, msgs);
+        respond_error(c, 400, "a numeric field has the wrong type");
+        return;
+    }
+
+    /* Fit: keep room for the requested reply length, else a 512-token
+     * reserve — enough for an answer, small enough to keep context. */
+    size_t reserve = o.max_tokens > 0 ? (size_t) o.max_tokens : 512;
+    if (reserve > CTX_CAP / 2)
+        reserve = CTX_CAP / 2;
+    size_t prompt_tokens = 0;
+    char  *prompt        = chat_render_fit(
+            sv->family, n_msgs, msgs, CTX_CAP, reserve, count_tokens, sv, &prompt_tokens);
+    free_messages(n_msgs, msgs);
+    if (prompt == nullptr) {
+        respond_error(c, 400, "the last message alone does not fit the context");
+        return;
+    }
+
+    char id[40];
+    snprintf(id,
+             sizeof id,
+             "chatcmpl-%llx",
+             (unsigned long long) time(nullptr) ^ (unsigned long long) clock());
+    struct sb      text = {};
+    struct sse_ctx x    = {.c       = c,
+                           .model   = sv->name,
+                           .id      = id,
+                           .created = time(nullptr),
+                           .text    = stream ? nullptr : &text,
+                           .chat    = true};
+    if (stream) {
+        if (!stream_begin(c, "text/event-stream")) {
+            free(prompt);
+            return;
+        }
+        /* First chunk carries the role, as OpenAI does. */
+        struct sb ev = {};
+        sb_printf(&ev,
+                  "data: "
+                  "{\"id\":\"%s\",\"object\":\"chat.completion.chunk\",\"created\":%lld,\"model\":"
+                  "\"%s\","
+                  "\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"},"
+                  "\"finish_reason\":null}]}\n\n",
+                  id,
+                  (long long) x.created,
+                  sv->name);
+        stream_write(c, ev.len, ev.p);
+        sb_free(&ev);
+    }
+
+    struct gen_result res;
+    char              err[256];
+    int               st = generate(sv, c, &o, prompt, emit_completion, &x, &res, err);
+    free(prompt);
+    if (st != 0) {
+        if (stream)
+            stream_end(c);
+        else
+            respond_error(c, st, err);
+        sb_free(&text);
+        return;
+    }
+    if (stream) {
+        struct sb ev = {};
+        sb_printf(
+                &ev,
+                "data: "
+                "{\"id\":\"%s\",\"object\":\"chat.completion.chunk\",\"created\":%lld,\"model\":\"%"
+                "s\","
+                "\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"%s\"}],"
+                "\"usage\":{\"prompt_tokens\":%d,\"completion_tokens\":%d,\"total_tokens\":%d}}\n\n"
+                "data: [DONE]\n\n",
+                id,
+                (long long) x.created,
+                sv->name,
+                res.finish_reason,
+                res.prompt_tokens,
+                res.completion_tokens,
+                res.prompt_tokens + res.completion_tokens);
+        stream_write(c, ev.len, ev.p);
+        stream_end(c);
+        sb_free(&ev);
+        return;
+    }
+    struct sb body = {};
+    sb_printf(&body,
+              "{\"id\":\"%s\",\"object\":\"chat.completion\",\"created\":%lld,\"model\":\"%s\","
+              "\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":",
+              id,
+              (long long) x.created,
+              sv->name);
+    sb_json_str(&body, text.len, text.p ? text.p : "");
+    sb_printf(&body,
+              "},\"finish_reason\":\"%s\"}],\"usage\":{\"prompt_tokens\":%d,"
+              "\"completion_tokens\":%d,\"total_tokens\":%d}}",
+              res.finish_reason,
+              res.prompt_tokens,
+              res.completion_tokens,
+              res.prompt_tokens + res.completion_tokens);
+    respond_json(c, 200, body.p);
+    sb_free(&body);
+    sb_free(&text);
+}
+
+static void route_v1_models(struct server *sv, struct conn *c) {
+    struct sb b = {};
+    sb_printf(&b,
+              "{\"object\":\"list\",\"data\":[{\"id\":\"%s\",\"object\":\"model\",\"created\":%lld,"
+              "\"owned_by\":\"geist\"}]}",
+              sv->name,
+              (long long) sv->loaded_at);
+    respond_json(c, 200, b.p);
+    sb_free(&b);
 }
 
 static void route_v1_completions(struct server *sv, struct conn *c, struct req *r) {
     struct json j;
     if (r->body_len == 0 || json_parse(&j, r->body_len, r->body) < 0) {
         respond_error(c, 400, "body is not a JSON object");
+        return;
+    }
+    if (!model_name_ok(sv, &j, 0)) {
+        respond_error(c, 404, "model not found; GET /v1/models lists the one served");
         return;
     }
     char *prompt = json_strdup(&j, json_get(&j, 0, "prompt"));
@@ -916,6 +1156,17 @@ static void handle(struct server *sv, struct conn *c, struct req *r) {
     }
     if (strcmp(r->path, "/") == 0) {
         respond(c, 200, "text/plain", 17, "Ollama is running");
+        return;
+    }
+    if (strcmp(r->path, "/v1/models") == 0) {
+        route_v1_models(sv, c);
+        return;
+    }
+    if (strcmp(r->path, "/v1/chat/completions") == 0) {
+        if (strcmp(r->method, "POST") != 0)
+            respond_error(c, 405, "POST only");
+        else
+            route_v1_chat(sv, c, r);
         return;
     }
     if (strcmp(r->path, "/v1/completions") == 0) {
@@ -1088,6 +1339,15 @@ int main(int argc, char **argv) {
             chat_family_name(sv.family),
             sv.template ? "" : " (no template in GGUF)",
             1 + sv.n_eot);
+    sv.loaded_at = time(nullptr);
+    /* Tokenize-only session for counting: max_seq_len 16 keeps its KV tiny. */
+    struct geist_session_opts tok_opts = {.max_seq_len = 16};
+    if (geist_session_create(sv.m, sv.be, &tok_opts, &sv.tok) != GEIST_OK) {
+        fprintf(stderr,
+                "geist-serve: tokenizer session: %s\n",
+                sv.tok ? geist_session_errmsg(sv.tok) : "failed");
+        return 1;
+    }
 
     /* EPIPE reaches us as a write error (conn.broken), not a signal. No
      * SA_RESTART: accept() must return EINTR so the loop sees the stop. */
@@ -1107,6 +1367,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "geist-serve: stopped\n");
     }
 
+    geist_session_destroy(sv.tok);
     free(sv.template);
     geist_model_destroy(sv.m);
     geist_backend_destroy(sv.be);
