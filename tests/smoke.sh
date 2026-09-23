@@ -63,6 +63,35 @@ for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
 done
 out=$(curl -s -i "http://127.0.0.1:$PORT/health" | tr -d '\r')
 check "tcp health"            '{"status":"ok"}'      "$out"
+
+# --- generation through /v1/completions (issue #3) --------------------------
+U="http://127.0.0.1:$PORT/v1/completions"
+out=$(curl -s "$U" -d '{"prompt":"The capital of France is","max_tokens":16,"temperature":0}')
+check "completion text"       'Paris'                "$out"
+check "completion stop"       '"finish_reason":"stop"' "$out"
+check "completion usage"      '"prompt_tokens":[1-9]' "$out"
+check "completion model name" '"model":"smollm2'     "$out"
+out=$(curl -s "$U" -d '{"prompt":"Count: 1, 2, 3,","max_tokens":3,"temperature":0}')
+check "max_tokens honoured"   '"completion_tokens":3' "$out"
+check "finish length"         '"finish_reason":"length"' "$out"
+out=$(curl -s "$U" -d '{"prompt":"List three colors: red,","max_tokens":40,"temperature":0,"stop":[","]}')
+check "stop string cuts"      '"text":" blue"'        "$out"
+out=$(curl -sN "$U" -d '{"prompt":"Count: 1, 2,","max_tokens":4,"stream":true,"temperature":0}' | tr -d '\r')
+check "sse chunk"             '^data: {"id":"cmpl-'  "$out"
+check "sse done"              '^data: \[DONE\]'      "$out"
+a=$(curl -s "$U" -d '{"prompt":"Once upon a time","max_tokens":8,"temperature":0.9,"seed":42}')
+b=$(curl -s "$U" -d '{"prompt":"Once upon a time","max_tokens":8,"temperature":0.9,"seed":42}')
+a=$(printf '%s' "$a" | sed 's/"id":"[^"]*"//;s/"created":[0-9]*//'); b=$(printf '%s' "$b" | sed 's/"id":"[^"]*"//;s/"created":[0-9]*//')
+check "seed reproducible"     "^$(printf '%s' "$a" | sed 's/[][\.*^$]/\\&/g')\$" "$b"
+out=$(curl -s "$U" -d '{"prompt":')
+check "bad json 400"          'not a JSON object'    "$out"
+out=$(curl -s "$U" -d '{"max_tokens":3}')
+check "missing prompt 400"    'prompt must be a string' "$out"
+out=$(python3 -c 'import json; print(json.dumps({"prompt":"word "*6000,"max_tokens":1}))' | curl -s "$U" -d @-)
+check "oversize prompt 400"   'does not fit'         "$out"
+curl -sN "$U" -d '{"prompt":"Write a long story:","max_tokens":300,"stream":true}' | head -c 100 >/dev/null
+out=$(curl -s "http://127.0.0.1:$PORT/health")
+check "survives client cancel" '{"status":"ok"}'     "$out"
 kill -TERM $pid
 wait $pid; rc=$?
 check "sigterm exit 0"        '^0$'                  "$rc"

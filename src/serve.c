@@ -14,16 +14,23 @@
 #include <geist.h>
 #include <geist_util.h>
 
+#define JSMN_STATIC
+#define JSMN_PARENT_LINKS
+#include "jsmn.h" /* MIT, Serge Zaitsev — vendored, same copy as geistshell */
+
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <time.h>
+#include <libgen.h>
 #include <unistd.h>
 
 /* ====================================================================== */
@@ -91,6 +98,15 @@ struct req {
     size_t      body_len;
     char       *body; /* malloc'd, NUL-terminated; nullptr when body_len == 0 */
     const char *content_type;
+};
+
+struct server {
+    struct geist_backend *be;
+    struct geist_model   *m;
+    char                  name[128]; /* GGUF basename without .gguf */
+    geist_token_t         eos;
+    geist_token_t         eot[4]; /* end-of-turn tokens by family */
+    int                   n_eot;
 };
 
 static bool send_all(struct conn *c, size_t n, const char buf[static n]) {
@@ -256,10 +272,9 @@ static void respond_error(struct conn *c, int status, const char *msg) {
     respond_json(c, status, json);
 }
 
-/* Streaming response: chunked transfer, one stream_write per event. The
- * endpoint issues (#5, #6) use these for SSE and NDJSON; maybe_unused
- * until then. */
-[[maybe_unused]] static bool stream_begin(struct conn *c, const char *content_type) {
+/* Streaming response: chunked transfer, one stream_write per event (SSE
+ * for /v1, NDJSON for /api). */
+static bool stream_begin(struct conn *c, const char *content_type) {
     char head[512];
     int  k = snprintf(head,
                       sizeof head,
@@ -271,27 +286,532 @@ static void respond_error(struct conn *c, int status, const char *msg) {
     return send_all(c, (size_t) k, head);
 }
 
-[[maybe_unused]] static bool stream_write(struct conn *c, size_t n, const char data[static n]) {
+static bool stream_write(struct conn *c, size_t n, const char data[static n]) {
     char size[32];
     int  k = snprintf(size, sizeof size, "%zx\r\n", n);
     return send_all(c, (size_t) k, size) && send_all(c, n, data) && send_str(c, "\r\n");
 }
 
-[[maybe_unused]] static bool stream_end(struct conn *c) {
+static bool stream_end(struct conn *c) {
     return send_str(c, "0\r\n\r\n");
+}
+
+/* ====================================================================== */
+/* Small string buffer + JSON writer                                       */
+/* ====================================================================== */
+
+struct sb {
+    char  *p;
+    size_t len, cap;
+};
+
+static void sb_put(struct sb *b, size_t n, const char s[static n]) {
+    if (b->len + n + 1 > b->cap) {
+        size_t cap = b->cap ? b->cap : 256;
+        while (cap < b->len + n + 1)
+            cap *= 2;
+        char *np = realloc(b->p, cap);
+        if (np == nullptr)
+            return; /* dropped write; response ends short */
+        b->p   = np;
+        b->cap = cap;
+    }
+    memcpy(b->p + b->len, s, n);
+    b->len += n;
+    b->p[b->len] = '\0';
+}
+
+static void sb_puts(struct sb *b, const char *s) {
+    sb_put(b, strlen(s), s);
+}
+
+static void sb_printf(struct sb *b, const char *fmt, ...) {
+    char    tmp[512];
+    va_list ap;
+    va_start(ap, fmt);
+    int k = vsnprintf(tmp, sizeof tmp, fmt, ap);
+    va_end(ap);
+    if (k > 0)
+        sb_put(b, (size_t) k < sizeof tmp ? (size_t) k : sizeof tmp - 1, tmp);
+}
+
+/* JSON string literal, quotes included. Bytes are emitted as-is except the
+ * JSON escapes; the generation loop only hands us complete UTF-8. */
+static void sb_json_str(struct sb *b, size_t n, const char s[static n]) {
+    sb_put(b, 1, "\"");
+    for (size_t i = 0; i < n; i++) {
+        unsigned char c = (unsigned char) s[i];
+        switch (c) {
+        case '"':
+            sb_puts(b, "\\\"");
+            break;
+        case '\\':
+            sb_puts(b, "\\\\");
+            break;
+        case '\n':
+            sb_puts(b, "\\n");
+            break;
+        case '\r':
+            sb_puts(b, "\\r");
+            break;
+        case '\t':
+            sb_puts(b, "\\t");
+            break;
+        default:
+            if (c < 0x20)
+                sb_printf(b, "\\u%04x", c);
+            else
+                sb_put(b, 1, (const char *) &c);
+        }
+    }
+    sb_put(b, 1, "\"");
+}
+
+static void sb_free(struct sb *b) {
+    free(b->p);
+    *b = (struct sb) {};
+}
+
+/* ====================================================================== */
+/* JSON reader (jsmn) — lookup helpers over a parsed request body           */
+/* ====================================================================== */
+
+#define JSON_TOK_CAP 4096
+
+struct json {
+    const char *src;
+    jsmntok_t   tok[JSON_TOK_CAP];
+    int         n;
+};
+
+/* Returns the token count, or -1 on malformed / too large. */
+static int json_parse(struct json *j, size_t n, const char src[static n]) {
+    jsmn_parser p;
+    jsmn_init(&p);
+    j->src = src;
+    j->n   = jsmn_parse(&p, src, n, j->tok, JSON_TOK_CAP);
+    if (j->n < 1 || j->tok[0].type != JSMN_OBJECT)
+        j->n = -1;
+    return j->n;
+}
+
+/* Direct child `key` of object `obj`; -1 when absent. Only direct children
+ * match (parent links), so "options.stop" needs two hops. */
+static int json_get(const struct json *j, int obj, const char *key) {
+    if (obj < 0 || j->tok[obj].type != JSMN_OBJECT)
+        return -1;
+    size_t kl = strlen(key);
+    for (int i = obj + 1; i < j->n; i++) {
+        const jsmntok_t *t = &j->tok[i];
+        if (t->parent != obj)
+            continue;
+        if (t->type == JSMN_STRING && (size_t) (t->end - t->start) == kl &&
+            memcmp(j->src + t->start, key, kl) == 0 && i + 1 < j->n)
+            return i + 1;
+    }
+    return -1;
+}
+
+static bool json_is_str(const struct json *j, int t) {
+    return t >= 0 && j->tok[t].type == JSMN_STRING;
+}
+
+/* Unescape a JSON string token into a fresh malloc'd buffer. \uXXXX is
+ * decoded to UTF-8 (surrogate pairs included); unknown escapes are copied. */
+static char *json_strdup(const struct json *j, int t) {
+    if (!json_is_str(j, t))
+        return nullptr;
+    const char *s   = j->src + j->tok[t].start;
+    size_t      n   = (size_t) (j->tok[t].end - j->tok[t].start);
+    char       *out = malloc(n + 1);
+    if (out == nullptr)
+        return nullptr;
+    size_t o = 0;
+    for (size_t i = 0; i < n; i++) {
+        if (s[i] != '\\' || i + 1 >= n) {
+            out[o++] = s[i];
+            continue;
+        }
+        char e = s[++i];
+        switch (e) {
+        case 'n':
+            out[o++] = '\n';
+            break;
+        case 't':
+            out[o++] = '\t';
+            break;
+        case 'r':
+            out[o++] = '\r';
+            break;
+        case 'b':
+            out[o++] = '\b';
+            break;
+        case 'f':
+            out[o++] = '\f';
+            break;
+        case 'u': {
+            if (i + 4 >= n)
+                break;
+            unsigned cp = (unsigned) strtoul(
+                    (char[]) {s[i + 1], s[i + 2], s[i + 3], s[i + 4], 0}, nullptr, 16);
+            i += 4;
+            if (cp >= 0xD800 && cp <= 0xDBFF && i + 6 < n && s[i + 1] == '\\' && s[i + 2] == 'u') {
+                unsigned lo = (unsigned) strtoul(
+                        (char[]) {s[i + 3], s[i + 4], s[i + 5], s[i + 6], 0}, nullptr, 16);
+                if (lo >= 0xDC00 && lo <= 0xDFFF) {
+                    cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00);
+                    i += 6;
+                }
+            }
+            if (cp < 0x80) {
+                out[o++] = (char) cp;
+            } else if (cp < 0x800) {
+                out[o++] = (char) (0xC0 | (cp >> 6));
+                out[o++] = (char) (0x80 | (cp & 0x3F));
+            } else if (cp < 0x10000) {
+                out[o++] = (char) (0xE0 | (cp >> 12));
+                out[o++] = (char) (0x80 | ((cp >> 6) & 0x3F));
+                out[o++] = (char) (0x80 | (cp & 0x3F));
+            } else {
+                out[o++] = (char) (0xF0 | (cp >> 18));
+                out[o++] = (char) (0x80 | ((cp >> 12) & 0x3F));
+                out[o++] = (char) (0x80 | ((cp >> 6) & 0x3F));
+                out[o++] = (char) (0x80 | (cp & 0x3F));
+            }
+            break;
+        }
+        default:
+            out[o++] = e; /* \" \\ \/ */
+        }
+    }
+    out[o] = '\0';
+    return out;
+}
+
+static double json_num(const struct json *j, int t, double dflt) {
+    if (t < 0 || j->tok[t].type != JSMN_PRIMITIVE)
+        return dflt;
+    char c = j->src[j->tok[t].start];
+    if (c != '-' && (c < '0' || c > '9'))
+        return dflt;
+    return strtod(j->src + j->tok[t].start, nullptr);
+}
+
+static bool json_bool(const struct json *j, int t, bool dflt) {
+    if (t < 0 || j->tok[t].type != JSMN_PRIMITIVE)
+        return dflt;
+    return j->src[j->tok[t].start] == 't';
+}
+
+/* ====================================================================== */
+/* Generation — the one place that talks to libgeist                       */
+/* ====================================================================== */
+
+/* The engine caps every session at 4096 tokens today (geistlib#428). */
+#define CTX_CAP 4096
+#define STOP_MAX 8
+#define STOP_LEN 64
+
+struct gen_opts {
+    float    temperature, top_p;
+    int      top_k;
+    uint64_t seed;
+    int      max_tokens; /* <= 0: fill the context */
+    int      n_stop;
+    char     stop[STOP_MAX][STOP_LEN];
+};
+
+/* Ollama's defaults; every editor client that sends nothing gets a
+ * non-greedy chat. Engine note: with both top_k > 1 and top_p < 1 set,
+ * the engine applies top_k and ignores top_p. */
+static struct gen_opts gen_opts_default(void) {
+    return (struct gen_opts) {.temperature = 0.7f, .top_p = 0.9f, .top_k = 40, .seed = 0};
+}
+
+struct gen_result {
+    int         prompt_tokens, completion_tokens;
+    const char *finish_reason; /* "stop" | "length" */
+    uint64_t    prefill_ns, decode_ns;
+};
+
+/* Called with complete UTF-8 text as it is decoded; return false to stop
+ * (the client hung up). */
+typedef bool (*emit_fn)(void *ctx, size_t n, const char text[static n]);
+
+/* Text pending emission: held back for the longest partial stop-string
+ * match and for an incomplete trailing UTF-8 sequence. */
+struct holdback {
+    char   buf[1024];
+    size_t len;
+};
+
+static bool hb_flush(struct holdback *h, size_t keep, emit_fn emit, void *ctx) {
+    if (h->len <= keep)
+        return true;
+    size_t cut = h->len - keep;
+    /* Back up to a UTF-8 boundary so a multibyte char is never split. */
+    while (cut > 0 && ((unsigned char) h->buf[cut] & 0xC0) == 0x80)
+        cut--;
+    if (cut == 0)
+        return true;
+    if (!emit(ctx, cut, h->buf))
+        return false;
+    memmove(h->buf, h->buf + cut, h->len - cut);
+    h->len -= cut;
+    return true;
+}
+
+/* Returns 0, or an HTTP status: 400 prompt does not fit, 500 engine error. */
+static int generate(struct server         *sv,
+                    const struct gen_opts *o,
+                    const char            *prompt,
+                    emit_fn                emit,
+                    void                  *ctx,
+                    struct gen_result     *res,
+                    char                   err[static 256]) {
+    *res = (struct gen_result) {.finish_reason = "stop"};
+
+    struct geist_session_opts so = {
+            .max_seq_len = CTX_CAP,
+            .temperature = o->temperature,
+            .top_p       = o->top_p,
+            .top_k       = o->top_k,
+            .random_seed = o->seed ? o->seed : (uint64_t) time(nullptr) ^ (uint64_t) clock(),
+    };
+    struct geist_session *s = nullptr;
+    if (geist_session_create(sv->m, sv->be, &so, &s) != GEIST_OK) {
+        snprintf(err, 256, "session: %s", s ? geist_session_errmsg(s) : "create failed");
+        if (s)
+            geist_session_destroy(s);
+        return 500;
+    }
+
+    /* Token budget: the count is exact, the +1 is BOS that set_prompt adds. */
+    static geist_token_t ids[CTX_CAP];
+    size_t               n_ids = 0;
+    if (geist_session_tokenize(s, prompt, CTX_CAP, ids, &n_ids) != GEIST_OK ||
+        n_ids + 1 >= CTX_CAP) {
+        snprintf(err, 256, "prompt does not fit the %d-token context", CTX_CAP);
+        geist_session_destroy(s);
+        return 400;
+    }
+    res->prompt_tokens = (int) n_ids + 1;
+    int budget         = CTX_CAP - res->prompt_tokens;
+    int max_tokens     = (o->max_tokens > 0 && o->max_tokens < budget) ? o->max_tokens : budget;
+
+    if (geist_session_set_prompt(s, prompt) != GEIST_OK) {
+        snprintf(err, 256, "prefill: %s", geist_session_errmsg(s));
+        geist_session_destroy(s);
+        return 500;
+    }
+
+    size_t keep = 0;
+    for (int i = 0; i < o->n_stop; i++) {
+        size_t l = strlen(o->stop[i]);
+        if (l > 0 && l - 1 > keep)
+            keep = l - 1;
+    }
+
+    struct holdback hb   = {};
+    bool            more = true;
+    for (int n = 0; n < max_tokens && more; n++) {
+        geist_token_t t;
+        if (geist_session_decode_step(s, &t) != GEIST_OK) {
+            snprintf(err, 256, "decode: %s", geist_session_errmsg(s));
+            geist_session_destroy(s);
+            return 500;
+        }
+        if (t == sv->eos)
+            break;
+        bool eot = false;
+        for (int k = 0; k < sv->n_eot; k++)
+            eot |= (t == sv->eot[k]);
+        if (eot)
+            break;
+
+        res->completion_tokens++;
+        const char *piece = geist_session_token_to_str(s, t);
+        if (piece == nullptr)
+            continue; /* control token */
+        size_t pl = strlen(piece);
+        if (hb.len + pl >= sizeof hb.buf)
+            more = hb_flush(&hb, 0, emit, ctx);
+        if (pl >= sizeof hb.buf)
+            continue; /* absurd token; drop it */
+        memcpy(hb.buf + hb.len, piece, pl);
+        hb.len += pl;
+        hb.buf[hb.len] = '\0';
+
+        for (int k = 0; k < o->n_stop; k++) {
+            char *at = o->stop[k][0] ? strstr(hb.buf, o->stop[k]) : nullptr;
+            if (at != nullptr) {
+                hb.len = (size_t) (at - hb.buf);
+                more   = false;
+                keep   = 0;
+                break;
+            }
+        }
+        if (more)
+            more = hb_flush(&hb, keep, emit, ctx);
+        if (n + 1 == max_tokens)
+            res->finish_reason = "length";
+    }
+    hb_flush(&hb, 0, emit, ctx);
+
+    struct geist_session_stats st = {};
+    geist_session_get_stats(s, &st);
+    res->prefill_ns = st.total_prefill_ns;
+    res->decode_ns  = st.total_decode_ns;
+    geist_session_destroy(s);
+    return 0;
+}
+
+/* Sampling fields shared by the OpenAI and Ollama request shapes: `obj` is
+ * the object that carries them (the request itself, or Ollama's options). */
+static void gen_opts_from_json(struct gen_opts *o, const struct json *j, int obj) {
+    o->temperature = (float) json_num(j, json_get(j, obj, "temperature"), o->temperature);
+    o->top_p       = (float) json_num(j, json_get(j, obj, "top_p"), o->top_p);
+    o->top_k       = (int) json_num(j, json_get(j, obj, "top_k"), o->top_k);
+    o->seed        = (uint64_t) json_num(j, json_get(j, obj, "seed"), (double) o->seed);
+    int stop       = json_get(j, obj, "stop");
+    if (json_is_str(j, stop)) {
+        char *s = json_strdup(j, stop);
+        if (s)
+            snprintf(o->stop[o->n_stop++], STOP_LEN, "%s", s);
+        free(s);
+    } else if (stop >= 0 && j->tok[stop].type == JSMN_ARRAY) {
+        for (int i = stop + 1; i < j->n && o->n_stop < STOP_MAX; i++) {
+            if (j->tok[i].parent != stop)
+                continue;
+            char *s = json_strdup(j, i);
+            if (s && s[0])
+                snprintf(o->stop[o->n_stop++], STOP_LEN, "%s", s);
+            free(s);
+        }
+    }
 }
 
 /* ====================================================================== */
 /* Routing                                                                 */
 /* ====================================================================== */
 
-struct server {
-    struct geist_backend *be;
-    struct geist_model   *m;
+/* ---- OpenAI /v1/completions — the first consumer of generate() ---------- */
+
+struct sse_ctx {
+    struct conn *c;
+    const char  *model;
+    const char  *id;
+    time_t       created;
+    struct sb   *text; /* non-stream: collect; stream: nullptr */
 };
 
+static bool emit_completion(void *vctx, size_t n, const char text[static n]) {
+    struct sse_ctx *x = vctx;
+    if (x->text != nullptr) {
+        sb_put(x->text, n, text);
+        return true;
+    }
+    struct sb ev = {};
+    sb_printf(
+            &ev,
+            "data: {\"id\":\"%s\",\"object\":\"text_completion\",\"created\":%lld,\"model\":\"%s\","
+            "\"choices\":[{\"index\":0,\"text\":",
+            x->id,
+            (long long) x->created,
+            x->model);
+    sb_json_str(&ev, n, text);
+    sb_puts(&ev, ",\"finish_reason\":null}]}\n\n");
+    bool ok = stream_write(x->c, ev.len, ev.p);
+    sb_free(&ev);
+    return ok;
+}
+
+static void route_v1_completions(struct server *sv, struct conn *c, struct req *r) {
+    struct json j;
+    if (r->body_len == 0 || json_parse(&j, r->body_len, r->body) < 0) {
+        respond_error(c, 400, "body is not a JSON object");
+        return;
+    }
+    char *prompt = json_strdup(&j, json_get(&j, 0, "prompt"));
+    if (prompt == nullptr) {
+        respond_error(c, 400, "prompt must be a string");
+        return;
+    }
+    struct gen_opts o = gen_opts_default();
+    gen_opts_from_json(&o, &j, 0);
+    o.max_tokens = (int) json_num(&j, json_get(&j, 0, "max_tokens"), 0);
+    bool stream  = json_bool(&j, json_get(&j, 0, "stream"), false);
+
+    char id[40];
+    snprintf(id,
+             sizeof id,
+             "cmpl-%llx",
+             (unsigned long long) time(nullptr) ^ (unsigned long long) clock());
+    struct sb      text = {};
+    struct sse_ctx x    = {.c       = c,
+                           .model   = sv->name,
+                           .id      = id,
+                           .created = time(nullptr),
+                           .text    = stream ? nullptr : &text};
+    if (stream && !stream_begin(c, "text/event-stream")) {
+        free(prompt);
+        return;
+    }
+
+    struct gen_result res;
+    char              err[256];
+    int               st = generate(sv, &o, prompt, emit_completion, &x, &res, err);
+    free(prompt);
+    if (st != 0) {
+        if (stream)
+            stream_end(c); /* headers are out; the stream just ends */
+        else
+            respond_error(c, st, err);
+        sb_free(&text);
+        return;
+    }
+    if (stream) {
+        struct sb ev = {};
+        sb_printf(
+                &ev,
+                "data: "
+                "{\"id\":\"%s\",\"object\":\"text_completion\",\"created\":%lld,\"model\":\"%s\","
+                "\"choices\":[{\"index\":0,\"text\":\"\",\"finish_reason\":\"%s\"}],"
+                "\"usage\":{\"prompt_tokens\":%d,\"completion_tokens\":%d,\"total_tokens\":%d}}\n\n"
+                "data: [DONE]\n\n",
+                id,
+                (long long) x.created,
+                sv->name,
+                res.finish_reason,
+                res.prompt_tokens,
+                res.completion_tokens,
+                res.prompt_tokens + res.completion_tokens);
+        stream_write(c, ev.len, ev.p);
+        stream_end(c);
+        sb_free(&ev);
+        return;
+    }
+    struct sb body = {};
+    sb_printf(&body,
+              "{\"id\":\"%s\",\"object\":\"text_completion\",\"created\":%lld,\"model\":\"%s\","
+              "\"choices\":[{\"index\":0,\"text\":",
+              id,
+              (long long) x.created,
+              sv->name);
+    sb_json_str(&body, text.len, text.p ? text.p : "");
+    sb_printf(&body,
+              ",\"finish_reason\":\"%s\"}],\"usage\":{\"prompt_tokens\":%d,"
+              "\"completion_tokens\":%d,\"total_tokens\":%d}}",
+              res.finish_reason,
+              res.prompt_tokens,
+              res.completion_tokens,
+              res.prompt_tokens + res.completion_tokens);
+    respond_json(c, 200, body.p);
+    sb_free(&body);
+    sb_free(&text);
+}
+
 static void handle(struct server *sv, struct conn *c, struct req *r) {
-    (void) sv;
     if (strcmp(r->method, "OPTIONS") == 0) {
         respond(c, 204, "text/plain", 0, "");
         return;
@@ -304,7 +824,14 @@ static void handle(struct server *sv, struct conn *c, struct req *r) {
         respond(c, 200, "text/plain", 17, "Ollama is running");
         return;
     }
-    /* ponytail: the /v1 (#5) and /api (#6) routes plug in here. */
+    if (strcmp(r->path, "/v1/completions") == 0) {
+        if (strcmp(r->method, "POST") != 0)
+            respond_error(c, 405, "POST only");
+        else
+            route_v1_completions(sv, c, r);
+        return;
+    }
+    /* ponytail: the remaining /v1 (#5) and /api (#6) routes plug in here. */
     respond_error(c, 404, "no such endpoint");
 }
 
@@ -403,7 +930,8 @@ int main(int argc, char **argv) {
 
     /* Decide the transport before the multi-second model load, so a bad
      * --host or a busy port fails in milliseconds. */
-    int lfd = -1;
+    int  lfd       = -1;
+    bool inherited = false;
     if (!a.stdio) {
         lfd = inherited_listener();
         if (lfd < 0)
@@ -422,11 +950,33 @@ int main(int argc, char **argv) {
         geist_backend_destroy(sv.be);
         return 1;
     }
+    /* Model name = GGUF basename without the extension, as /api/tags shows it. */
+    char path_copy[1024];
+    snprintf(path_copy, sizeof path_copy, "%s", a.model);
+    snprintf(sv.name, sizeof sv.name, "%s", basename(path_copy));
+    char *dot = strrchr(sv.name, '.');
+    if (dot != nullptr && strcmp(dot, ".gguf") == 0)
+        *dot = '\0';
+
+    /* Stop tokens: EOS plus the end-of-turn markers of the families we
+     * serve — some GGUFs set them as EOS, some do not (Gemma). */
+    sv.eos = geist_model_eos_token(sv.m);
+    for (const char **t =
+                 (const char *[]) {
+                         "<end_of_turn>", "<|im_end|>", "<|eot_id|>", "<|end_of_text|>", nullptr};
+         *t != nullptr && sv.n_eot < 4;
+         t++) {
+        geist_token_t id = geist_model_token_by_text(sv.m, *t);
+        if (id != GEIST_TOKEN_NONE)
+            sv.eot[sv.n_eot++] = id;
+    }
     fprintf(stderr,
-            "geist-serve: loaded %s (%s) on %s\n",
+            "geist-serve: loaded %s as \"%s\" (%s) on %s, %d stop tokens\n",
             a.model,
+            sv.name,
             geist_model_arch(sv.m),
-            geist_backend_name(sv.be));
+            geist_backend_name(sv.be),
+            1 + sv.n_eot);
 
     /* EPIPE reaches us as a write error (conn.broken), not a signal. No
      * SA_RESTART: accept() must return EINTR so the loop sees the stop. */
@@ -440,7 +990,7 @@ int main(int argc, char **argv) {
     } else {
         fprintf(stderr,
                 "geist-serve: listening (%s)\n",
-                lfd == 3 || lfd == 0 ? "inherited socket" : "own socket");
+                inherited ? "inherited socket" : "own socket");
         accept_loop(&sv, lfd);
         close(lfd);
         fprintf(stderr, "geist-serve: stopped\n");
