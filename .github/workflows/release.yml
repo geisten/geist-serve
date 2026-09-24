@@ -31,14 +31,18 @@ jobs:
             make TARGET=linux CC=gcc GEMM_PROVIDER=native EXTRA_LDFLAGS=-static
           '
           cp geist-serve ${{ matrix.asset }}
+          cp geistd ${{ matrix.asset }}-geistd
       - name: sanity on glibc (static binary runs here too)
         run: |
           file ${{ matrix.asset }} | grep -q 'statically linked'
           ./${{ matrix.asset }} 2>/dev/null || test $? -eq 2
+          ./${{ matrix.asset }}-geistd 2>/dev/null || test $? -eq 2
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset }}
-          path: ${{ matrix.asset }}
+          path: |
+            ${{ matrix.asset }}
+            ${{ matrix.asset }}-geistd
 
   macos:
     runs-on: macos-15
@@ -47,15 +51,18 @@ jobs:
       - name: deps
         run: brew install libomp
       - name: build (static libomp)
-        run: make GEIST_STATIC_OMP=1 && cp geist-serve geist-serve-macos-arm64
+        run: make GEIST_STATIC_OMP=1 && cp geist-serve geist-serve-macos-arm64 && cp geistd geist-serve-macos-arm64-geistd
       - name: sanity (no Homebrew library at runtime)
         run: |
           ! otool -L geist-serve-macos-arm64 | grep -q homebrew
           ./geist-serve-macos-arm64 2>/dev/null || test $? -eq 2
+          ./geist-serve-macos-arm64-geistd 2>/dev/null || test $? -eq 2
       - uses: actions/upload-artifact@v4
         with:
           name: geist-serve-macos-arm64
-          path: geist-serve-macos-arm64
+          path: |
+            geist-serve-macos-arm64
+            geist-serve-macos-arm64-geistd
 
   publish:
     needs: [linux, macos]

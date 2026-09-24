@@ -1,0 +1,13 @@
+# geistd for agents on this machine: a Unix socket in the runtime dir,
+# handed to the service as fd 3. Enable per user (systemctl --user) so the
+# socket lands in $XDG_RUNTIME_DIR with the user's permissions.
+[Unit]
+Description=geistd listener (libgeist over a socket)
+
+[Socket]
+ListenStream=%t/geistd.sock
+SocketMode=0600
+Backlog=16
+
+[Install]
+WantedBy=sockets.target
