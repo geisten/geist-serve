@@ -85,11 +85,24 @@ for name, hdr, body in [("unknown op", {"op": "nope"}, b""), ("no op", {"x": 1},
         c._call(hdr, body); check(f"error: {name}", False, "no error raised")
     except geistd.GeistdError as e:
         check(f"error: {name}", True)
-raw = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); raw.connect(SOCK)
-raw.sendall(b"\xff\xff\xff\xff\x00\x00\x00\x00"); reply = raw.recv(300); raw.close()
+def raw_reply(payload):
+    """Send raw bytes, read one whole reply frame (prefix + header), then whatever else until EOF."""
+    raw = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); raw.connect(SOCK); raw.settimeout(10)
+    raw.sendall(payload)
+    buf = b""
+    try:
+        while len(buf) < 8: buf += raw.recv(4096) or b"\0" * 8
+        hl, bl = struct.unpack("<II", buf[:8])
+        while len(buf) < 8 + hl + bl:
+            chunk = raw.recv(4096)
+            if not chunk: break
+            buf += chunk
+    finally:
+        raw.close()
+    return buf
+reply = raw_reply(b"\xff\xff\xff\xff\x00\x00\x00\x00")
 check("oversize frame refused + closed", b"malformed" in reply, reply)
-raw = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); raw.connect(SOCK)
-raw.sendall(struct.pack("<II", 5, 0) + b"{{{{{"); reply = raw.recv(300); raw.close()
+reply = raw_reply(struct.pack("<II", 5, 0) + b"{{{{{")
 check("bad json header refused", b"not a JSON" in reply, reply)
 check("daemon alive after all that", c.info()["ok"])
 
