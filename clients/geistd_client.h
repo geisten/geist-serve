@@ -37,6 +37,14 @@ int geistd_prefill(struct geistd *g, const char *id, size_t n, const int32_t ids
 int geistd_step(struct geistd *g, const char *id, int32_t *token_out, bool *stop_out);
 /* log-softmax logprobs of the pending distribution at the given ids. */
 int geistd_peek_logprobs(struct geistd *g, const char *id, size_t n, const int32_t ids[static n], float out[static n]);
+/* The whole pending logit vector (vocab floats) into `out`; *n_out = vocab. */
+int geistd_peek_full(struct geistd *g, const char *id, size_t cap, float out[static cap], size_t *n_out);
+/* Pieces for ids[0..n): each malloc'd (nullptr for control tokens); free them. Chunks internally. */
+int geistd_strs(struct geistd *g, const char *id, size_t n, const int32_t ids[static n], char *out[static n]);
+/* Pin the first n history tokens; reset keeps them afterwards. */
+int geistd_pin(struct geistd *g, const char *id, size_t n);
+/* A few info numbers without parsing JSON yourself. */
+int geistd_info_numbers(struct geistd *g, size_t *vocab, int32_t *eos, int32_t *bos, bool *add_bos);
 /* Streams pieces to `emit` (return false to stop). reason_out: "stop" | "max" | ... */
 int geistd_generate(struct geistd *g, const char *id, size_t max, bool (*emit)(void *, const char *), void *ctx,
                     char reason_out[static 16]);
@@ -69,7 +77,7 @@ struct geistd {
     size_t hl;
     unsigned char *body;
     size_t bl;
-    jsmntok_t tok[512];
+    jsmntok_t tok[4096];
     int   ntok;
 };
 
@@ -156,7 +164,7 @@ static int gd_recv(struct geistd *g) {
     g->hdr[hl] = '\0', g->hl = hl, g->bl = bl;
     jsmn_parser p;
     jsmn_init(&p);
-    g->ntok = jsmn_parse(&p, g->hdr, hl, g->tok, 512);
+    g->ntok = jsmn_parse(&p, g->hdr, hl, g->tok, 4096);
     if (g->ntok < 1) return gd_fail(g, "unparsable header from geistd");
     return 0;
 }
@@ -302,6 +310,83 @@ int geistd_peek_logprobs(struct geistd *g, const char *id, size_t n, const int32
     for (int i = arr + 1; i < g->ntok && k < n; i++)
         if (g->tok[i].parent == arr) out[k++] = (float) strtod(g->hdr + g->tok[i].start, nullptr);
     return k == n ? 0 : gd_fail(g, "short logprobs");
+}
+
+int geistd_peek_full(struct geistd *g, const char *id, size_t cap, float out[static cap], size_t *n_out) {
+    char h[120];
+    snprintf(h, sizeof h, "{\"op\":\"peek\",\"session\":\"%s\",\"full\":true}", id);
+    if (gd_call(g, h, 0, nullptr) != 0) return -1;
+    size_t n = g->bl / sizeof(float);
+    if (n == 0 || n > cap) return gd_fail(g, "logit vector does not fit");
+    memcpy(out, g->body, n * sizeof(float));
+    *n_out = n;
+    return 0;
+}
+
+/* JSON string token → malloc'd unescaped C string. */
+static char *gd_unescape(const char *s, const char *e) {
+    char  *out = malloc((size_t) (e - s) + 1);
+    size_t o   = 0;
+    if (!out) return nullptr;
+    for (; s < e; s++) {
+        if (*s != '\\' || s + 1 >= e) { out[o++] = *s; continue; }
+        s++;
+        switch (*s) {
+        case 'n': out[o++] = '\n'; break;
+        case 't': out[o++] = '\t'; break;
+        case 'r': out[o++] = '\r'; break;
+        case 'b': out[o++] = '\b'; break;
+        case 'f': out[o++] = '\f'; break;
+        case 'u': {
+            unsigned cp = 0;
+            if (s + 4 < e) { char hex[5] = {s[1], s[2], s[3], s[4], 0}; cp = (unsigned) strtoul(hex, nullptr, 16); s += 4; }
+            if (cp < 0x80) out[o++] = (char) cp;
+            else if (cp < 0x800) { out[o++] = (char) (0xC0 | cp >> 6); out[o++] = (char) (0x80 | (cp & 0x3F)); }
+            else { out[o++] = (char) (0xE0 | cp >> 12); out[o++] = (char) (0x80 | ((cp >> 6) & 0x3F)); out[o++] = (char) (0x80 | (cp & 0x3F)); }
+            break;
+        }
+        default: out[o++] = *s;
+        }
+    }
+    out[o] = '\0';
+    return out;
+}
+
+int geistd_strs(struct geistd *g, const char *id, size_t n, const int32_t ids[static n], char *out[static n]) {
+    char h[100];
+    snprintf(h, sizeof h, "{\"op\":\"str\",\"session\":\"%s\"}", id);
+    for (size_t i = 0; i < n; i++) out[i] = nullptr;
+    const size_t CHUNK = 2048; /* 2048 pieces stay under the 64 KiB header cap */
+    for (size_t at = 0; at < n; at += CHUNK) {
+        size_t m = n - at < CHUNK ? n - at : CHUNK;
+        if (gd_call(g, h, m * sizeof(int32_t), ids + at) != 0) return -1;
+        int arr = gd_find(g, "pieces");
+        if (arr < 0 || g->tok[arr].type != JSMN_ARRAY) return gd_fail(g, "no pieces in reply");
+        size_t k = 0;
+        for (int i = arr + 1; i < g->ntok && k < m; i++) {
+            if (g->tok[i].parent != arr) continue;
+            out[at + k] = g->tok[i].type == JSMN_STRING ? gd_unescape(g->hdr + g->tok[i].start, g->hdr + g->tok[i].end) : nullptr;
+            k++;
+        }
+        if (k != m) return gd_fail(g, "short pieces");
+    }
+    return 0;
+}
+
+int geistd_pin(struct geistd *g, const char *id, size_t n) {
+    char h[120];
+    snprintf(h, sizeof h, "{\"op\":\"pin\",\"session\":\"%s\",\"n\":%zu}", id, n);
+    return gd_call(g, h, 0, nullptr);
+}
+
+int geistd_info_numbers(struct geistd *g, size_t *vocab, int32_t *eos, int32_t *bos, bool *add_bos) {
+    if (gd_call(g, "{\"op\":\"info\"}", 0, nullptr) != 0) return -1;
+    if (vocab) *vocab = gd_num(g, "vocab");
+    int te = gd_find(g, "eos"), tb = gd_find(g, "bos"), ta = gd_find(g, "add_bos");
+    if (eos) *eos = te < 0 ? -1 : (int32_t) strtol(g->hdr + g->tok[te].start, nullptr, 10);
+    if (bos) *bos = tb < 0 ? -1 : (int32_t) strtol(g->hdr + g->tok[tb].start, nullptr, 10);
+    if (add_bos) *add_bos = ta >= 0 && g->hdr[g->tok[ta].start] == 't';
+    return 0;
 }
 
 int geistd_generate(struct geistd *g, const char *id, size_t max, bool (*emit)(void *, const char *), void *ctx,

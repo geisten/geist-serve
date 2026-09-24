@@ -49,6 +49,7 @@ struct sess {
     struct geist_session *s;
     geist_token_t        *hist; /* what the KV cache holds, in order */
     size_t                n_hist;
+    size_t                pinned; /* geist_session_pin_prefix: reset keeps this many */
     time_t                used;
 };
 
@@ -436,16 +437,21 @@ op_prefill(struct daemon *d, struct conn *c, struct sess *x, size_t bl, const un
         sb_printf(&h, "{\"ok\":true,\"prefilled\":0,\"reused\":%zu,\"n\":%zu}", n, x->n_hist);
         return reply(c, &h, 0, nullptr); /* identical: nothing to do */
     } else {
+        /* Divergence. A pinned prefix cannot be undone: refuse when the
+         * request differs inside it, otherwise reset back to the pin. */
+        if (x->pinned > 0 && common < x->pinned)
+            return reply_error(c, "prefill: request differs inside the pinned prefix");
         if (geist_session_reset(x->s) != GEIST_OK)
             return reply_error(c, "prefill: reset failed");
-        x->n_hist = 0;
+        x->n_hist = x->pinned;
+        reused    = x->pinned;
     }
     size_t tail = n - reused;
-    if (geist_session_prefill_tokens(x->s, tail, ids + reused) != GEIST_OK) {
+    if (tail > 0 && geist_session_prefill_tokens(x->s, tail, ids + reused) != GEIST_OK) {
         char msg[300];
         snprintf(msg, sizeof msg, "prefill: %s", geist_session_errmsg(x->s));
         geist_session_reset(x->s);
-        x->n_hist = 0;
+        x->n_hist = x->pinned;
         return reply_error(c, msg);
     }
     hist_push(x, tail, ids + reused);
@@ -684,12 +690,30 @@ static bool handle(struct daemon       *d,
         if (x == nullptr)
             ok = reply_error(c, "reset: unknown session");
         else {
-            geist_session_reset(x->s);
-            x->n_hist = 0;
-            ok        = reply(c,
-                              &(struct sb) {.p = strdup("{\"ok\":true}"), .len = 11, .cap = 12},
-                              0,
-                              nullptr);
+            geist_session_reset(x->s); /* the engine keeps a pinned prefix */
+            x->n_hist   = x->pinned;
+            struct sb h = {};
+            sb_printf(&h, "{\"ok\":true,\"n\":%zu}", x->n_hist);
+            ok = reply(c, &h, 0, nullptr);
+        }
+    } else if (strcmp(op, "pin") == 0) {
+        /* Pin the first n history tokens: reset then truncates to them
+         * instead of to zero (geist_session_pin_prefix). Once pinned, a
+         * prefill that differs inside the prefix is refused. */
+        size_t n = (size_t) json_num(&j, json_get(&j, 0, "n"), 0);
+        if (x == nullptr)
+            ok = reply_error(c, "pin: unknown session");
+        else if (x->pinned > 0)
+            ok = reply_error(c, "pin: already pinned");
+        else if (n == 0 || n > x->n_hist)
+            ok = reply_error(c, "pin: n must be 1..history length");
+        else if (geist_session_pin_prefix(x->s, n, x->hist) != GEIST_OK)
+            ok = reply_error(c, "pin: unsupported by this architecture");
+        else {
+            x->pinned   = n;
+            struct sb h = {};
+            sb_printf(&h, "{\"ok\":true,\"pinned\":%zu}", n);
+            ok = reply(c, &h, 0, nullptr);
         }
     } else if (strcmp(op, "close") == 0) {
         if (x == nullptr)

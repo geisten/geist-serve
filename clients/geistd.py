@@ -144,8 +144,14 @@ class Session:
         finally:
             self.client.close()
 
+    def pin(self, n):
+        """Pin the first n history tokens: reset() then keeps them (a constant system prompt)."""
+        h, _ = self._call("pin", n=n)
+        return h["pinned"]
+
     def reset(self):
-        self._call("reset")
+        h, _ = self._call("reset")
+        return h.get("n", 0)
 
     def close(self):
         self._call("close")

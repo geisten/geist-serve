@@ -74,6 +74,25 @@ try:
 except geistd.GeistdError as e:
     check("step after reset refused", "prefill first" in str(e), e)
 
+# pin: a constant prefix survives reset; prefill after reset pays only the suffix
+p = c.open(temperature=0)
+sysp = c.tokenize("<|im_start|>system\nAnswer in one word.<|im_end|>\n")
+q1 = c.tokenize("<|im_start|>user\nCapital of France?<|im_end|>\n<|im_start|>assistant\n")
+p.prefill(sysp + q1)
+check("pin accepted", p.pin(len(sysp)) == len(sysp))
+check("reset keeps the pin", p.reset() == len(sysp))
+r = p.prefill(sysp + c.tokenize("<|im_start|>user\nCapital of Italy?<|im_end|>\n<|im_start|>assistant\n"))
+check("after reset only the suffix is prefilled", r["reused"] == len(sysp) and r["prefilled"] > 0, r)
+try:
+    p.prefill(c.tokenize("totally different") + q1); check("prefill inside the pin refused", False, "accepted")
+except geistd.GeistdError as e:
+    check("prefill inside the pin refused", "pinned prefix" in str(e), e)
+try:
+    p.pin(1); check("second pin refused", False)
+except geistd.GeistdError as e:
+    check("second pin refused", "already" in str(e), e)
+p.close()
+
 # errors never end the daemon
 for name, hdr, body in [("unknown op", {"op": "nope"}, b""), ("no op", {"x": 1}, b""),
                         ("unknown session", {"op": "step", "session": "0000000000000000"}, b""),
