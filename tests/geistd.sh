@@ -16,7 +16,8 @@ trap 'kill ${D1:-} ${D2:-} ${S1:-} 2>/dev/null || true; wait 2>/dev/null || true
 # --- Unix socket + ops --------------------------------------------------------
 ./geistd "$MODEL" --socket "$SOCK" --sessions 3 2>"$LOG" & D1=$!
 wait_log "listening" 60 || { bad "geistd start: $(tail -2 "$LOG")"; exit 1; }
-[ "$(stat -f %Lp "$SOCK" 2>/dev/null || stat -c %a "$SOCK")" = 600 ] && ok "socket mode 0600" || bad "socket mode $(stat -f %Lp "$SOCK" 2>/dev/null || stat -c %a "$SOCK")"
+case "$(uname -s)" in Darwin) MODE=$(stat -f %Lp "$SOCK") ;; *) MODE=$(stat -c %a "$SOCK") ;; esac
+[ "$MODE" = 600 ] && ok "socket mode 0600" || bad "socket mode $MODE"
 python3 -u tests/geistd_ops.py "$SOCK" || fail=1
 
 # --- --stdio ------------------------------------------------------------------
