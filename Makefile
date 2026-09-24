@@ -8,7 +8,7 @@
 # and its mk/ fragments supply the flags, so geist-serve links with exactly
 # what the engine was built with.
 #
-#> make               build ./geist-serve (syncs + builds libgeist.a on demand)
+#> make               build ./geist-serve and ./geistd (syncs + builds libgeist.a on demand)
 #> make fetch-model   the 369 MB SmolLM2 reference GGUF into the engine tree (SHA-pinned)
 #> make test          model-free unit tests + HTTP smoke against a GGUF (skips without one)
 #> make format        clang-format, shared style file with the engine
@@ -52,15 +52,20 @@ LDLIBS  := $(LDLIBS_TARGET) $(GEMM_LDLIBS) $(EXTRA_LDLIBS)
 
 .PHONY: all help test fetch-model format clean distclean FORCE
 
-all: geist-serve
+all: geist-serve geistd
 
 help:
 	@grep "^#>" Makefile | cut -c4-
 
-SRC := src/serve.c src/template.c
+SHARED := src/template.c src/json.c src/net.c
+HDRS   := src/template.h src/json.h src/net.h src/jsmn.h
 
-geist-serve: $(SRC) src/template.h src/jsmn.h $(LIB)
-	$(CC) $(CFLAGS) -o $@ $(SRC) $(LIB) $(LDFLAGS) $(LDLIBS)
+geist-serve: src/serve.c $(SHARED) $(HDRS) $(LIB)
+	$(CC) $(CFLAGS) -o $@ src/serve.c $(SHARED) $(LIB) $(LDFLAGS) $(LDLIBS)
+
+# geistd: libgeist over a socket for agents (resident sessions, logits).
+geistd: src/geistd.c $(SHARED) $(HDRS) $(LIB)
+	$(CC) $(CFLAGS) -o $@ src/geistd.c $(SHARED) $(LIB) $(LDFLAGS) $(LDLIBS)
 
 # Model-free unit test of the chat renderers; no engine needed.
 build/test_template: tests/test_template.c src/template.c src/template.h
@@ -80,15 +85,16 @@ FORCE:
 fetch-model:
 	$(MAKE) -C $(GEISTLIB) fetch-llama-model
 
-test: geist-serve build/test_template
+test: geist-serve geistd build/test_template
 	./build/test_template
 	sh tests/smoke.sh
+	sh tests/geistd.sh
 
 format:
 	clang-format -i $(wildcard src/*.c tests/*.c)
 
 clean:
-	rm -rf geist-serve build
+	rm -rf geist-serve geistd build
 
 # The engine checkout is build input, not source.
 distclean: clean

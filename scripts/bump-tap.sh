@@ -17,6 +17,9 @@ SUMS=$(curl -fsSL --max-time 60 --retry 3 "$BASE/SHA256SUMS")
 sha() { echo "$SUMS" | grep " $1\$" | cut -d' ' -f1; }
 MAC=$(sha geist-serve-macos-arm64); LX=$(sha geist-serve-linux-x86_64); LA=$(sha geist-serve-linux-aarch64)
 [ -n "$MAC" ] && [ -n "$LX" ] && [ -n "$LA" ] || { echo "bump-tap: SHA256SUMS of $TAG incomplete" >&2; exit 1; }
+# geistd ships next to geist-serve from v0.2 on; older tags have no such asset.
+DMAC=$(sha geist-serve-macos-arm64-geistd); DLX=$(sha geist-serve-linux-x86_64-geistd); DLA=$(sha geist-serve-linux-aarch64-geistd)
+res() { [ -n "$2" ] && printf '      resource "geistd" do\n        url "%s/%s-geistd"\n        sha256 "%s"\n      end\n' "$BASE" "$1" "$2"; }
 
 mkdir -p "$TAP/Formula"
 cat > "$TAP/Formula/geist-serve.rb" <<RB
@@ -31,21 +34,22 @@ class GeistServe < Formula
     on_arm do
       url "$BASE/geist-serve-macos-arm64"
       sha256 "$MAC"
-    end
+$(res geist-serve-macos-arm64 "$DMAC")    end
   end
   on_linux do
     on_intel do
       url "$BASE/geist-serve-linux-x86_64"
       sha256 "$LX"
-    end
+$(res geist-serve-linux-x86_64 "$DLX")    end
     on_arm do
       url "$BASE/geist-serve-linux-aarch64"
       sha256 "$LA"
-    end
+$(res geist-serve-linux-aarch64 "$DLA")    end
   end
 
   def install
-    bin.install Dir["geist-serve-*"].first => "geist-serve"
+    bin.install Dir["geist-serve-*"].reject { |f| f.end_with?("-geistd") }.first => "geist-serve"
+    resource("geistd").stage { bin.install Dir["geist-serve-*-geistd"].first => "geistd" } if resources.any? { |r| r.name == "geistd" }
     # brew services runs this wrapper: it reads the model path (and optional
     # flags on a second line) from etc/geist-serve/model, the one file a
     # user edits. Same idea as /etc/default/geist-serve under systemd.

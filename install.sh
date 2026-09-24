@@ -43,6 +43,14 @@ echo "checksum ok"
 mkdir -p "$BIN"
 install -m 0755 "$TMP/$ASSET" "$BIN/geist-serve"
 echo "installed $BIN/geist-serve"
+# geistd (agents' socket daemon) ships next to it from v0.2; older releases have none.
+if curl -fsSL --retry 3 -o "$TMP/$ASSET-geistd" "$BASE/$ASSET-geistd" 2>/dev/null; then
+    want=$(sed -n "s|^\([0-9a-f]\{64\}\) [ *]$ASSET-geistd\$|\1|p" "$TMP/SHA256SUMS" | head -1)
+    have=$( (sha256sum "$TMP/$ASSET-geistd" 2>/dev/null || shasum -a 256 "$TMP/$ASSET-geistd") | cut -d' ' -f1)
+    [ "$have" = "$want" ] || { echo "geist-serve: checksum mismatch for $ASSET-geistd" >&2; exit 1; }
+    install -m 0755 "$TMP/$ASSET-geistd" "$BIN/geistd"
+    echo "installed $BIN/geistd"
+fi
 "$BIN/geist-serve" >/dev/null 2>&1 || [ $? -eq 2 ] || { echo "geist-serve: installed binary does not run" >&2; exit 1; }
 
 # systemd units: only as root on a systemd host, and never overwriting a

@@ -1,0 +1,18 @@
+[Unit]
+Description=geistd: resident model sessions for agents
+Documentation=https://github.com/geisten/geist-serve/blob/main/docs/GEISTD.md
+Requires=geistd.socket
+After=geistd.socket
+
+[Service]
+EnvironmentFile=-%h/.config/geistd.env
+ExecStart=/usr/local/bin/geistd $GEIST_MODEL $GEISTD_ARGS
+Type=exec
+KillSignal=SIGTERM
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=2
+Environment=OMP_NUM_THREADS=4 OMP_WAIT_POLICY=active
+
+[Install]
+WantedBy=default.target
