@@ -5,6 +5,7 @@
 #include "geistd_client.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static bool emit(void *ctx, const char *piece) {
@@ -45,6 +46,28 @@ int main(int argc, char **argv) {
     printf("generate: ");
     if (geistd_generate(g, id, 8, emit, nullptr, reason) != 0) return fprintf(stderr, "generate: %s\n", geistd_error(g)), 1;
     printf("\n  reason %s\n", reason);
+    /* the pieces the constrained decoder scans, in one batch; the full vector; a pin */
+    size_t  vocab; int32_t eos, bos; bool add_bos;
+    if (geistd_info_numbers(g, &vocab, &eos, &bos, &add_bos) != 0) return fprintf(stderr, "info_numbers: %s\n", geistd_error(g)), 1;
+    int32_t *all = malloc(vocab * sizeof *all);
+    char   **pieces = malloc(vocab * sizeof *pieces);
+    for (size_t i = 0; i < vocab; i++) all[i] = (int32_t) i;
+    if (geistd_strs(g, id, vocab, all, pieces) != 0) return fprintf(stderr, "strs: %s\n", geistd_error(g)), 1;
+    size_t have = 0;
+    for (size_t i = 0; i < vocab; i++) have += pieces[i] != nullptr;
+    printf("vocab %zu pieces fetched, %zu non-control, eos %d bos %d add_bos %d\n", vocab, have, eos, bos, add_bos);
+    if (have < vocab / 2) return fprintf(stderr, "FAIL: too few pieces\n"), 1;
+    float *lg = malloc(vocab * sizeof *lg);
+    size_t nl;
+    if (geistd_peek_full(g, id, vocab, lg, &nl) != 0) return fprintf(stderr, "peek_full: %s\n", geistd_error(g)), 1;
+    printf("peek_full: %zu logits, [0]=%.3f\n", nl, (double) lg[0]);
+    if (geistd_pin(g, id, 3) != 0) return fprintf(stderr, "pin: %s\n", geistd_error(g)), 1;
+    if (geistd_reset(g, id) != 0) return fprintf(stderr, "reset: %s\n", geistd_error(g)), 1;
+    geistd_prefill(g, id, n, ids, &pre, &re);
+    printf("after pin(3)+reset: prefilled %zu reused %zu\n", pre, re);
+    if (re != 3) return fprintf(stderr, "FAIL: pin not honoured\n"), 1;
+    for (size_t i = 0; i < vocab; i++) free(pieces[i]);
+    free(pieces), free(all), free(lg);
     geistd_close_session(g, id);
     geistd_close(g);
     printf("geistd_client_test: all passed\n");

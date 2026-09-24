@@ -61,7 +61,8 @@ costs microseconds. `clients/geistd.py` does this.
 | `info` | | | `model, arch, eos, eot[], bos, add_bos, ctx, vocab, template, sessions, max_sessions` |
 | `open` | `temperature, top_p, top_k, seed` (engine session options; fixed for the session's life) | | `session` (16 hex). Evicts the least recently used session when the table is full. |
 | `close` | `session` | | frees the session |
-| `reset` | `session` | | empties the KV cache and history |
+| `reset` | `session` | | truncates the KV cache and history to the pinned prefix (0 without a pin); replies `n` |
+| `pin` | `session, n` | | pins the first `n` history tokens (`geist_session_pin_prefix`): `reset` keeps them, a `prefill` that differs inside them is refused. Once per session. How geistshell amortises a constant system prompt. |
 | `tokenize` | `text` (≤ 32 KiB) | | body int32[] ids, `n`. No BOS is added: `info.add_bos` says whether the model expects one (`info.bos`). |
 | `str` | `session` | int32[] ids | `pieces[]`, `null` for control tokens |
 | `prefill` | `session` | int32[] ids: the whole intended context | `prefilled, reused, n`. See semantics below. |
@@ -78,8 +79,10 @@ tokens and tokens produced by `step`/`generate`):
 - history is a proper prefix of the request → only the tail is prefilled,
   `reused` = history length;
 - request equals history → nothing happens, `prefilled` = 0;
-- anything else (divergence) → the session is reset and everything is
-  prefilled, `reused` = 0. The engine has no rollback to a position.
+- anything else (divergence) → the session is reset and everything after
+  the pinned prefix is prefilled (`reused` = pinned length, 0 without a
+  pin). The engine has no rollback to a position. A request that differs
+  inside a pinned prefix is refused.
 
 The context is capped at 4096 tokens (geistlib#428): a request that would
 exceed it is refused before the engine is touched.
