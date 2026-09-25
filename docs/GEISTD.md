@@ -17,6 +17,21 @@ Raspberry Pi, where prefill is the expensive part. `tests/agent_short_calls.py`
 runs the comparison and prints the load average, because under contention
 the stateless path degrades much faster (measured 187 s vs 4.4 s at load 215).
 
+**Raspberry Pi 5 (4 GB), measured 2026-09-25**, model on the board, agent
+on a Mac over an SSH tunnel to the board's Unix socket, `OMP_NUM_THREADS=4`,
+board idle and under 60 °C:
+
+| model | prefill | decode | 4–5 agent turns as separate processes | same turns, stateless chat API |
+| :-- | --: | --: | --: | --: |
+| SmolLM2-360M Q8_0 | — | — | 6.2 s (5 turns, 1884 tokens reused) | 23.8 s |
+| BitNet b1.58 2B-4T i2_s | 41.9 tok/s | 17.8 tok/s | 15.3 s (4 turns, 1569 tokens reused) | 41.9 s |
+
+geistshell's constrained decoder ran unchanged against both, through the
+tunnel: with BitNet it answered "list the files" with
+`(recommend (kind local_shell) … (command "ls") …)` in about 15 s including
+the vocabulary fetch. The full `make test` suite passes on the board in
+under five minutes.
+
 ```sh
 geistd model.gguf                                 # $XDG_RUNTIME_DIR/geistd.sock (0600)
 geistd model.gguf --socket /tmp/g.sock --sessions 8 --idle 600
