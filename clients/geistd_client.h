@@ -254,12 +254,12 @@ int geistd_tokenize(struct geistd *g, const char *text, size_t cap, int32_t out[
     size_t tl = strlen(text);
     char  *h  = malloc(tl * 6 + 32);
     if (!h) return gd_fail(g, "out of memory");
-    char *p = h + sprintf(h, "{\"op\":\"tokenize\",\"text\":\"");
+    char *p = h + snprintf(h, tl * 6 + 32, "{\"op\":\"tokenize\",\"text\":\"");
     for (const char *s = text; *s; s++) {
         unsigned char c = (unsigned char) *s;
         if (c == '"' || c == '\\') *p++ = '\\', *p++ = (char) c;
         else if (c == '\n') *p++ = '\\', *p++ = 'n';
-        else if (c < 0x20) p += sprintf(p, "\\u%04x", c);
+        else if (c < 0x20) p += snprintf(p, 8, "\\u%04x", c);
         else *p++ = (char) c;
     }
     strcpy(p, "\"}");

@@ -12,7 +12,7 @@ POSIX C23 — sockets, `recv` with `MSG_DONTWAIT`, `clock_gettime`,
 | Linux arm64 | `linux` | works | CI: same, on the arm64 runner |
 | macOS arm64 | `mac-omp` | works | developed and tested here; `ollama` CLI end to end |
 | macOS x86-64 | `mac-omp` | compiles | `clang -arch x86_64` compile check of the server sources; no Intel Mac to run on |
-| Raspberry Pi 5 (64-bit OS) | `pi5` | pending | `.github/workflows/pi5.yml` runs the whole suite on the reference board through its self-hosted runner. The runner is currently registered to another repo; the board's SSH was refusing connections on 2026-09-23, so no run yet. The Linux arm64 CI result is the same code on the same ISA without the cortex-a76 tuning. |
+| Raspberry Pi 5 (64-bit OS) | `pi5` | works | 2026-09-25 on the reference board (4 GB, gcc 14): `make TARGET=pi5 test` green in under five minutes; BitNet 2B via `/api/generate` 41.9 tok/s prefill, 17.8 tok/s decode; geistd numbers in `docs/GEISTD.md`. Run by hand over SSH under the board lock — `pi5.yml` still needs a runner visible to this repo. |
 | Android (Termux) | none yet | expected | Bionic has everything the server uses. Blocked on an engine target for Termux's clang + libomp; no NDK on the dev machine to cross-check. Untested. |
 | iOS / iPadOS | none yet | compiles | The server sources compile for `arm64-apple-ios16` with the iPhoneOS SDK. An app cannot run a daemon with a `main()`, so embedding means calling the accept loop from the app with a listener it created — a small refactor, not a port. Blocked on an engine target. |
 | Windows native | none | no | POSIX sockets and signals, and the engine has no MSVC/MinGW target. |
