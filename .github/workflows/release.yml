@@ -87,16 +87,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes
-      # Homebrew formula in geisten/homebrew-tap. Needs a fine-grained PAT
-      # with contents:write on that repo as the TAP_TOKEN secret; until it
-      # exists this step only says so (run scripts/bump-tap.sh by hand).
+      # Homebrew formula in geisten/homebrew-tap, pushed with a deploy key
+      # that can write that one repository and nothing else (secret
+      # TAP_DEPLOY_KEY; the public half is registered on the tap).
       - name: bump homebrew tap
         if: startsWith(github.ref, 'refs/tags/v')
         env:
-          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+          TAP_DEPLOY_KEY: ${{ secrets.TAP_DEPLOY_KEY }}
         run: |
-          if [ -z "$TAP_TOKEN" ]; then echo "::notice::TAP_TOKEN not set — run scripts/bump-tap.sh $GITHUB_REF_NAME by hand"; exit 0; fi
+          if [ -z "$TAP_DEPLOY_KEY" ]; then echo "::notice::TAP_DEPLOY_KEY not set — run scripts/bump-tap.sh $GITHUB_REF_NAME by hand"; exit 0; fi
+          umask 077; printf '%s\n' "$TAP_DEPLOY_KEY" > /tmp/tap_key
+          export GIT_SSH_COMMAND="ssh -i /tmp/tap_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
           TAP=$(mktemp -d)/homebrew-tap
-          git clone -q "https://x-access-token:$TAP_TOKEN@github.com/geisten/homebrew-tap" "$TAP"
+          git clone -q git@github.com:geisten/homebrew-tap "$TAP"
           sh scripts/bump-tap.sh "$GITHUB_REF_NAME" "$TAP"
           git -C "$TAP" push -q origin HEAD:main
+          rm -f /tmp/tap_key

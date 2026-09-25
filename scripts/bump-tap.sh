@@ -1,8 +1,8 @@
 #!/bin/sh
 # bump-tap.sh <vX.Y.Z> [tap-checkout] — write Formula/geist-serve.rb for
 # that release into the geisten/homebrew-tap checkout (cloned to a temp dir
-# when not given) and commit. The caller pushes (release.yml does, when a
-# TAP_TOKEN secret exists; by hand: sh scripts/bump-tap.sh v0.1.0 && push).
+# when not given) and commit. The caller pushes (release.yml does, with the
+# TAP_DEPLOY_KEY secret; by hand: sh scripts/bump-tap.sh v0.1.0 && push).
 set -eu
 TAG=${1:?usage: bump-tap.sh vX.Y.Z [tap-dir]}
 VERSION=${TAG#v}
@@ -10,7 +10,7 @@ BASE="https://github.com/geisten/geist-serve/releases/download/$TAG"
 TAP=${2:-}
 if [ -z "$TAP" ]; then
     TAP=$(mktemp -d)/homebrew-tap
-    git clone -q "https://${TAP_TOKEN:+$TAP_TOKEN@}github.com/geisten/homebrew-tap" "$TAP"
+    git clone -q "https://github.com/geisten/homebrew-tap" "$TAP"
 fi
 
 SUMS=$(curl -fsSL --max-time 60 --retry 3 "$BASE/SHA256SUMS")
