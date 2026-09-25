@@ -202,15 +202,22 @@ ls = socket.socket(); ls.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 ls.bind(("127.0.0.1", port)); ls.listen(4); os.set_inheritable(ls.fileno(), True)
 env = dict(os.environ, LISTEN_FDS="1", LISTEN_PID="0")
 # close_fds runs after preexec_fn, so fd 3 must be in pass_fds too.
+# stdout to DEVNULL: an orphaned server must never hold this $(...) capture open.
 p = subprocess.Popen(["./geist-serve", model], env=env, pass_fds=(ls.fileno(), 3),
-                     stderr=subprocess.PIPE, text=True,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
                      preexec_fn=lambda: os.dup2(ls.fileno(), 3))
 for line in p.stderr:
     if "listening" in line: break
 else:
     print("server exited before listening"); sys.exit(0)
 body = urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=10).read().decode()
-p.terminate(); p.wait(10)
+p.stderr.close()
+p.terminate()
+try:
+    p.wait(30)
+except subprocess.TimeoutExpired:
+    p.kill(); p.wait(5)
+    print(body, "sigterm-not-honoured-within-30s"); sys.exit(0)
 print(body, "listener-fd-ok" if p.returncode == 0 else f"rc={p.returncode}")
 PY
 )
