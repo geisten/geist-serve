@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -12,6 +16,7 @@ concurrency:
 
 jobs:
   build:
+    timeout-minutes: 25
     strategy:
       matrix:
         # -std=c23 needs gcc >= 14; force the generic linux target — the
@@ -19,7 +24,7 @@ jobs:
         runner: [ubuntu-24.04, ubuntu-24.04-arm]
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: deps
         run: sudo apt-get update -q && sudo apt-get install -y -q gcc-14 libcurl4-openssl-dev libssl-dev
       - name: build
@@ -34,9 +39,10 @@ jobs:
           systemd-analyze verify --man=no deploy/systemd/geist-serve.socket deploy/systemd/geist-serve.service
 
   build-macos:
+    timeout-minutes: 25
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: deps
         run: brew install libomp
       - name: build
@@ -64,7 +70,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: deps (linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update -q && sudo apt-get install -y -q gcc-14 libcurl4-openssl-dev libssl-dev curl python3
@@ -74,7 +80,7 @@ jobs:
       - name: build
         run: ${{ matrix.make }}
       - name: cache reference model
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf
           key: geist-model-smollm2-360m-q8-48ab3034d0dd
@@ -87,8 +93,16 @@ jobs:
           GEIST_TEST_MODEL: geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf
         run: |
           if [ "${{ runner.os }}" = Linux ]; then export APP_CC=gcc-14; fi
-          make -f App.mk build/geist-app-test
+          make -f App.mk app build/geist-app-test
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/deadline_test.py
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/http_test.py
+          GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/compat_test.py
+          python3 tests/app/cli_test.py
           python3 tests/app/download_test.py
           python3 tests/app/daemon_test.py
+
+  installers:
+    needs: smoke
+    uses: ./.github/workflows/installers.yml
+    permissions:
+      contents: read

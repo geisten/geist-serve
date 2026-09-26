@@ -9,6 +9,7 @@ let showAllModels = false;
 let stopped = false, timer;
 let tasks = [], selectedTask = null;
 let qualityRecords = [];
+let connectionTesting = false;
 function qualityFor(model, task = selectedTask) {
   return qualityRecords.find(r => r.model_sha256 === model?.sha256 && r.task === task?.id &&
     r.task_version === task?.version && r.language === $('language-choice').value &&
@@ -26,7 +27,7 @@ async function api(path, body, signal) {
   });
   if (!response.ok) {
     let error = `Request failed (${response.status}).`;
-    try { error = (await response.json()).error || error; } catch { /* retain status */ }
+    try { const detail = (await response.json()).error; error = typeof detail === 'string' ? detail : detail?.message || error; } catch { /* retain status */ }
     throw new Error(error);
   }
   return response;
@@ -34,6 +35,10 @@ async function api(path, body, signal) {
 
 function message(text, local = true) { $('notice').textContent = text; localMessage = local; }
 function buttonStates() {
+  $('test-connection').disabled = !state?.ready || state?.busy || connectionTesting || requesting || !!controller;
+  $('copy-connection').disabled = !state?.ready;
+  $('connection-endpoint').textContent = `${location.origin}/v1`;
+  $('connection-model').textContent = state?.active_id || 'Choose a model';
   const ready = selectedTask && !selectedTask.url && state?.ready && !state?.busy && !requesting && !controller && allowed(state?.models.find(m => m.id === state.active_id));
   $('run').disabled = !ready;
   $('benchmark').disabled = !state?.ready || state?.busy || requesting || !!controller ||
@@ -232,6 +237,41 @@ $('more-models').addEventListener('click', () => {
   if (state) render(state);
 });
 window.addEventListener('beforeunload', () => controller?.abort());
+const connectionHelp = {
+  terminal: 'Paste the copied curl command into your terminal to try the loaded model. Ubuntu also installs geist test and geist chat. On Mac, the CLI is bundled at /Applications/Geist.app/Contents/MacOS/geist-cli.',
+  continue: 'In Continue, open your local config.yaml and add the model from this configuration. JSON is valid YAML. Select Geist and use Chat mode. Preserve your existing configuration.',
+  opencode: 'Save as opencode.json in a private test folder. Run opencode there and choose geist-chat. This profile disables tools; it does not enable coding-agent workflows.'
+};
+function updateConnectionHelp() { $('connection-help').textContent = connectionHelp[$('connection-client').value]; }
+$('connection-client').addEventListener('change', updateConnectionHelp);
+updateConnectionHelp();
+$('copy-connection').addEventListener('click', async () => {
+  try {
+    const c = await (await api('/app/connections')).json();
+    if (!c.ready) throw new Error('Load a model first.');
+    const kind = $('connection-client').value;
+    // The URL in a remote browser is the forwarded origin, not an arbitrary host.
+    const base = `${location.origin}/v1`;
+    let config;
+    if (kind === 'continue') config = {name: 'Geist Local', version: '1.0.0', schema: 'v1', models: [{name: 'Geist', provider: 'openai', model: c.model, apiBase: base, apiKey: c.api_key, roles: ['chat'], capabilities: [], defaultCompletionOptions: {contextLength: 4096, maxTokens: 512}}]};
+    else if (kind === 'opencode') config = {$schema: 'https://opencode.ai/config.json', provider: {geist: {npm: '@ai-sdk/openai-compatible', name: 'Geist', options: {baseURL: base, apiKey: c.api_key}, models: {[c.model]: {name: 'Geist local text', tool_call: false, limit: {context: 4096, output: 512}}}}}, model: `geist/${c.model}`, default_agent: 'geist-chat', agent: {'geist-chat': {mode: 'primary', description: 'Local text chat without tools', prompt: 'Answer the user briefly. You cannot access files or execute tools.', permission: {'*': 'deny'}}}};
+    else {
+      const quote = text => `'${text.replaceAll("'", "'\\''")}'`;
+      config = `curl ${quote(`${base}/chat/completions`)} -H ${quote(`Authorization: Bearer ${c.api_key}`)} -H 'Content-Type: application/json' --data ${quote(JSON.stringify({model: c.model, messages: [{role: 'user', content: 'Hello'}], max_tokens: 64}))}`;
+    }
+    await navigator.clipboard.writeText(typeof config === 'string' ? config : JSON.stringify(config, null, 2));
+    $('connection-result').textContent = 'Copied. The configuration contains your private local key.';
+  } catch (error) { $('connection-result').textContent = error.message; }
+});
+$('test-connection').addEventListener('click', async () => {
+  connectionTesting = true; buttonStates(); $('connection-result').textContent = 'Asking the loaded model through the editor endpoint…';
+  try {
+    const result = await (await api('/v1/chat/completions', {model: state.active_id, messages: [{role: 'user', content: 'Say hello in one sentence.'}], max_tokens: 32})).json();
+    if (!result.choices?.[0]?.message?.content || !(result.usage?.completion_tokens > 0)) throw new Error('The model completed without text. Try another model.');
+    $('connection-result').textContent = `Connected. The shared model returned ${result.usage.completion_tokens} tokens. Now test the configuration in your chosen client.`;
+  } catch (error) { $('connection-result').textContent = error.message; }
+  finally { connectionTesting = false; buttonStates(); }
+});
 $('output').classList.add('empty');
-if (!/^[a-f0-9]{64}$/.test(token)) message('Open Geist using the private link from the app or Pi launcher. The link authorizes only this local session.');
+if (!/^[a-f0-9]{64}$/.test(token)) message('Open Geist using the private link from the app or Pi launcher. The link contains your private local API key.');
 else { loadTasks().catch(error => message(error.message)); poll(); timer = setInterval(poll, 1800); }

@@ -15,14 +15,17 @@ bool app_daemon_ready(const char *path) {
     return ok;
 }
 
-int app_daemon_run(const char *path,
-                   const char *prompt,
-                   unsigned    max,
-                   bool (*emit)(void *, const char *),
-                   bool (*cancel)(void *),
-                   void                 *ctx,
-                   struct app_run_stats *stats,
-                   char                  error[static 256]) {
+int app_daemon_chat(const char           *path,
+                    size_t                count,
+                    const struct chat_msg messages[],
+                    unsigned              max,
+                    float                 temperature,
+                    float                 top_p,
+                    bool (*emit)(void *, const char *),
+                    bool (*cancel)(void *),
+                    void                 *ctx,
+                    struct app_run_stats *stats,
+                    char                  error[static 256]) {
     int            rc       = 502;
     struct geistd *g        = geistd_connect_unix(path, nullptr);
     struct json   *j        = calloc(1, sizeof *j);
@@ -58,8 +61,8 @@ int app_daemon_run(const char *path,
     int32_t bos      = (int32_t) json_num(j, json_get(j, 0, "bos"), -1);
     if (!capacity || capacity > 4096 || !max || max >= capacity)
         goto cleanup;
-    rendered = chat_render(f, 1, &(struct chat_msg) {.role = "user", .content = prompt});
-    if (!rendered || geistd_open(g, .2f, 1, 0, 0, session) != 0)
+    rendered = chat_render(f, count, messages);
+    if (!rendered || geistd_open(g, temperature, top_p, 0, 0, session) != 0)
         goto cleanup;
     if (geistd_tokenize(g, rendered, 4095, ids + 1, &n) != 0) {
         rc = 400;
@@ -100,4 +103,16 @@ cleanup:
     free(j);
     geistd_close(g);
     return rc;
+}
+
+int app_daemon_run(const char *path,
+                   const char *prompt,
+                   unsigned    max,
+                   bool (*emit)(void *, const char *),
+                   bool (*cancel)(void *),
+                   void                 *ctx,
+                   struct app_run_stats *stats,
+                   char                  error[static 256]) {
+    const struct chat_msg message = {.role = "user", .content = prompt};
+    return app_daemon_chat(path, 1, &message, max, .2f, 1, emit, cancel, ctx, stats, error);
 }

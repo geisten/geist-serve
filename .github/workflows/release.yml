@@ -9,10 +9,16 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
   linux:
+    timeout-minutes: 30
     strategy:
       matrix:
         include:
@@ -22,10 +28,10 @@ jobs:
             asset: geist-serve-linux-aarch64
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
-      - name: build static (alpine 3.21, musl, gcc 14)
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: build static (pinned Alpine, musl)
         run: |
-          docker run --rm -v "$PWD:/w" -w /w alpine:3.21 sh -ec '
+          docker run --rm -v "$PWD:/w" -w /w alpine:3.23@sha256:85fe1e81d6758c208f3e1eed4338a1997e19d4be002d4dd32d3100c9a8c010a0 sh -ec '
             apk add --no-cache build-base linux-headers git >/dev/null
             git config --global --add safe.directory /w
             make TARGET=linux CC=gcc GEMM_PROVIDER=native EXTRA_LDFLAGS=-static
@@ -37,7 +43,7 @@ jobs:
           file ${{ matrix.asset }} | grep -q 'statically linked'
           ./${{ matrix.asset }} 2>/dev/null || test $? -eq 2
           ./${{ matrix.asset }}-geistd 2>/dev/null || test $? -eq 2
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ matrix.asset }}
           path: |
@@ -45,9 +51,10 @@ jobs:
             ${{ matrix.asset }}-geistd
 
   macos:
+    timeout-minutes: 30
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: deps
         run: brew install libomp
       - name: build (static libomp)
@@ -57,7 +64,7 @@ jobs:
           ! otool -L geist-serve-macos-arm64 | grep -q homebrew
           ./geist-serve-macos-arm64 2>/dev/null || test $? -eq 2
           ./geist-serve-macos-arm64-geistd 2>/dev/null || test $? -eq 2
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: geist-serve-macos-arm64
           path: |
@@ -65,13 +72,18 @@ jobs:
             geist-serve-macos-arm64-geistd
 
   publish:
-    needs: [linux, macos]
+    needs: [verify, linux, macos]
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: write
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: dist
+          pattern: geist-serve-*
           merge-multiple: true
       - name: assemble
         run: |

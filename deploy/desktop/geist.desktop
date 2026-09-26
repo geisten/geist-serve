@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Geist
+Comment=Choose local models and connect your tools
+Exec=geist open
+Icon=utilities-terminal
+Terminal=false
+Categories=Development;
+Keywords=local;model;privacy;

@@ -1,10 +1,23 @@
 # geist-serve
 
-**Runs here. Stays here.** The optional `geist-app` adds a local interface,
-hardware-aware model choices and verified first-run downloads for Mac and
-Raspberry Pi. Build with `make app` after building the server.
-See [the app guide](docs/APP.md) for desktop and headless setup.
-The app is currently a local development build, not a published download.
+**Runs here. Stays here.** Choose a model for your hardware, download it once,
+and use the same `geistd` from the model manager, terminal and editor.
+`geist-app` owns the private inference process; the C23 `geist` client and
+authenticated `/v1/chat/completions` gateway connect to that same service.
+
+Mac DMG and Ubuntu amd64/arm64 DEB candidates are under development. See
+[installation and connections](docs/INSTALL.md) for setup, Continue in VS Code,
+OpenCode, restart, update and removal. Text chat and agent support are distinct:
+this gateway rejects tool calls explicitly. These are not published releases;
+the Mac candidate has not yet received Apple notarization acceptance.
+
+Build with `make app` after building `geistd`, then run `./geist open`.
+The [app guide](docs/APP.md) explains resource advice and model downloads.
+
+## Legacy standalone HTTP server
+
+The following section describes the separate `geist-serve` executable. It does
+not share the manager's loaded model and is not the installer entry point.
 
 An Ollama- and OpenAI-compatible HTTP front for the
 [geist engine](https://github.com/geisten/geistlib): one GGUF, one process,

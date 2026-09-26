@@ -14,14 +14,14 @@ Mac release still needs Developer ID signing and notarization.
 Open the Geist DMG, drag Geist to Applications, and open Geist. Its menu bar
 icon opens the local interface in your default browser. Choose a task, then Download on a model that fits your resources. After verification and loading, try an example.
 Use Stop to cancel an answer, Unload to free model memory, or Quit Geist
-to stop the local runtime. Start at Login is optional in the native menu.
+to stop the local runtime. Closing the browser or quitting the menu bar leaves the shared service running. Start at Login is optional in the native menu.
 
 Apple Silicon and macOS 14 or later are required by the Mac app.
 Previously downloaded catalog files in the Geist data folder are reused
 after verification. The former Swift application's selected-model preference
-is not migrated: choose Use once. Its LAN toggle and CLI installer are not
-part of this interface; the standalone geist-serve APIs remain available
-separately.
+is not migrated: choose Use once. The new Connections panel and bundled `geist` terminal client use the same
+loaded daemon. The older standalone geist-serve server is a separate legacy
+entry point; do not start it to connect an editor to the manager.
 
 ## Start on a Raspberry Pi
 
@@ -31,7 +31,7 @@ Extract the `geist-…-linux-aarch64.tar.gz` archive. On the desktop, run
 manager asks). It opens your browser. If the file manager opens the script
 as text, run `sh './Start Geist.sh'` in that folder's terminal.
 
-The package contains two static executables. It does not need a compiler,
+The package contains three static executables: geist, geist-app and geistd. It does not need a compiler,
 Python, a package manager, Docker or an inference service installation.
 HTTPS downloads use the operating system's CA certificate store.
 
@@ -121,7 +121,9 @@ is embedded in the C executable and shared by Mac and Pi.
 
 Data lives in `~/Library/Application Support/Geist` on Mac and
 `$XDG_DATA_HOME/geist` (normally `~/.local/share/geist`) on Linux. Files contain
-models, the selected catalog ID, a runtime log and a process lock. The app
+models, the selected catalog ID, a runtime log, a process lock, a mode-0600 API
+key and mode-0600 connection.json. The connection descriptor is removed on
+shutdown; the API key survives restarts. The app
 does not save prompt history or send telemetry. Prompts and answers exist
 in browser/process memory. Browser history may retain the local launch URL.
 Model downloads contact Hugging Face; manual Mac update checks contact the
@@ -174,3 +176,10 @@ Socket operations have a 120-second deadline; an app request has a 180-second ce
 See [EVALUATION.md](EVALUATION.md) for the controlled llama.cpp smoke comparison and the separate Home Assistant evidence gates.
 
 The launcher starts at most two compute threads on Macs/unknown hardware and four on Pi 5, with passive OpenMP waiting. These are conservative resource limits, not a claim of optimal throughput. BitNet uses the existing Llama-3 renderer, matching geistagent's framing policy; generation stops and output-limit truncation are distinct UI states.
+
+## Shared editor endpoint
+
+See [installation and client setup](INSTALL.md). The authenticated `/v1/models`
+and `/v1/chat/completions` routes use the same geistd as the browser. Text
+history, streaming and usage are supported. Tool requests fail explicitly;
+this preview does not claim coding-agent support.

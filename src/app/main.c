@@ -5,6 +5,8 @@
 #include "core.h"
 #include "daemon.h"
 #include "tasks.h"
+#include "compat.h"
+#include "connection.h"
 #include <sys/un.h>
 #include "../json.h"
 #include <arpa/inet.h>
@@ -131,9 +133,9 @@ static ssize_t request_recv(int fd, void *buffer, size_t size, double deadline) 
             errno = ETIMEDOUT;
             return -1;
         }
-        struct pollfd wait = {.fd = fd, .events = POLLIN};
-        int ms = left > 50 ? 50 : (int) left + 1;
-        int ready = poll(&wait, 1, ms);
+        struct pollfd wait  = {.fd = fd, .events = POLLIN};
+        int           ms    = left > 50 ? 50 : (int) left + 1;
+        int           ready = poll(&wait, 1, ms);
         if (ready < 0 && errno == EINTR)
             continue;
         if (ready < 0)
@@ -213,8 +215,8 @@ static bool loopback_host(const char *host) {
 
 static int read_request(int fd, struct app_arena *arena, struct request *r) {
     double deadline = monotonic_ms() + REQUEST_TIMEOUT_MS;
-    char *head = app_alloc(arena, HEADER_CAP + 1, 1, 1);
-    r->body    = app_alloc(arena, REQUEST_CAP + 1, 1, 1);
+    char  *head     = app_alloc(arena, HEADER_CAP + 1, 1, 1);
+    r->body         = app_alloc(arena, REQUEST_CAP + 1, 1, 1);
     if (!head || !r->body)
         return 503;
     size_t got = 0;
@@ -701,7 +703,10 @@ static void status_response(int fd, struct app_arena *arena) {
     app_put(&b, ",\"arch\":");
     app_quote(&b, h.arch);
     app_put(&b, ",\"device\":");
-    app_quote(&b, h.device == APP_APPLE_SILICON ? "apple-silicon" : h.device == APP_PI5 ? "pi5" : "unknown");
+    app_quote(&b,
+              h.device == APP_APPLE_SILICON ? "apple-silicon"
+              : h.device == APP_PI5         ? "pi5"
+                                            : "unknown");
     app_printf(&b,
                ",\"ram\":%llu,\"available\":%llu,\"disk\":%llu,\"cores\":%u,\"known\":%s,\"disk_"
                "known\":%s,\"available_known\":%s},",
@@ -776,9 +781,9 @@ static void status_response(int fd, struct app_arena *arena) {
 }
 
 struct proxy {
-    int    fd;
-    bool   started;
-    double start;
+    int             fd;
+    bool            started;
+    double          start;
     struct app_utf8 utf8;
 };
 static bool proxy_cancel(void *opaque) {
@@ -846,11 +851,12 @@ static void generate(int fd, struct request *r, struct app_arena *arena) {
         error_response(fd, 400, "The input is empty or exceeds this task's byte limit.");
         return;
     }
-    int language_token = json_get(json, 0, "language");
-    char *requested_language = json_strdup(json, language_token);
+    int         language_token     = json_get(json, 0, "language");
+    char       *requested_language = json_strdup(json, language_token);
     const char *language = requested_language && !strcmp(requested_language, "de") ? "de" : "en";
-    bool valid_language = language_token < 0 || (requested_language &&
-                         (!strcmp(requested_language, "de") || !strcmp(requested_language, "en")));
+    bool        valid_language =
+            language_token < 0 || (requested_language && (!strcmp(requested_language, "de") ||
+                                                          !strcmp(requested_language, "en")));
     free(requested_language);
     if (!valid_language) {
         free(prompt);
@@ -858,15 +864,18 @@ static void generate(int fd, struct request *r, struct app_arena *arena) {
         return;
     }
     size_t composed_cap = length + strlen(task->instruction) + 128;
-    char *composed = app_alloc(arena, composed_cap, 1, 1);
+    char  *composed     = app_alloc(arena, composed_cap, 1, 1);
     if (!composed) {
         free(prompt);
         error_response(fd, 503, "Request memory budget exhausted.");
         return;
     }
-    snprintf(composed, composed_cap, "%s\n%s\n\nInput:\n%s",
+    snprintf(composed,
+             composed_cap,
+             "%s\n%s\n\nInput:\n%s",
              !strcmp(language, "de") ? "Answer in German." : "Answer in English.",
-             task->instruction, prompt);
+             task->instruction,
+             prompt);
     pthread_mutex_lock(&app.mutex);
     poll_child();
     if (!app.ready || app.generating || app.job_running) {
@@ -876,13 +885,19 @@ static void generate(int fd, struct request *r, struct app_arena *arena) {
         return;
     }
     struct app_hardware hardware;
-    bool hardware_known = app_hardware_read(&hardware, app.models);
-    enum app_quality quality = app_task_quality(app_model_find(app.active_id), task, language,
-                                               hardware_known ? hardware.device : APP_UNKNOWN);
-    if (quality != APP_QUALITY_PASSED && !json_bool(json, json_get(json, 0, "experimental"), false)) {
+    bool                hardware_known = app_hardware_read(&hardware, app.models);
+    enum app_quality    quality = app_task_quality(app_model_find(app.active_id),
+                                                   task,
+                                                   language,
+                                                   hardware_known ? hardware.device : APP_UNKNOWN);
+    if (quality != APP_QUALITY_PASSED &&
+        !json_bool(json, json_get(json, 0, "experimental"), false)) {
         pthread_mutex_unlock(&app.mutex);
         free(prompt);
-        error_response(fd, 409, "This task/model/language is experimental. Enable experimental use explicitly.");
+        error_response(
+                fd,
+                409,
+                "This task/model/language is experimental. Enable experimental use explicitly.");
         return;
     }
     bool benchmark   = json_bool(json, json_get(json, 0, "benchmark"), false);
@@ -921,13 +936,13 @@ static void generate(int fd, struct request *r, struct app_arena *arena) {
                           sizeof final,
                           "{\"done\":true,\"eval_count\":%zu,\"eval_duration\":%.0f,"
                           "\"total_duration\":%.0f,\"prompt_eval_count\":%zu,\"reused\":%zu,"
-                         "\"limited\":%s}\n",
-                         stats.tokens,
-                         stats.generation_ns,
-                         stats.total_ns,
-                         stats.prompt_tokens,
-                         stats.reused,
-                         stats.limited ? "true" : "false");
+                          "\"limited\":%s}\n",
+                          stats.tokens,
+                          stats.generation_ns,
+                          stats.total_ns,
+                          stats.prompt_tokens,
+                          stats.reused,
+                          stats.limited ? "true" : "false");
         (void) send_bytes(fd, final, (size_t) n);
         if (model_index >= 0 && stats.tokens >= 16 && stats.generation_ns > 1e6) {
             pthread_mutex_lock(&app.mutex);
@@ -939,6 +954,219 @@ static void generate(int fd, struct request *r, struct app_arena *arena) {
     pthread_mutex_lock(&app.mutex);
     app.generating = false;
     pthread_mutex_unlock(&app.mutex);
+}
+
+/* External clients and the browser share the same owned daemon and busy flag. */
+struct completion_proxy {
+    struct proxy      transport;
+    bool              stream;
+    char              model[160], id[64];
+    struct app_buffer text;
+};
+
+static void api_error(int fd, int code, const char *message) {
+    char              body[1024];
+    struct app_buffer b = {.data = body, .cap = sizeof body};
+    app_put(&b, "{\"error\":{\"message\":");
+    app_quote(&b, message);
+    app_printf(&b, ",\"type\":\"invalid_request_error\",\"code\":%d}}", code);
+    response(fd, code, "application/json", body, b.len);
+}
+
+static void completion_prefix(struct app_buffer *b, const struct completion_proxy *p, bool chunk) {
+    app_put(b, "{\"id\":");
+    app_quote(b, p->id);
+    app_printf(b,
+               ",\"object\":\"chat.completion%s\",\"created\":%lld,\"model\":",
+               chunk ? ".chunk" : "",
+               (long long) time(nullptr));
+    app_quote(b, p->model);
+}
+
+static bool completion_emit(void *opaque, const char *piece) {
+    struct completion_proxy *p = opaque;
+    if (proxy_cancel(&p->transport))
+        return false;
+    char decoded[8192];
+    if (!app_utf8_feed(&p->transport.utf8, piece, decoded, sizeof decoded))
+        return false;
+    if (!decoded[0] && piece[0])
+        return true;
+    if (!p->stream) {
+        app_put(&p->text, decoded);
+        return !p->text.failed;
+    }
+    if (!p->transport.started) {
+        const char *header =
+                "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: "
+                "no-store\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\n\r\n";
+        if (!send_bytes(p->transport.fd, header, strlen(header)))
+            return false;
+        p->transport.started = true;
+    }
+    char              data[16384];
+    struct app_buffer b = {.data = data, .cap = sizeof data};
+    app_put(&b, "data: ");
+    completion_prefix(&b, p, true);
+    app_put(&b, ",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":");
+    app_quote(&b, decoded);
+    app_put(&b, "},\"finish_reason\":null}]}\n\n");
+    return !b.failed && send_bytes(p->transport.fd, data, b.len);
+}
+
+static void completions(int fd, const struct request *r, struct app_arena *arena) {
+    struct app_chat chat;
+    const char     *why;
+    int             code = app_chat_parse(arena, r->body, &chat, &why);
+    if (code) {
+        api_error(fd, code, why);
+        return;
+    }
+    char *text = app_alloc(arena, 32768, 1, 1), *body = app_alloc(arena, 65536, 1, 1);
+    if (!text || !body) {
+        api_error(fd, 503, "Request memory budget exhausted.");
+        return;
+    }
+    struct completion_proxy p = {.transport = {.fd = fd, .start = monotonic_ms()},
+                                 .stream    = chat.stream,
+                                 .text      = {.data = text, .cap = 32768}};
+    static atomic_ulong     sequence;
+    snprintf(p.id,
+             sizeof p.id,
+             "chatcmpl-geist-%ld-%lu",
+             (long) getpid(),
+             atomic_fetch_add(&sequence, 1));
+    pthread_mutex_lock(&app.mutex);
+    poll_child();
+    if (!app.ready || app.job_running) {
+        pthread_mutex_unlock(&app.mutex);
+        api_error(fd, 503, "Select and load a model in Geist first.");
+        return;
+    }
+    if (strcmp(chat.model, app.active_id)) {
+        pthread_mutex_unlock(&app.mutex);
+        api_error(fd,
+                  404,
+                  "Requested model is not loaded. Refresh /v1/models after changing models.");
+        return;
+    }
+    if (app.generating) {
+        pthread_mutex_unlock(&app.mutex);
+        api_error(fd, 429, "The shared model is busy. Retry after the current request completes.");
+        return;
+    }
+    snprintf(p.model, sizeof p.model, "%s", app.active_id);
+    app.generating = true;
+    pthread_mutex_unlock(&app.mutex);
+    struct app_run_stats stats;
+    char                 error[256];
+    int                  rc = app_daemon_chat(app.socket_path,
+                                              chat.count,
+                                              chat.messages,
+                                              chat.max_tokens,
+                                              chat.temperature,
+                                              chat.top_p,
+                                              completion_emit,
+                                              proxy_cancel,
+                                              &p,
+                                              &stats,
+                                              error);
+    /* completion_proxy begins with proxy, so the cancellation callback borrows it. */
+    if (p.transport.utf8.used || p.transport.utf8.failed || p.text.failed) {
+        rc = 502;
+        snprintf(error, sizeof error, "The model produced invalid or oversized text.");
+    }
+    if (!rc && chat.stream && !p.transport.started && !completion_emit(&p, ""))
+        rc = 502;
+    struct app_buffer b = {.data = body, .cap = 65536};
+    if (rc) {
+        if (!p.transport.started)
+            api_error(fd, rc, error);
+        else {
+            app_put(&b, "data: {\"error\":{\"message\":");
+            app_quote(&b, error);
+            app_put(&b, "}}\n\n");
+            (void) send_bytes(fd, body, b.len);
+        }
+    } else {
+        if (chat.stream)
+            app_put(&b, "data: ");
+        completion_prefix(&b, &p, chat.stream);
+        app_put(&b, ",\"choices\":[{\"index\":0,");
+        if (chat.stream)
+            app_put(&b, "\"delta\":{},");
+        else {
+            app_put(&b, "\"message\":{\"role\":\"assistant\",\"content\":");
+            app_quote(&b, text);
+            app_put(&b, "},");
+        }
+        app_put(&b, "\"finish_reason\":");
+        app_quote(&b, stats.limited ? "length" : "stop");
+        app_put(&b, "}]");
+        if (!chat.stream)
+            app_printf(&b,
+                       ",\"usage\":{\"prompt_tokens\":%zu,\"completion_tokens\":%zu,\"total_"
+                       "tokens\":%zu}",
+                       stats.prompt_tokens,
+                       stats.tokens,
+                       stats.prompt_tokens + stats.tokens);
+        app_put(&b, "}");
+        if (chat.stream) {
+            app_put(&b, "\n\n");
+            if (chat.include_usage) {
+                app_put(&b, "data: ");
+                completion_prefix(&b, &p, true);
+                app_printf(&b,
+                           ",\"choices\":[],\"usage\":{\"prompt_tokens\":%zu,\"completion_tokens\":"
+                           "%zu,\"total_tokens\":%zu}}\n\n",
+                           stats.prompt_tokens,
+                           stats.tokens,
+                           stats.prompt_tokens + stats.tokens);
+            }
+            app_put(&b, "data: [DONE]\n\n");
+            if (!b.failed)
+                (void) send_bytes(fd, body, b.len);
+        } else if (b.failed)
+            api_error(fd, 502, "Completion exceeds response capacity.");
+        else
+            response(fd, 200, "application/json", body, b.len);
+    }
+    pthread_mutex_lock(&app.mutex);
+    app.generating = false;
+    pthread_mutex_unlock(&app.mutex);
+}
+
+static void connections(int fd, bool models) {
+    char              body[4096];
+    struct app_buffer b = {.data = body, .cap = sizeof body};
+    pthread_mutex_lock(&app.mutex);
+    poll_child();
+    if (models) {
+        app_put(&b, "{\"object\":\"list\",\"data\":[");
+        if (app.ready) {
+            app_put(&b, "{\"id\":");
+            app_quote(&b, app.active_id);
+            app_put(&b,
+                    ",\"object\":\"model\",\"created\":0,\"owned_by\":\"local\",\"context_window\":"
+                    "4096,\"capabilities\":{\"chat\":true,\"tools\":false,\"vision\":false}}");
+        }
+        app_put(&b, "]}");
+    } else {
+        app_printf(&b, "{\"base_url\":\"http://127.0.0.1:%u/v1\",\"api_key\":", app.port);
+        app_quote(&b, app.token);
+        app_put(&b, ",\"model\":");
+        app_quote(&b, app.active_id);
+        app_printf(&b,
+                   ",\"ready\":%s,\"daemon_pid\":%ld,\"context_tokens\":4096,\"max_output_tokens\":"
+                   "1024,\"chat\":true,\"tools\":false,\"quality\":\"unverified\"}",
+                   app.ready ? "true" : "false",
+                   (long) app.child);
+    }
+    pthread_mutex_unlock(&app.mutex);
+    if (b.failed)
+        api_error(fd, 503, "Connection description exceeds capacity.");
+    else
+        response(fd, 200, "application/json", body, b.len);
 }
 
 static void handle(int fd, struct app_arena *arena) {
@@ -967,7 +1195,27 @@ static void handle(int fd, struct app_arena *arena) {
         }
     }
     if (!authorized(&r)) {
+        if (!strncmp(r.path, "/v1/", 4)) {
+            api_error(fd, 401, "A valid local Geist API key is required.");
+            return;
+        }
         error_response(fd, 403, "Open the private app link supplied by the launcher.");
+        return;
+    }
+    if (!strcmp(r.method, "GET") && !strcmp(r.path, "/v1/models")) {
+        connections(fd, true);
+        return;
+    }
+    if (!strcmp(r.method, "GET") && !strcmp(r.path, "/app/connections")) {
+        connections(fd, false);
+        return;
+    }
+    if (!strcmp(r.method, "POST") && !strcmp(r.path, "/v1/chat/completions")) {
+        completions(fd, &r, arena);
+        return;
+    }
+    if (!strncmp(r.path, "/v1/", 4)) {
+        api_error(fd, 404, "Unsupported endpoint. Use /v1/models or /v1/chat/completions.");
         return;
     }
     if (strcmp(r.method, "GET") == 0 && strcmp(r.path, "/app/status") == 0) {
@@ -1207,17 +1455,13 @@ int main(int argc, char **argv) {
         close(lock);
         return 1;
     }
-    int           random = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
-    unsigned char bytes[32];
-    bool          random_ok = random >= 0 && read(random, bytes, sizeof bytes) == sizeof bytes;
-    if (random >= 0)
-        close(random);
-    if (!random_ok) {
+    if (!app_key(app.home, app.token)) {
+        fprintf(stderr,
+                "Cannot create or read the private API key. Check data-folder ownership and "
+                "permissions.\n");
         close(lock);
         return 1;
     }
-    for (size_t i = 0; i < sizeof bytes; ++i)
-        snprintf(app.token + i * 2, 3, "%02x", bytes[i]);
     signal(SIGPIPE, SIG_IGN);
     struct sigaction action = {.sa_handler = on_signal};
     sigemptyset(&action.sa_mask);
@@ -1233,6 +1477,13 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Port is unavailable. Use --port 0 to choose a free port.\n");
         curl_global_cleanup();
         close(lock);
+        return 1;
+    }
+    if (!app_connection_write(app.home, app.port, app.token)) {
+        fprintf(stderr, "Cannot save private connection details.\n");
+        close(fd);
+        close(lock);
+        curl_global_cleanup();
         return 1;
     }
     printf("GEIST_APP_URL=http://127.0.0.1:%u/#%s\n", app.port, app.token);
@@ -1310,6 +1561,7 @@ int main(int argc, char **argv) {
     if (app.job_joinable)
         pthread_join(app.job, nullptr);
     stop_child();
+    app_connection_remove(app.home);
     curl_global_cleanup();
     close(lock);
     return 0;

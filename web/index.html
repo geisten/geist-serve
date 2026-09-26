@@ -29,6 +29,17 @@
       <details class="method"><summary>How recommendations work</summary><p>RAM guidance includes a planning allowance for runtime and context memory. It is an estimate, not measured peak usage. Available memory changes as other apps run.</p><p>A model is recommended only when both hardware fit and task quality have evidence. Task quality is currently unverified, so usable models remain conditional. A greyed-out download has a concrete resource or compatibility reason.</p><p>Completed runs with at least 16 generated tokens update this session's speed observation. They do not validate task quality. The interactive target is 8 tokens/s, a product guideline rather than a quality score. Slower models remain selectable.</p><p>Models are fetched from Hugging Face only when you choose Download. The app checks their SHA-256 before starting them. No account is needed.</p><p>Pi 5 BitNet speed reference: geist-serve, 25 September 2026, 4 GB RAM, idle and cooled, 4 threads. Other hardware and workloads may differ.</p></details>
     </aside>
     <main id="main">
+      <section class="task-panel connections" aria-labelledby="connections-title">
+        <h2 id="connections-title">Connect your tools.</h2>
+        <p class="hint">Your editor and this page use the same loaded model. Closing this tab keeps the service running.</p>
+        <dl><dt>Local endpoint</dt><dd id="connection-endpoint" class="connection-value">Loading…</dd><dt>Model</dt><dd id="connection-model" class="connection-value">Choose a model</dd></dl>
+        <label for="connection-client">Use with</label>
+        <select id="connection-client"><option value="terminal">Terminal</option><option value="continue">VS Code · Continue</option><option value="opencode">OpenCode · text chat</option></select>
+        <p id="connection-help" class="hint"></p>
+        <div class="actions"><button id="copy-connection" type="button" disabled>Copy configuration</button><button id="test-connection" type="button" disabled>Test local connection</button></div>
+        <p id="connection-result" role="status" aria-live="polite" class="hint"></p>
+        <p class="hint">Text chat: available after loading. Agent tools: not supported. Context: 4096 tokens. Copied configurations include your private local key; keep them out of repositories. A connection test does not certify answer quality.</p>
+      </section>
       <section class="task-panel" aria-labelledby="task-title">
         <div class="section-heading"><h2 id="task-title">3. Try it here.</h2><span id="runtime-state" class="state">Choose a model</span></div>
         <p id="active-model" class="muted">Download a suggested model to begin.</p>
