@@ -1,5 +1,24 @@
 # geist-serve
 
+**Runs here. Stays here.** Choose a model for your hardware, download it once,
+and use the same `geistd` from the model manager, terminal and editor.
+`geist-app` owns the private inference process; the C23 `geist` client and
+authenticated `/v1/chat/completions` gateway connect to that same service.
+
+Mac DMG and Ubuntu amd64/arm64 DEB candidates are under development. See
+[installation and connections](docs/INSTALL.md) for setup, Continue in VS Code,
+OpenCode, restart, update and removal. Text chat and agent support are distinct:
+this gateway rejects tool calls explicitly. These are not published releases;
+the Mac candidate has not yet received Apple notarization acceptance.
+
+Build with `make app` after building `geistd`, then run `./geist open`.
+The [app guide](docs/APP.md) explains resource advice and model downloads.
+
+## Legacy standalone HTTP server
+
+The following section describes the separate `geist-serve` executable. It does
+not share the manager's loaded model and is not the installer entry point.
+
 An Ollama- and OpenAI-compatible HTTP front for the
 [geist engine](https://github.com/geisten/geistlib): one GGUF, one process,
 one request at a time, no dependencies. Point VS Code Copilot Chat, Continue,
@@ -65,6 +84,13 @@ What to type into each editor or chat client: [`docs/CLIENTS.md`](docs/CLIENTS.m
 Deploying: `deploy/systemd/` (socket activation on 11434, hardened service,
 model path in `/etc/default/geist-serve`), `install.sh`, and static release
 binaries from `.github/workflows/release.yml` on every `v*` tag.
+
+## Task quality
+
+The local app requires explicit experimental opt-in unless a model, task,
+language and device combination has reviewed evidence. See
+[task-quality acceptance](docs/TASK-QUALITY.md) for the frozen corpus, human
+review and reproducibility limits. Resource fit alone does not establish quality.
 
 ## License
 

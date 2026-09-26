@@ -91,6 +91,18 @@ try:
     p.pin(1); check("second pin refused", False)
 except geistd.GeistdError as e:
     check("second pin refused", "already" in str(e), e)
+# The engine pin call truncates to that prefix immediately, before reset.
+p2 = c.open(temperature=0)
+p2.prefill(sysp + q1)
+p2.pin(len(sysp))
+r = p2.prefill(sysp + q1)
+check('pin synchronizes daemon history with engine KV', r['prefilled'] == len(q1) and r['reused'] == len(sysp), r)
+c._call({'op':'unpin','session':p2.id})
+r = p2.prefill(q1)
+check('unpin clears both engine and daemon history', r['reused'] == 0 and r['prefilled'] == len(q1), r)
+check('exact token lookup', c._call({'op':'token_id','text':'<|im_end|>'})[0]['token'] >= 0)
+check('absent token lookup', c._call({'op':'token_id','text':'<|unknown_9393|>'})[0]['token'] == -1)
+p2.close()
 p.close()
 
 # errors never end the daemon

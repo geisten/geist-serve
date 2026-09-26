@@ -5,6 +5,14 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      package_version:
+        type: string
+        default: '0.3.0'
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -12,6 +20,7 @@ concurrency:
 
 jobs:
   build:
+    timeout-minutes: 25
     strategy:
       matrix:
         # -std=c23 needs gcc >= 14; force the generic linux target — the
@@ -19,13 +28,17 @@ jobs:
         runner: [ubuntu-24.04, ubuntu-24.04-arm]
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: deps
-        run: sudo apt-get update -q && sudo apt-get install -y -q gcc-14
+        run: sudo apt-get update -q && sudo apt-get install -y -q gcc-14 libcurl4-openssl-dev libssl-dev
       - name: build
-        run: make CC=gcc-14 TARGET=linux
+        run: make CC=gcc-14 TARGET=linux && make app test-app APP_CC=gcc-14
       - name: usage exits 2
         run: ./geist-serve 2>/dev/null || test $? -eq 2
+      - name: installer failure and rollback tests
+        run: |
+          python3 tests/install/legacy_test.py
+          python3 tests/install/manifest_test.py
       - name: unit tests (model-free)
         run: make CC=gcc-14 TARGET=linux build/test_template && ./build/test_template
       - name: systemd units parse
@@ -34,15 +47,20 @@ jobs:
           systemd-analyze verify --man=no deploy/systemd/geist-serve.socket deploy/systemd/geist-serve.service
 
   build-macos:
+    timeout-minutes: 25
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: deps
         run: brew install libomp
       - name: build
-        run: make
+        run: make && make app test-app
       - name: usage exits 2
         run: ./geist-serve 2>/dev/null || test $? -eq 2
+      - name: installer failure and rollback tests
+        run: |
+          python3 tests/install/legacy_test.py
+          python3 tests/install/manifest_test.py
       - name: unit tests (model-free)
         run: make build/test_template && ./build/test_template
 
@@ -64,17 +82,17 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: deps (linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update -q && sudo apt-get install -y -q gcc-14 curl python3
+        run: sudo apt-get update -q && sudo apt-get install -y -q gcc-14 libcurl4-openssl-dev libssl-dev curl python3
       - name: deps (macos)
         if: runner.os == 'macOS'
         run: brew install libomp
       - name: build
         run: ${{ matrix.make }}
       - name: cache reference model
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf
           key: geist-model-smollm2-360m-q8-48ab3034d0dd
@@ -82,3 +100,22 @@ jobs:
         run: ${{ matrix.make }} fetch-model
       - name: smoke + wire-level suite
         run: OMP_NUM_THREADS=3 ${{ matrix.make }} test
+      - name: app integration with sanitizers
+        env:
+          GEIST_TEST_MODEL: geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf
+        run: |
+          if [ "${{ runner.os }}" = Linux ]; then export APP_CC=gcc-14; fi
+          make -f App.mk app build/geist-app-test
+          GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/deadline_test.py
+          GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/http_test.py
+          GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/compat_test.py
+          python3 tests/app/cli_test.py
+          python3 tests/app/download_test.py
+          python3 tests/app/daemon_test.py
+
+  installers:
+    uses: ./.github/workflows/installers.yml
+    with:
+      package_version: ${{ inputs.package_version || '0.3.0' }}
+    permissions:
+      contents: read

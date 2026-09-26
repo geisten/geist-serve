@@ -1,5 +1,11 @@
 # Client matrix
 
+The matrix below applies to the legacy standalone `geist-serve` server. The
+new manager exposes an authenticated shared-daemon text-chat endpoint; use
+[INSTALL.md](INSTALL.md) and its Connections panel for that installation.
+Do not launch a second standalone server to connect to the manager.
+
+
 What to type into each client to point it at geist-serve, and whether
 someone has actually done it. A ticked box means a person ran that client
 against this server and got a streamed answer; an unticked box is a
