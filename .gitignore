@@ -1,4 +1,6 @@
 /geist-serve
+/geist-app
+/geistd
 /geistlib/
 /build/
 *.tar.gz

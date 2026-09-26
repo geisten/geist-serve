@@ -132,8 +132,11 @@ static int read_frame(struct conn *c, char **hdr, unsigned char **body, size_t *
         return -1;
     *hdr  = malloc(hl + 1);
     *body = bl ? malloc(bl) : nullptr;
-    if (*hdr == nullptr || (bl && *body == nullptr))
+    if (*hdr == nullptr || (bl && *body == nullptr)) {
+        free(*hdr);
+        free(*body);
         return -1;
+    }
     if (!read_all(c, hl, (unsigned char *) *hdr) || (bl && !read_all(c, bl, *body))) {
         free(*hdr);
         free(*body);
@@ -308,7 +311,7 @@ static bool op_info(struct daemon *d, struct conn *c) {
         live += d->sess[i].live;
     sb_printf(&h,
               "],\"ctx\":%d,\"vocab\":%zu,\"add_bos\":%s,\"bos\":%d,\"template\":\"%s\","
-              "\"sessions\":%d,\"max_sessions\":%d}",
+              "\"agent_api\":1,\"sessions\":%d,\"max_sessions\":%d}",
               CTX_CAP,
               d->vocab,
               d->add_bos ? "true" : "false",
@@ -566,6 +569,8 @@ static bool op_generate(struct daemon *d, struct conn *c, struct sess *x, const 
             if (j->tok[i].parent == sarr && json_is_str(j, i))
                 stops[n_str++] = json_strdup(j, i);
 
+    struct timespec start;
+    clock_gettime(CLOCK_MONOTONIC, &start);
     char        tail[512] = "";
     const char *reason    = "max";
     size_t      k         = 0;
@@ -586,18 +591,25 @@ static bool op_generate(struct daemon *d, struct conn *c, struct sess *x, const 
             stop |= (t == stop_ids[i]);
         if (p) {
             size_t pl = strlen(p), tl = strlen(tail);
-            if (tl + pl >= sizeof tail) {
-                memmove(tail,
-                        tail + (tl + pl - sizeof tail + 1),
-                        sizeof tail - (tl + pl - sizeof tail + 1));
-                tl = strlen(tail);
+            if (pl >= sizeof tail) {
+                memcpy(tail, p + pl - sizeof tail + 1, sizeof tail - 1);
+                tail[sizeof tail - 1] = 0;
+            } else {
+                if (tl + pl >= sizeof tail) {
+                    size_t drop = tl + pl - sizeof tail + 1;
+                    memmove(tail, tail + drop, tl - drop + 1);
+                    tl -= drop;
+                }
+                memcpy(tail + tl, p, pl + 1);
             }
-            memcpy(tail + tl, p, pl + 1);
             for (size_t i = 0; i < n_str; i++)
                 stop |= strstr(tail, stops[i]) != nullptr;
         }
         struct sb h = {};
-        sb_printf(&h, "{\"ok\":true,\"token\":%d,\"done\":false,\"piece\":", t);
+        sb_printf(&h,
+                  "{\"ok\":true,\"token\":%d,\"done\":false,\"stop\":%s,\"piece\":",
+                  t,
+                  stop ? "true" : "false");
         if (p)
             sb_json_str(&h, strlen(p), p);
         else
@@ -617,12 +629,17 @@ static bool op_generate(struct daemon *d, struct conn *c, struct sess *x, const 
         free(stops[i]);
     if (c->broken)
         return false;
-    struct sb h = {};
+    struct timespec end;
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    double    elapsed_ns = (end.tv_sec - start.tv_sec) * 1e9 + end.tv_nsec - start.tv_nsec;
+    struct sb h          = {};
     sb_printf(&h,
-              "{\"ok\":true,\"done\":true,\"reason\":\"%s\",\"generated\":%zu,\"n\":%zu}",
+              "{\"ok\":true,\"done\":true,\"reason\":\"%s\",\"generated\":%zu,\"n\":%zu,\"duration_"
+              "ns\":%.0f}",
               reason,
               k,
-              x->n_hist);
+              x->n_hist,
+              elapsed_ns);
     return reply(c, &h, 0, nullptr);
 }
 
@@ -672,7 +689,28 @@ static bool handle(struct daemon       *d,
     free(sid);
     if (strcmp(op, "info") == 0)
         ok = op_info(d, c);
-    else if (strcmp(op, "open") == 0)
+    else if (strcmp(op, "token_id") == 0) {
+        char *text = json_strdup(&j, json_get(&j, 0, "text"));
+        if (!text)
+            ok = reply_error(c, "token_id: text required");
+        else {
+            struct sb h = {};
+            sb_printf(&h, "{\"ok\":true,\"token\":%d}", geist_model_token_by_text(d->m, text));
+            ok = reply(c, &h, 0, nullptr);
+        }
+        free(text);
+    } else if (strcmp(op, "unpin") == 0) {
+        if (!x)
+            ok = reply_error(c, "unpin: unknown session");
+        else if (geist_session_pin_prefix(x->s, 0, x->hist) != GEIST_OK)
+            ok = reply_error(c, "unpin: unsupported");
+        else {
+            x->pinned = x->n_hist = 0;
+            struct sb h           = {};
+            sb_puts(&h, "{\"ok\":true}");
+            ok = reply(c, &h, 0, nullptr);
+        }
+    } else if (strcmp(op, "open") == 0)
         ok = op_open(d, c, &j);
     else if (strcmp(op, "tokenize") == 0)
         ok = op_tokenize(d, c, &j);
@@ -710,8 +748,8 @@ static bool handle(struct daemon       *d,
         else if (geist_session_pin_prefix(x->s, n, x->hist) != GEIST_OK)
             ok = reply_error(c, "pin: unsupported by this architecture");
         else {
-            x->pinned   = n;
-            struct sb h = {};
+            x->pinned = x->n_hist = n;
+            struct sb h           = {};
             sb_printf(&h, "{\"ok\":true,\"pinned\":%zu}", n);
             ok = reply(c, &h, 0, nullptr);
         }

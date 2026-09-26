@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Geist — Runs here. Stays here.</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#prompt">Skip to your task</a>
+  <header><a class="brand" href="#">geisten</a><span class="local">Local by design</span></header>
+  <div class="intro"><p class="eyebrow">YOUR COMPUTER. YOUR WORDS.</p><h1>Runs here.<br>Stays here.</h1><p>Draft a message. Summarize a note. Try it on your own hardware.<br>Processing runs on the computer hosting Geist. Your text is not sent to a cloud service.</p></div>
+  <section class="task-picker" aria-labelledby="choose-task-title">
+    <div><h2 id="choose-task-title">1. Choose what to try</h2><p id="task-description" class="muted">Loading local task definitions…</p></div>
+    <div><label for="task-choice">Your task</label><select id="task-choice" disabled></select></div>
+    <p id="task-evidence" class="hint">Task quality has not yet been validated for this model.</p>
+    <a id="task-link" hidden target="_blank" rel="noreferrer">Open the Home Assistant integration ↗</a>
+  </section>
+  <div class="workspace">
+    <aside aria-labelledby="models-title">
+      <section class="device"><p class="eyebrow">RUNNING ON</p><h2 id="device-name">Checking this computer…</h2><p id="device-specs">Reading memory and processor information.</p><p id="disk-space" class="muted"></p></section>
+      <div class="section-heading"><h2 id="models-title">2. Find your fit</h2><span id="model-count">6 models</span></div>
+      <p class="hint">Recommendations consider this computer's resources. A model that fits may still answer poorly. Each card separates resource fit from unverified task quality.</p>
+      <div id="models" aria-label="Available models"></div>
+      <button id="more-models" class="text-button" type="button" aria-expanded="false" aria-controls="models">Show more models</button>
+      <details class="method"><summary>How recommendations work</summary><p>RAM guidance includes a planning allowance for runtime and context memory. It is an estimate, not measured peak usage. Available memory changes as other apps run.</p><p>A model is recommended only when both hardware fit and task quality have evidence. Task quality is currently unverified, so usable models remain conditional. A greyed-out download has a concrete resource or compatibility reason.</p><p>Completed runs with at least 16 generated tokens update this session's speed observation. They do not validate task quality. The interactive target is 8 tokens/s, a product guideline rather than a quality score. Slower models remain selectable.</p><p>Models are fetched from Hugging Face only when you choose Download. The app checks their SHA-256 before starting them. No account is needed.</p><p>Pi 5 BitNet speed reference: geist-serve, 25 September 2026, 4 GB RAM, idle and cooled, 4 threads. Other hardware and workloads may differ.</p></details>
+    </aside>
+    <main id="main">
+      <section class="task-panel" aria-labelledby="task-title">
+        <div class="section-heading"><h2 id="task-title">3. Try it here.</h2><span id="runtime-state" class="state">Choose a model</span></div>
+        <p id="active-model" class="muted">Download a suggested model to begin.</p>
+        <div id="job" hidden><div class="section-heading"><strong id="job-title">Downloading</strong><button id="cancel-download" class="text-button" type="button">Cancel</button></div><progress id="download-progress" max="1" value="0" aria-label="Model download progress"></progress><p id="job-detail" class="muted"></p></div>
+        <p id="notice" role="status" aria-live="polite"></p>
+        <form id="task-form">
+          <label for="prompt">Your input</label>
+          <textarea id="prompt" name="prompt" rows="6" maxlength="12000" placeholder="Write here, or use the example below…" required></textarea>
+          <div class="examples"><button id="use-example" type="button">Use an example</button></div>
+          <div class="actions"><button id="run" class="primary" type="submit" disabled>Run locally <span aria-hidden="true">↗</span></button><button id="stop" type="button" hidden>Stop</button><button id="benchmark" class="text-button" type="button" disabled>Quick speed test</button></div>
+          <p class="hint">Each request starts fresh. Small models can make mistakes. Review the result before using it.</p>
+        </form>
+        <section class="result" aria-labelledby="result-title"><div class="section-heading"><h3 id="result-title">Your result</h3><button id="copy" type="button" class="text-button" disabled>Copy</button></div><div id="output" tabindex="0">The first answer starts here.</div></section>
+        <dl id="metrics"><div><dt>Generation</dt><dd id="speed">—<small>tokens/s</small></dd></div><div><dt>First text</dt><dd id="first-token">—<small>seconds</small></dd></div><div><dt>Total time</dt><dd id="elapsed">—<small>seconds</small></dd></div></dl>
+        <p id="measurement-note" class="hint">Measurements appear after a completed run. They describe speed, not answer quality.</p>
+      </section>
+      <button id="unload" class="text-button" type="button" disabled>Unload model to free memory</button>
+      <button id="quit" class="text-button" type="button">Quit Geist</button>
+    </main>
+  </div>
+  <footer><span>Geist · Open engineering by geisten</span><span>No prompt history is saved by this app.</span></footer>
+</body>
+</html>

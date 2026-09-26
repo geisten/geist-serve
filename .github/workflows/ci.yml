@@ -21,9 +21,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: deps
-        run: sudo apt-get update -q && sudo apt-get install -y -q gcc-14
+        run: sudo apt-get update -q && sudo apt-get install -y -q gcc-14 libcurl4-openssl-dev libssl-dev
       - name: build
-        run: make CC=gcc-14 TARGET=linux
+        run: make CC=gcc-14 TARGET=linux && make app test-app APP_CC=gcc-14
       - name: usage exits 2
         run: ./geist-serve 2>/dev/null || test $? -eq 2
       - name: unit tests (model-free)
@@ -40,7 +40,7 @@ jobs:
       - name: deps
         run: brew install libomp
       - name: build
-        run: make
+        run: make && make app test-app
       - name: usage exits 2
         run: ./geist-serve 2>/dev/null || test $? -eq 2
       - name: unit tests (model-free)
@@ -67,7 +67,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: deps (linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update -q && sudo apt-get install -y -q gcc-14 curl python3
+        run: sudo apt-get update -q && sudo apt-get install -y -q gcc-14 libcurl4-openssl-dev libssl-dev curl python3
       - name: deps (macos)
         if: runner.os == 'macOS'
         run: brew install libomp
@@ -82,3 +82,13 @@ jobs:
         run: ${{ matrix.make }} fetch-model
       - name: smoke + wire-level suite
         run: OMP_NUM_THREADS=3 ${{ matrix.make }} test
+      - name: app integration with sanitizers
+        env:
+          GEIST_TEST_MODEL: geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf
+        run: |
+          if [ "${{ runner.os }}" = Linux ]; then export APP_CC=gcc-14; fi
+          make -f App.mk build/geist-app-test
+          GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/deadline_test.py
+          GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/http_test.py
+          python3 tests/app/download_test.py
+          python3 tests/app/daemon_test.py

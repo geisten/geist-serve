@@ -25,6 +25,14 @@ struct geistd;
 struct geistd *geistd_connect_unix(const char *path, const char *token);
 struct geistd *geistd_connect_tcp(const char *host, int port, const char *token);
 void           geistd_close(struct geistd *g);
+/* Per-operation monotonic deadline, including streaming; default 120 seconds.
+ * Cancellation is checked at most every 50 ms during socket I/O. The callback
+ * and its context are borrowed for the client lifetime; use from one thread. */
+void geistd_limits(struct geistd *g, unsigned timeout_ms, bool (*cancel)(void *), void *ctx);
+struct geistd_generation { size_t tokens; double duration_ns; };
+int geistd_generate_ex(struct geistd *g, const char *id, size_t max,
+    bool (*emit)(void *, const char *), void *ctx, char reason_out[static 16],
+    struct geistd_generation *stats);
 const char    *geistd_error(const struct geistd *g);
 
 int geistd_info(struct geistd *g, size_t cap, char json_out[static cap]); /* raw info JSON */
@@ -50,7 +58,9 @@ int geistd_generate(struct geistd *g, const char *id, size_t max, bool (*emit)(v
                     char reason_out[static 16]);
 
 #ifdef GEISTD_CLIENT_IMPLEMENTATION
+#ifndef JSMN_HEADER
 #define JSMN_STATIC
+#endif
 #define JSMN_STRICT
 #define JSMN_PARENT_LINKS
 #include "jsmn.h"
@@ -58,6 +68,10 @@ int geistd_generate(struct geistd *g, const char *id, size_t max, bool (*emit)(v
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
+#include <poll.h>
+#include <fcntl.h>
+#include <time.h>
+#include <stdckdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -66,12 +80,16 @@ int geistd_generate(struct geistd *g, const char *id, size_t max, bool (*emit)(v
 #include <unistd.h>
 
 struct geistd {
-    char  path[256];
+    char  path[sizeof ((struct sockaddr_un *)0)->sun_path];
     char  host[128];
     int   port;
     char  token[128];
     char  err[256];
     int   fd;
+    unsigned timeout_ms;
+    double deadline;
+    bool (*cancel)(void *);
+    void *cancel_ctx;
     /* last reply */
     char *hdr;
     size_t hl;
@@ -84,12 +102,15 @@ struct geistd {
 static struct geistd *gd_alloc(const char *token) {
     struct geistd *g = calloc(1, sizeof *g);
     if (g && token) snprintf(g->token, sizeof g->token, "%s", token);
-    if (g) g->fd = -1;
+    if (g) { g->fd = -1; g->timeout_ms = 120000; }
     return g;
 }
 
 struct geistd *geistd_connect_unix(const char *path, const char *token) {
     struct geistd *g = gd_alloc(token);
+    if (g && (!path || strlen(path) >= sizeof ((struct sockaddr_un *)0)->sun_path)) {
+        free(g); return nullptr;
+    }
     if (g) snprintf(g->path, sizeof g->path, "%s", path);
     return g;
 }
@@ -120,31 +141,69 @@ static int gd_fail(struct geistd *g, const char *msg) {
     return -1;
 }
 
+static double gd_now(void) {
+    struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t);
+    return t.tv_sec * 1000.0 + t.tv_nsec / 1e6;
+}
+void geistd_limits(struct geistd *g, unsigned ms, bool (*cancel)(void *), void *ctx) {
+    if (g) { g->timeout_ms = ms ? ms : 1; g->cancel = cancel; g->cancel_ctx = ctx; }
+}
+static bool gd_wait(struct geistd *g, short events) {
+    for (;;) {
+        if (g->cancel && g->cancel(g->cancel_ctx)) { errno = ECANCELED; return false; }
+        double remaining = g->deadline - gd_now();
+        if (remaining <= 0) { errno = ETIMEDOUT; return false; }
+        struct pollfd p = {.fd = g->fd, .events = events};
+        int rc = poll(&p, 1, remaining < 50 ? (int)remaining + 1 : 50);
+        if (rc > 0) return !(p.revents & POLLNVAL);
+        if (rc < 0 && errno != EINTR) return false;
+    }
+}
 static bool gd_write(struct geistd *g, size_t n, const void *buf) {
     const unsigned char *p = buf;
     while (n) {
-        ssize_t w = write(g->fd, p, n);
-        if (w < 0 && errno == EINTR) continue;
+        if (!gd_wait(g, POLLOUT)) return false;
+#ifdef MSG_NOSIGNAL
+        ssize_t w = send(g->fd, p, n, MSG_NOSIGNAL);
+#else
+        ssize_t w = send(g->fd, p, n, 0);
+#endif
+        if (w < 0 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)) continue;
         if (w <= 0) return false;
-        p += w, n -= (size_t) w;
+        p += w, n -= (size_t)w;
     }
     return true;
 }
-
 static bool gd_read(struct geistd *g, size_t n, void *buf) {
     unsigned char *p = buf;
     while (n) {
-        ssize_t r = read(g->fd, p, n);
-        if (r < 0 && errno == EINTR) continue;
+        if (!gd_wait(g, POLLIN)) return false;
+        ssize_t r = recv(g->fd, p, n, 0);
+        if (r < 0 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)) continue;
         if (r <= 0) return false;
-        p += r, n -= (size_t) r;
+        p += r, n -= (size_t)r;
     }
     return true;
+}
+static bool gd_socket_connect(struct geistd *g, const struct sockaddr *sa, socklen_t len) {
+    if (g->fd < 0) return false;
+    if (fcntl(g->fd, F_SETFD, FD_CLOEXEC) != 0 ||
+        fcntl(g->fd, F_SETFL, O_NONBLOCK) != 0) return false;
+#ifdef SO_NOSIGPIPE
+    int one = 1; setsockopt(g->fd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof one);
+#endif
+    if (connect(g->fd, sa, len) == 0) return true;
+    if (errno != EINPROGRESS && errno != EAGAIN) return false;
+    if (!gd_wait(g, POLLOUT)) return false;
+    int err = 0; socklen_t size = sizeof err;
+    return getsockopt(g->fd, SOL_SOCKET, SO_ERROR, &err, &size) == 0 && err == 0;
 }
 
 static bool gd_send(struct geistd *g, const char *hdr, size_t bl, const void *body) {
     unsigned char pre[8];
-    uint32_t      hl = (uint32_t) strlen(hdr);
+    size_t len = strlen(hdr);
+    if (!len || len > (64u << 10) || bl > (16u << 20)) return false;
+    uint32_t hl = (uint32_t)len;
     for (int i = 0; i < 4; i++) pre[i] = (unsigned char) (hl >> (8 * i)), pre[4 + i] = (unsigned char) (bl >> (8 * i));
     return gd_write(g, 8, pre) && gd_write(g, hl, hdr) && (bl == 0 || gd_write(g, bl, body));
 }
@@ -165,7 +224,7 @@ static int gd_recv(struct geistd *g) {
     jsmn_parser p;
     jsmn_init(&p);
     g->ntok = jsmn_parse(&p, g->hdr, hl, g->tok, 4096);
-    if (g->ntok < 1) return gd_fail(g, "unparsable header from geistd");
+    if (g->ntok < 1 || g->tok[0].type != JSMN_OBJECT) return gd_fail(g, "unparsable header from geistd");
     return 0;
 }
 
@@ -189,13 +248,16 @@ static int gd_check_ok(struct geistd *g) {
 }
 
 static int gd_connect(struct geistd *g) {
+    g->deadline = gd_now() + g->timeout_ms;
+    if (g->fd >= 0) close(g->fd);
+    g->fd = -1;
     if (g->host[0]) {
         struct addrinfo hints = {.ai_family = AF_INET, .ai_socktype = SOCK_STREAM}, *res;
         char            port[8];
         snprintf(port, sizeof port, "%d", g->port);
         if (getaddrinfo(g->host, port, &hints, &res) != 0) return gd_fail(g, "resolve failed");
         g->fd = socket(res->ai_family, res->ai_socktype, 0);
-        if (g->fd < 0 || connect(g->fd, res->ai_addr, res->ai_addrlen) != 0) {
+        if (!gd_socket_connect(g, res->ai_addr, res->ai_addrlen)) {
             freeaddrinfo(res);
             return gd_fail(g, "connect failed");
         }
@@ -204,7 +266,7 @@ static int gd_connect(struct geistd *g) {
         struct sockaddr_un sa = {.sun_family = AF_UNIX};
         snprintf(sa.sun_path, sizeof sa.sun_path, "%s", g->path);
         g->fd = socket(AF_UNIX, SOCK_STREAM, 0);
-        if (g->fd < 0 || connect(g->fd, (struct sockaddr *) &sa, sizeof sa) != 0) return gd_fail(g, "connect failed");
+        if (!gd_socket_connect(g, (struct sockaddr *) &sa, sizeof sa)) return gd_fail(g, "connect failed");
     }
     if (g->token[0]) {
         char h[200];
@@ -226,6 +288,7 @@ static int gd_call(struct geistd *g, const char *hdr, size_t bl, const void *bod
 
 int geistd_info(struct geistd *g, size_t cap, char out[static cap]) {
     if (gd_call(g, "{\"op\":\"info\"}", 0, nullptr) != 0) return -1;
+    if (g->hl >= cap) return gd_fail(g, "info buffer too small");
     snprintf(out, cap, "%s", g->hdr);
     return 0;
 }
@@ -252,7 +315,10 @@ int geistd_reset(struct geistd *g, const char *id) { return gd_simple(g, "reset"
 
 int geistd_tokenize(struct geistd *g, const char *text, size_t cap, int32_t out[static cap], size_t *n_out) {
     size_t tl = strlen(text);
-    char  *h  = malloc(tl * 6 + 32);
+    size_t cap_bytes;
+    if (tl > (64u << 10) || ckd_mul(&cap_bytes, tl, 6) || ckd_add(&cap_bytes, cap_bytes, 32))
+        return gd_fail(g, "text too long");
+    char *h = malloc(cap_bytes);
     if (!h) return gd_fail(g, "out of memory");
     char *p = h + snprintf(h, tl * 6 + 32, "{\"op\":\"tokenize\",\"text\":\"");
     for (const char *s = text; *s; s++) {
@@ -266,9 +332,10 @@ int geistd_tokenize(struct geistd *g, const char *text, size_t cap, int32_t out[
     int rc = gd_call(g, h, 0, nullptr);
     free(h);
     if (rc != 0) return -1;
+    if (g->bl % sizeof(int32_t)) return gd_fail(g, "misaligned tokens");
     size_t n = g->bl / sizeof(int32_t);
     if (n > cap) return gd_fail(g, "too many tokens for the buffer");
-    memcpy(out, g->body, n * sizeof(int32_t));
+    if (n) memcpy(out, g->body, n * sizeof(int32_t));
     *n_out = n;
     return 0;
 }
@@ -316,6 +383,7 @@ int geistd_peek_full(struct geistd *g, const char *id, size_t cap, float out[sta
     char h[120];
     snprintf(h, sizeof h, "{\"op\":\"peek\",\"session\":\"%s\",\"full\":true}", id);
     if (gd_call(g, h, 0, nullptr) != 0) return -1;
+    if (g->bl % sizeof(float)) return gd_fail(g, "misaligned logits");
     size_t n = g->bl / sizeof(float);
     if (n == 0 || n > cap) return gd_fail(g, "logit vector does not fit");
     memcpy(out, g->body, n * sizeof(float));
@@ -339,10 +407,24 @@ static char *gd_unescape(const char *s, const char *e) {
         case 'f': out[o++] = '\f'; break;
         case 'u': {
             unsigned cp = 0;
-            if (s + 4 < e) { char hex[5] = {s[1], s[2], s[3], s[4], 0}; cp = (unsigned) strtoul(hex, nullptr, 16); s += 4; }
-            if (cp < 0x80) out[o++] = (char) cp;
-            else if (cp < 0x800) { out[o++] = (char) (0xC0 | cp >> 6); out[o++] = (char) (0x80 | (cp & 0x3F)); }
-            else { out[o++] = (char) (0xE0 | cp >> 12); out[o++] = (char) (0x80 | ((cp >> 6) & 0x3F)); out[o++] = (char) (0x80 | (cp & 0x3F)); }
+            if (s + 4 >= e) { free(out); return nullptr; }
+            for (int i = 1; i <= 4; i++) {
+                char c = s[i]; unsigned v = c >= '0' && c <= '9' ? (unsigned)(c-'0') :
+                    c >= 'a' && c <= 'f' ? (unsigned)(c-'a'+10) : c >= 'A' && c <= 'F' ? (unsigned)(c-'A'+10) : 16;
+                if (v == 16) { free(out); return nullptr; } cp = cp * 16 + v;
+            }
+            s += 4;
+            if (cp >= 0xd800 && cp <= 0xdbff) {
+                if (s + 6 >= e || s[1] != '\\' || s[2] != 'u') { free(out); return nullptr; }
+                char hex[5] = {s[3], s[4], s[5], s[6], 0}; char *end;
+                unsigned low = (unsigned)strtoul(hex, &end, 16);
+                if (*end || low < 0xdc00 || low > 0xdfff) { free(out); return nullptr; }
+                cp = 0x10000 + ((cp - 0xd800) << 10) + low - 0xdc00; s += 6;
+            } else if (cp >= 0xdc00 && cp <= 0xdfff) { free(out); return nullptr; }
+            if (cp < 0x80) out[o++] = (char)cp;
+            else if (cp < 0x800) { out[o++] = (char)(0xc0 | cp >> 6); out[o++] = (char)(0x80 | (cp & 63)); }
+            else if (cp < 0x10000) { out[o++] = (char)(0xe0 | cp >> 12); out[o++] = (char)(0x80 | ((cp >> 6) & 63)); out[o++] = (char)(0x80 | (cp & 63)); }
+            else { out[o++] = (char)(0xf0 | cp >> 18); out[o++] = (char)(0x80 | ((cp >> 12) & 63)); out[o++] = (char)(0x80 | ((cp >> 6) & 63)); out[o++] = (char)(0x80 | (cp & 63)); }
             break;
         }
         default: out[o++] = *s;
@@ -389,8 +471,9 @@ int geistd_info_numbers(struct geistd *g, size_t *vocab, int32_t *eos, int32_t *
     return 0;
 }
 
-int geistd_generate(struct geistd *g, const char *id, size_t max, bool (*emit)(void *, const char *), void *ctx,
-                    char reason_out[static 16]) {
+int geistd_generate_ex(struct geistd *g, const char *id, size_t max, bool (*emit)(void *, const char *), void *ctx,
+                    char reason_out[static 16], struct geistd_generation *stats) {
+    if (stats) *stats = (struct geistd_generation){};
     char h[120];
     snprintf(h, sizeof h, "{\"op\":\"generate\",\"session\":\"%s\",\"max\":%zu}", id, max);
     if (gd_connect(g) != 0) return -1;
@@ -403,28 +486,29 @@ int geistd_generate(struct geistd *g, const char *id, size_t max, bool (*emit)(v
         if (done >= 0 && g->hdr[g->tok[done].start] == 't') {
             int r = gd_find(g, "reason");
             snprintf(reason_out, 16, "%.*s", r < 0 ? 0 : g->tok[r].end - g->tok[r].start, r < 0 ? "" : g->hdr + g->tok[r].start);
+            if (stats) { stats->tokens = gd_num(g, "generated");
+                int dt = gd_find(g, "duration_ns");
+                stats->duration_ns = dt < 0 ? 0 : strtod(g->hdr + g->tok[dt].start, nullptr); }
             close(g->fd), g->fd = -1;
             return 0;
         }
+        int stop = gd_find(g, "stop");
+        if (stop >= 0 && g->hdr[g->tok[stop].start] == 't') continue;
         int p = gd_find(g, "piece");
-        char piece[256] = "";
-        if (p >= 0 && g->tok[p].type == JSMN_STRING) {
-            /* unescape the common cases; a client wanting exact bytes uses str/ids */
-            const char *s = g->hdr + g->tok[p].start, *e = g->hdr + g->tok[p].end;
-            size_t      o = 0;
-            for (; s < e && o + 1 < sizeof piece; s++) {
-                if (*s == '\\' && s + 1 < e) {
-                    s++;
-                    piece[o++] = *s == 'n' ? '\n' : *s == 't' ? '\t' : *s == 'r' ? '\r' : *s;
-                } else piece[o++] = *s;
-            }
-            piece[o] = '\0';
-        }
-        if (emit && !emit(ctx, piece)) {
+        char *piece = p >= 0 && g->tok[p].type == JSMN_STRING
+            ? gd_unescape(g->hdr + g->tok[p].start, g->hdr + g->tok[p].end) : strdup("");
+        if (!piece) return gd_fail(g, "out of memory");
+        bool keep = !emit || emit(ctx, piece);
+        free(piece);
+        if (!keep) {
             close(g->fd), g->fd = -1;
             snprintf(reason_out, 16, "client");
             return 0;
         }
     }
+}
+int geistd_generate(struct geistd *g, const char *id, size_t max,
+    bool (*emit)(void *, const char *), void *ctx, char reason[static 16]) {
+    return geistd_generate_ex(g, id, max, emit, ctx, reason, nullptr);
 }
 #endif /* GEISTD_CLIENT_IMPLEMENTATION */

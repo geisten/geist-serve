@@ -1,5 +1,11 @@
 # geist-serve
 
+**Runs here. Stays here.** The optional `geist-app` adds a local interface,
+hardware-aware model choices and verified first-run downloads for Mac and
+Raspberry Pi. Build with `make app` after building the server.
+See [the app guide](docs/APP.md) for desktop and headless setup.
+The app is currently a local development build, not a published download.
+
 An Ollama- and OpenAI-compatible HTTP front for the
 [geist engine](https://github.com/geisten/geistlib): one GGUF, one process,
 one request at a time, no dependencies. Point VS Code Copilot Chat, Continue,
