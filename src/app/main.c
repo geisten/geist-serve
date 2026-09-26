@@ -700,6 +700,8 @@ static void status_response(int fd, struct app_arena *arena) {
     app_quote(&b, h.name);
     app_put(&b, ",\"arch\":");
     app_quote(&b, h.arch);
+    app_put(&b, ",\"device\":");
+    app_quote(&b, h.device == APP_APPLE_SILICON ? "apple-silicon" : h.device == APP_PI5 ? "pi5" : "unknown");
     app_printf(&b,
                ",\"ram\":%llu,\"available\":%llu,\"disk\":%llu,\"cores\":%u,\"known\":%s,\"disk_"
                "known\":%s,\"available_known\":%s},",
@@ -745,6 +747,8 @@ static void status_response(int fd, struct app_arena *arena) {
         app_quote(&b, m->id);
         app_put(&b, ",\"name\":");
         app_quote(&b, m->name);
+        app_put(&b, ",\"sha256\":");
+        app_quote(&b, m->sha256);
         app_printf(&b,
                    ",\"bytes\":%llu,\"ram_gib\":%u,\"working_mib\":%u,\"installed\":%s,\"partial\":"
                    "%llu,\"resource_fit\":%d,\"fit\":%d,\"quality\":\"unverified\",\"reason\":",
@@ -775,6 +779,7 @@ struct proxy {
     int    fd;
     bool   started;
     double start;
+    struct app_utf8 utf8;
 };
 static bool proxy_cancel(void *opaque) {
     struct proxy *p = opaque;
@@ -787,6 +792,11 @@ static bool proxy_emit(void *opaque, const char *piece) {
     struct proxy *p = opaque;
     if (proxy_cancel(p))
         return false;
+    char decoded[8192];
+    if (!app_utf8_feed(&p->utf8, piece, decoded, sizeof decoded))
+        return false;
+    if (!decoded[0] && piece[0])
+        return true;
     if (!p->started) {
         const char *head = "HTTP/1.1 200 OK\r\nContent-Type: application/x-ndjson\r\n"
                            "Cache-Control: no-store\r\nConnection: "
@@ -798,7 +808,7 @@ static bool proxy_emit(void *opaque, const char *piece) {
     char              data[16384];
     struct app_buffer b = {.data = data, .cap = sizeof data};
     app_put(&b, "{\"response\":");
-    app_quote(&b, piece);
+    app_quote(&b, decoded);
     app_put(&b, ",\"done\":false}\n");
     return !b.failed && send_bytes(p->fd, data, b.len);
 }
@@ -836,26 +846,43 @@ static void generate(int fd, struct request *r, struct app_arena *arena) {
         error_response(fd, 400, "The input is empty or exceeds this task's byte limit.");
         return;
     }
-    char *composed = app_alloc(arena, length + strlen(task->instruction) + 32, 1, 1);
+    int language_token = json_get(json, 0, "language");
+    char *requested_language = json_strdup(json, language_token);
+    const char *language = requested_language && !strcmp(requested_language, "de") ? "de" : "en";
+    bool valid_language = language_token < 0 || (requested_language &&
+                         (!strcmp(requested_language, "de") || !strcmp(requested_language, "en")));
+    free(requested_language);
+    if (!valid_language) {
+        free(prompt);
+        error_response(fd, 400, "Choose English or German for this task.");
+        return;
+    }
+    size_t composed_cap = length + strlen(task->instruction) + 128;
+    char *composed = app_alloc(arena, composed_cap, 1, 1);
     if (!composed) {
         free(prompt);
         error_response(fd, 503, "Request memory budget exhausted.");
         return;
     }
-    if (task->instruction[0])
-        snprintf(composed,
-                 length + strlen(task->instruction) + 32,
-                 "%s\n\nInput:\n%s",
-                 task->instruction,
-                 prompt);
-    else
-        strcpy(composed, prompt);
+    snprintf(composed, composed_cap, "%s\n%s\n\nInput:\n%s",
+             !strcmp(language, "de") ? "Answer in German." : "Answer in English.",
+             task->instruction, prompt);
     pthread_mutex_lock(&app.mutex);
     poll_child();
     if (!app.ready || app.generating || app.job_running) {
         pthread_mutex_unlock(&app.mutex);
         free(prompt);
         error_response(fd, 409, "Wait until the model is ready and idle.");
+        return;
+    }
+    struct app_hardware hardware;
+    bool hardware_known = app_hardware_read(&hardware, app.models);
+    enum app_quality quality = app_task_quality(app_model_find(app.active_id), task, language,
+                                               hardware_known ? hardware.device : APP_UNKNOWN);
+    if (quality != APP_QUALITY_PASSED && !json_bool(json, json_get(json, 0, "experimental"), false)) {
+        pthread_mutex_unlock(&app.mutex);
+        free(prompt);
+        error_response(fd, 409, "This task/model/language is experimental. Enable experimental use explicitly.");
         return;
     }
     bool benchmark   = json_bool(json, json_get(json, 0, "benchmark"), false);
@@ -877,6 +904,10 @@ static void generate(int fd, struct request *r, struct app_arena *arena) {
                                              &stats,
                                              error);
     free(prompt);
+    if (proxy.utf8.used || proxy.utf8.failed) {
+        rc = 502;
+        snprintf(error, sizeof error, "The model stream ended with invalid text encoding.");
+    }
     if (rc == 0 && !proxy.started && !proxy_emit(&proxy, ""))
         rc = 502;
     if (!proxy.started)

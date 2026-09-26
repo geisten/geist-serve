@@ -21,6 +21,9 @@ struct app_buffer {
 void app_put(struct app_buffer *b, const char *s);
 void app_printf(struct app_buffer *b, const char *format, ...);
 void app_quote(struct app_buffer *b, const char *s);
+/* Token pieces may end inside UTF-8. Emit only complete validated code points. */
+struct app_utf8 { unsigned char bytes[4]; unsigned used, need; bool failed; };
+[[nodiscard]] bool app_utf8_feed(struct app_utf8 *state, const char *piece, char *out, size_t cap);
 
 struct app_model {
     const char *id, *name, *file, *url, *sha256;

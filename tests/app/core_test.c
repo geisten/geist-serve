@@ -11,6 +11,19 @@ static bool cancel_hash(void) {
 }
 
 int main(void) {
+    struct app_utf8 utf8 = {};
+    char decoded[64];
+    assert(app_utf8_feed(&utf8, "Gr\xc3", decoded, sizeof decoded) && !strcmp(decoded, "Gr"));
+    assert(app_utf8_feed(&utf8, "\xbc\xc3", decoded, sizeof decoded) && !strcmp(decoded, "\xc3\xbc"));
+    assert(app_utf8_feed(&utf8, "\x9f" "e \xf0\x9f", decoded, sizeof decoded) && !strcmp(decoded, "\xc3\x9f" "e "));
+    assert(app_utf8_feed(&utf8, "\x8c\xb1", decoded, sizeof decoded) && !strcmp(decoded, "\xf0\x9f\x8c\xb1"));
+    assert(!utf8.used);
+    const char *invalid[] = {"\xc0\xaf", "\xed\xa0\x80", "\xf4\x90\x80\x80", "\x80"};
+    for (size_t i = 0; i < sizeof invalid / sizeof *invalid; i++) {
+        struct app_utf8 bad = {};
+        assert(!app_utf8_feed(&bad, invalid[i], decoded, sizeof decoded) && bad.failed);
+        assert(!app_utf8_feed(&bad, "ok", decoded, sizeof decoded));
+    }
     alignas(max_align_t) unsigned char storage[64];
     struct app_arena                   a = {.base = storage, .cap = sizeof storage};
     assert(app_alloc(&a, 1, 3, 1));

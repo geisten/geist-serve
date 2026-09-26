@@ -21,6 +21,7 @@ test-app: geist-app build/test_app_core build/test_app_client build/test_app_tas
 	./build/test_app_tasks
 	python3 tests/app/client_test.py
 	python3 tests/app/eval_test.py
+	python3 tests/app/quality_test.py
 	python3 tests/app/deadline_test.py
 	python3 tests/app/http_test.py
 
@@ -35,7 +36,7 @@ build/test_app_client: tests/app/client_probe.c clients/geistd_client.h src/jsmn
 	@mkdir -p build
 	$(APP_CC) $(APP_CFLAGS) -Isrc -g -fsanitize=address,undefined -o $@ $<
 
-build/app_tasks.h: tasks/catalog.json scripts/embed-tasks.py
+build/app_tasks.h: tasks/catalog.json scripts/embed-tasks.py $(wildcard quality/*.json quality/*.py quality/bundles/*/*.json quality/bundles/*/*.jsonl) $(wildcard src/*.c src/*.h src/app/*.c src/app/*.h)
 	python3 scripts/embed-tasks.py
 
 build/test_app_tasks: tests/app/tasks_test.c src/app/tasks.c src/app/tasks.h build/app_tasks.h

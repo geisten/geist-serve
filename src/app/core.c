@@ -59,6 +59,40 @@ void app_quote(struct app_buffer *b, const char *s) {
     app_put(b, "\"");
 }
 
+bool app_utf8_feed(struct app_utf8 *s, const char *piece, char *out, size_t cap) {
+    size_t written = 0;
+    if (!cap || s->failed)
+        return false;
+    out[0] = 0;
+    for (const unsigned char *p = (const unsigned char *) piece; *p; ++p) {
+        unsigned char c = *p;
+        if (!s->used) {
+            s->need = c < 0x80 ? 1 : c >= 0xc2 && c <= 0xdf ? 2 :
+                      c >= 0xe0 && c <= 0xef ? 3 : c >= 0xf0 && c <= 0xf4 ? 4 : 0;
+            if (!s->need)
+                goto invalid;
+        } else if (c < 0x80 || c > 0xbf ||
+                   (s->used == 1 && ((s->bytes[0] == 0xe0 && c < 0xa0) ||
+                                    (s->bytes[0] == 0xed && c > 0x9f) ||
+                                    (s->bytes[0] == 0xf0 && c < 0x90) ||
+                                    (s->bytes[0] == 0xf4 && c > 0x8f))))
+            goto invalid;
+        s->bytes[s->used++] = c;
+        if (s->used == s->need) {
+            if (cap - written <= s->used)
+                goto invalid;
+            memcpy(out + written, s->bytes, s->used);
+            written += s->used;
+            s->used = s->need = 0;
+        }
+    }
+    out[written] = 0;
+    return true;
+invalid:
+    s->failed = true;
+    return false;
+}
+
 /* SHA pins and sizes match the existing Mac catalog. Planning memory is
  * deliberately separate from GGUF size and is not a measured RSS claim.
  * Keep this catalog in application code, never in geistlib. */

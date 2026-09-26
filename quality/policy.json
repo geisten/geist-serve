@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "version": "1.1.0",
+  "languages": [
+    "de",
+    "en"
+  ],
+  "tasks": [
+    "rewrite",
+    "summary",
+    "ideas",
+    "freeform"
+  ],
+  "screening_cases_per_cell": 10,
+  "acceptance_cases_per_cell": 50,
+  "minimum_pass_rate": 0.9,
+  "human_sample_per_cell": 10,
+  "adverse_cases_per_cell": 5,
+  "critical_errors_allowed": 0,
+  "configuration": "app-v2-temperature0.2-topp1-topk0-seed0-context4096",
+  "freeform_scope": "Short factual answers, clarification, supplied conversation context and missing information; not arbitrary chat."
+}

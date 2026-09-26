@@ -94,8 +94,10 @@ def main():
             catalog = json.loads(app.request('/app/tasks')[1])
             assert len(catalog['tasks']) == 5 and all(t['version'] == '1.0.0' for t in catalog['tasks'])
             for task, version in [('missing','1.0.0'),('summary','0.0.1'),('home-assistant','1.0.0')]:
-                assert app.request('/app/generate', {'task':task,'task_version':version,'prompt':'hello'})[0] == 400
+                assert app.request('/app/generate', {'task':task,'task_version':version,'prompt':'hello','experimental':True})[0] == 400
             assert app.request('/app/generate', {'task':'summary','task_version':'1.0.0','prompt':'x'*6001})[0] == 400
+            for language in [None, True, 42, [], {}, 'fr', '']:
+                assert app.request('/app/generate', {'prompt':'hello','language':language})[0] == 400
             assert app.request("/app/status", auth=False)[0] == 403
             assert app.request("/app/status", headers={"Authorization": "Bearer wrong"})[0] == 403
             assert app.request("/app/status", headers={"Origin": "https://untrusted.example"})[0] == 403
@@ -109,8 +111,8 @@ def main():
             assert app.token.encode() not in html
             assert app.request("/app/select", {"id": "../../bad"})[0] == 400
             assert app.request("/app/select", {"id": "bitnet-2b"})[0] == 409
-            assert app.request("/app/generate", {"prompt": "hello"})[0] == 409
-            assert app.request("/app/generate", {"prompt": "x" * 12001})[0] == 400
+            assert app.request("/app/generate", {"experimental": True, "prompt": "hello"})[0] == 409
+            assert app.request("/app/generate", {"experimental": True, "prompt": "x" * 12001})[0] == 400
             assert b" 413 " in app.raw(b"POST /app/select HTTP/1.1\r\nHost: localhost:8766\r\nContent-Length: 32769\r\n\r\n")
             assert b" 400 " in app.raw(b"POST /app/select HTTP/1.1\r\nHost: localhost:8766\r\nContent-Length: 0\r\nContent-Length: 0\r\n\r\n")
             assert b" 400 " in app.raw(b"POST /app/select HTTP/1.1\r\nHost: localhost:8766\r\nTransfer-Encoding: chunked\r\n\r\n")
@@ -137,28 +139,29 @@ def main():
         app = App(home, model=Path(model), binary=binary)
         try:
             app.wait(lambda state: state["ready"], timeout=60)
+            assert app.request("/app/generate", {"prompt":"Hello","experimental":False})[0] == 409
             child = int(subprocess.check_output(['pgrep','-P',str(app.process.pid)],text=True).strip())
             import shlex, stat
             args = shlex.split(subprocess.check_output(['ps','-p',str(child),'-o','args='],text=True))
             private = Path(args[args.index('--socket')+1])
             assert stat.S_IMODE(private.stat().st_mode) == 0o600
             assert stat.S_IMODE(private.parent.stat().st_mode) == 0o700
-            code, body, _ = app.request("/app/generate", {"prompt": "Name three colors."})
+            code, body, _ = app.request("/app/generate", {"experimental": True, "prompt": "Name three colors."})
             events = [json.loads(line) for line in body.splitlines() if line]
             assert code == 200 and events[-1]["done"] and events[-1]["eval_count"] > 0, body
             assert any(event.get("response") for event in events), body
             assert b"<|im_end|>" not in body, body
             # Client abort closes the proxied connection, then the backend becomes usable.
             conn = http.client.HTTPConnection("127.0.0.1", app.port, timeout=30)
-            conn.request("POST", "/app/generate", json.dumps({"prompt": "List one hundred animal names."}),
+            conn.request("POST", "/app/generate", json.dumps({"experimental": True, "prompt": "List one hundred animal names."}),
                          {"Authorization": "Bearer " + app.token})
             response = conn.getresponse()
             assert response.status == 200
             assert response.readline()
             response.close(); conn.close()
             app.wait(lambda state: not state["busy"], timeout=15)
-            assert app.request("/app/generate", {"prompt": "Say hello."})[0] == 200
-            assert app.request('/app/generate', {'prompt':' xy'*3900})[0] == 400
+            assert app.request("/app/generate", {"experimental": True, "prompt": "Say hello."})[0] == 200
+            assert app.request('/app/generate', {'experimental': True, 'prompt':' xy'*3900})[0] == 400
             assert not app.status()['busy']
             assert app.request("/app/stop", {})[0] == 200
             assert not private.exists() and not private.parent.exists()
@@ -179,6 +182,7 @@ def main():
                 assert app.request("/app/select", {"id": "smollm2-360m"})[0] == 202
                 app.wait(lambda state: state["ready"], timeout=60)
                 code, body, _ = app.request("/app/generate", {
+                    "experimental": True,
                     "prompt": "Write a detailed paragraph about how a garden changes through the seasons.",
                     "benchmark": True})
                 event = json.loads(body.splitlines()[-1])
@@ -194,7 +198,7 @@ def main():
                 app.wait(lambda state: not state['ready'])
                 assert app.request('/app/select', {'id':'smollm2-360m'})[0] == 202
                 app.wait(lambda state: state['ready'],timeout=60)
-                assert app.request('/app/generate',{'prompt':'Say hello.'})[0] == 200
+                assert app.request('/app/generate',{'experimental': True, 'prompt':'Say hello.'})[0] == 200
                 assert app.request("/app/quit", {})[0] == 202
                 app.process.wait(timeout=15)
                 print("app advice: verified catalog model, actual measured speed and clean quit passed")

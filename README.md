@@ -72,6 +72,13 @@ Deploying: `deploy/systemd/` (socket activation on 11434, hardened service,
 model path in `/etc/default/geist-serve`), `install.sh`, and static release
 binaries from `.github/workflows/release.yml` on every `v*` tag.
 
+## Task quality
+
+The local app requires explicit experimental opt-in unless a model, task,
+language and device combination has reviewed evidence. See
+[task-quality acceptance](docs/TASK-QUALITY.md) for the frozen corpus, human
+review and reproducibility limits. Resource fit alone does not establish quality.
+
 ## License
 
 Apache-2.0, like the engine.

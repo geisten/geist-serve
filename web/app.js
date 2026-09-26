@@ -8,6 +8,13 @@ let lastServerMessage = '', localMessage = false;
 let showAllModels = false;
 let stopped = false, timer;
 let tasks = [], selectedTask = null;
+let qualityRecords = [];
+function qualityFor(model, task = selectedTask) {
+  return qualityRecords.find(r => r.model_sha256 === model?.sha256 && r.task === task?.id &&
+    r.task_version === task?.version && r.language === $('language-choice').value &&
+    r.device === state?.hardware.device);
+}
+function allowed(model, task = selectedTask) { return qualityFor(model, task)?.quality === 'passed' || $('experimental').checked; }
 const bytes = n => n < 1e9 ? `${Math.round(n / 1e6)} MB` : `${(n / 1e9).toFixed(2)} GB`;
 const gib = n => `${(n / 2 ** 30).toFixed(1)} GiB`;
 
@@ -27,13 +34,16 @@ async function api(path, body, signal) {
 
 function message(text, local = true) { $('notice').textContent = text; localMessage = local; }
 function buttonStates() {
-  const ready = selectedTask && !selectedTask.url && state?.ready && !state?.busy && !requesting && !controller;
+  const ready = selectedTask && !selectedTask.url && state?.ready && !state?.busy && !requesting && !controller && allowed(state?.models.find(m => m.id === state.active_id));
   $('run').disabled = !ready;
-  $('benchmark').disabled = !ready;
+  $('benchmark').disabled = !state?.ready || state?.busy || requesting || !!controller ||
+    !allowed(state?.models.find(m => m.id === state.active_id), tasks.find(t => t.id === 'freeform'));
   $('unload').disabled = !state?.ready || state?.busy || requesting || !!controller;
   $('stop').hidden = !controller;
   $('prompt').readOnly = !!controller;
   $('task-choice').disabled = !!controller || !tasks.length;
+  $('language-choice').disabled = !!controller;
+  $('experimental').disabled = !!controller;
   $('use-example').disabled = !!controller || !selectedTask || !!selectedTask.url;
 }
 
@@ -48,19 +58,21 @@ function modelCard(model) {
   }
   const active = state.active_id === model.id && state.ready;
   card.hidden = !showAllModels && state.models.indexOf(model) >= 2 && !active;
-  const badge = ['Recommended', 'Conditional', 'Unavailable'][model.fit];
+  const evidence = qualityFor(model);
+  const fitValue = model.resource_fit === 2 ? 2 : evidence?.quality === 'passed' ? model.resource_fit : 1;
+  const badge = fitValue === 2 ? 'Unavailable' : evidence?.quality !== 'passed' ? 'Experimental' : ['Recommended', 'Conditional'][fitValue];
   card.className = `model${active ? ' active' : ''}${model.fit === 2 ? ' unavailable' : ''}`;
   card.querySelector('h3').textContent = model.name;
   const fit = card.querySelector('.fit'); fit.textContent = badge;
-  fit.className = `fit ${['', 'conditional', 'unavailable'][model.fit]}`;
+  fit.className = `fit ${['', 'conditional', 'unavailable'][fitValue]}`;
   card.querySelector('.specs').textContent = `${bytes(model.bytes)} download · ${model.ram_gib} GiB RAM guidance`;
   card.querySelector('.reason').textContent = `Resources: ${model.reason}`;
-  card.querySelector('.quality').textContent = 'Task quality: unverified. Try and review the result.';
+  card.querySelector('.quality').textContent = evidence ? `Task quality: ${evidence.quality} · ${evidence.cases} test cases · ${evidence.language.toUpperCase()}. ${evidence.human_complete ? 'Human sample complete.' : 'Human assessment pending.'}` : 'Task quality: unverified for this task, language and device.';
   card.querySelector('.performance').textContent = model.measured_tps > 0
     ? `Measured here: ${model.measured_tps.toFixed(1)} tokens/s · ${model.measured_tokens} tokens · this session`
     : model.performance;
   const button = card.querySelector('button');
-  button.disabled = model.fit === 2 || state.busy || requesting || !!controller || active;
+  button.disabled = model.fit === 2 || state.busy || requesting || !!controller || active || !allowed(model);
   button.textContent = active ? 'Running here' : model.installed ? 'Use this model' : model.partial ? 'Resume download' : `Download · ${bytes(model.bytes)}`;
   button.setAttribute('aria-label', `${button.textContent}: ${model.name}. ${model.reason}`);
 }
@@ -99,7 +111,7 @@ async function poll() {
 async function choose(id) {
   if (requesting || controller) return;
   const model = state?.models.find(m => m.id === id);
-  if (!model || model.fit === 2) return;
+  if (!model || model.fit === 2 || !allowed(model)) return;
   requesting = true; message('', false); buttonStates(); state.models.forEach(modelCard);
   try { await api(model.installed ? '/app/select' : '/app/download', { id }); }
   catch (error) { message(error.message); }
@@ -112,7 +124,8 @@ function metric(id, value, unit) {
 }
 
 async function run(prompt, benchmark = false) {
-  if (controller || requesting || !state?.ready) return;
+  const task = benchmark ? tasks.find(t => t.id === 'freeform') : selectedTask;
+  if (controller || requesting || !state?.ready || !task || !allowed(state.models.find(m => m.id === state.active_id), task)) return;
   const activeController = new AbortController(); controller = activeController;
   buttonStates(); state.models.forEach(modelCard);
   $('output').textContent = ''; $('output').classList.remove('empty'); $('copy').disabled = true; $('copy').textContent = 'Copy';
@@ -141,7 +154,7 @@ async function run(prompt, benchmark = false) {
     }
   }
   try {
-    const response = await api('/app/generate', { prompt, benchmark, task: benchmark ? 'freeform' : selectedTask.id, task_version: benchmark ? '1.0.0' : selectedTask.version }, activeController.signal);
+    const response = await api('/app/generate', { prompt, benchmark, language: $('language-choice').value, experimental: $('experimental').checked, task: benchmark ? 'freeform' : selectedTask.id, task_version: benchmark ? '1.0.0' : selectedTask.version }, activeController.signal);
     if (!response.body) throw new Error('This browser does not support streamed responses.');
     reader = response.body.getReader(); const decoder = new TextDecoder();
     for (;;) {
@@ -174,7 +187,7 @@ function chooseTask(id) {
   selectedTask = tasks.find(t => t.id === id);
   if (!selectedTask) return;
   $('task-description').textContent = selectedTask.description;
-  $('task-evidence').textContent = `${selectedTask.title} · v${selectedTask.version}. Quality is unverified for the offered models. Speed alone is not a recommendation.`;
+  $('task-evidence').textContent = `${selectedTask.title} · v${selectedTask.version}. Evidence is specific to the model, language and device. ${id === 'freeform' ? 'Tests cover simple chats only, not arbitrary questions.' : ''}`;
   $('task-link').hidden = !selectedTask.url;
   if (selectedTask.url) $('task-link').href = selectedTask.url;
   $('task-form').hidden = !!selectedTask.url;
@@ -182,7 +195,10 @@ function chooseTask(id) {
   $('prompt').value = '';
   $('prompt').placeholder = selectedTask.example || 'Write your input here…';
   buttonStates();
+  if (state) state.models.forEach(modelCard);
 }
+$('language-choice').addEventListener('change', () => { buttonStates(); if (state) render(state); });
+$('experimental').addEventListener('change', () => { buttonStates(); if (state) render(state); });
 $('task-choice').addEventListener('change', () => chooseTask($('task-choice').value));
 $('use-example').addEventListener('click', () => {
   if (!controller && selectedTask) { $('prompt').value = selectedTask.example; $('prompt').focus(); }
@@ -190,6 +206,7 @@ $('use-example').addEventListener('click', () => {
 async function loadTasks() {
   const catalog = await (await api('/app/tasks')).json();
   tasks = catalog.tasks;
+  qualityRecords = catalog.quality_records || [];
   $('task-choice').replaceChildren(...tasks.map(t => {
     const option = document.createElement('option'); option.value = t.id; option.textContent = t.title; return option;
   }));
