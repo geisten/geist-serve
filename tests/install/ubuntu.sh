@@ -5,6 +5,7 @@ test "${GEIST_INSTALLER_TEST:-}" = 1
 test "$(id -u)" = 0
 package=$(realpath "${1:?path to candidate DEB}")
 source_root=$(realpath "${2:?source checkout}")
+(cd "$(dirname "$package")" && sha256sum -c "$(basename "$package").sha256")
 apt-get update -qq
 apt-get install -y -qq ca-certificates python3 systemd dbus-user-session desktop-file-utils procps >/dev/null
 apt-get install -y -qq "$package" >/dev/null
@@ -16,6 +17,14 @@ testroot=$(mktemp -d /tmp/geist-installed.XXXXXX)
 cp -R "$source_root/tests" "$testroot/"
 for binary in geist geist-app geistd; do ln -s "/usr/lib/geist/$binary" "$testroot/$binary"; done
 chown -R geist-acceptance:geist-acceptance "$testroot"
+if test -n "${GEIST_TEST_MODEL:-}"; then
+    # The runner's private checkout/cache need not be traversable by this user.
+    # Copy only the public, verified model fixture; do not relax checkout modes.
+    install -o geist-acceptance -g geist-acceptance -m 600 "$GEIST_TEST_MODEL" "$testroot/model.gguf"
+    GEIST_TEST_MODEL="$testroot/model.gguf"
+    export GEIST_TEST_MODEL
+    runuser -u geist-acceptance -- test -r "$GEIST_TEST_MODEL"
+fi
 runuser -u geist-acceptance -- env GEIST_TEST_MODEL="${GEIST_TEST_MODEL:-}" python3 "$testroot/tests/app/compat_test.py"
 runuser -u geist-acceptance -- env GEIST_TEST_MODEL="${GEIST_TEST_MODEL:-}" python3 "$testroot/tests/app/cli_test.py"
 as_user() {

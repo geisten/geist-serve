@@ -15,6 +15,14 @@ an Apple Accepted result; see the Mac repository's NOTARIZATION.md.
 
 ## Ubuntu (64-bit Intel/AMD or ARM)
 
+The current engine requires x86-64-v3 (AVX2/FMA/BMI2-era CPUs) or ARMv8.2 with
+FP16 and dot-product instructions (for example Pi 5). An arbitrary 64-bit CPU
+is not sufficient. The manager checks CPU capabilities before suggesting or
+loading models. Older CPUs need a separately built compatible engine.
+
+Keep the DEB and its matching `.deb.sha256` file together, then verify with
+`sha256sum -c geist_VERSION_ARCH.deb.sha256` before installation.
+
 Install the matching candidate with `sudo apt install ./geist_VERSION_ARCH.deb`.
 Open Geist from the application menu, or run `geist open`. Downloads and the
 daemon run as your user, never as root. The optional per-user service uses

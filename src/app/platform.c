@@ -13,6 +13,25 @@
 #include <sys/sysctl.h>
 #else
 #include <openssl/evp.h>
+#if defined(__aarch64__)
+#include <sys/auxv.h>
+#include <asm/hwcap.h>
+#endif
+#endif
+
+#ifndef __APPLE__
+/* Match the immutable engine's generic Linux compilation baseline. */
+static bool linux_cpu_supported(void) {
+#if defined(__x86_64__)
+    __builtin_cpu_init();
+    return __builtin_cpu_supports("x86-64-v3") != 0;
+#elif defined(__aarch64__)
+    const unsigned long required = HWCAP_ATOMICS | HWCAP_FPHP | HWCAP_ASIMDHP | HWCAP_ASIMDDP;
+    return (getauxval(AT_HWCAP) & required) == required;
+#else
+    return false;
+#endif
+}
 #endif
 
 bool app_hardware_read(struct app_hardware *h, const char *directory) {
@@ -53,7 +72,7 @@ bool app_hardware_read(struct app_hardware *h, const char *directory) {
     }
     mach_port_deallocate(mach_task_self(), host);
 #else
-    h->supported = strcmp(u.machine, "aarch64") == 0 || strcmp(u.machine, "x86_64") == 0;
+    h->supported = linux_cpu_supported();
     FILE *f      = fopen("/proc/meminfo", "r");
     if (f) {
         char               line[256];

@@ -102,7 +102,6 @@ jobs:
           python3 tests/app/daemon_test.py
 
   installers:
-    needs: smoke
     uses: ./.github/workflows/installers.yml
     permissions:
       contents: read

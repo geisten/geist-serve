@@ -20,6 +20,7 @@ class App:
                 "--daemon", str(server or (ROOT / "geistd" if model else "/usr/bin/false"))]
         if model:
             args += ["--model", str(model)]
+        self.home = Path(home)
         self.log = tempfile.TemporaryFile()
         self.process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=self.log,
                                         text=True, env=env)
@@ -58,7 +59,9 @@ class App:
             if predicate(state):
                 return state
             time.sleep(.1)
-        raise AssertionError(state)
+        log = self.home/'server.log'
+        diagnostic = log.read_text(errors='replace')[-8192:] if log.exists() else 'No daemon log'
+        raise AssertionError((state, diagnostic))
 
     def raw(self, request):
         with socket.create_connection(("127.0.0.1", self.port), timeout=10) as sock:

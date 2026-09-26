@@ -392,6 +392,14 @@ cleanup:
 
 static bool start_child(const char *path, const char *id) {
     stop_child();
+    struct app_hardware hardware;
+    bool                known = app_hardware_read(&hardware, app.home);
+    if (!known || !hardware.supported) {
+        snprintf(app.message,
+                 sizeof app.message,
+                 "This CPU/platform does not support the bundled inference engine.");
+        return false;
+    }
     strcpy(app.runtime_dir, "/tmp/geist-app-XXXXXX");
     if (!mkdtemp(app.runtime_dir)) {
         app.runtime_dir[0] = 0;
@@ -436,10 +444,8 @@ static bool start_child(const char *path, const char *id) {
             strncmp(environ[i], "OMP_NUM_THREADS=", 16) &&
             strncmp(environ[i], "OMP_WAIT_POLICY=", 16))
             env[used++] = environ[i];
-    struct app_hardware hardware;
-    bool                known = app_hardware_read(&hardware, app.home);
-    unsigned            cores = known ? hardware.cores : 1;
-    unsigned            limit = known && hardware.device == APP_PI5 ? 4 : 2;
+    unsigned cores = known ? hardware.cores : 1;
+    unsigned limit = known && hardware.device == APP_PI5 ? 4 : 2;
     if (cores > limit)
         cores = limit;
     char threads[40];

@@ -170,7 +170,7 @@ app_assess(const struct app_hardware *h, const struct app_model *m, bool install
         a.performance = "Apple Silicon profile; run a local test for actual speed.";
     if (!h->supported) {
         a.fit    = APP_UNAVAILABLE;
-        a.reason = "This app build does not support this platform.";
+        a.reason = "This CPU instruction set or platform is not supported by the bundled engine.";
     } else if (!installed && h->disk_known &&
                (h->disk < m->bytes || h->disk - m->bytes < 256 * UINT64_C(1048576))) {
         a.fit    = APP_UNAVAILABLE;

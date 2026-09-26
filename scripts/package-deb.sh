@@ -66,4 +66,4 @@ EOF
 chmod 755 "$stage/DEBIAN/prerm"
 (cd "$stage" && find usr -type f -exec md5sum {} + > DEBIAN/md5sums)
 dpkg-deb --root-owner-group --build "$stage" "build/geist_${version}_${arch}.deb"
-sha256sum "build/geist_${version}_${arch}.deb" > "build/geist_${version}_${arch}.deb.sha256"
+(cd build && sha256sum "geist_${version}_${arch}.deb" > "geist_${version}_${arch}.deb.sha256")
