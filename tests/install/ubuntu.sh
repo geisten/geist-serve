@@ -30,12 +30,36 @@ runuser -u geist-acceptance -- env GEIST_TEST_MODEL="${GEIST_TEST_MODEL:-}" pyth
 as_user() {
     runuser -u geist-acceptance -- env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" "$@"
 }
+check_selected_model() {
+    test -n "${GEIST_TEST_MODEL:-}" || return 0
+    for attempt in $(seq 1 60); do
+        if as_user geist status | python3 -c 'import json,sys; s=json.load(sys.stdin); sys.exit(not(s["ready"] and s["active_id"]=="smollm2-360m"))'; then
+            as_user geist test | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["usage"]["completion_tokens"]>0'
+            echo "PASS: selected model answers through installed systemd service after $1"
+            return 0
+        fi
+        sleep 1
+    done
+    echo "FAIL: selected model did not recover after $1" >&2
+    as_user journalctl --user -u geist.service --no-pager -n 40 >&2
+    return 1
+}
 if test -d /run/systemd/system; then
+    # Required native acceptance must exercise the actual sandboxed service with
+    # its selected catalog model, not only a foreground --model fixture.
+    if test "${GEIST_REQUIRE_SYSTEMD:-0}" = 1; then test -n "${GEIST_TEST_MODEL:-}"; fi
     loginctl enable-linger geist-acceptance
     systemctl start "user@$uid.service"
     as_user geist start
     as_user systemctl --user enable geist.service
     as_user geist status >/dev/null
+    if test -n "${GEIST_TEST_MODEL:-}"; then
+        install -o geist-acceptance -g geist-acceptance -m 600 "$GEIST_TEST_MODEL" \
+            /home/geist-acceptance/.local/share/geist/models/smollm2-360m-instruct-q8_0.gguf
+        as_user geist use smollm2-360m >/dev/null
+        check_selected_model 'initial selection'
+    fi
+    cp /home/geist-acceptance/.local/share/geist/api-key "$testroot/key-before"
     before=$(as_user systemctl --user show -p MainPID --value geist.service)
     test "$before" -gt 1
     # Supervisor failure must recover through the installed unit.
@@ -47,8 +71,11 @@ if test -d /run/systemd/system; then
     done
     test "$after" -gt 1
     test "$after" != "$before"
+    check_selected_model 'supervisor crash'
     as_user geist restart
     as_user geist status >/dev/null
+    check_selected_model 'explicit restart'
+    cmp "$testroot/key-before" /home/geist-acceptance/.local/share/geist/api-key
 else
     test "${GEIST_REQUIRE_SYSTEMD:-0}" != 1
     echo 'SKIPPED actual systemd lifecycle: container was not booted with systemd'
@@ -66,12 +93,14 @@ apt-get install -y -qq "$testroot/upgrade.deb" >/dev/null
 if test -d /run/systemd/system; then
     as_user systemctl --user daemon-reload
     as_user geist restart
+    check_selected_model 'package upgrade'
 fi
 cmp "$testroot/key-before" /home/geist-acceptance/.local/share/geist/api-key
 apt-get install -y -qq --allow-downgrades "$package" >/dev/null
 if test -d /run/systemd/system; then
     as_user systemctl --user daemon-reload
     as_user geist restart
+    check_selected_model 'package rollback'
 fi
 cmp "$testroot/key-before" /home/geist-acceptance/.local/share/geist/api-key
 test "$(cat /home/geist-acceptance/.local/share/geist/models/keep-me)" = 'user data'
@@ -79,6 +108,10 @@ apt-get remove -y -qq geist >/dev/null
 test ! -e /usr/bin/geist
 if test -d /run/systemd/system; then
     ! as_user systemctl --user is-active --quiet geist.service
+    ! as_user systemctl --user is-enabled --quiet geist.service
+    if test -n "${GEIST_TEST_MODEL:-}"; then
+        cmp "$GEIST_TEST_MODEL" /home/geist-acceptance/.local/share/geist/models/smollm2-360m-instruct-q8_0.gguf
+    fi
 fi
 test -f /home/geist-acceptance/.local/share/geist/models/keep-me
 test ! -f /home/geist-acceptance/.local/share/geist/connection.json
