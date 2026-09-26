@@ -85,7 +85,7 @@ for name in "$ASSET" "$ASSET-geistd"; do
     "$TMP/$name" >/dev/null 2>&1 || status=$?
     [ "$status" = 2 ] || { echo "geist-serve: $name failed the usage check" >&2; exit 1; }
 done
-mkdir -p "$BIN"
+if [ ! -d "$BIN" ]; then mkdir -p -m 755 "$BIN"; fi
 lock_path=$PREFIX/.geist-serve-install.lock
 mkdir "$lock_path" 2>/dev/null || { echo "geist-serve: install locked; inspect $lock_path" >&2; exit 1; }
 LOCK=$lock_path
