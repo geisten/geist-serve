@@ -4,7 +4,7 @@ set -eu
 cd "$(dirname "$0")/.."
 version=${VERSION:?Set a numeric VERSION, e.g. 0.3.0}
 arch=${1:?usage: package-deb.sh amd64|arm64}
-case "$version" in ''|*[!0-9.]*) echo 'Numeric version required' >&2; exit 2;; esac
+printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo 'Expected X.Y.Z version' >&2; exit 2; }
 case "$arch" in amd64|arm64) ;; *) exit 2;; esac
 for binary in geist geist-app geistd; do
     test -x "$binary"

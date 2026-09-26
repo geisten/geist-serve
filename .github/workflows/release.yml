@@ -12,8 +12,28 @@ permissions:
   contents: read
 
 jobs:
+  version:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      package: ${{ steps.version.outputs.package }}
+    steps:
+      - id: version
+        env:
+          RELEASE_REF: ${{ github.ref }}
+        run: |
+          version=0.3.0
+          if [[ "$RELEASE_REF" == refs/tags/* ]]; then
+            version=${RELEASE_REF#refs/tags/v}
+          fi
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "package=$version" >> "$GITHUB_OUTPUT"
+
   verify:
+    needs: version
     uses: ./.github/workflows/ci.yml
+    with:
+      package_version: ${{ needs.version.outputs.package }}
     permissions:
       contents: read
 
@@ -72,7 +92,7 @@ jobs:
             geist-serve-macos-arm64-geistd
 
   publish:
-    needs: [verify, linux, macos]
+    needs: [version, verify, linux, macos]
     timeout-minutes: 15
     environment: release
     permissions:
@@ -85,10 +105,19 @@ jobs:
           path: dist
           pattern: geist-serve-*
           merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: candidates
+          pattern: ubuntu-*-candidate
       - name: assemble
+        env:
+          PACKAGE_VERSION: ${{ needs.version.outputs.package }}
         run: |
           cp deploy/systemd/geist-serve.socket deploy/systemd/geist-serve.service deploy/systemd/geist-serve.default dist/
-          cd dist && sha256sum geist-serve-* > SHA256SUMS && cat SHA256SUMS
+          cp candidates/ubuntu-amd64-candidate/*.deb dist/
+          cp candidates/ubuntu-arm64-candidate/*.deb dist/
+          python3 scripts/release-manifest.py dist "$PACKAGE_VERSION"
+          (cd dist && sha256sum -c SHA256SUMS)
       - name: installer against these exact assets
         run: |
           GEIST_SERVE_BASE="file://$PWD/dist" GEIST_SERVE_PREFIX=/tmp/gs-prefix sh install.sh

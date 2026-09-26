@@ -6,6 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      package_version:
+        type: string
+        default: '0.3.0'
 
 permissions:
   contents: read
@@ -31,6 +35,10 @@ jobs:
         run: make CC=gcc-14 TARGET=linux && make app test-app APP_CC=gcc-14
       - name: usage exits 2
         run: ./geist-serve 2>/dev/null || test $? -eq 2
+      - name: installer failure and rollback tests
+        run: |
+          python3 tests/install/legacy_test.py
+          python3 tests/install/manifest_test.py
       - name: unit tests (model-free)
         run: make CC=gcc-14 TARGET=linux build/test_template && ./build/test_template
       - name: systemd units parse
@@ -49,6 +57,10 @@ jobs:
         run: make && make app test-app
       - name: usage exits 2
         run: ./geist-serve 2>/dev/null || test $? -eq 2
+      - name: installer failure and rollback tests
+        run: |
+          python3 tests/install/legacy_test.py
+          python3 tests/install/manifest_test.py
       - name: unit tests (model-free)
         run: make build/test_template && ./build/test_template
 
@@ -103,5 +115,7 @@ jobs:
 
   installers:
     uses: ./.github/workflows/installers.yml
+    with:
+      package_version: ${{ inputs.package_version || '0.3.0' }}
     permissions:
       contents: read

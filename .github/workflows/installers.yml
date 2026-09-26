@@ -1,12 +1,18 @@
 name: installer candidates
 on:
   workflow_call:
+    inputs:
+      package_version:
+        type: string
+        default: '0.3.0'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   ubuntu:
     timeout-minutes: 45
+    env:
+      VERSION: ${{ inputs.package_version || '0.3.0' }}
     strategy:
       fail-fast: false
       matrix:
@@ -28,7 +34,7 @@ jobs:
       - name: Build static installer payload
         run: |
           mkdir -p build/package
-          docker run --rm \
+          docker run --rm -e VERSION \
             --mount "type=bind,source=$PWD,target=/source,readonly" \
             --mount "type=bind,source=$PWD/build/package,target=/out" \
             alpine:3.23@sha256:85fe1e81d6758c208f3e1eed4338a1997e19d4be002d4dd32d3100c9a8c010a0 \
@@ -38,7 +44,7 @@ jobs:
           set -o pipefail
           sudo env GEIST_INSTALLER_TEST=1 GEIST_REQUIRE_SYSTEMD=1 \
             GEIST_TEST_MODEL="$PWD/geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf" \
-            sh tests/install/ubuntu.sh "build/package/geist_0.3.0_${{ matrix.arch }}.deb" "$PWD" \
+            sh tests/install/ubuntu.sh "build/package/geist_${VERSION}_${{ matrix.arch }}.deb" "$PWD" \
             2>&1 | tee build/package/acceptance.log
       - name: Record source identity
         run: |

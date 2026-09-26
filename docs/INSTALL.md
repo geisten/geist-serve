@@ -75,3 +75,21 @@ Quit/stop before replacing a Mac development bundle, then open the replacement.
 No package scripts obtain secrets or remove user models. Public update feeds,
 signed release provenance and independent clean-machine notarization acceptance
 must be verified before presenting these candidates as a stable download.
+
+## Legacy standalone installer
+
+`install.sh` installs the older standalone `geist-serve` plus `geistd`; it does
+not install the shared model manager, `geist` client or desktop interface.
+Use the Mac/Ubuntu package above for those features.
+
+The revised script requires exactly one SHA-256 entry for both binaries and
+all three service/config files. Missing or mismatched assets abort before
+installed files change. It stages verified executables, serializes installation
+with a prefix lock and restores previous files after ordinary replacement
+errors or catchable signals. Existing administrator configuration is retained.
+Older release manifests without unit checksums are deliberately rejected.
+
+This is not atomic across power loss or SIGKILL, and a checksum manifest from
+the same host is not an independent provenance signature. A stale lock after
+an uncatchable interruption must be inspected before retrying; preserve its
+recovery files. No new release is published by these changes.
