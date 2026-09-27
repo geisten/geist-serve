@@ -198,6 +198,12 @@ class Desktop(Gtk.Application):
                 with os.fdopen(fd, 'w') as target: json.dump({'language': text}, target)
                 os.replace(temporary, self.preferences)
                 self.language = text
+                manager = self.view.get_user_content_manager()
+                manager.remove_all_scripts()
+                manager.add_script(WebKit.UserScript.new(
+                    f"window.geistLanguage = '{text}'; window.geistDesktop = 'linux';",
+                    WebKit.UserContentInjectedFrames.TOP_FRAME,
+                    WebKit.UserScriptInjectionTime.START, None, None))
             else: raise ValueError('Unknown desktop action')
             ok = True
         except (OSError, ValueError, TypeError, AttributeError):

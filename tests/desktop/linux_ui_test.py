@@ -106,6 +106,8 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
             evaluate(desktop.view, "document.getElementById('test-connection').click(); true")
             wait_js(desktop.view, "connectionTesting || document.getElementById('connection-result').textContent.length > 0")
             wait_js(desktop.view, "!connectionTesting && document.getElementById('connection-result').textContent.startsWith('Connected.')", timeout=60)
+        evaluate(desktop.view, "document.getElementById('ui-language').value='de'; document.getElementById('ui-language').dispatchEvent(new Event('change')); document.getElementById('language-choice').value='de'; document.getElementById('language-choice').dispatchEvent(new Event('change')); true")
+        wait_js(desktop.view, "state?.answer_language === 'de' && document.documentElement.lang === 'de'")
         # Closing the UI leaves the service owned by its separate supervisor.
         desktop.window.set_visible(False)
         subprocess.run([str(ROOT / 'geist'), 'status'], check=True, stdout=subprocess.DEVNULL)
@@ -117,6 +119,7 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
         desktop.start()
         spin(lambda: desktop.origin is not None)
         wait_js(desktop.view, "document.querySelectorAll('.model').length === 6")
+        wait_js(desktop.view, "document.documentElement.lang === 'de' && document.getElementById('language-choice').value === 'de'")
         if model:
             wait_js(desktop.view, "state?.ready && !document.getElementById('workspace').hidden && !document.getElementById('run').disabled", timeout=60)
             assert evaluate(desktop.view, "document.getElementById('prompt').value === ''")

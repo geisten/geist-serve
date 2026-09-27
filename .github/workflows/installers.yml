@@ -12,7 +12,7 @@ jobs:
   ubuntu:
     timeout-minutes: 45
     env:
-      VERSION: ${{ inputs.package_version || '0.5.0' }}
+      VERSION: ${{ inputs.package_version || '0.5.1' }}
     strategy:
       fail-fast: false
       matrix:
