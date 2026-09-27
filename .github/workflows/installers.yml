@@ -4,7 +4,7 @@ on:
     inputs:
       package_version:
         type: string
-        default: '0.3.0'
+        default: '0.4.0'
   workflow_dispatch:
 permissions:
   contents: read
@@ -12,7 +12,7 @@ jobs:
   ubuntu:
     timeout-minutes: 45
     env:
-      VERSION: ${{ inputs.package_version || '0.3.0' }}
+      VERSION: ${{ inputs.package_version || '0.4.0' }}
     strategy:
       fail-fast: false
       matrix:
@@ -46,6 +46,20 @@ jobs:
             GEIST_TEST_MODEL="$PWD/geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf" \
             sh tests/install/ubuntu.sh "build/package/geist_${VERSION}_${{ matrix.arch }}.deb" "$PWD" \
             2>&1 | tee build/package/acceptance.log
+      - name: Build optional desktop package and install system WebView
+        run: |
+          sudo apt-get install -y -qq python3-gi gir1.2-gtk-4.0 gir1.2-webkit-6.0 xvfb xauth dbus-x11 fonts-dejavu-core
+          VERSION="$VERSION" sh scripts/package-desktop-deb.sh
+          cp build/geist-desktop_*.deb* build/package/
+          sudo apt-get install -y "$PWD/build/package/geist_${VERSION}_${{ matrix.arch }}.deb" "$PWD/build/geist-desktop_${VERSION}_all.deb"
+          desktop-file-validate /usr/share/applications/geist.desktop
+          cp /usr/lib/geist/geist /usr/lib/geist/geist-app /usr/lib/geist/geistd .
+      - name: Actual GTK and WebKit desktop interaction
+        run: |
+          set -o pipefail
+          timeout 300s env GEIST_TEST_MODEL="$PWD/geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf" GDK_BACKEND=x11 GSK_RENDERER=cairo LIBGL_ALWAYS_SOFTWARE=1 \
+            xvfb-run -a -s '-screen 0 1280x900x24' dbus-run-session -- \
+            /usr/bin/python3 tests/desktop/linux_ui_test.py 2>&1 | tee build/package/desktop-acceptance.log
       - name: Record source identity
         run: |
           git rev-parse HEAD > build/package/source-commit.txt
@@ -59,9 +73,9 @@ jobs:
             build/package/*.deb.sha256
             build/package/*-commit.txt
             build/package/app-build-packages.txt
-            build/package/acceptance.log
+            build/package/*acceptance.log
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: failure()
         with:
           name: ubuntu-${{ matrix.arch }}-diagnostics
-          path: build/package/acceptance.log
+          path: build/package/*acceptance.log

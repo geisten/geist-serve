@@ -13,7 +13,7 @@ APP_HEADERS := src/app/tasks.h build/app_tasks.h src/app/daemon.h src/app/compat
 app: geist-app geist
 geist: src/app/cli.c src/app/connection.c src/app/connection.h src/app/core.c src/app/core.h src/json.c src/json.h
 	$(APP_CC) $(APP_CFLAGS) -Isrc -o $@ src/app/cli.c src/app/connection.c src/app/core.c src/json.c $(APP_LDLIBS)
-geist-app: src/app/main.c $(APP_SOURCE) $(APP_RUNTIME) $(APP_HEADERS) src/app/core.h src/json.c src/json.h web/index.html web/app.css web/app.js build/app_assets.h
+geist-app: src/app/main.c $(APP_SOURCE) $(APP_RUNTIME) $(APP_HEADERS) src/app/core.h src/json.c src/json.h web/index.html web/app.css web/app.js web/i18n.js build/app_assets.h
 	$(APP_CC) $(APP_CFLAGS) -Isrc -o $@ src/app/main.c $(APP_SOURCE) $(APP_RUNTIME) src/json.c $(APP_LDLIBS)
 build/test_app_core: tests/app/core_test.c $(APP_SOURCE) src/app/core.h
 	@mkdir -p build
@@ -26,14 +26,15 @@ test-app: geist-app geist build/test_app_core build/test_app_client build/test_a
 	python3 tests/app/quality_test.py
 	python3 tests/app/deadline_test.py
 	python3 tests/app/http_test.py
+	python3 tests/app/remove_test.py
 	python3 tests/app/compat_test.py
 	python3 tests/app/cli_test.py
 
-build/geist-app-test: src/app/main.c $(APP_SOURCE) $(APP_RUNTIME) $(APP_HEADERS) src/app/core.h src/json.c web/index.html web/app.css web/app.js build/app_assets.h
+build/geist-app-test: src/app/main.c $(APP_SOURCE) $(APP_RUNTIME) $(APP_HEADERS) src/app/core.h src/json.c web/index.html web/app.css web/app.js web/i18n.js build/app_assets.h
 	@mkdir -p build
 	$(APP_CC) $(APP_CFLAGS) -DAPP_TESTING -g -fsanitize=address,undefined -Isrc -o $@ src/app/main.c $(APP_SOURCE) $(APP_RUNTIME) src/json.c $(APP_LDLIBS)
 
-build/app_assets.h: web/index.html web/app.css web/app.js scripts/embed-app.py
+build/app_assets.h: web/index.html web/app.css web/app.js web/i18n.js scripts/embed-app.py
 	python3 scripts/embed-app.py
 
 build/test_app_client: tests/app/client_probe.c clients/geistd_client.h src/jsmn.h

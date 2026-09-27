@@ -1,19 +1,21 @@
 # Install Geist and connect your tools
 
 These are development candidates, not a published release or Apple-approved
-distribution. The manager, browser, terminal and compatible editor share one
+distribution. The desktop manager, terminal and compatible editor share one
 loaded geistd. No model is included; choose Download on first use.
 
 ## macOS (Apple Silicon, macOS 14+)
 
-Drag Geist.app from the DMG to Applications and open it. The menu bar opens the
-local manager. Choose a model, then use the Connections panel. The bundled
+Drag Geist.app from the DMG to Applications and open it. Geist opens its own desktop window, with Models, Test and Connect steps.
+Choose a task, explicitly allow experimental models if needed, then download
+a model and try a response. The interface follows the system language (English
+or German), with a separate answer-language selector. The bundled
 terminal client is `/Applications/Geist.app/Contents/MacOS/geist-cli`.
 Use its full path, or link it as `geist` in a directory on your PATH. Start at Login is
 optional. An actual distributable DMG still requires Developer ID signing and
 an Apple Accepted result; see the Mac repository's NOTARIZATION.md.
 
-## Ubuntu (64-bit Intel/AMD or ARM)
+## Ubuntu 24.04 (64-bit Intel/AMD or ARM)
 
 The current engine requires x86-64-v3 (AVX2/FMA/BMI2-era CPUs) or ARMv8.2 with
 FP16 and dot-product instructions (for example Pi 5). An arbitrary 64-bit CPU
@@ -23,8 +25,18 @@ loading models. Older CPUs need a separately built compatible engine.
 Keep the DEB and its matching `.deb.sha256` file together, then verify with
 `sha256sum -c geist_VERSION_ARCH.deb.sha256` before installation.
 
-Install the matching candidate with `sudo apt install ./geist_VERSION_ARCH.deb`.
-Open Geist from the application menu, or run `geist open`. Downloads and the
+For a desktop, download both the matching `geist_VERSION_ARCH.deb` and
+`geist-desktop_VERSION_all.deb`, with their SHA-256 sidecars. Install both:
+
+```sh
+sudo apt install ./geist_VERSION_ARCH.deb ./geist-desktop_VERSION_all.deb
+```
+
+Open Geist from the application menu, or run `geist-desktop`. This opens a GTK
+window with the system WebKit renderer; no browser tab is opened. `geist open`
+also uses the desktop app when installed. Terminal-only installations need
+only `geist_VERSION_ARCH.deb`, without GTK/WebKit dependencies. A browser/SSH
+interface remains available on headless systems. Downloads and the
 daemon run as your user, never as root. The optional per-user service uses
 `systemctl --user enable --now geist.service` for login startup.
 
@@ -45,7 +57,7 @@ It is stored with user-only permissions and survives service restarts.
 config.yaml. Preserve existing settings; add its model and select Chat mode.
 `geist config opencode` prints a private opencode.json for an isolated folder.
 Its geist-chat profile denies all tools. Do not commit either generated file.
-The browser Connections panel can copy equivalent configurations.
+The desktop Connect step can copy equivalent configurations.
 
 Only text chat is supported by this gateway: 4096 context tokens, up to 1024
 output tokens, one generation at a time. Busy clients receive HTTP 429. Changing
@@ -57,18 +69,18 @@ acceptance. A successful connection is not an answer-quality recommendation.
 
 `geist stop` stops this user's service and its daemon. `geist restart` restarts
 it; a previously selected catalog model is verified and loaded again. Closing
-the browser leaves the service available to editors.
+the application window leaves the service available to editors.
 
-On Ubuntu install a newer DEB with apt, run `systemctl --user daemon-reload`, then
+On Ubuntu install both newer DEBs with apt, run `systemctl --user daemon-reload`, then
 `geist restart`. To recover a failed candidate, install the previous verified
 DEB with apt's explicit downgrade option and restart. Models stay in
 `~/.local/share/geist/models`. Model storage and connection credentials are not
 modified by package scripts.
 
 Before uninstalling Ubuntu, run `systemctl --user disable --now geist.service`
-and `geist stop`, then `sudo apt remove geist`. Models remain in the user data
+and `geist stop`, then `sudo apt remove geist-desktop geist`. Models remain in the user data
 folder even after package purge. Delete that folder separately only if desired.
-On Mac, disable Start at Login, stop Geist, quit the menu app, then move
+On Mac, disable Start at Login, stop Geist, quit the desktop app, then move
 Geist.app to Trash. Cached models remain in `~/Library/Application Support/Geist`.
 Quit/stop before replacing a Mac development bundle, then open the replacement.
 
@@ -93,3 +105,21 @@ This is not atomic across power loss or SIGKILL, and a checksum manifest from
 the same host is not an independent provenance signature. A stale lock after
 an uncatchable interruption must be inspected before retrying; preserve its
 recovery files. No new release is published by these changes.
+
+## Desktop privacy and recovery
+
+The Mac host uses an ephemeral WKWebView; the Ubuntu host uses an ephemeral
+WebKitGTK NetworkSession. Neither stores browser history or private links to
+disk. Only the chosen interface language is saved. External navigation is
+restricted to user-activated Geisten GitHub links. Clipboard integration can
+write text but cannot read the clipboard or execute commands.
+
+Closing the window preserves the shared service. **Stop model service** asks
+for confirmation because it also disconnects editors. The native window then
+offers **Start / reconnect**. **Unload model** frees the active model while
+keeping the service alive. Remove an inactive model with **Remove download**;
+active models must be unloaded first. Interrupted downloads can also be removed.
+
+The initial native support targets macOS 14+ on Apple Silicon and Ubuntu 24.04.
+GTK/Xvfb tests do not establish manual GNOME/Wayland acceptance. Local Mac
+ad-hoc signatures are not an Apple notarization result.

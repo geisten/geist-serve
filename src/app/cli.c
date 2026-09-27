@@ -241,6 +241,10 @@ static int run(int argc, char **argv) {
             printf("Open through your SSH tunnel: %s\n", url);
             return 0;
         }
+        if (access("/usr/bin/geist-desktop", X_OK) == 0) {
+            char *desktop[] = {"/usr/bin/geist-desktop", nullptr};
+            return command(desktop) == 0 ? 0 : 1;
+        }
         char *args[] = {"xdg-open", url, nullptr};
 #endif
         return command(args) == 0 ? 0 : 1;

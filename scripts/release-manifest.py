@@ -12,6 +12,7 @@ def assemble(directory: Path, version: str):
     platforms = ('linux-x86_64', 'linux-aarch64', 'macos-arm64')
     binaries = [f'geist-serve-{p}{suffix}' for p in platforms for suffix in ('', '-geistd')]
     packages = [f'geist_{version}_{arch}.deb' for arch in ('amd64', 'arm64')]
+    packages.append(f'geist-desktop_{version}_all.deb')
     payload = sorted(binaries+packages+['geist-serve.socket','geist-serve.service','geist-serve.default'])
     expected = set(payload)
     actual = {p.name for p in directory.iterdir()}

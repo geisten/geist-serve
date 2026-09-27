@@ -2,8 +2,11 @@
 Type=Application
 Name=Geist
 Comment=Choose local models and connect your tools
-Exec=geist open
-Icon=utilities-terminal
+Exec=geist-desktop
+Icon=applications-science
 Terminal=false
 Categories=Development;
 Keywords=local;model;privacy;
+Name[de]=Geist
+Comment[de]=Lokale Modelle auswählen und deine Programme verbinden
+StartupWMClass=com.geisten.Geist

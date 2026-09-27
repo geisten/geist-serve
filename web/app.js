@@ -33,12 +33,12 @@ async function api(path, body, signal) {
   return response;
 }
 
-function message(text, local = true) { $('notice').textContent = text; localMessage = local; }
+function message(text, local = true) { $('notice').textContent = t(text); localMessage = local; }
 function buttonStates() {
   $('test-connection').disabled = !state?.ready || state?.busy || connectionTesting || requesting || !!controller;
   $('copy-connection').disabled = !state?.ready;
-  $('connection-endpoint').textContent = `${location.origin}/v1`;
-  $('connection-model').textContent = state?.active_id || 'Choose a model';
+  $('connection-endpoint').textContent = t(`${location.origin}/v1`);
+  $('connection-model').textContent = t(state?.active_id || 'Choose a model');
   const ready = selectedTask && !selectedTask.url && state?.ready && !state?.busy && !requesting && !controller && allowed(state?.models.find(m => m.id === state.active_id));
   $('run').disabled = !ready;
   $('benchmark').disabled = !state?.ready || state?.busy || requesting || !!controller ||
@@ -57,8 +57,9 @@ function modelCard(model) {
   if (!card) {
     card = document.createElement('article'); card.className = 'model'; card.dataset.id = model.id;
     // This template is static. Model metadata and output always use textContent.
-    card.innerHTML = '<h3></h3><span class="fit"></span><p class="specs"></p><p class="reason"></p><p class="performance"></p><p class="quality"></p><button type="button"></button>';
+    card.innerHTML = '<h3></h3><span class="fit"></span><p class="specs"></p><p class="reason"></p><p class="performance"></p><p class="quality"></p><button type="button"></button><button class="remove" type="button"></button>';
     card.querySelector('button').addEventListener('click', () => choose(model.id));
+    card.querySelector('.remove').addEventListener('click', () => removeModel(model.id));
     cards.set(model.id, card); $('models').append(card);
   }
   const active = state.active_id === model.id && state.ready;
@@ -68,37 +69,42 @@ function modelCard(model) {
   const badge = fitValue === 2 ? 'Unavailable' : evidence?.quality !== 'passed' ? 'Experimental' : ['Recommended', 'Conditional'][fitValue];
   card.className = `model${active ? ' active' : ''}${model.fit === 2 ? ' unavailable' : ''}`;
   card.querySelector('h3').textContent = model.name;
-  const fit = card.querySelector('.fit'); fit.textContent = badge;
+  const fit = card.querySelector('.fit'); fit.textContent = t(badge);
   fit.className = `fit ${['', 'conditional', 'unavailable'][fitValue]}`;
-  card.querySelector('.specs').textContent = `${bytes(model.bytes)} download · ${model.ram_gib} GiB RAM guidance`;
-  card.querySelector('.reason').textContent = `Resources: ${model.reason}`;
-  card.querySelector('.quality').textContent = evidence ? `Task quality: ${evidence.quality} · ${evidence.cases} test cases · ${evidence.language.toUpperCase()}. ${evidence.human_complete ? 'Human sample complete.' : 'Human assessment pending.'}` : 'Task quality: unverified for this task, language and device.';
-  card.querySelector('.performance').textContent = model.measured_tps > 0
+  card.querySelector('.specs').textContent = t(`${bytes(model.bytes)} download · ${model.ram_gib} GiB RAM guidance`);
+  card.querySelector('.reason').textContent = t(`Resources: ${model.reason}`);
+  card.querySelector('.quality').textContent = t(evidence ? `Task quality: ${evidence.quality} · ${evidence.cases} test cases · ${evidence.language.toUpperCase()}. ${evidence.human_complete ? 'Human sample complete.' : 'Human assessment pending.'}` : 'Task quality: unverified for this task, language and device.');
+  card.querySelector('.performance').textContent = t(model.measured_tps > 0
     ? `Measured here: ${model.measured_tps.toFixed(1)} tokens/s · ${model.measured_tokens} tokens · this session`
-    : model.performance;
+    : model.performance);
   const button = card.querySelector('button');
   button.disabled = model.fit === 2 || state.busy || requesting || !!controller || active || !allowed(model);
-  button.textContent = active ? 'Running here' : model.installed ? 'Use this model' : model.partial ? 'Resume download' : `Download · ${bytes(model.bytes)}`;
-  button.setAttribute('aria-label', `${button.textContent}: ${model.name}. ${model.reason}`);
+  button.textContent = t(active ? 'Running here' : model.installed ? 'Use this model' : model.partial ? 'Resume download' : `Download · ${bytes(model.bytes)}`);
+  const remove = card.querySelector('.remove');
+  remove.textContent = t('Remove download');
+  remove.hidden = !model.installed && !model.partial;
+  remove.disabled = active || state.busy || requesting || !!controller;
+  remove.setAttribute('aria-label', `${t('Remove download')}: ${model.name}`);
+  button.setAttribute('aria-label', `${button.textContent}: ${model.name}. ${t(model.reason)}`);
 }
 
 function render(next) {
   state = next;
-  $('device-name').textContent = next.hardware.name || 'Hardware information unavailable';
-  $('device-specs').textContent = `${gib(next.hardware.ram)} RAM · ${next.hardware.cores} compute cores · ${next.hardware.arch}`;
-  $('disk-space').textContent = next.hardware.disk_known ? `${bytes(next.hardware.disk)} disk space available` : 'Disk space could not be read';
-  $('runtime-state').textContent = next.phase ? next.phase === 'verifying' ? 'Verifying model' : 'Downloading model' : next.loading ? 'Loading model' : next.ready ? 'Ready on this device' : 'Choose a model';
-  $('active-model').textContent = next.active ? next.active : 'Download a suggested model to begin.';
+  $('device-name').textContent = t(next.hardware.name || 'Hardware information unavailable');
+  $('device-specs').textContent = t(`${gib(next.hardware.ram)} RAM · ${next.hardware.cores} compute cores · ${next.hardware.arch}`);
+  $('disk-space').textContent = t(next.hardware.disk_known ? `${bytes(next.hardware.disk)} disk space available` : 'Disk space could not be read');
+  $('runtime-state').textContent = t(next.phase ? next.phase === 'verifying' ? 'Verifying model' : 'Downloading model' : next.loading ? 'Loading model' : next.ready ? 'Ready on this device' : 'Choose a model');
+  $('active-model').textContent = t(next.active ? next.active : 'Download a suggested model to begin.');
   next.models.forEach(modelCard);
-  $('more-models').textContent = showAllModels ? 'Show fewer models' : `Show ${next.models.filter((m, i) => i >= 2 && m.id !== next.active_id).length} more models`;
+  $('more-models').textContent = t(showAllModels ? 'Show fewer models' : `Show ${next.models.filter((m, i) => i >= 2 && m.id !== next.active_id).length} more models`);
   $('job').hidden = !next.phase;
   if (next.phase) {
     const model = next.models.find(m => m.id === next.job_model);
     const verifying = next.phase === 'verifying';
-    $('job-title').textContent = `${verifying ? 'Verifying' : 'Downloading'} ${model?.name || 'model'}`;
+    $('job-title').textContent = t(`${verifying ? 'Verifying' : 'Downloading'} ${model?.name || 'model'}`);
     if (verifying) $('download-progress').removeAttribute('value');
     else $('download-progress').value = Math.min(1, next.received / (model?.bytes || 1));
-    $('job-detail').textContent = verifying ? 'Checking the complete file before it can run.' : `${bytes(next.received)} of ${bytes(model?.bytes || 0)} · partial downloads can be resumed`;
+    $('job-detail').textContent = t(verifying ? 'Checking the complete file before it can run.' : `${bytes(next.received)} of ${bytes(model?.bytes || 0)} · partial downloads can be resumed`);
   }
   if (!controller && !requesting && (!localMessage || next.message !== lastServerMessage)) message(next.message || '', false);
   lastServerMessage = next.message;
@@ -109,7 +115,7 @@ async function poll() {
   if (polling || stopped) return;
   polling = true;
   try { const next = await (await api('/app/status')).json(); if (!stopped) render(next); }
-  catch (error) { if (!stopped) { message(error.message); state = null; buttonStates(); } }
+  catch (error) { if (!stopped) { message('Service unavailable. Reopen Geist to reconnect.'); state = null; buttonStates(); } }
   finally { polling = false; }
 }
 
@@ -125,7 +131,7 @@ async function choose(id) {
 
 function metric(id, value, unit) {
   const target = $(id); target.replaceChildren(document.createTextNode(value));
-  const label = document.createElement('small'); label.textContent = unit; target.append(label);
+  const label = document.createElement('small'); label.textContent = t(unit); target.append(label);
 }
 
 async function run(prompt, benchmark = false) {
@@ -133,9 +139,9 @@ async function run(prompt, benchmark = false) {
   if (controller || requesting || !state?.ready || !task || !allowed(state.models.find(m => m.id === state.active_id), task)) return;
   const activeController = new AbortController(); controller = activeController;
   buttonStates(); state.models.forEach(modelCard);
-  $('output').textContent = ''; $('output').classList.remove('empty'); $('copy').disabled = true; $('copy').textContent = 'Copy';
+  $('output').textContent = ''; $('output').classList.remove('empty'); $('copy').disabled = true; $('copy').textContent = t('Copy');
   for (const [id, unit] of [['speed', 'tokens/s'], ['first-token', 'seconds'], ['elapsed', 'seconds']]) metric(id, '—', unit);
-  $('measurement-note').textContent = benchmark ? 'Short local test running. Results apply to this model and this workload.' : 'Running on your device…';
+  $('measurement-note').textContent = t(benchmark ? 'Short local test running. Results apply to this model and this workload.' : 'Running on your device…');
   message('Waiting for the first text…');
   const start = performance.now(); let first = null, done = false, reader;
   let output = '', pending = '', limited = false;
@@ -155,7 +161,7 @@ async function run(prompt, benchmark = false) {
       const rate = seconds > 0 && item.eval_count > 0 ? item.eval_count / seconds : null;
       metric('speed', rate === null ? '—' : rate.toFixed(1), 'tokens/s');
       metric('elapsed', ((performance.now() - start) / 1000).toFixed(2), 'seconds');
-      $('measurement-note').textContent = `${item.eval_count || 0} generated tokens. Speed uses geistd's generation time, including token streaming; first text and total include the local connection and prompt processing. ${benchmark ? 'A short sample, not a general benchmark.' : ''}`;
+      $('measurement-note').textContent = t(`${item.eval_count || 0} generated tokens. Speed uses geistd's generation time, including token streaming; first text and total include the local connection and prompt processing. ${benchmark ? 'A short sample, not a general benchmark.' : ''}`);
     }
   }
   try {
@@ -175,30 +181,30 @@ async function run(prompt, benchmark = false) {
   } catch (error) {
     activeController.abort();
     message(error.name === 'AbortError' ? 'Stopped. Partial output is kept here.' : error.message);
-    $('measurement-note').textContent = 'Run incomplete. No final generation speed is reported.';
+    $('measurement-note').textContent = t('Run incomplete. No final generation speed is reported.');
     metric('speed', '—', 'tokens/s');
     metric('elapsed', ((performance.now() - start) / 1000).toFixed(2), 'seconds');
   } finally {
     if (reader) { try { await reader.cancel(); } catch { /* connection already closed */ } }
     controller = null; $('copy').disabled = !output;
     buttonStates(); if (state) state.models.forEach(modelCard);
-    if (stopped) message('Geist is stopping. You can close this tab.');
+    if (stopped) message('Geist is stopping. Reopen the app to start it again.');
   }
 }
 
 $('task-form').addEventListener('submit', event => { event.preventDefault(); run($('prompt').value.trim()); });
 $('prompt').addEventListener('keydown', event => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); $('task-form').requestSubmit(); } });
-function chooseTask(id) {
+function chooseTask(id, preserve = false) {
   selectedTask = tasks.find(t => t.id === id);
   if (!selectedTask) return;
-  $('task-description').textContent = selectedTask.description;
-  $('task-evidence').textContent = `${selectedTask.title} · v${selectedTask.version}. Evidence is specific to the model, language and device. ${id === 'freeform' ? 'Tests cover simple chats only, not arbitrary questions.' : ''}`;
+  $('task-description').textContent = t(selectedTask.description);
+  $('task-evidence').textContent = t(`${t(selectedTask.title)} · v${selectedTask.version}. ${t('Evidence is specific to the model, language and device.')} ${id === 'freeform' ? t('Tests cover simple chats only, not arbitrary questions.') : ''}`);
   $('task-link').hidden = !selectedTask.url;
   if (selectedTask.url) $('task-link').href = selectedTask.url;
   $('task-form').hidden = !!selectedTask.url;
   $('prompt').maxLength = selectedTask.input_limit || 12000;
-  $('prompt').value = '';
-  $('prompt').placeholder = selectedTask.example || 'Write your input here…';
+  if (!preserve) $('prompt').value = '';
+  $('prompt').placeholder = t(selectedTask.example || 'Write your input here…');
   buttonStates();
   if (state) state.models.forEach(modelCard);
 }
@@ -206,14 +212,14 @@ $('language-choice').addEventListener('change', () => { buttonStates(); if (stat
 $('experimental').addEventListener('change', () => { buttonStates(); if (state) render(state); });
 $('task-choice').addEventListener('change', () => chooseTask($('task-choice').value));
 $('use-example').addEventListener('click', () => {
-  if (!controller && selectedTask) { $('prompt').value = selectedTask.example; $('prompt').focus(); }
+  if (!controller && selectedTask) { $('prompt').value = t(selectedTask.example); $('prompt').focus(); }
 });
 async function loadTasks() {
   const catalog = await (await api('/app/tasks')).json();
   tasks = catalog.tasks;
   qualityRecords = catalog.quality_records || [];
-  $('task-choice').replaceChildren(...tasks.map(t => {
-    const option = document.createElement('option'); option.value = t.id; option.textContent = t.title; return option;
+  $('task-choice').replaceChildren(...tasks.map(task => {
+    const option = document.createElement('option'); option.value = task.id; option.textContent = t(task.title); return option;
   }));
   chooseTask(tasks[0].id);
 }
@@ -222,16 +228,17 @@ $('benchmark').addEventListener('click', () => run('Explain in a short paragraph
 $('cancel-download').addEventListener('click', async () => { try { await api('/app/cancel', {}); message('Cancelling…'); } catch (error) { message(error.message); } });
 $('unload').addEventListener('click', async () => { try { await api('/app/stop', {}); await poll(); } catch (error) { message(error.message); } });
 $('quit').addEventListener('click', async () => {
+  if (!confirm(t('Stop the shared service? Terminal and editor connections will stop too. Downloaded models are kept.'))) return;
   try {
     await api('/app/quit', {}); stopped = true; clearInterval(timer); controller?.abort();
-    state = null; buttonStates(); $('runtime-state').textContent = 'Stopping';
+    state = null; buttonStates(); $('runtime-state').textContent = t('Stopping');
     document.querySelectorAll('#models button, #quit').forEach(button => { button.disabled = true; });
-    message('Geist is stopping. You can close this tab.');
+    message('Geist is stopping. Reopen the app to start it again.');
   } catch (error) { message(error.message); }
 });
-$('copy').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('output').textContent); $('copy').textContent = 'Copied'; } catch { message('Copy is unavailable here. Select the result and copy it manually.'); } });
-document.querySelector('.brand').addEventListener('click', event => { event.preventDefault(); window.scrollTo({ top: 0 }); });
-document.querySelector('.skip').addEventListener('click', event => { event.preventDefault(); $('prompt').focus(); $('prompt').scrollIntoView({block: 'center'}); });
+$('copy').addEventListener('click', async () => { try { await copyText($('output').textContent); $('copy').textContent = 'Copied'; } catch { message('Copy is unavailable here. Select the result and copy it manually.'); } });
+document.querySelector('.brand').addEventListener('click', event => { event.preventDefault(); showPage('models-page'); });
+document.querySelector('.skip').addEventListener('click', event => { event.preventDefault(); document.querySelector('.page:not([hidden]) h2').focus(); });
 $('more-models').addEventListener('click', () => {
   showAllModels = !showAllModels; $('more-models').setAttribute('aria-expanded', String(showAllModels));
   if (state) render(state);
@@ -242,7 +249,7 @@ const connectionHelp = {
   continue: 'In Continue, open your local config.yaml and add the model from this configuration. JSON is valid YAML. Select Geist and use Chat mode. Preserve your existing configuration.',
   opencode: 'Save as opencode.json in a private test folder. Run opencode there and choose geist-chat. This profile disables tools; it does not enable coding-agent workflows.'
 };
-function updateConnectionHelp() { $('connection-help').textContent = connectionHelp[$('connection-client').value]; }
+function updateConnectionHelp() { $('connection-help').textContent = t(connectionHelp[$('connection-client').value]); }
 $('connection-client').addEventListener('change', updateConnectionHelp);
 updateConnectionHelp();
 $('copy-connection').addEventListener('click', async () => {
@@ -259,19 +266,52 @@ $('copy-connection').addEventListener('click', async () => {
       const quote = text => `'${text.replaceAll("'", "'\\''")}'`;
       config = `curl ${quote(`${base}/chat/completions`)} -H ${quote(`Authorization: Bearer ${c.api_key}`)} -H 'Content-Type: application/json' --data ${quote(JSON.stringify({model: c.model, messages: [{role: 'user', content: 'Hello'}], max_tokens: 64}))}`;
     }
-    await navigator.clipboard.writeText(typeof config === 'string' ? config : JSON.stringify(config, null, 2));
-    $('connection-result').textContent = 'Copied. The configuration contains your private local key.';
-  } catch (error) { $('connection-result').textContent = error.message; }
+    await copyText(typeof config === 'string' ? config : JSON.stringify(config, null, 2));
+    $('connection-result').textContent = t('Copied. The configuration contains your private local key.');
+  } catch (error) { $('connection-result').textContent = t(error.message); }
 });
 $('test-connection').addEventListener('click', async () => {
-  connectionTesting = true; buttonStates(); $('connection-result').textContent = 'Asking the loaded model through the editor endpoint…';
+  connectionTesting = true; buttonStates(); $('connection-result').textContent = t('Asking the loaded model through the editor endpoint…');
   try {
     const result = await (await api('/v1/chat/completions', {model: state.active_id, messages: [{role: 'user', content: 'Say hello in one sentence.'}], max_tokens: 32})).json();
     if (!result.choices?.[0]?.message?.content || !(result.usage?.completion_tokens > 0)) throw new Error('The model completed without text. Try another model.');
-    $('connection-result').textContent = `Connected. The shared model returned ${result.usage.completion_tokens} tokens. Now test the configuration in your chosen client.`;
-  } catch (error) { $('connection-result').textContent = error.message; }
+    $('connection-result').textContent = t(`Connected. The shared model returned ${result.usage.completion_tokens} tokens. Now test the configuration in your chosen client.`);
+  } catch (error) { $('connection-result').textContent = t(error.message); }
   finally { connectionTesting = false; buttonStates(); }
 });
 $('output').classList.add('empty');
 if (!/^[a-f0-9]{64}$/.test(token)) message('Open Geist using the private link from the app or Pi launcher. The link contains your private local API key.');
 else { loadTasks().catch(error => message(error.message)); poll(); timer = setInterval(poll, 1800); }
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(page => { page.hidden = page.id !== id; });
+  document.querySelectorAll('[data-page]').forEach(button => {
+    if (button.dataset.page === id) button.setAttribute('aria-current', 'step');
+    else button.removeAttribute('aria-current');
+  });
+  const heading = $(id).querySelector('h2'); heading.tabIndex = -1; heading.focus();
+}
+document.querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => showPage(button.dataset.page)));
+$('ui-language').value = interfaceLanguage;
+$('language-choice').value = interfaceLanguage;
+$('ui-language').addEventListener('change', async () => {
+  interfaceLanguage = $('ui-language').value;
+  translateStatic();
+  for (const option of $('task-choice').options) option.textContent = t(tasks.find(task => task.id === option.value).title);
+  if (selectedTask) chooseTask(selectedTask.id, true);
+  updateConnectionHelp();
+  if (state) render(state);
+  try {
+    if (window.geistDesktop) await desktopMessage('language', interfaceLanguage);
+    else localStorage.setItem('geist-language', interfaceLanguage);
+  } catch { message(t('The language applies to this window but could not be saved.')); }
+});
+async function removeModel(id) {
+  const model = state?.models.find(item => item.id === id);
+  if (!model || requesting || controller || state.busy || state.active_id === id) return;
+  if (!confirm(t(`Remove ${model.name} from this computer? You can download it again later.`))) return;
+  requesting = true; buttonStates(); state.models.forEach(modelCard);
+  try { await api('/app/remove', {id}); message('', false); }
+  catch (error) { message(error.message); }
+  finally { requesting = false; await poll(); }
+}

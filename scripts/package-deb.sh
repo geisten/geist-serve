@@ -19,7 +19,6 @@ mkdir -p "$stage/DEBIAN" "$stage/usr/lib/geist" "$stage/usr/bin" \
 install -m 755 geist geist-app geistd "$stage/usr/lib/geist/"
 ln -s ../lib/geist/geist "$stage/usr/bin/geist"
 install -m 644 deploy/systemd/geist.service "$stage/usr/lib/systemd/user/"
-install -m 644 deploy/desktop/geist.desktop "$stage/usr/share/applications/"
 install -m 644 LICENSE "$stage/usr/share/doc/geist/copyright"
 install -m 644 docs/INSTALL.md "$stage/usr/share/doc/geist/README.md"
 cat > "$stage/DEBIAN/control" <<EOF
@@ -38,7 +37,7 @@ cat > "$stage/DEBIAN/postinst" <<'EOF'
 #!/bin/sh
 set -eu
 # Never impersonate desktop users or start an inference workload as root.
-echo 'Open Geist from the application menu, or run: geist open'
+echo 'Start the service with: geist start. Install geist-desktop for the graphical app.'
 echo 'Enable login startup with: systemctl --user enable geist.service'
 echo 'After an upgrade, run: systemctl --user daemon-reload && geist restart'
 EOF

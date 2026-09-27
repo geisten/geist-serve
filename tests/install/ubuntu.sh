@@ -9,7 +9,7 @@ source_root=$(realpath "${2:?source checkout}")
 apt-get update -qq
 apt-get install -y -qq ca-certificates python3 systemd dbus-user-session desktop-file-utils procps >/dev/null
 apt-get install -y -qq "$package" >/dev/null
-desktop-file-validate /usr/share/applications/geist.desktop
+test ! -e /usr/share/applications/geist.desktop # GUI is a separate optional package.
 systemd-analyze verify --man=no /usr/lib/systemd/user/geist.service
 useradd -m geist-acceptance
 uid=$(id -u geist-acceptance)

@@ -44,6 +44,9 @@ static const unsigned char page[] = {
 static const unsigned char style[] = {
 #embed "../../web/app.css"
 };
+static const unsigned char translations[] = {
+#embed "../../web/i18n.js"
+};
 static const unsigned char script[] = {
 #embed "../../web/app.js"
 };
@@ -1191,6 +1194,10 @@ static void handle(int fd, struct app_arena *arena) {
             response(fd, 200, "text/css; charset=utf-8", style, sizeof style);
             return;
         }
+        if (strcmp(r.path, "/i18n.js") == 0) {
+            response(fd, 200, "text/javascript; charset=utf-8", translations, sizeof translations);
+            return;
+        }
         if (strcmp(r.path, "/app.js") == 0) {
             response(fd, 200, "text/javascript; charset=utf-8", script, sizeof script);
             return;
@@ -1266,7 +1273,8 @@ static void handle(int fd, struct app_arena *arena) {
         return;
     }
     bool download = strcmp(r.path, "/app/download") == 0;
-    if (!download && strcmp(r.path, "/app/select") != 0) {
+    bool remove   = strcmp(r.path, "/app/remove") == 0;
+    if (!download && !remove && strcmp(r.path, "/app/select") != 0) {
         error_response(fd, 404, "Unknown action.");
         return;
     }
@@ -1292,9 +1300,46 @@ static void handle(int fd, struct app_arena *arena) {
         error_response(fd, 409, "Another task is active.");
         return;
     }
-    char                path[APP_PATH_CAP], part[APP_PATH_CAP];
-    bool                valid     = path_join(path, app.models, model->file);
-    bool                installed = valid && regular_size(path) == model->bytes;
+    char path[APP_PATH_CAP], part[APP_PATH_CAP];
+    bool valid     = path_join(path, app.models, model->file);
+    bool installed = valid && regular_size(path) == model->bytes;
+    if (remove) {
+        if (!valid ||
+            (app.child > 0 && (!strcmp(app.active_id, model->id) || !strcmp(app.chosen, path)))) {
+            pthread_mutex_unlock(&app.mutex);
+            error_response(fd, 409, "Unload this model before removing it.");
+            return;
+        }
+        // Catalog filenames only; never follow a replaced directory or a symlink.
+        int         directory = open(app.models, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        char        partial_name[256];
+        bool        safe    = directory >= 0 &&
+                              snprintf(partial_name, sizeof partial_name, "%s.part", model->file) <
+                                      (int) sizeof partial_name;
+        const char *names[] = {model->file, partial_name};
+        for (unsigned i = 0; safe && i < 2; ++i) {
+            struct stat info;
+            if (fstatat(directory, names[i], &info, AT_SYMLINK_NOFOLLOW) == 0)
+                safe = S_ISREG(info.st_mode);
+            else
+                safe = errno == ENOENT;
+        }
+        for (unsigned i = 0; safe && i < 2; ++i)
+            if (unlinkat(directory, names[i], 0) != 0 && errno != ENOENT)
+                safe = false;
+        if (directory >= 0)
+            close(directory);
+        if (safe) {
+            app.measurements[model - app_models].tps    = 0;
+            app.measurements[model - app_models].tokens = 0;
+        }
+        pthread_mutex_unlock(&app.mutex);
+        if (safe)
+            response(fd, 200, "application/json", "{}", 2);
+        else
+            error_response(fd, 409, "Cannot remove this download safely.");
+        return;
+    }
     struct app_hardware h;
     bool                known = app_hardware_read(&h, app.models);
     if (valid && snprintf(part, sizeof part, "%s.part", path) < (int) sizeof part) {

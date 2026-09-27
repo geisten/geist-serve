@@ -1,0 +1,145 @@
+'use strict';
+let interfaceLanguage = (window.geistLanguage || (() => { try { return localStorage.getItem('geist-language'); } catch { return null; } })() || navigator.language).startsWith('de') ? 'de' : 'en';
+const german = {
+  'Skip to content': 'Zum Inhalt', 'Interface': 'Oberfläche', 'Interface language': 'Sprache der Oberfläche', 'Setup': 'Einrichtung',
+  '1. Models': '1. Modelle', '2. Test': '2. Testen', '3. Connect': '3. Verbinden',
+  'Make room for your ideas.': 'Platz für deine Ideen.',
+  'Choose a task and a model. Your text is processed on the computer running Geist.': 'Wähle eine Aufgabe und ein Modell. Dein Text wird auf dem Rechner verarbeitet, auf dem Geist läuft.',
+  'Your task': 'Deine Aufgabe', 'Answer language': 'Antwortsprache', 'Loading tasks…': 'Aufgaben werden geladen…',
+  'Allow experimental models. I will review their answers.': 'Experimentelle Modelle zulassen. Ich werde ihre Antworten prüfen.',
+  'Open Home Assistant integration ↗': 'Home-Assistant-Integration öffnen ↗',
+  'THIS COMPUTER': 'DIESER RECHNER', 'Checking this computer…': 'Rechner wird geprüft…', 'Find your fit.': 'Finde das passende Modell.',
+  '6 models': '6 Modelle', 'Hardware fit and answer quality are separate. Experimental models need your explicit choice.': 'Hardware-Eignung und Antwortqualität sind getrennte Kriterien. Experimentelle Modelle musst du ausdrücklich freigeben.',
+  'Available models': 'Verfügbare Modelle', 'Show more models': 'Weitere Modelle anzeigen', 'Show fewer models': 'Weniger Modelle anzeigen',
+  'How recommendations work': 'So entstehen Empfehlungen',
+  'Memory figures are planning estimates. A recommendation needs evidence for the model, task, language and device. Speed alone does not establish answer quality.': 'Speicherangaben sind Planungsschätzungen. Eine Empfehlung braucht Belege für Modell, Aufgabe, Sprache und Gerät. Geschwindigkeit allein belegt keine Antwortqualität.',
+  'Downloads come from Hugging Face after you choose a model. Each completed download is verified with SHA-256. No account is needed.': 'Modelle werden nach deiner Auswahl von Hugging Face geladen und mit SHA-256 geprüft. Du brauchst kein Konto.',
+  'Try it here.': 'Probiere es aus.', 'Choose a model': 'Modell auswählen', 'Choose a model to begin.': 'Wähle zuerst ein Modell.',
+  'Download a suggested model to begin.': 'Wähle und lade zuerst ein Modell.', 'Your input': 'Deine Eingabe', 'Write here…': 'Hier schreiben…',
+  'Use an example': 'Beispiel verwenden', 'Run locally': 'Lokal ausführen', 'Stop': 'Stoppen', 'Quick speed test': 'Kurzer Geschwindigkeitstest',
+  'Each request starts fresh. Review the result before using it. ⌘ / Ctrl + Enter to send.': 'Jede Anfrage beginnt neu. Prüfe das Ergebnis vor der Verwendung. Senden mit ⌘ / Strg + Enter.',
+  'Your result': 'Dein Ergebnis', 'Copy': 'Kopieren', 'Copied': 'Kopiert', 'Generation speed': 'Ausgabegeschwindigkeit', 'First text': 'Erster Text', 'Total time': 'Gesamtzeit',
+  'Measurements appear after a run.': 'Messwerte erscheinen nach einem Durchlauf.', 'Bring your own tools.': 'Nutze deine Programme.',
+  'Your editor and this window use the same model. Closing the window keeps the service running.': 'Dein Editor und dieses Fenster verwenden dasselbe Modell. Beim Schließen läuft der Dienst weiter.',
+  'Local endpoint': 'Lokaler Endpunkt', 'Model': 'Modell', 'Use with': 'Verwenden mit', 'OpenCode · text chat': 'OpenCode · Textchat',
+  'Copy configuration': 'Konfiguration kopieren', 'Test local connection': 'Lokale Verbindung testen',
+  'Text chat is available after loading a model. Agent tools are not supported. Context: 4096 tokens. Copied configurations contain your private local key: keep them out of repositories.': 'Textchat ist nach dem Laden verfügbar. Agentenwerkzeuge werden nicht unterstützt. Kontext: 4096 Token. Kopierte Konfigurationen enthalten deinen privaten lokalen Schlüssel und gehören nicht in Repositories.',
+  'Models stay on this computer. Prompts and results are not saved as chat history.': 'Modelle bleiben auf diesem Rechner. Eingaben und Ergebnisse werden nicht als Chatverlauf gespeichert.',
+  'Unload model': 'Modell entladen', 'Stop model service': 'Modelldienst stoppen', 'Downloading': 'Wird heruntergeladen', 'Download progress': 'Download-Fortschritt', 'Cancel': 'Abbrechen',
+  'Unavailable': 'Nicht verfügbar', 'Experimental': 'Experimentell', 'Recommended': 'Empfohlen', 'Conditional': 'Bedingt geeignet',
+  'Running here': 'Läuft hier', 'Use this model': 'Modell verwenden', 'Resume download': 'Download fortsetzen', 'Remove download': 'Download löschen',
+  'Task quality: unverified for this task, language and device.': 'Aufgabenqualität: Für diese Aufgabe, Sprache und dieses Gerät noch nicht bestätigt.',
+  'Hardware information unavailable': 'Hardware-Informationen nicht verfügbar', 'Disk space could not be read': 'Freier Speicher konnte nicht ermittelt werden',
+  'Verifying model': 'Modell wird geprüft', 'Downloading model': 'Modell wird heruntergeladen', 'Loading model': 'Modell wird geladen', 'Ready on this device': 'Auf diesem Gerät bereit',
+  'Checking the complete file before it can run.': 'Die vollständige Datei wird vor dem Start geprüft.',
+  'Short local test running. Results apply to this model and this workload.': 'Kurzer lokaler Test läuft. Die Messwerte gelten für dieses Modell und diese Aufgabe.',
+  'Running on your device…': 'Läuft auf deinem Gerät…', 'Waiting for the first text…': 'Warte auf den ersten Text…', 'Generating locally…': 'Text wird lokal erzeugt…',
+  'The model returned an error.': 'Das Modell hat einen Fehler gemeldet.', 'Output exceeded the display memory limit.': 'Die Ausgabe überschreitet das Speicherlimit der Anzeige.',
+  'This browser does not support streamed responses.': 'Diese Oberfläche unterstützt keine gestreamten Antworten.', 'The response exceeded the stream buffer limit.': 'Die Antwort überschreitet das Pufferlimit.',
+  'The connection ended before the model completed its response.': 'Die Verbindung endete vor Abschluss der Antwort.',
+  'Output limit reached. The result may be incomplete; try a shorter input.': 'Ausgabelimit erreicht. Das Ergebnis kann unvollständig sein; versuche eine kürzere Eingabe.',
+  'Complete. Your result stays on this device.': 'Fertig. Dein Ergebnis bleibt auf diesem Gerät.', 'The model completed without producing text. Try a different prompt.': 'Das Modell lieferte keinen Text. Versuche eine andere Eingabe.',
+  'Stopped. Partial output is kept here.': 'Gestoppt. Die bisherige Ausgabe bleibt hier.', 'Run incomplete. No final generation speed is reported.': 'Durchlauf unvollständig. Es wird keine abschließende Geschwindigkeit angegeben.',
+  'Cancelling…': 'Wird abgebrochen…', 'Stopping': 'Wird gestoppt', 'Geist is stopping. Reopen the app to start it again.': 'Geist wird gestoppt. Öffne die App erneut, um den Dienst zu starten.',
+  'Stop the shared service? Terminal and editor connections will stop too. Downloaded models are kept.': 'Gemeinsamen Dienst stoppen? Auch Terminal und Editoren werden getrennt. Heruntergeladene Modelle bleiben erhalten.',
+  'Copy is unavailable here. Select the result and copy it manually.': 'Kopieren ist hier nicht verfügbar. Markiere das Ergebnis und kopiere es manuell.',
+  'Load a model first.': 'Lade zuerst ein Modell.', 'Copied. The configuration contains your private local key.': 'Kopiert. Die Konfiguration enthält deinen privaten lokalen Schlüssel.',
+  'Asking the loaded model through the editor endpoint…': 'Das geladene Modell wird über den Editor-Endpunkt angesprochen…',
+  'The model completed without text. Try another model.': 'Das Modell lieferte keinen Text. Versuche ein anderes Modell.',
+  'Open Geist using the private link from the app or Pi launcher. The link contains your private local API key.': 'Öffne Geist über den privaten Link aus der App oder dem Pi-Starter. Der Link enthält deinen privaten lokalen API-Schlüssel.',
+  'Service unavailable. Reopen Geist to reconnect.': 'Dienst nicht erreichbar. Öffne Geist erneut, um dich zu verbinden.',
+  'Stop the current task first.': 'Stoppe zuerst die laufende Aufgabe.', 'Another task is active.': 'Eine andere Aufgabe läuft bereits.',
+  'Unload this model before removing it.': 'Entlade das Modell, bevor du es löschst.', 'Cannot remove this download safely.': 'Dieser Download konnte nicht sicher gelöscht werden.',
+  'Download this model first.': 'Lade dieses Modell zuerst herunter.', 'Write your input here…': 'Schreibe hier deine Eingabe…',
+  'seconds': 'Sekunden'
+};
+const germanPatterns = [
+  [/^(.+) download · (.+) GiB RAM guidance$/, (_, a, b) => `${a} Download · ${b} GiB RAM empfohlen`],
+  [/^Download · (.+)$/, (_, a) => `Herunterladen · ${a}`],
+  [/^(.+) disk space available$/, (_, a) => `${a} Speicherplatz verfügbar`],
+  [/^(.+) RAM · (.+) compute cores · (.+)$/, (_, a, b, c) => `${a} RAM · ${b} Rechenkerne · ${c}`],
+  [/^Show (\d+) more models$/, (_, a) => `${a} weitere Modelle anzeigen`],
+  [/^(Verifying|Downloading) (.+)$/, (_, a, b) => `${b}: ${a === 'Verifying' ? 'wird geprüft' : 'wird heruntergeladen'}`],
+  [/^(.+) of (.+) · partial downloads can be resumed$/, (_, a, b) => `${a} von ${b} · Teil-Downloads lassen sich fortsetzen`],
+  [/^Remove (.+) from this computer\? You can download it again later\.$/, (_, a) => `${a} von diesem Rechner löschen? Du kannst es später erneut herunterladen.`],
+  [/^Measured here: (.+) tokens\/s · (.+) tokens · this session$/, (_, a, b) => `Hier gemessen: ${a} Token/s · ${b} Token · diese Sitzung`],
+  [/^Connected\. The shared model returned (.+) tokens\. Now test the configuration in your chosen client\.$/, (_, a) => `Verbunden. Das gemeinsame Modell hat ${a} Token geliefert. Teste nun die Konfiguration in deinem Programm.`],
+  [/^Request failed \((\d+)\)\.$/, (_, a) => `Anfrage fehlgeschlagen (${a}).`],
+  [/^Resources: (.+)$/, (_, a) => `Ressourcen: ${t(a)}`],
+  [/^(\d+) generated tokens\..+$/, (_, a) => `${a} erzeugte Token. Die Geschwindigkeit verwendet die Ausgabezeit von geistd einschließlich Streaming. Erster Text und Gesamtzeit enthalten Verbindung und Eingabeverarbeitung.`]
+];
+function t(text) {
+  if (interfaceLanguage !== 'de' || typeof text !== 'string') return text;
+  if (german[text]) return german[text];
+  for (const [pattern, replace] of germanPatterns) if (pattern.test(text)) return text.replace(pattern, replace);
+  return text;
+}
+const staticTexts = [];
+const staticAttributes = [];
+const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+while (walker.nextNode()) {
+  const node = walker.currentNode;
+  if (node.textContent.trim() && !['SCRIPT', 'STYLE'].includes(node.parentElement.tagName)) staticTexts.push([node, node.textContent]);
+}
+for (const node of document.querySelectorAll('[aria-label], [placeholder]')) for (const attr of ['aria-label', 'placeholder']) if (node.hasAttribute(attr)) staticAttributes.push([node, attr, node.getAttribute(attr)]);
+function translateStatic() {
+  document.documentElement.lang = interfaceLanguage;
+  for (const [node, original] of staticTexts) if (node.isConnected) node.textContent = original.replace(original.trim(), t(original.trim()));
+  for (const [node, attr, original] of staticAttributes) node.setAttribute(attr, t(original));
+}
+async function desktopMessage(action, value) {
+  if (window.geistDesktop === 'mac') return window.webkit.messageHandlers.desktop.postMessage({action, value});
+  if (window.geistDesktop === 'linux') {
+    // Linux replies by resolving only this bounded, opaque request identifier.
+    return new Promise((resolve, reject) => {
+      const id = String(++desktopRequest);
+      const timeout = setTimeout(() => { desktopReplies.delete(id); reject(new Error('Desktop request timed out.')); }, 5000);
+      desktopReplies.set(id, {resolve, reject, timeout});
+      window.webkit.messageHandlers.desktop.postMessage(JSON.stringify({id, action, value}));
+    });
+  }
+}
+let desktopRequest = 0;
+const desktopReplies = new Map();
+window.geistDesktopReply = (id, ok) => {
+  const pending = desktopReplies.get(id); if (!pending) return;
+  clearTimeout(pending.timeout); desktopReplies.delete(id);
+  if (ok) pending.resolve(); else pending.reject(new Error('Desktop request denied.'));
+};
+async function copyText(value) {
+  if (window.geistDesktop) await desktopMessage('copy', value);
+  else await navigator.clipboard.writeText(value);
+}
+translateStatic();
+Object.assign(german, {
+  'Evidence is specific to the model, language and device.': 'Belege gelten jeweils für Modell, Sprache und Gerät.',
+  'Tests cover simple chats only, not arbitrary questions.': 'Die Tests decken einfache Chats ab, nicht beliebige Fragen.',
+  'The language applies to this window but could not be saved.': 'Die Sprache gilt für dieses Fenster, konnte aber nicht gespeichert werden.',
+  'Rewrite a message': 'Nachricht umformulieren', 'Summarize a note': 'Notiz zusammenfassen', 'Explore an idea': 'Ideen finden', 'Try your own request': 'Freie Anfrage testen', 'Control Home Assistant': 'Home Assistant steuern',
+  'Turn a rough message into a clear, friendly draft.': 'Formuliere eine Nachricht klar und freundlich um.',
+  'Extract the main point from a short note.': 'Fasse den wichtigsten Punkt einer kurzen Notiz zusammen.',
+  'Get a short starting point to develop yourself.': 'Erhalte einen kurzen Ausgangspunkt zum Weiterentwickeln.',
+  'An open experiment with the model you choose.': 'Ein freier Versuch mit dem gewählten Modell.',
+  'Use the existing Home Assistant integration. Device permissions and execution stay in Home Assistant. Product validation is still in progress.': 'Nutze die bestehende Home-Assistant-Integration. Geräteberechtigungen und Ausführung bleiben in Home Assistant. Die Produktprüfung läuft noch.',
+  'I cannot attend our meeting tomorrow. Could we move it to Friday morning?': 'Ich kann morgen nicht an unserem Treffen teilnehmen. Können wir es auf Freitagvormittag verschieben?',
+  'The garden workshop takes place on Saturday at 10 am. Bring gloves and a small container. Seeds and tools will be provided. The event ends at noon.': 'Der Gartenworkshop findet am Samstag um 10 Uhr statt. Bring Handschuhe und einen kleinen Behälter mit. Saatgut und Werkzeuge werden gestellt. Die Veranstaltung endet um 12 Uhr.',
+  'Useful things to do with a Raspberry Pi at home.': 'Nützliche Einsatzmöglichkeiten für einen Raspberry Pi zu Hause.',
+  'Explain how a seed grows into a plant in three sentences.': 'Erkläre in drei Sätzen, wie aus einem Samen eine Pflanze wächst.',
+  'Performance on this device is not measured yet.': 'Die Leistung auf diesem Gerät wurde noch nicht gemessen.',
+  'Unknown on this device; measure after download.': 'Für dieses Gerät unbekannt; nach dem Download messen.',
+  'Pi 5 reference: 17.8 tokens/s; your speed may differ.': 'Pi-5-Referenz: 17,8 Token/s; deine Geschwindigkeit kann abweichen.',
+  'Apple Silicon profile; run a local test for actual speed.': 'Apple-Silicon-Profil; tatsächliche Geschwindigkeit lokal testen.',
+  'This CPU instruction set or platform is not supported by the bundled engine.': 'Die enthaltene Engine unterstützt diesen CPU-Befehlssatz oder diese Plattform nicht.',
+  'Not enough disk space for the download plus 256 MiB reserve.': 'Nicht genug Speicherplatz für den Download und 256 MiB Reserve.',
+  'RAM is smaller than the model file, before context and OS memory.': 'Der RAM ist kleiner als die Modelldatei, noch ohne Kontext und Betriebssystem.',
+  'Below the RAM recommendation; swapping or allocation failures are possible.': 'Unter der RAM-Empfehlung; Auslagerung oder Speicherfehler sind möglich.',
+  'Available RAM is tight now. Close other apps before loading this model.': 'Der verfügbare RAM ist knapp. Schließe andere Programme vor dem Laden.',
+  'Fits the Pi 5 memory profile and has a published speed reference.': 'Passt zum Pi-5-Speicherprofil und hat eine veröffentlichte Geschwindigkeitsreferenz.',
+  'Fits the Apple Silicon hardware and RAM profile; speed is an estimate.': 'Passt zum Hardware- und RAM-Profil von Apple Silicon; Geschwindigkeit geschätzt.',
+  "Measured below the app's interactive target of 8 tokens/s. Still usable for patient tasks.": 'Gemessene Geschwindigkeit unter dem Zielwert von 8 Token/s. Für Aufgaben mit Wartezeit weiterhin nutzbar.',
+  "Memory fits and measured speed meets the app's interactive target of 8 tokens/s.": 'Speicher passt, gemessene Geschwindigkeit erreicht den Zielwert von 8 Token/s.',
+  'Measured on this device in this app session; workload and temperature affect speed.': 'In dieser Sitzung auf diesem Gerät gemessen; Aufgabe und Temperatur beeinflussen die Geschwindigkeit.',
+  'Paste the copied curl command into your terminal to try the loaded model. Ubuntu also installs geist test and geist chat. On Mac, the CLI is bundled at /Applications/Geist.app/Contents/MacOS/geist-cli.': 'Füge den kopierten curl-Befehl im Terminal ein. Unter Ubuntu gibt es auch geist test und geist chat. Auf dem Mac liegt die CLI unter /Applications/Geist.app/Contents/MacOS/geist-cli.',
+  'In Continue, open your local config.yaml and add the model from this configuration. JSON is valid YAML. Select Geist and use Chat mode. Preserve your existing configuration.': 'Öffne in Continue deine lokale config.yaml und ergänze das Modell aus dieser Konfiguration. JSON ist gültiges YAML. Wähle Geist im Chat-Modus. Behalte deine bestehenden Einstellungen.',
+  'Save as opencode.json in a private test folder. Run opencode there and choose geist-chat. This profile disables tools; it does not enable coding-agent workflows.': 'Speichere dies als opencode.json in einem privaten Testordner. Starte dort opencode und wähle geist-chat. Das Profil deaktiviert Werkzeuge und unterstützt keine Coding-Agenten.'
+});
