@@ -36,7 +36,12 @@ def evaluate(view, script):
 
 
 def wait_js(view, condition, timeout=30):
-    spin(lambda: evaluate(view, condition) is True, timeout)
+    try:
+        spin(lambda: evaluate(view, condition) is True, timeout)
+    except AssertionError as error:
+        # Whitelist diagnostics: never print the URL, capability or connection.json.
+        details = evaluate(view, "({ready: state?.ready, busy: state?.busy, generating: !!controller, connectionTesting, connectionDisabled: document.getElementById('test-connection').disabled, connectionResult: document.getElementById('connection-result').textContent, notice: document.getElementById('notice').textContent})")
+        raise AssertionError(f'{condition}: {details}') from error
 
 
 with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
@@ -88,7 +93,12 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
             evaluate(desktop.view, "document.getElementById('task-choice').value='freeform'; document.getElementById('task-choice').dispatchEvent(new Event('change')); document.getElementById('prompt').value='Say hello in one sentence.'; document.getElementById('task-form').requestSubmit(); true")
             wait_js(desktop.view, "document.getElementById('output').textContent.length > 0 && controller === null", timeout=90)
             assert '—' not in evaluate(desktop.view, "document.getElementById('speed').textContent")
+            evaluate(desktop.view, "document.querySelector('[data-page=\"connect-page\"]').click(); true")
+            # Stream completion may precede the next status poll clearing busy.
+            # A click on a disabled button is discarded, so wait for the visible UI.
+            wait_js(desktop.view, "!document.getElementById('test-connection').disabled")
             evaluate(desktop.view, "document.getElementById('test-connection').click(); true")
+            wait_js(desktop.view, "connectionTesting || document.getElementById('connection-result').textContent.length > 0")
             wait_js(desktop.view, "!connectionTesting && document.getElementById('connection-result').textContent.startsWith('Connected.')", timeout=60)
         # Closing the UI leaves the service owned by its separate supervisor.
         desktop.window.set_visible(False)
