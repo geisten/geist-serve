@@ -3,8 +3,10 @@
 A model that fits memory is not necessarily suitable for a task. The app
 keeps resource advice, locally measured speed and task quality separate.
 Unknown or failed task/model/language/device combinations require an explicit,
-unchecked-by-default experimental-use choice. The HTTP boundary enforces the
-same policy. A manually supplied model remains experimental.
+preview notice and deliberate start action. Consent is remembered per immutable
+model hash; each generation still sends `experimental: true`. The HTTP boundary
+continues to reject unapproved combinations without that flag. A manually
+supplied model remains experimental and requires fresh consent in each window.
 
 Quality records are keyed by model SHA-256, task version, language and device
 family. They describe the tested configuration; they do not establish quality

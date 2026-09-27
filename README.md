@@ -1,6 +1,6 @@
 # geist-serve
 
-**Runs here. Stays here.** Choose a model for your hardware, download it once,
+**Runs here. Stays here.** Start with one model suggested for your hardware,
 and use the same `geistd` from the model manager, terminal and editor.
 `geist-app` owns the private inference process; the C23 `geist` client and
 authenticated `/v1/chat/completions` gateway connect to that same service.

@@ -75,6 +75,63 @@ int main(void) {
     h.supported = false;
     assert(app_assess(&h, gemma, true).fit == APP_UNAVAILABLE);
 
+    struct app_inventory inventory[APP_MODEL_COUNT] = {};
+    h                             = (struct app_hardware) {.supported       = true,
+                                                           .ram             = 16 * APP_GIB,
+                                                           .available       = 8 * APP_GIB,
+                                                           .available_known = true,
+                                                           .disk_known      = true,
+                                                           .disk            = 20 * APP_GIB,
+                                                           .cores           = 8,
+                                                           .device          = APP_APPLE_SILICON};
+    struct app_recommendation rec = app_recommend(&h, inventory, "", "");
+    assert(rec.eligible && rec.model == gemma && !strcmp(rec.source, "default"));
+    h.available = APP_GIB;
+    rec         = app_recommend(&h, inventory, "", "");
+    assert(rec.eligible && !strcmp(rec.model->id, "smollm2-360m") &&
+           !strcmp(rec.source, "fallback"));
+    h.available = 767 * UINT64_C(1048576);
+    assert(!app_recommend(&h, inventory, "", "").eligible);
+    h.available = 8 * APP_GIB;
+    h.cores     = 2;
+    assert(!strcmp(app_recommend(&h, inventory, "", "").source, "fallback"));
+    h.cores                           = 4;
+    inventory[gemma - app_models].tps = 5;
+    assert(!strcmp(app_recommend(&h, inventory, "", "").source, "fallback"));
+    inventory[gemma - app_models].tps = 0;
+    h.device                          = APP_PI5;
+    h.ram                             = 4 * APP_GIB;
+    h.available                       = 3 * APP_GIB;
+    assert(app_recommend(&h, inventory, "", "").model == bitnet);
+    h.device                      = APP_UNKNOWN;
+    const struct app_model *small = app_model_find("smollm2-360m");
+    assert(app_recommend(&h, inventory, "", "").model == small);
+    h.disk = small->bytes + 256 * UINT64_C(1048576) - 1;
+    assert(!app_recommend(&h, inventory, "", "").eligible);
+    inventory[small - app_models].partial = 100;
+    assert(app_recommend(&h, inventory, "", "").eligible);
+    inventory[small - app_models].partial = UINT64_MAX;
+    assert(!app_recommend(&h, inventory, "", "").eligible);
+    inventory[small - app_models].installed = true;
+    assert(app_recommend(&h, inventory, "", "").eligible);
+    h.disk_known = false;
+    assert(!app_recommend(&h, inventory, "", "").eligible);
+    h.disk_known      = true;
+    h.available_known = false;
+    assert(!app_recommend(&h, inventory, "", "").eligible);
+    h.available_known = true;
+    h.supported       = false;
+    assert(!app_recommend(&h, inventory, "", "").eligible);
+    h.supported = true;
+    h.disk      = 20 * APP_GIB;
+    // Saved choices never silently switch, even when the current budget fails.
+    rec = app_recommend(&h, inventory, gemma->id, "");
+    assert(!rec.eligible && rec.model == gemma && !strcmp(rec.source, "saved"));
+    h.ram       = 16 * APP_GIB;
+    h.available = 100;
+    rec         = app_recommend(&h, inventory, small->id, small->id);
+    assert(rec.eligible && rec.model == small); // already loaded memory is not charged twice
+
     char path[] = "/tmp/geist-sha-XXXXXX";
     int  fd     = mkstemp(path);
     assert(fd >= 0 && write(fd, "abc", 3) == 3);

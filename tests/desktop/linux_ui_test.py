@@ -58,10 +58,11 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
         desktop.activate()
         spin(lambda: desktop.origin is not None)
         wait_js(desktop.view, "document.querySelectorAll('.model').length === 6")
-        wait_js(desktop.view, "document.getElementById('task-choice').options.length === 5 && selectedTask !== null")
+        wait_js(desktop.view, "tasks.length === 5 && selectedTask?.id === 'freeform'")
         assert desktop.window.get_visible()
         assert desktop.view.get_network_session().is_ephemeral()
-        assert evaluate(desktop.view, "document.querySelectorAll('.model button:first-of-type:not(:disabled)').length") == 0
+        assert evaluate(desktop.view, "document.getElementById('workspace').hidden && !document.getElementById('setup').hidden && !document.getElementById('experimental')")
+        assert evaluate(desktop.view, "state.models.every(m => !m.preview_accepted)")
         connection = json.loads((Path(temporary) / 'connection.json').read_text())
         desktop.activate()
         spin(lambda: not desktop.working)
@@ -70,7 +71,7 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
         wait_js(desktop.view, "document.documentElement.lang === 'de'")
         spin(lambda: desktop.preferences.exists())
         assert json.loads(desktop.preferences.read_text())['language'] == 'de'
-        assert evaluate(desktop.view, "document.getElementById('task-title').textContent") == 'Probiere es aus.'
+        assert evaluate(desktop.view, "document.getElementById('task-title').textContent") == 'Was möchtest du ausprobieren?'
         evaluate(desktop.view, "document.querySelector('[data-page=\"test-page\"]').click(); document.getElementById('prompt').value='Keep my input'; document.getElementById('ui-language').value='en'; document.getElementById('ui-language').dispatchEvent(new Event('change')); true")
         assert evaluate(desktop.view, "document.getElementById('prompt').value") == 'Keep my input'
         evaluate(desktop.view, "window.copyDone=false; copyText('Geist desktop clipboard test').then(() => window.copyDone=true); true")
@@ -88,9 +89,14 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
         desktop.window.set_default_size(540, 600)
         assert evaluate(desktop.view, 'document.documentElement.scrollWidth <= innerWidth')
         if model:
-            evaluate(desktop.view, "document.getElementById('experimental').click(); document.querySelector('[data-id=\"smollm2-360m\"] button').click(); true")
-            wait_js(desktop.view, 'state?.ready === true', timeout=60)
-            evaluate(desktop.view, "document.getElementById('task-choice').value='freeform'; document.getElementById('task-choice').dispatchEvent(new Event('change')); document.getElementById('prompt').value='Say hello in one sentence.'; document.getElementById('task-form').requestSubmit(); true")
+            evaluate(desktop.view, "document.getElementById('setup-start').click(); true")
+            wait_js(desktop.view, "state?.ready === true && !document.getElementById('workspace').hidden", timeout=60)
+            assert evaluate(desktop.view, "state.active_id === 'smollm2-360m' && state.models.find(m=>m.id===state.active_id).preview_accepted")
+            evaluate(desktop.view, "document.querySelector('[data-task=ideas]').click(); true")
+            assert evaluate(desktop.view, "selectedTask.id === 'ideas' && state.active_id === 'smollm2-360m' && !state.busy")
+            evaluate(desktop.view, "document.querySelector('[data-task=ideas]').click(); true")
+            assert evaluate(desktop.view, "selectedTask.id === 'freeform' && document.getElementById('run').getBoundingClientRect().bottom < innerHeight")
+            evaluate(desktop.view, "document.getElementById('prompt').value='Say hello in one sentence.'; document.getElementById('task-form').requestSubmit(); true")
             wait_js(desktop.view, "document.getElementById('output').textContent.length > 0 && controller === null", timeout=90)
             assert '—' not in evaluate(desktop.view, "document.getElementById('speed').textContent")
             evaluate(desktop.view, "document.querySelector('[data-page=\"connect-page\"]').click(); true")
@@ -111,7 +117,10 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
         desktop.start()
         spin(lambda: desktop.origin is not None)
         wait_js(desktop.view, "document.querySelectorAll('.model').length === 6")
-        print('GTK/WebKit: real local UI, explicit experimental opt-in, DE/EN, preferences, clipboard, navigation restrictions, resize, reactivation, shared-service reuse and stop/reconnect passed')
+        if model:
+            wait_js(desktop.view, "state?.ready && !document.getElementById('workspace').hidden && !document.getElementById('run').disabled", timeout=60)
+            assert evaluate(desktop.view, "document.getElementById('prompt').value === ''")
+        print('GTK/WebKit: real local UI, one-click setup, persistent preview consent, task chips without model switching, DE/EN, preferences, clipboard, navigation restrictions, resize, reactivation, shared-service reuse and stop/reconnect passed')
     finally:
         desktop.shutdown(desktop)
         if desktop.window: desktop.window.destroy()

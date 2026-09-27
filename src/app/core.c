@@ -214,3 +214,66 @@ struct app_assessment app_assess_observed(const struct app_hardware *h,
     }
     return a;
 }
+
+static const char *setup_limit(const struct app_hardware  *h,
+                               const struct app_model     *m,
+                               const struct app_inventory *inventory,
+                               bool                        running) {
+    if (!h->supported)
+        return "This CPU instruction set or platform is not supported by the bundled engine.";
+    if (!h->ram || !h->available_known || !h->disk_known)
+        return "Cannot check available memory or disk space. Retry the platform check.";
+    if (h->ram < (uint64_t) m->recommended_ram_gib * APP_GIB * 95 / 100)
+        return "Not enough total RAM for this model's planning budget.";
+    if (!running && h->available < (uint64_t) m->working_mib * 1048576)
+        return "Available RAM is tight now. Close other apps before loading this model.";
+    uint64_t remaining = m->bytes - (inventory->partial <= m->bytes ? inventory->partial : 0);
+    if (!inventory->installed &&
+        (h->disk < remaining || h->disk - remaining < 256 * UINT64_C(1048576)))
+        return "Not enough disk space for the download plus 256 MiB reserve.";
+    return nullptr;
+}
+
+struct app_recommendation
+app_recommend(const struct app_hardware *h,
+              const struct app_inventory inventory[static APP_MODEL_COUNT],
+              const char                *selected,
+              const char                *running) {
+    /* Compatibility-tested preview defaults, not task-quality winners. Generic
+     * Linux uses the small model exercised by both native installer CI jobs. */
+    const struct app_model *preferred = app_model_find(h->device == APP_APPLE_SILICON ? "gemma4-e2b"
+                                                       : h->device == APP_PI5 ? "bitnet-2b"
+                                                                              : "smollm2-360m");
+    const struct app_model *saved     = app_model_find(selected);
+    if (saved) {
+        const char *limit = setup_limit(
+                h, saved, &inventory[saved - app_models], running && !strcmp(running, saved->id));
+        return (struct app_recommendation) {
+                saved,
+                preferred,
+                "saved",
+                limit ? limit : "Your model choice is kept. Change it in Customize.",
+                !limit};
+    }
+    const struct app_model *choices[] = {preferred, app_model_find("smollm2-360m")};
+    const char             *reason    = nullptr;
+    for (unsigned i = 0; i < 2; ++i) {
+        const struct app_model *m     = choices[i];
+        const char             *limit = setup_limit(h, m, &inventory[m - app_models], false);
+        if (!limit && ((m != choices[1] && h->cores < 4) ||
+                       (inventory[m - app_models].tps > 0 && inventory[m - app_models].tps < 8)))
+            limit = "Local performance is below the interactive setup target.";
+        if (!i)
+            reason = limit;
+        if (!limit)
+            return (struct app_recommendation) {
+                    m,
+                    preferred,
+                    i ? "fallback" : "default",
+                    i ? "A smaller model fits the available resources better."
+                      : "Platform default. Memory is estimated; answer quality is still "
+                        "unverified.",
+                    true};
+    }
+    return (struct app_recommendation) {nullptr, preferred, "blocked", reason, false};
+}

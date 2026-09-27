@@ -59,3 +59,21 @@ struct app_assessment app_assess_observed(const struct app_hardware *h,
 [[nodiscard]] bool    app_sha256(const char *path, char out[static 65]);
 [[nodiscard]] bool
 app_sha256_interruptible(const char *path, char out[static 65], bool (*cancel)(void));
+
+/* Product policy belongs to the shared application, not the inference library.
+ * Inventory is a snapshot; eligibility must be checked again before setup. */
+struct app_inventory {
+    bool     installed;
+    uint64_t partial;
+    double   tps;
+};
+struct app_recommendation {
+    const struct app_model *model, *preferred;
+    const char             *source, *reason;
+    bool                    eligible;
+};
+struct app_recommendation
+app_recommend(const struct app_hardware *h,
+              const struct app_inventory inventory[static APP_MODEL_COUNT],
+              const char                *selected,
+              const char                *running);

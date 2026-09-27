@@ -1,48 +1,70 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Geist</title><link rel="stylesheet" href="/app.css">
-  <script src="/i18n.js" defer></script><script src="/app.js" defer></script>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Geist</title><link rel="stylesheet" href="/app.css">
+<script src="/i18n.js" defer></script><script src="/app.js" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
-<header><a class="brand" href="#">geist<span class="local">Runs here. Stays here.</span></a><label class="locale">Interface <select id="ui-language" aria-label="Interface language"><option value="en">English</option><option value="de">Deutsch</option></select></label></header>
+<header><a class="brand" href="#" aria-label="Geist home">geist<span class="local">Runs here. Stays here.</span></a>
+<nav aria-label="Navigation">
+<button data-page="test-page" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/></svg><span>Try it</span></button>
+<button data-page="connect-page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 13 4-4m-7 6-1 1a4 4 0 0 0 6 6l4-4m1-9 1-1a4 4 0 0 0-6-6L8 6"/></svg><span>Connect</span></button>
+<button data-page="models-page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h7m4 0h5M4 17h3m4 0h9M11 4v6M7 14v6"/></svg><span>Customize</span></button>
+</nav></header>
 <main id="main">
-  <nav class="steps" aria-label="Setup"><button data-page="models-page" aria-current="step">1. Models</button><button data-page="test-page">2. Test</button><button data-page="connect-page">3. Connect</button></nav>
-  <section class="task-picker" aria-labelledby="choose-task-title">
-    <div><h1 id="choose-task-title">Your models. Your computer.</h1><p class="hint">Choose a task and a model. Your text is processed on the computer running Geist.</p></div>
-    <div><label for="task-choice">Your task</label><select id="task-choice" disabled></select></div>
-    <div><label for="language-choice">Answer language</label><select id="language-choice"><option value="en">English</option><option value="de">Deutsch</option></select></div>
-    <label class="hint experimental"><input type="checkbox" id="experimental"> Allow experimental models. I will review their answers.</label>
-    <a id="task-link" hidden target="_blank" rel="noreferrer">Open Home Assistant integration ↗</a>
-  </section>
-  <p id="notice" role="status" aria-live="polite"></p>
-  <div id="job" hidden><div class="section-heading"><strong id="job-title">Downloading</strong><button id="cancel-download" type="button">Cancel</button></div><progress id="download-progress" max="1" value="0" aria-label="Download progress"></progress><p id="job-detail" class="muted"></p></div>
-  <section id="models-page" class="page" aria-labelledby="models-title">
-    <div class="device"><div><p class="eyebrow">THIS COMPUTER</p><h2 id="device-name">Checking this computer…</h2></div><div><p id="device-specs"></p><p id="disk-space" class="muted"></p></div></div>
-    <div class="section-heading"><h2 id="models-title">Find your fit.</h2><span id="model-count">6 models</span></div>
-    <p class="hint">Hardware fit and answer quality are separate. Experimental models need your explicit choice.</p>
-    <div id="models" aria-label="Available models"></div>
-    <button id="more-models" class="text-button" type="button" aria-expanded="false" aria-controls="models">Show more models</button>
-    <details class="method"><summary>How recommendations work</summary><p id="task-evidence" class="hint"></p><p>Memory figures are planning estimates. A recommendation needs evidence for the model, task, language and device. Speed alone does not establish answer quality.</p><p>Downloads come from Hugging Face after you choose a model. Each completed download is verified with SHA-256. No account is needed.</p></details>
-  </section>
-  <section id="test-page" class="page" aria-labelledby="task-title" hidden>
-    <div class="section-heading"><h2 id="task-title">Try it here.</h2><span id="runtime-state" class="state">Choose a model</span></div><p id="active-model" class="muted">Choose a model to begin.</p>
-    <p id="task-description" class="muted">Loading tasks…</p>
-    <form id="task-form"><label for="prompt">Your input</label><textarea id="prompt" rows="5" maxlength="12000" placeholder="Write here…" required></textarea>
-      <div class="examples"><button id="use-example" type="button">Use an example</button></div>
-      <div class="actions"><button id="run" class="primary" type="submit" disabled>Run locally</button><button id="stop" type="button" hidden>Stop</button><button id="benchmark" type="button" disabled>Quick speed test</button></div><p class="hint">Each request starts fresh. Review the result before using it. ⌘ / Ctrl + Enter to send.</p>
+<section id="test-page" class="page" aria-labelledby="task-title">
+  <div id="setup" class="welcome">
+    <div class="welcome-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/></svg></div>
+    <h1 id="setup-title">A little more room for your ideas.</h1>
+    <p class="lead">Write, summarize, explore. Right on your computer.</p>
+    <p id="setup-detail" class="muted" role="status">Checking this computer…</p>
+    <p id="setup-reason" class="hint"></p>
+    <p id="preview-notice" class="preview">Preview: answers can be wrong. By starting, you agree to try this model and review its answers.</p>
+    <button id="setup-start" class="primary" type="button" disabled aria-describedby="setup-detail preview-notice">Set up and start</button>
+    <button class="text-button" data-page="models-page" type="button">Customize</button>
+    <p class="hint">No account. No cloud processing.</p>
+  </div>
+  <div id="job" class="welcome" hidden>
+    <h2 id="job-title">Getting ready…</h2>
+    <progress id="download-progress" max="1" value="0" aria-label="Download progress"></progress>
+    <p id="job-detail" class="muted" role="status"></p>
+    <button id="cancel-download" type="button">Cancel</button>
+  </div>
+  <div id="workspace" hidden>
+    <div class="section-heading"><h2 id="task-title">What would you like to try?</h2><span id="runtime-state" class="state">Ready on this device</span></div>
+    <div class="chips" role="group" aria-label="Optional tasks">
+      <button data-task="rewrite" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 16-1 4 4-1L20 7l-3-3ZM14 7l3 3"/></svg><span>Rewrite</span></button>
+      <button data-task="summary" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h10M5 18h6"/></svg><span>Summarize</span></button>
+      <button data-task="ideas" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/></svg><span>Ideas</span></button>
+    </div>
+    <form id="task-form"><label class="sr-only" for="prompt">Your input</label>
+      <textarea id="prompt" rows="5" maxlength="12000" placeholder="Write here…" required></textarea>
+      <div class="actions"><button id="use-example" class="text-button" type="button">Use an example</button><span class="spacer"></span><button id="stop" type="button" hidden>Stop</button><button id="run" class="primary" type="submit" disabled>Run locally</button></div>
+      <p class="hint">Each request starts fresh. ⌘ / Ctrl + Enter to send.</p>
     </form>
-    <section class="result" aria-labelledby="result-title"><div class="section-heading"><h3 id="result-title">Your result</h3><button id="copy" type="button" disabled>Copy</button></div><div id="output" aria-live="off"></div></section>
-    <div class="metrics"><div><span>Generation speed</span><strong id="speed">—</strong></div><div><span>First text</span><strong id="first-token">—</strong></div><div><span>Total time</span><strong id="elapsed">—</strong></div></div><p id="measurement-note" class="hint">Measurements appear after a run.</p>
-  </section>
+    <section id="result" class="result" aria-labelledby="result-title" hidden><div class="section-heading"><h3 id="result-title">Your result</h3><button id="copy" type="button" disabled>Copy</button></div><div id="output" aria-live="off"></div></section>
+  </div>
+</section>
+<p id="notice" role="status" aria-live="polite"></p>
   <section id="connect-page" class="page connections" aria-labelledby="connections-title" hidden>
     <h2 id="connections-title">Bring your own tools.</h2><p>Your editor and this window use the same model. Closing the window keeps the service running.</p>
     <dl><dt>Local endpoint</dt><dd id="connection-endpoint" class="connection-value"></dd><dt>Model</dt><dd id="connection-model" class="connection-value"></dd></dl>
     <label for="connection-client">Use with</label><select id="connection-client"><option value="terminal">Terminal</option><option value="continue">VS Code · Continue</option><option value="opencode">OpenCode · text chat</option></select>
     <p id="connection-help" class="hint"></p><div class="actions"><button id="copy-connection" type="button" disabled>Copy configuration</button><button id="test-connection" type="button" disabled>Test local connection</button></div><p id="connection-result" role="status" aria-live="polite"></p>
     <p class="hint">Text chat is available after loading a model. Agent tools are not supported. Context: 4096 tokens. Copied configurations contain your private local key: keep them out of repositories.</p>
+    <details class="settings"><summary>Home Assistant</summary><p class="hint">Use the existing Home Assistant integration. Device permissions and execution stay in Home Assistant. Product validation is still in progress.</p><a href="https://github.com/geisten/geist-home-assistant" target="_blank" rel="noreferrer">Open Home Assistant integration ↗</a></details>
   </section>
-  <footer><p>Models stay on this computer. Prompts and results are not saved as chat history.</p><div class="actions"><button id="unload" type="button" disabled>Unload model</button><button id="quit" type="button">Stop model service</button></div></footer>
+
+<section id="models-page" class="page" aria-labelledby="models-title" hidden>
+  <h2 id="models-title">Make yourself at home.</h2>
+  <div class="settings-row"><label for="ui-language">Interface language</label><select id="ui-language"><option value="en">English</option><option value="de">Deutsch</option></select></div>
+  <div class="settings-row"><label for="language-choice">Answer language</label><select id="language-choice"><option value="en">English</option><option value="de">Deutsch</option></select></div>
+  <details class="settings" open><summary>Model</summary><p id="active-model" class="muted"></p><p id="recommendation-reason" class="hint"></p><div id="models" aria-label="Available models"></div></details>
+  <details class="settings"><summary>This computer</summary><h3 id="device-name"></h3><p id="device-specs"></p><p id="disk-space" class="muted"></p><p class="hint">Memory figures are planning estimates. A recommendation needs evidence for the model, task, language and device. Speed alone does not establish answer quality.</p><p class="hint">Downloads come from Hugging Face after you choose a model. Each completed download is verified with SHA-256. No account is needed.</p></details>
+  <details class="settings"><summary>Measurements</summary><div class="metrics"><div><span>Generation speed</span><strong id="speed">—</strong></div><div><span>First text</span><strong id="first-token">—</strong></div><div><span>Total time</span><strong id="elapsed">—</strong></div></div><p id="measurement-note" class="hint">Measurements appear after a run.</p><button id="benchmark" type="button" disabled>Quick speed test</button></details>
+  <details class="settings"><summary>Service</summary><p class="hint">Your editor and this window use the same model. Closing the window keeps the service running.</p><div class="actions"><button id="unload" type="button" disabled>Unload model</button><button id="quit" type="button">Stop model service</button></div></details>
+</section>
+<footer>Models stay on this computer. Prompts and results are not saved as chat history.</footer>
 </main></body></html>

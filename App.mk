@@ -27,6 +27,7 @@ test-app: geist-app geist build/test_app_core build/test_app_client build/test_a
 	python3 tests/app/deadline_test.py
 	python3 tests/app/http_test.py
 	python3 tests/app/remove_test.py
+	python3 tests/app/setup_test.py
 	python3 tests/app/compat_test.py
 	python3 tests/app/cli_test.py
 

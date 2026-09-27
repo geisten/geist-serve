@@ -69,7 +69,7 @@ try:
         mode = 'valid'
         app = App(home, binary=ROOT / 'build/geist-app-test', env=env)
         try:
-            assert app.request('/app/download', {'id': 'smollm2-360m'})[0] == 202
+            assert app.request('/app/setup', {'id': 'smollm2-360m'})[0] == 202
             app.wait(lambda s: not s['busy'], timeout=90)
             assert saved in offsets, offsets
             assert target.exists() and not part.exists()
@@ -90,9 +90,9 @@ try:
             state = app.wait(lambda s: not s['busy'], timeout=90)
             assert 'mismatch' in state['message'], state
             assert not list((Path(home) / 'models').glob('*.gguf*'))
-            assert not (Path(home) / 'selected').exists()
+            assert (Path(home) / 'selected').read_text() == 'smollm2-360m'  # explicit retry choice, never loaded
             assert not state['ready']
-            print('download: correctly sized corrupt model discarded and never selected or started')
+            print('download: correctly sized corrupt model discarded and never started; retry choice retained')
         finally:
             app.close()
 finally:

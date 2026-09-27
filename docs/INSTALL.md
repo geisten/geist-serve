@@ -2,14 +2,15 @@
 
 These are development candidates, not a published release or Apple-approved
 distribution. The desktop manager, terminal and compatible editor share one
-loaded geistd. No model is included; choose Download on first use.
+loaded geistd. No model is included; choose Set up and start on first use.
 
 ## macOS (Apple Silicon, macOS 14+)
 
-Drag Geist.app from the DMG to Applications and open it. Geist opens its own desktop window, with Models, Test and Connect steps.
-Choose a task, explicitly allow experimental models if needed, then download
-a model and try a response. The interface follows the system language (English
-or German), with a separate answer-language selector. The bundled
+Drag Geist.app from the DMG to Applications and open it. Geist opens its own
+desktop window. Read the preview notice and choose **Set up and start**. A
+platform check suggests one model, including a smaller fallback when needed.
+Once ready, type a request or choose Rewrite, Summarize or Ideas. Optional
+models, languages and measurements live in **Customize**. The bundled
 terminal client is `/Applications/Geist.app/Contents/MacOS/geist-cli`.
 Use its full path, or link it as `geist` in a directory on your PATH. Start at Login is
 optional. An actual distributable DMG still requires Developer ID signing and

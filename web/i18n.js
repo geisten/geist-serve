@@ -111,7 +111,6 @@ async function copyText(value) {
   if (window.geistDesktop) await desktopMessage('copy', value);
   else await navigator.clipboard.writeText(value);
 }
-translateStatic();
 Object.assign(german, {
   'Evidence is specific to the model, language and device.': 'Belege gelten jeweils für Modell, Sprache und Gerät.',
   'Tests cover simple chats only, not arbitrary questions.': 'Die Tests decken einfache Chats ab, nicht beliebige Fragen.',
@@ -144,3 +143,31 @@ Object.assign(german, {
   'In Continue, open your local config.yaml and add the model from this configuration. JSON is valid YAML. Select Geist and use Chat mode. Preserve your existing configuration.': 'Öffne in Continue deine lokale config.yaml und ergänze das Modell aus dieser Konfiguration. JSON ist gültiges YAML. Wähle Geist im Chat-Modus. Behalte deine bestehenden Einstellungen.',
   'Save as opencode.json in a private test folder. Run opencode there and choose geist-chat. This profile disables tools; it does not enable coding-agent workflows.': 'Speichere dies als opencode.json in einem privaten Testordner. Starte dort opencode und wähle geist-chat. Das Profil deaktiviert Werkzeuge und unterstützt keine Coding-Agenten.'
 });
+
+Object.assign(german, {
+  'Geist home': 'Geist Startseite', 'Navigation': 'Navigation', 'Try it': 'Ausprobieren',
+  'Connect': 'Verbinden', 'Customize': 'Anpassen', 'Optional tasks': 'Optionale Aufgaben',
+  'A little more room for your ideas.': 'Mehr Platz für deine Ideen.',
+  'Write, summarize, explore. Right on your computer.': 'Schreiben, zusammenfassen, weiterdenken. Direkt auf deinem Rechner.',
+  'Preview: answers can be wrong. By starting, you agree to try this model and review its answers.': 'Vorschau: Antworten können falsch sein. Mit dem Start probierst du dieses Modell bewusst aus und prüfst seine Antworten.',
+  'Set up and start': 'Einrichten und starten', 'No account. No cloud processing.': 'Ohne Konto. Ohne Verarbeitung in der Cloud.',
+  'Getting ready…': 'Wird vorbereitet…', 'What would you like to try?': 'Was möchtest du ausprobieren?',
+  'Rewrite': 'Umformulieren', 'Summarize': 'Zusammenfassen', 'Ideas': 'Ideen',
+  'Each request starts fresh. ⌘ / Ctrl + Enter to send.': 'Jede Anfrage beginnt neu. Senden mit ⌘ / Strg + Enter.',
+  'Make yourself at home.': 'So passt es zu dir.', 'This computer': 'Dieser Rechner', 'Measurements': 'Messwerte',
+  'Service': 'Dienst', 'Selected for setup': 'Für die Einrichtung gewählt', 'Available': 'Verfügbar', 'Details': 'Details',
+  'Choose': 'Auswählen', 'Already on this computer': 'Bereits auf diesem Rechner', 'Download': 'Download',
+  'No suitable model available right now.': 'Zurzeit ist kein geeignetes Modell verfügbar.',
+  'Try preview': 'Vorschau ausprobieren', 'Start model': 'Modell starten', 'compute cores': 'Rechenkerne',
+  'Starting the local service…': 'Lokaler Dienst wird gestartet…',
+  'Cannot check available memory or disk space. Retry the platform check.': 'Verfügbarer Arbeits- oder Festplattenspeicher konnte nicht geprüft werden. Die Prüfung wird wiederholt.',
+  "Not enough total RAM for this model's planning budget.": 'Der Arbeitsspeicher reicht für das geplante Speicherbudget dieses Modells nicht aus.',
+  'Your model choice is kept. Change it in Customize.': 'Deine Modellauswahl bleibt erhalten. Du kannst sie unter Anpassen ändern.',
+  'Local performance is below the interactive setup target.': 'Die lokale Leistung liegt unter dem Zielwert für interaktive Nutzung.',
+  'A smaller model fits the available resources better.': 'Ein kleineres Modell passt besser zu den verfügbaren Ressourcen.',
+  'Platform default. Memory is estimated; answer quality is still unverified.': 'Standard für diese Plattform. Speicherbedarf geschätzt; Antwortqualität noch nicht bestätigt.',
+  'The platform check changed. Review the setup suggestion and retry.': 'Die Plattformprüfung hat sich geändert. Prüfe den Vorschlag und starte erneut.',
+  'Choose English or German.': 'Wähle Englisch oder Deutsch.', 'Cannot save language preference.': 'Die Sprache konnte nicht gespeichert werden.',
+  'Preview consent must be explicit.': 'Die Vorschau muss ausdrücklich bestätigt werden.', 'Cannot save preview consent.': 'Die Vorschau-Bestätigung konnte nicht gespeichert werden.'
+});
+translateStatic();

@@ -1,7 +1,8 @@
 # Geist — Runs here. Stays here.
 
 Try rewriting, summarizing and generating ideas on your own computer.
-Choose a task and a model, download it once, then work offline. No account is required.
+Select **Set up and start** to download the platform suggestion, then work offline.
+No account or initial task/model/language selection is required.
 Small models have limited capabilities: check their answers, and use the
 examples to decide whether a model meets your needs.
 
@@ -11,15 +12,22 @@ Mac release still needs Developer ID signing and notarization.
 
 ## Start on a Mac
 
-Open the Geist DMG, drag Geist to Applications, and open Geist. Its menu bar
-icon opens the local interface in your default browser. Choose a task, then Download on a model that fits your resources. After verification and loading, try an example.
-Use Stop to cancel an answer, Unload to free model memory, or Quit Geist
-to stop the local runtime. Closing the browser or quitting the menu bar leaves the shared service running. Start at Login is optional in the native menu.
+Open the Geist DMG, drag Geist to Applications, and open its desktop window.
+Read the short preview notice and choose **Set up and start**. Geist downloads,
+verifies and starts one suggested model. The input becomes available when the
+local service is ready. Ordinary typing is freeform; optional Rewrite,
+Summarize and Ideas presets change instructions without switching models.
+
+**Customize** contains manual model selection, independent interface/answer
+languages, hardware details, measurements and service controls. **Connect**
+sets up Terminal, Continue or OpenCode text chat. Closing the window keeps the
+shared service running; stopping it requires confirmation. Start at Login is
+optional in the native menu.
 
 Apple Silicon and macOS 14 or later are required by the Mac app.
 Previously downloaded catalog files in the Geist data folder are reused
 after verification. The former Swift application's selected-model preference
-is not migrated: choose Use once. The new Connections panel and bundled `geist` terminal client use the same
+is not migrated: choose the model once under Customize. The new Connections panel and bundled `geist` terminal client use the same
 loaded daemon. The older standalone geist-serve server is a separate legacy
 entry point; do not start it to connect an editor to the manager.
 
@@ -92,12 +100,50 @@ update the model's card for the current app session. They are not saved.
 The quick test generates at most 64 tokens; normal tasks at most 256.
 Tokens/s uses geistd generation wall time (including token streaming), not answer quality or time to first text. End-to-end time includes tokenization and prefill.
 
+## Shared platform selection
+
+The C23 application service (`src/app/core.c`, `platform.c`, `main.c`) owns
+product policy. `geistlib` provides inference capabilities; it does not choose
+product defaults, ask for consent or select a model by scenario. Native hosts,
+the authenticated `/app/status` API and `geist models` see the same recommendation.
+
+| Platform | Initial preview default | Smaller candidate |
+| --- | --- | --- |
+| Apple Silicon / macOS | Gemma 4 E2B | SmolLM2 360M |
+| Raspberry Pi 5 | BitNet b1.58 2B | SmolLM2 360M |
+| Other supported Linux AMD64/ARM64 | SmolLM2 360M | None smaller in this catalog |
+
+These defaults follow existing executable/model compatibility checks: the Mac
+Gemma task run, physical Pi BitNet runs, and both Linux installer CI jobs using
+SmolLM2. They are **not task-quality winners**. The registry is still empty.
+Larger defaults require at least four compute cores. Observed session speed
+below the product's 8 tokens/s target can rule out an automatic candidate;
+unmeasured speed is not advertised as a measurement or a guarantee.
+
+Automatic setup requires supported CPU instructions, known memory/disk values,
+the total-RAM guideline (95% allows firmware reservations), available memory
+at least the working-memory estimate, and remaining download space plus
+256 MiB. Existing partial bytes are credited, installed files reused and
+verified. If no candidate fits, setup is blocked. `/app/setup` rechecks the
+recommendation before accepting the displayed model ID. Manual conditional
+choices remain available in Customize; they never become automatic fallbacks.
+
+The private `selected` file preserves an explicit choice across restarts and
+policy updates. Resource pressure can block that choice but cannot silently
+replace it. Incomplete downloads reopen without loading a missing file;
+removal clears a matching selection. Answer language and versioned preview
+consent per immutable model SHA are saved separately in private atomic files.
+No prompts, responses or API keys are stored in these preferences. Each
+`/app/generate` request still needs the explicit experimental flag unless its
+quality evidence passes. Preview consent does not change evidence or approve
+agent tools. Custom command-line GGUFs require fresh window-local consent.
+
 ## Architecture and memory ownership
 
 `geist-app` is a C23 application in this repository. It uses the public framed protocol of an adjacent `geistd` child process over a private Unix socket. One session is allowed; each independent task closes its session after completion. The daemon stays warm. No application code or
-private engine dependency is added to geistlib. The Mac repository supplies
-only native lifecycle, menu, login-item and update integration. HTML/CSS/JS
-is embedded in the C executable and shared by Mac and Pi.
+private engine dependency is added to geistlib. The Mac repository supplies the native WKWebView window, lifecycle, menu,
+login-item and update integration. Ubuntu uses GTK/WebKitGTK. HTML/CSS/JS is
+embedded in the C executable and shared by these hosts and the headless Pi browser.
 
 - Each HTTP worker owns one 256 KiB arena, freed on every exit. Typed arena
   allocation checks multiplication, addition, alignment and capacity using

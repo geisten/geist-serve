@@ -67,7 +67,8 @@ static struct {
     pthread_cond_t          drained;
     char                    home[APP_PATH_CAP], server[APP_PATH_CAP], models[APP_PATH_CAP];
     char                    token[65], message[512], active[160], active_id[64];
-    char                    chosen[APP_PATH_CAP];
+    char                    chosen[APP_PATH_CAP], selected[64], answer_language[3];
+    bool                    preview_accepted[APP_MODEL_COUNT];
     unsigned                port, workers;
     char                    runtime_dir[64], socket_path[100];
     pid_t                   child;
@@ -496,20 +497,62 @@ static uint64_t regular_size(const char *path) {
                                                                           : 0;
 }
 
-static void save_selection(const char *id) {
-    char target[APP_PATH_CAP], temporary[APP_PATH_CAP];
-    if (!path_join(target, app.home, "selected") || !path_join(temporary, app.home, "selected.tmp"))
-        return;
-    int fd = open(temporary, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0600);
+/* Only fixed application keys are passed here. Atomic private files never
+ * contain prompts, output or capabilities. Callers hold app.mutex after startup. */
+static bool read_preference(const char *name, char *out, size_t cap) {
+    char path[APP_PATH_CAP];
+    if (!path_join(path, app.home, name))
+        return false;
+    int fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
     if (fd < 0)
-        return;
-    size_t n  = strlen(id);
-    bool   ok = write(fd, id, n) == (ssize_t) n && fsync(fd) == 0;
+        return false;
+    struct stat st;
+    bool        ok = fstat(fd, &st) == 0 && S_ISREG(st.st_mode) && st.st_uid == getuid() &&
+                     st.st_nlink == 1 && st.st_size > 0 && (uint64_t) st.st_size < cap;
+    ssize_t     n  = ok ? read(fd, out, cap - 1) : -1;
+    close(fd);
+    if (n <= 0 || n != st.st_size) {
+        out[0] = 0;
+        return false;
+    }
+    out[n] = 0;
+    return true;
+}
+
+static bool save_preference(const char *name, const char *value) {
+    char target[APP_PATH_CAP], temporary[APP_PATH_CAP];
+    if (!path_join(target, app.home, name) || !path_join(temporary, app.home, ".preference-XXXXXX"))
+        return false;
+    int fd = mkstemp(temporary);
+    if (fd < 0)
+        return false;
+    size_t n  = strlen(value);
+    bool   ok = write(fd, value, n) == (ssize_t) n && fsync(fd) == 0;
     close(fd);
     if (ok)
-        (void) rename(temporary, target);
-    else
+        ok = rename(temporary, target) == 0;
+    if (!ok)
         unlink(temporary);
+    return ok;
+}
+
+static bool save_selection(const char *id) {
+    if (!save_preference("selected", id))
+        return false;
+    snprintf(app.selected, sizeof app.selected, "%s", id);
+    return true;
+}
+
+static void model_inventory(struct app_inventory items[static APP_MODEL_COUNT]) {
+    for (size_t i = 0; i < APP_MODEL_COUNT; ++i) {
+        char path[APP_PATH_CAP], part[APP_PATH_CAP];
+        bool valid = path_join(path, app.models, app_models[i].file);
+        items[i]   = (struct app_inventory) {.installed = valid &&
+                                                          regular_size(path) == app_models[i].bytes,
+                                             .tps       = app.measurements[i].tps};
+        if (valid && snprintf(part, sizeof part, "%s.part", path) < (int) sizeof part)
+            items[i].partial = regular_size(part);
+    }
 }
 
 struct download_sink {
@@ -666,7 +709,7 @@ static void *model_job(void *unused) {
                  "Download or verification cancelled. Partial downloads can be resumed.");
     } else if (ok) {
         if (start_child(target, m->id))
-            save_selection(m->id);
+            (void) save_selection(m->id);
     } else
         snprintf(app.message, sizeof app.message, "%s", *why ? why : "Cannot prepare the model.");
     app.job_running = false;
@@ -689,6 +732,7 @@ static bool begin_job(const struct app_model *m, bool download) {
     atomic_store(&cancelled, false);
     if (pthread_create(&app.job, nullptr, model_job, nullptr) != 0) {
         app.job_running = false;
+        app.phase[0]    = 0;
         strcpy(app.message, "Cannot start model worker.");
         return false;
     }
@@ -707,7 +751,23 @@ static void status_response(int fd, struct app_arena *arena) {
     bool                known = app_hardware_read(&h, app.models);
     pthread_mutex_lock(&app.mutex);
     poll_child();
-    app_put(&b, "{\"hardware\":{\"name\":");
+    struct app_inventory inventory[APP_MODEL_COUNT];
+    model_inventory(inventory);
+    struct app_recommendation recommendation =
+            app_recommend(&h, inventory, app.selected, app.ready ? app.active_id : nullptr);
+    app_put(&b, "{\"recommendation\":{\"id\":");
+    app_quote(&b, recommendation.model ? recommendation.model->id : "");
+    app_put(&b, ",\"preferred_id\":");
+    app_quote(&b, recommendation.preferred->id);
+    app_put(&b, ",\"source\":");
+    app_quote(&b, recommendation.source);
+    app_put(&b, ",\"reason\":");
+    app_quote(&b, recommendation.reason);
+    app_printf(&b,
+               ",\"eligible\":%s},\"answer_language\":",
+               recommendation.eligible ? "true" : "false");
+    app_quote(&b, app.answer_language);
+    app_put(&b, ",\"hardware\":{\"name\":");
     app_quote(&b, h.name);
     app_put(&b, ",\"arch\":");
     app_quote(&b, h.arch);
@@ -744,12 +804,8 @@ static void status_response(int fd, struct app_arena *arena) {
                app.job_running || app.generating ? "true" : "false");
     for (size_t i = 0; i < APP_MODEL_COUNT; ++i) {
         const struct app_model *m = &app_models[i];
-        char                    path[APP_PATH_CAP], part[APP_PATH_CAP];
-        bool                    valid_path = path_join(path, app.models, m->file);
-        bool                    installed  = valid_path && regular_size(path) == m->bytes;
-        uint64_t                partial    = 0;
-        if (valid_path && snprintf(part, sizeof part, "%s.part", path) < (int) sizeof part)
-            partial = regular_size(part);
+        bool                    installed = inventory[i].installed;
+        uint64_t                partial   = inventory[i].partial;
         struct app_hardware adjusted = h;
         if (partial <= m->bytes && h.disk_known && UINT64_MAX - adjusted.disk > partial)
             adjusted.disk += partial;
@@ -774,6 +830,7 @@ static void status_response(int fd, struct app_arena *arena) {
                    a.fit,
                    app_task_fit(a.fit, APP_QUALITY_UNVERIFIED));
         app_quote(&b, a.reason);
+        app_printf(&b, ",\"preview_accepted\":%s", app.preview_accepted[i] ? "true" : "false");
         app_put(&b, ",\"performance\":");
         app_quote(&b, a.performance);
         app_printf(&b,
@@ -1272,9 +1329,13 @@ static void handle(int fd, struct app_arena *arena) {
         response(fd, 200, "application/json", "{}", 2);
         return;
     }
+    bool setup       = strcmp(r.path, "/app/setup") == 0;
+    bool preview     = strcmp(r.path, "/app/preview") == 0;
+    bool preferences = strcmp(r.path, "/app/preferences") == 0;
     bool download = strcmp(r.path, "/app/download") == 0;
     bool remove   = strcmp(r.path, "/app/remove") == 0;
-    if (!download && !remove && strcmp(r.path, "/app/select") != 0) {
+    if (!setup && !preview && !preferences && !download && !remove &&
+        strcmp(r.path, "/app/select") != 0) {
         error_response(fd, 404, "Unknown action.");
         return;
     }
@@ -1285,6 +1346,23 @@ static void handle(int fd, struct app_arena *arena) {
     }
     if (json_parse(json, strlen(r.body), r.body) < 0) {
         error_response(fd, 400, "Invalid JSON.");
+        return;
+    }
+    if (preferences) {
+        char *language = json_strdup(json, json_get(json, 0, "language"));
+        bool  valid    = language && (!strcmp(language, "de") || !strcmp(language, "en"));
+        pthread_mutex_lock(&app.mutex);
+        bool ok = valid && save_preference("answer-language", language);
+        if (ok)
+            snprintf(app.answer_language, sizeof app.answer_language, "%s", language);
+        pthread_mutex_unlock(&app.mutex);
+        free(language);
+        if (!valid)
+            error_response(fd, 400, "Choose English or German.");
+        else if (!ok)
+            error_response(fd, 500, "Cannot save language preference.");
+        else
+            response(fd, 200, "application/json", "{}", 2);
         return;
     }
     char                   *id    = json_strdup(json, json_get(json, 0, "id"));
@@ -1298,6 +1376,22 @@ static void handle(int fd, struct app_arena *arena) {
     if (app.job_running || app.generating) {
         pthread_mutex_unlock(&app.mutex);
         error_response(fd, 409, "Another task is active.");
+        return;
+    }
+    if (preview) {
+        bool consent = json_bool(json, json_get(json, 0, "experimental"), false);
+        char key[80];
+        snprintf(key, sizeof key, "preview-%s", model->sha256);
+        bool ok = consent && save_preference(key, "v1");
+        if (ok)
+            app.preview_accepted[model - app_models] = true;
+        pthread_mutex_unlock(&app.mutex);
+        if (!consent)
+            error_response(fd, 400, "Preview consent must be explicit.");
+        else if (!ok)
+            error_response(fd, 500, "Cannot save preview consent.");
+        else
+            response(fd, 200, "application/json", "{}", 2);
         return;
     }
     char path[APP_PATH_CAP], part[APP_PATH_CAP];
@@ -1329,7 +1423,12 @@ static void handle(int fd, struct app_arena *arena) {
                 safe = false;
         if (directory >= 0)
             close(directory);
+        if (safe && !strcmp(app.selected, model->id))
+            safe = save_selection("");
         if (safe) {
+            if (!strcmp(app.active_id, model->id)) {
+                app.active_id[0] = app.active[0] = 0;
+            }
             app.measurements[model - app_models].tps    = 0;
             app.measurements[model - app_models].tokens = 0;
         }
@@ -1347,6 +1446,23 @@ static void handle(int fd, struct app_arena *arena) {
         if (partial <= model->bytes && UINT64_MAX - h.disk > partial)
             h.disk += partial;
     }
+    if (setup) {
+        struct app_inventory inventory[APP_MODEL_COUNT];
+        model_inventory(inventory);
+        /* Re-evaluate resources on the server. Never silently accept a different
+         * model from the one whose download/preview the user just approved. */
+        struct app_hardware       current;
+        bool                      current_known = app_hardware_read(&current, app.models);
+        struct app_recommendation choice        = app_recommend(
+                &current, inventory, app.selected, app.ready ? app.active_id : nullptr);
+        if (!current_known || !choice.eligible || choice.model != model) {
+            pthread_mutex_unlock(&app.mutex);
+            error_response(
+                    fd, 409, "The platform check changed. Review the setup suggestion and retry.");
+            return;
+        }
+        download = !installed;
+    }
     struct app_assessment assessment = app_assess(&h, model, installed && !download);
     if (!known || assessment.fit == APP_UNAVAILABLE || (!download && !installed)) {
         pthread_mutex_unlock(&app.mutex);
@@ -1357,7 +1473,7 @@ static void handle(int fd, struct app_arena *arena) {
                                                          : assessment.reason));
         return;
     }
-    bool ok = begin_job(model, download);
+    bool ok = save_selection(model->id) && begin_job(model, download);
     pthread_mutex_unlock(&app.mutex);
     if (ok)
         response(fd, 202, "application/json", "{}", 2);
@@ -1544,21 +1660,25 @@ int main(int argc, char **argv) {
             "open the private link on your computer.\n",
             app.home,
             app.port);
+    (void) read_preference("answer-language", app.answer_language, sizeof app.answer_language);
+    if (strcmp(app.answer_language, "en") && strcmp(app.answer_language, "de"))
+        app.answer_language[0] = 0;
+    for (size_t i = 0; i < APP_MODEL_COUNT; ++i) {
+        char key[80], value[8] = "";
+        snprintf(key, sizeof key, "preview-%s", app_models[i].sha256);
+        app.preview_accepted[i] = read_preference(key, value, sizeof value) && !strcmp(value, "v1");
+    }
+    (void) read_preference("selected", app.selected, sizeof app.selected);
     if (model) {
         pthread_mutex_lock(&app.mutex);
         (void) start_child(model, "custom");
         pthread_mutex_unlock(&app.mutex);
     } else {
-        char selected[APP_PATH_CAP], id[64] = "";
-        if (path_join(selected, app.home, "selected")) {
-            FILE *f = fopen(selected, "r");
-            if (f) {
-                (void) fgets(id, sizeof id, f);
-                fclose(f);
-            }
-        }
-        const struct app_model *m = app_model_find(id);
-        if (m) {
+        const struct app_model *m = app_model_find(app.selected);
+        char                    path[APP_PATH_CAP];
+        /* A missing/cancelled download remains a resumable choice. Never start
+         * verification of a missing file on reopen, or download without action. */
+        if (m && path_join(path, app.models, m->file) && regular_size(path) == m->bytes) {
             pthread_mutex_lock(&app.mutex);
             (void) begin_job(m, false);
             pthread_mutex_unlock(&app.mutex);
