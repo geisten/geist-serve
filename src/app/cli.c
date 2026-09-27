@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -77,6 +78,34 @@ static int command(char *const args[]) {
             return -1;
     return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
 }
+static bool systemd_home(void) {
+#ifdef __APPLE__
+    return false;
+#else
+    char standard[APP_PATH_CAP];
+    int  n = snprintf(standard,
+                      sizeof standard,
+                      "%s/.local/share/geist",
+                      getenv("HOME") ? getenv("HOME") : "");
+    return n > 0 && n < (int) sizeof standard && !getenv("GEIST_HOME") && !strcmp(home, standard) &&
+           access("/usr/lib/systemd/user/geist.service", R_OK) == 0;
+#endif
+}
+
+static bool owner_released(void) {
+    char path[APP_PATH_CAP];
+    if (snprintf(path, sizeof path, "%s/app.lock", home) >= (int) sizeof path)
+        return false;
+    int fd = open(path, O_RDWR | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+    if (fd < 0)
+        return errno == ENOENT;
+    struct stat info;
+    bool released = fstat(fd, &info) == 0 && S_ISREG(info.st_mode) && info.st_uid == getuid() &&
+                    info.st_nlink == 1 && flock(fd, LOCK_EX | LOCK_NB) == 0;
+    close(fd);
+    return released;
+}
+
 static bool start(void) {
     if (request("/app/status", nullptr, 2) == 200)
         return true;
@@ -93,14 +122,7 @@ static bool start(void) {
         if (!end)
             break;
     }
-#ifndef __APPLE__
-    char standard[APP_PATH_CAP];
-    snprintf(standard,
-             sizeof standard,
-             "%s/.local/share/geist",
-             getenv("HOME") ? getenv("HOME") : "");
-    if (!getenv("GEIST_HOME") && !strcmp(home, standard) &&
-        access("/usr/lib/systemd/user/geist.service", R_OK) == 0) {
+    if (systemd_home()) {
         char *args[] = {"systemctl", "--user", "start", "geist.service", nullptr};
         if (command(args) != 0) {
             fprintf(stderr,
@@ -108,9 +130,7 @@ static bool start(void) {
                     "foreground.\n");
             return false;
         }
-    } else
-#endif
-    {
+    } else {
         char executable[APP_PATH_CAP];
         if (snprintf(executable, sizeof executable, "%s/geist-app", directory) >=
             (int) sizeof executable)
@@ -200,13 +220,24 @@ static int run(int argc, char **argv) {
             fputs(reply, stderr);
             return 1;
         }
+        /* Discovery removal precedes process exit. Wait for the actual user
+         * unit stop job: `start` on a still-active unit otherwise does nothing. */
+        if (systemd_home()) {
+            char *args[] = {"systemctl", "--user", "stop", "geist.service", nullptr};
+            if (command(args) != 0) {
+                fputs("Cannot confirm the user service stopped. Check its journal before "
+                      "restarting.\n",
+                      stderr);
+                return 1;
+            }
+        }
         bool stopped = false;
         for (unsigned i = 0; i < 100; i++) {
             char descriptor[APP_PATH_CAP];
             if (snprintf(descriptor, sizeof descriptor, "%s/connection.json", home) >=
                 (int) sizeof descriptor)
                 return 1;
-            if (access(descriptor, F_OK) < 0 && errno == ENOENT) {
+            if (access(descriptor, F_OK) < 0 && errno == ENOENT && owner_released()) {
                 stopped = true;
                 break;
             }
@@ -221,8 +252,6 @@ static int run(int argc, char **argv) {
             puts("Geist stopped. Downloaded models are preserved.");
             return 0;
         }
-        /* Allow the old owner to release its process lock after unlinking discovery. */
-        pause_short();
         return start() ? 0 : 1;
     }
     if (!strcmp(cmd, "start") || !strcmp(cmd, "open")) {

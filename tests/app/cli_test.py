@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Isolated installed-client lifecycle and model reuse; never changes user config."""
+import fcntl
+import threading
 import json
 import os
 from pathlib import Path
@@ -46,6 +48,19 @@ with tempfile.TemporaryDirectory(prefix='geist-cli-') as home:
         cli('stop')
         assert not (Path(home)/'connection.json').exists()
         cli('status',code=1)
+        # Discovery can disappear before the prior process releases its lock.
+        # A fixed sleep is not a completion barrier. This fails on the old CLI.
+        with (Path(home)/'app.lock').open('r+') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            release = threading.Timer(.5, lambda: fcntl.flock(lock, fcntl.LOCK_UN))
+            release.start()
+            started = time.monotonic()
+            try:
+                cli('stop')
+                assert time.monotonic() - started >= .4, 'stop returned before owner released its lock'
+            finally:
+                release.join()
+
         cli('start');cli('stop')
     finally:
         subprocess.run([str(binary),'stop'],env=env,capture_output=True,timeout=30)

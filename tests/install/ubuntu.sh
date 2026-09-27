@@ -44,6 +44,16 @@ check_selected_model() {
     as_user journalctl --user -u geist.service --no-pager -n 40 >&2
     return 1
 }
+diagnose_failure() {
+    result=$?
+    if test "$result" != 0 && test -d /run/systemd/system; then
+        echo "FAIL: installed-service acceptance exited $result" >&2
+        as_user systemctl --user show geist.service -p MainPID -p ActiveState -p SubState -p Result >&2 || true
+        as_user journalctl --user -u geist.service --no-pager -n 60 >&2 || true
+    fi
+    exit "$result"
+}
+trap diagnose_failure EXIT
 if test -d /run/systemd/system; then
     # Required native acceptance must exercise the actual sandboxed service with
     # its selected catalog model, not only a foreground --model fixture.

@@ -32,7 +32,9 @@ def evaluate(view, script):
     view.evaluate_javascript(script, -1, None, None, None, done, None)
     spin(lambda: result)
     if isinstance(result[0], Exception): raise result[0]
-    return json.loads(result[0])
+    # JavaScript undefined has no JSON representation while a new document
+    # is initializing; it is an unmet wait condition, not a successful result.
+    return None if result[0] is None else json.loads(result[0])
 
 
 def wait_js(view, condition, timeout=30):
@@ -59,6 +61,8 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
         spin(lambda: desktop.origin is not None)
         wait_js(desktop.view, "document.querySelectorAll('.model').length === 6")
         wait_js(desktop.view, "tasks.length === 5 && selectedTask?.id === 'freeform'")
+        assert evaluate(desktop.view, 'undefined') is None
+        assert evaluate(desktop.view, 'false') is False
         assert desktop.window.get_visible()
         assert desktop.view.get_network_session().is_ephemeral()
         assert evaluate(desktop.view, "document.getElementById('workspace').hidden && !document.getElementById('setup').hidden && !document.getElementById('experimental')")
