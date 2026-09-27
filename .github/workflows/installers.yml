@@ -48,18 +48,24 @@ jobs:
             2>&1 | tee build/package/acceptance.log
       - name: Build optional desktop package and install system WebView
         run: |
-          sudo apt-get install -y -qq python3-gi gir1.2-gtk-4.0 gir1.2-webkit-6.0 xvfb xauth dbus-x11 fonts-dejavu-core
+          sudo apt-get install -y -qq python3-gi gir1.2-gtk-4.0 gir1.2-webkit-6.0 xvfb xauth dbus-x11 fonts-dejavu-core apparmor-utils at-spi2-core
           VERSION="$VERSION" sh scripts/package-desktop-deb.sh
           cp build/geist-desktop_*.deb* build/package/
           sudo apt-get install -y "$PWD/build/package/geist_${VERSION}_${{ matrix.arch }}.deb" "$PWD/build/geist-desktop_${VERSION}_all.deb"
           desktop-file-validate /usr/share/applications/geist.desktop
+          sudo aa-status | grep -F geist-desktop
           cp /usr/lib/geist/geist /usr/lib/geist/geist-app /usr/lib/geist/geistd .
       - name: Actual GTK and WebKit desktop interaction
         run: |
           set -o pipefail
           timeout 300s env GEIST_TEST_MODEL="$PWD/geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf" GDK_BACKEND=x11 GSK_RENDERER=cairo LIBGL_ALWAYS_SOFTWARE=1 \
             xvfb-run -a -s '-screen 0 1280x900x24' dbus-run-session -- \
-            /usr/bin/python3 tests/desktop/linux_ui_test.py 2>&1 | tee build/package/desktop-acceptance.log
+            sh -c 'python3 tests/desktop/installed_entry_test.py && exec aa-exec -p geist-desktop -- /usr/bin/python3 tests/desktop/linux_ui_test.py' 2>&1 | tee build/package/desktop-acceptance.log
+      - name: Desktop profile upgrade, rollback and removal
+        run: |
+          set -o pipefail
+          sudo env GEIST_INSTALLER_TEST=1 sh tests/install/desktop.sh "build/geist-desktop_${VERSION}_all.deb" \
+            2>&1 | tee build/package/desktop-package-acceptance.log
       - name: Record source identity
         run: |
           git rev-parse HEAD > build/package/source-commit.txt

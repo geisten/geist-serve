@@ -34,7 +34,14 @@ sudo apt install ./geist_VERSION_ARCH.deb ./geist-desktop_VERSION_all.deb
 
 Open Geist from the application menu, or run `geist-desktop`. This opens a GTK
 window with the system WebKit renderer; no browser tab is opened. `geist open`
-also uses the desktop app when installed. Terminal-only installations need
+also uses the desktop app when installed.
+
+The Ubuntu 24.04 desktop package installs a scoped AppArmor profile permitting
+WebKit sandbox user namespaces for the Geist desktop process tree. It leaves
+global namespace policy unchanged; the host profile does not add filesystem
+or network confinement. Package updates reload the profile; removal unloads it.
+
+Terminal-only installations need
 only `geist_VERSION_ARCH.deb`, without GTK/WebKit dependencies. A browser/SSH
 interface remains available on headless systems. Downloads and the
 daemon run as your user, never as root. The optional per-user service uses

@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import threading
 from urllib.parse import urlsplit
 
@@ -207,4 +208,4 @@ class Desktop(Gtk.Application):
 
 
 if __name__ == '__main__':
-    raise SystemExit(Desktop().run())
+    raise SystemExit(Desktop().run(sys.argv))
