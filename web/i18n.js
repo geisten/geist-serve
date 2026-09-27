@@ -54,7 +54,18 @@ const german = {
   'Download this model first.': 'Lade dieses Modell zuerst herunter.', 'Write your input here…': 'Schreibe hier deine Eingabe…',
   'seconds': 'Sekunden'
 };
+Object.assign(german, {
+  'Your space to think.': 'Raum für deine Ideen.',
+  'Write, summarize, explore. Locally.': 'Schreiben, kürzen, weiterdenken. Lokal.',
+  'One download. Then ready offline.': 'Einmal herunterladen. Danach offline bereit.',
+  'Pause download': 'Download pausieren',
+  'Measuring speed…': 'Geschwindigkeit wird ermittelt…',
+  'Waiting for data…': 'Warte auf Daten…',
+  'Less than a minute left': 'Noch weniger als eine Minute'
+});
 const germanPatterns = [
+  [/^About (\d+) min left$/, (_, n) => `Noch etwa ${n} Min.`],
+  [/^([\d.]+ [MG]B) of ([\d.]+ [MG]B)$/, (_, a, b) => `${a} von ${b}`],
   [/^(.+) download · (.+) GiB RAM guidance$/, (_, a, b) => `${a} Download · ${b} GiB RAM empfohlen`],
   [/^Download · (.+)$/, (_, a) => `Herunterladen · ${a}`],
   [/^(.+) disk space available$/, (_, a) => `${a} Speicherplatz verfügbar`],

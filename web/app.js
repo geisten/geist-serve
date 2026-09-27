@@ -20,6 +20,24 @@ function allowed(model, task = selectedTask) { return qualityFor(model, task)?.q
 const bytes = n => n < 1e9 ? `${Math.round(n / 1e6)} MB` : `${(n / 1e9).toFixed(2)} GB`;
 const gib = n => `${(n / 2 ** 30).toFixed(1)} GiB`;
 
+// A rolling observation from this window, never an advertised network speed.
+// Resuming/reconnecting starts a new sample: saved bytes do not inflate it.
+const transfer = {id: '', samples: []};
+function downloadEstimate(id, received, total, now = performance.now()) {
+  if (transfer.id !== id || received < (transfer.samples.at(-1)?.bytes || 0)) {
+    transfer.id = id; transfer.samples = [];
+  }
+  transfer.samples.push({time: now, bytes: received});
+  while (transfer.samples.length > 2 && transfer.samples[1].time < now - 10000) transfer.samples.shift();
+  const first = transfer.samples[0], elapsed = (now - first.time) / 1000;
+  if (elapsed < 2) return t('Measuring speed…');
+  const speed = (received - first.bytes) / elapsed;
+  if (speed <= 0) return t('Waiting for data…');
+  const rate = speed < 1e6 ? `${Math.round(speed / 1000)} KB/s` : `${(speed / 1e6).toFixed(1)} MB/s`;
+  const remaining = Math.max(0, (total - received) / speed);
+  return `${rate} · ${t(remaining < 60 ? 'Less than a minute left' : `About ${Math.ceil(remaining / 60)} min left`)}`;
+}
+
 async function api(path, body, signal) {
   const response = await fetch(path, {
     method: body === undefined ? 'GET' : 'POST', cache: 'no-store', signal,
@@ -119,13 +137,18 @@ function render(next) {
   $('recommendation-reason').textContent = t(next.recommendation.reason);
   $('runtime-state').textContent = t(next.ready ? 'Ready on this device' : 'Choose a model');
   next.models.forEach(modelCard);
+  if (!working) { transfer.id = ''; transfer.samples = []; }
   if (working) {
     const model = next.models.find(m => m.id === next.job_model);
     const verifying = next.phase === 'verifying';
     $('job-title').textContent = t(next.loading ? 'Loading model' : verifying ? 'Verifying model' : 'Downloading model');
     if (verifying || next.loading) $('download-progress').removeAttribute('value');
     else $('download-progress').value = Math.min(1, next.received / (model?.bytes || 1));
-    $('job-detail').textContent = t(next.loading ? 'Starting the local service…' : verifying ? 'Checking the complete file before it can run.' : `${bytes(next.received)} of ${bytes(model?.bytes || 0)} · partial downloads can be resumed`);
+    const downloading = !verifying && !next.loading;
+    $('job-percent').textContent = downloading ? `${Math.min(100, Math.floor(next.received / (model?.bytes || 1) * 100))}%` : '';
+    $('job-speed').textContent = downloading ? downloadEstimate(next.job_model, next.received, model?.bytes || 0) : '';
+    $('job-caption').hidden = !downloading;
+    $('job-detail').textContent = t(next.loading ? 'Starting the local service…' : verifying ? 'Checking the complete file before it can run.' : `${bytes(next.received)} of ${bytes(model?.bytes || 0)}`);
     $('cancel-download').hidden = next.loading;
   }
   if (!controller && !requesting && (!localMessage || next.message !== lastServerMessage)) message(working ? '' : next.message || '', false);

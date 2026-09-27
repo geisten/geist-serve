@@ -55,6 +55,8 @@ static const unsigned char script[] = {
 #include "../../build/app_assets.h"
 #endif
 
+#include "version.h"
+
 #define WORKER_BYTES (256u * 1024u)
 #define REQUEST_CAP 32768u
 #define HEADER_CAP 8192u
@@ -635,6 +637,7 @@ static bool download_model(const struct app_model *m, const char *part, char *wh
         curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 8L);
         curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 30L);
+        curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 256L * 1024L);
         curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 128L);
         curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 60L);
         curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
@@ -755,7 +758,9 @@ static void status_response(int fd, struct app_arena *arena) {
     model_inventory(inventory);
     struct app_recommendation recommendation =
             app_recommend(&h, inventory, app.selected, app.ready ? app.active_id : nullptr);
-    app_put(&b, "{\"recommendation\":{\"id\":");
+    app_put(&b, "{\"version\":");
+    app_quote(&b, APP_VERSION);
+    app_put(&b, ",\"recommendation\":{\"id\":");
     app_quote(&b, recommendation.model ? recommendation.model->id : "");
     app_put(&b, ",\"preferred_id\":");
     app_quote(&b, recommendation.preferred->id);
@@ -944,7 +949,7 @@ static void generate(int fd, struct request *r, struct app_arena *arena) {
              prompt);
     pthread_mutex_lock(&app.mutex);
     poll_child();
-    if (!app.ready || app.generating || app.job_running) {
+    if (atomic_load(&closing) || !app.ready || app.generating || app.job_running) {
         pthread_mutex_unlock(&app.mutex);
         free(prompt);
         error_response(fd, 409, "Wait until the model is ready and idle.");
@@ -1104,7 +1109,7 @@ static void completions(int fd, const struct request *r, struct app_arena *arena
              atomic_fetch_add(&sequence, 1));
     pthread_mutex_lock(&app.mutex);
     poll_child();
-    if (!app.ready || app.job_running) {
+    if (atomic_load(&closing) || !app.ready || app.job_running) {
         pthread_mutex_unlock(&app.mutex);
         api_error(fd, 503, "Select and load a model in Geist first.");
         return;
@@ -1310,6 +1315,18 @@ static void handle(int fd, struct app_arena *arena) {
         response(fd, 200, "application/json", "{}", 2);
         return;
     }
+    if (strcmp(r.path, "/app/quit-if-idle") == 0) {
+        pthread_mutex_lock(&app.mutex);
+        bool busy = app.generating || app.job_running || (app.child && !app.ready);
+        if (!busy)
+            atomic_store(&closing, true);
+        pthread_mutex_unlock(&app.mutex);
+        if (busy)
+            error_response(fd, 409, "Finish the current task before updating Geist.");
+        else
+            response(fd, 202, "application/json", "{}", 2);
+        return;
+    }
     if (strcmp(r.path, "/app/quit") == 0) {
         atomic_store(&closing, true);
         response(fd, 202, "application/json", "{}", 2);
@@ -1373,7 +1390,7 @@ static void handle(int fd, struct app_arena *arena) {
         return;
     }
     pthread_mutex_lock(&app.mutex);
-    if (app.job_running || app.generating) {
+    if (atomic_load(&closing) || app.job_running || app.generating) {
         pthread_mutex_unlock(&app.mutex);
         error_response(fd, 409, "Another task is active.");
         return;

@@ -58,7 +58,7 @@ class Desktop(Gtk.Application):
 
     def activate_window(self, _):
         if self.window is None:
-            self.window = Gtk.ApplicationWindow(application=self, title='Geist', default_width=1080, default_height=780)
+            self.window = Gtk.ApplicationWindow(application=self, title='Geist', default_width=780, default_height=620)
             self.window.set_size_request(540, 500)
             self.stack = Gtk.Stack()
             self.window.set_child(self.stack)
@@ -123,21 +123,30 @@ class Desktop(Gtk.Application):
         self.status.set_text(self.text('Starting local service…', 'Lokaler Dienst wird gestartet…'))
         if not self.loaded: self.stack.set_visible_child_name('status')
         def work():
+            error_code = 0
             try:
                 self.service(['start'])
                 url = connection_url(json.loads(self.service(['connection'])))
+            except subprocess.CalledProcessError as error:
+                url = None; error_code = error.returncode
             except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
                 url = None
-            GLib.idle_add(self.started, url)
+            GLib.idle_add(self.started, url, error_code)
         threading.Thread(target=work, daemon=True).start()
 
-    def started(self, url):
+    def started(self, url, error_code=0):
         self.working = False
         self.retry.set_sensitive(True)
         self.origin = url
         if not url:
             self.loaded = None
             self.status.set_text(self.text('Service unavailable. Check whether another program uses port 8766, then retry.', 'Dienst nicht erreichbar. Prüfe, ob ein anderes Programm Port 8766 belegt, und versuche es erneut.'))
+            if error_code == 42:
+                self.status.set_text(self.text('An older service is running. Finish your work, then run geist restart in Terminal.', 'Ein älterer Dienst läuft. Beende deine Arbeit und führe im Terminal geist restart aus.'))
+            elif error_code == 43:
+                self.status.set_text(self.text('Finish the current task, then reconnect to update Geist.', 'Beende die laufende Aufgabe und verbinde dich erneut, um Geist zu aktualisieren.'))
+            elif error_code == 44:
+                self.status.set_text(self.text('A newer service is running. Open the newest installed app.', 'Ein neuerer Dienst läuft. Öffne die neueste installierte App.'))
             self.stack.set_visible_child_name('status')
         elif self.loaded != url:
             self.loaded = url

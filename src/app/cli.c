@@ -1,5 +1,6 @@
 /* Small C23 client. Models and inference remain owned by the shared service. */
 #include "connection.h"
+#include "version.h"
 #include "../json.h"
 #include <curl/curl.h>
 #include <errno.h>
@@ -21,6 +22,7 @@ extern char   **environ;
 static char     home[APP_PATH_CAP], directory[APP_PATH_CAP], token[65];
 static unsigned port;
 static char     reply[65536];
+static int      start_error = 1;
 
 static size_t receive(char *data, size_t size, size_t count, void *opaque) {
     struct app_buffer *b = opaque;
@@ -106,9 +108,92 @@ static bool owner_released(void) {
     return released;
 }
 
-static bool start(void) {
-    if (request("/app/status", nullptr, 2) == 200)
+static bool wait_stopped(void) {
+    /* Discovery removal precedes process exit. Wait for the actual user
+     * unit stop job: `start` on a still-active unit otherwise does nothing. */
+    if (systemd_home()) {
+        char *args[] = {"systemctl", "--user", "stop", "geist.service", nullptr};
+        if (command(args) != 0) {
+            fputs("Cannot confirm the user service stopped. Check its journal before "
+                  "restarting.\n",
+                  stderr);
+            return false;
+        }
+    }
+    bool stopped = false;
+    for (unsigned i = 0; i < 100; i++) {
+        char descriptor[APP_PATH_CAP];
+        if (snprintf(descriptor, sizeof descriptor, "%s/connection.json", home) >=
+            (int) sizeof descriptor)
+            return false;
+        if (access(descriptor, F_OK) < 0 && errno == ENOENT && owner_released()) {
+            stopped = true;
+            break;
+        }
+        pause_short();
+    }
+    if (!stopped) {
+        fputs("Cannot confirm the service stopped. Check the service log before restarting.\n",
+              stderr);
+        return false;
+    }
+    return true;
+}
+
+/* Stable versions only. Unknown/pre-versioned services require one explicit
+ * restart; a newer service must never be downgraded by an old app copy. */
+static int version_order(const char *remote) {
+    unsigned a[3], b[3];
+    char     tail;
+    if (!remote || sscanf(remote, "%u.%u.%u%c", &a[0], &a[1], &a[2], &tail) != 3 ||
+        sscanf(APP_VERSION, "%u.%u.%u%c", &b[0], &b[1], &b[2], &tail) != 3)
+        return 2;
+    for (unsigned i = 0; i < 3; i++)
+        if (a[i] != b[i])
+            return a[i] < b[i] ? -1 : 1;
+    return 0;
+}
+
+static bool current_service(void) {
+    struct json *j = calloc(1, sizeof *j);
+    if (!j)
+        return false;
+    char *version = nullptr;
+    if (json_parse(j, strlen(reply), reply) >= 0)
+        version = json_strdup(j, json_get(j, 0, "version"));
+    int order = version_order(version);
+    free(version);
+    free(j);
+    if (order == 0)
         return true;
+    if (order == 1) {
+        start_error = 44;
+        fputs("A newer Geist service is running. Open the newest installed app.\n", stderr);
+        return false;
+    }
+    if (order == 2) {
+        start_error = 42;
+        fputs("An older unversioned service is running. Finish your work, then run: geist "
+              "restart\n",
+              stderr);
+        return false;
+    }
+    long code = request("/app/quit-if-idle", "{}", 5);
+    if (code != 202) {
+        start_error = code == 409 ? 43 : 42;
+        fputs("Finish the current task before updating Geist; then reopen the app.\n", stderr);
+        return false;
+    }
+    return wait_stopped();
+}
+
+static bool start(void) {
+    if (request("/app/status", nullptr, 2) == 200) {
+        if (!current_service())
+            return false;
+        if (request("/app/status", nullptr, 2) == 200)
+            return true;
+    }
     char folder[APP_PATH_CAP];
     snprintf(folder, sizeof folder, "%s", home);
     for (char *p = folder + 1;; p++) {
@@ -220,43 +305,17 @@ static int run(int argc, char **argv) {
             fputs(reply, stderr);
             return 1;
         }
-        /* Discovery removal precedes process exit. Wait for the actual user
-         * unit stop job: `start` on a still-active unit otherwise does nothing. */
-        if (systemd_home()) {
-            char *args[] = {"systemctl", "--user", "stop", "geist.service", nullptr};
-            if (command(args) != 0) {
-                fputs("Cannot confirm the user service stopped. Check its journal before "
-                      "restarting.\n",
-                      stderr);
-                return 1;
-            }
-        }
-        bool stopped = false;
-        for (unsigned i = 0; i < 100; i++) {
-            char descriptor[APP_PATH_CAP];
-            if (snprintf(descriptor, sizeof descriptor, "%s/connection.json", home) >=
-                (int) sizeof descriptor)
-                return 1;
-            if (access(descriptor, F_OK) < 0 && errno == ENOENT && owner_released()) {
-                stopped = true;
-                break;
-            }
-            pause_short();
-        }
-        if (!stopped) {
-            fputs("Cannot confirm the service stopped. Check the service log before restarting.\n",
-                  stderr);
+        if (!wait_stopped())
             return 1;
-        }
         if (!strcmp(cmd, "stop")) {
             puts("Geist stopped. Downloaded models are preserved.");
             return 0;
         }
-        return start() ? 0 : 1;
+        return start() ? 0 : start_error;
     }
     if (!strcmp(cmd, "start") || !strcmp(cmd, "open")) {
         if (!start())
-            return 1;
+            return start_error;
         if (!strcmp(cmd, "start")) {
             puts("Geist is running.");
             return 0;

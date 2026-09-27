@@ -17,8 +17,8 @@
 <section id="test-page" class="page" aria-labelledby="task-title">
   <div id="setup" class="welcome">
     <div class="welcome-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/></svg></div>
-    <h1 id="setup-title">A little more room for your ideas.</h1>
-    <p class="lead">Write, summarize, explore. Right on your computer.</p>
+    <h1 id="setup-title">Your space to think.</h1>
+    <p class="lead">Write, summarize, explore. Locally.</p>
     <p id="setup-detail" class="muted" role="status">Checking this computer…</p>
     <p id="setup-reason" class="hint"></p>
     <p id="preview-notice" class="preview">Preview: answers can be wrong. By starting, you agree to try this model and review its answers.</p>
@@ -28,9 +28,11 @@
   </div>
   <div id="job" class="welcome" hidden>
     <h2 id="job-title">Getting ready…</h2>
+    <div class="download-numbers"><strong id="job-percent" aria-hidden="true"></strong><span id="job-speed" class="hint"></span></div>
     <progress id="download-progress" max="1" value="0" aria-label="Download progress"></progress>
     <p id="job-detail" class="muted" role="status"></p>
-    <button id="cancel-download" type="button">Cancel</button>
+    <p id="job-caption" class="hint">One download. Then ready offline.</p>
+    <button id="cancel-download" class="text-button" type="button">Pause download</button>
   </div>
   <div id="workspace" hidden>
     <div class="section-heading"><h2 id="task-title">What would you like to try?</h2><span id="runtime-state" class="state">Ready on this device</span></div>
@@ -61,7 +63,7 @@
   <h2 id="models-title">Make yourself at home.</h2>
   <div class="settings-row"><label for="ui-language">Interface language</label><select id="ui-language"><option value="en">English</option><option value="de">Deutsch</option></select></div>
   <div class="settings-row"><label for="language-choice">Answer language</label><select id="language-choice"><option value="en">English</option><option value="de">Deutsch</option></select></div>
-  <details class="settings" open><summary>Model</summary><p id="active-model" class="muted"></p><p id="recommendation-reason" class="hint"></p><div id="models" aria-label="Available models"></div></details>
+  <details class="settings"><summary>Model</summary><p id="active-model" class="muted"></p><p id="recommendation-reason" class="hint"></p><div id="models" aria-label="Available models"></div></details>
   <details class="settings"><summary>This computer</summary><h3 id="device-name"></h3><p id="device-specs"></p><p id="disk-space" class="muted"></p><p class="hint">Memory figures are planning estimates. A recommendation needs evidence for the model, task, language and device. Speed alone does not establish answer quality.</p><p class="hint">Downloads come from Hugging Face after you choose a model. Each completed download is verified with SHA-256. No account is needed.</p></details>
   <details class="settings"><summary>Measurements</summary><div class="metrics"><div><span>Generation speed</span><strong id="speed">—</strong></div><div><span>First text</span><strong id="first-token">—</strong></div><div><span>Total time</span><strong id="elapsed">—</strong></div></div><p id="measurement-note" class="hint">Measurements appear after a run.</p><button id="benchmark" type="button" disabled>Quick speed test</button></details>
   <details class="settings"><summary>Service</summary><p class="hint">Your editor and this window use the same model. Closing the window keeps the service running.</p><div class="actions"><button id="unload" type="button" disabled>Unload model</button><button id="quit" type="button">Stop model service</button></div></details>

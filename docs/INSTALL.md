@@ -131,3 +131,17 @@ active models must be unloaded first. Interrupted downloads can also be removed.
 The initial native support targets macOS 14+ on Apple Silicon and Ubuntu 24.04.
 GTK/Xvfb tests do not establish manual GNOME/Wayland acceptance. Local Mac
 ad-hoc signatures are not an Apple notarization result.
+
+
+### Updating an existing installation
+
+Install the newer `geist` and matching `geist-desktop` packages with APT. Their
+package names and installation paths stay the same across minor versions, so
+APT replaces the prior files. Models and the local API key stay in your user
+data directory. Close the previous window and reopen Geist after installation.
+
+From 0.5.3, starting a newer client replaces an older versioned service only
+when it is idle. A running download, model load or response blocks the handoff;
+finish it and reconnect. A newer service is never silently downgraded. For
+older releases without version discovery, finish your work and run
+`geist restart` once (the Mac app offers the equivalent migration dialog).

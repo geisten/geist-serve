@@ -1,25 +1,25 @@
 @charset "UTF-8";
 :root {
   color-scheme:light dark;
-  --bg:#f6f7f5;
+  --bg:#f7f8fa;
   --surface:#fff;
-  --ink:#23342c;
-  --muted:#63736b;
-  --border:#dce3dd;
+  --ink:#242a2e;
+  --muted:#646f76;
+  --border:#dde2e5;
   --accent:#276345;
-  --soft:#e9f1e9;
+  --soft:#edf3ef;
   --focus:#1571cc;
-  --shadow:0 8px 32px #1d3c2910;
+  --shadow:0 2px 4px #17242c04,0 12px 36px #17242c07;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   font-size:15px
 }
 @media(prefers-color-scheme:dark) {
   :root {
-    --bg:#171c19;
-    --surface:#202823;
+    --bg:#191c20;
+    --surface:#22272b;
     --ink:#e6eee7;
     --muted:#abbcaf;
-    --border:#3b483f;
+    --border:#3a4248;
     --accent:#abd6b5;
     --soft:#2c3b30;
     --shadow:none
@@ -98,14 +98,14 @@ h1,h2,h3,p {
   margin:0 0 14px
 }
 h1 {
-  font-size:clamp(28px,4vw,39px);
-  letter-spacing:-1.3px;
+  font-size:clamp(27px,4vw,34px);
+  letter-spacing:-1px;
   line-height:1.2;
   font-weight:620
 }
 h2 {
   font-size:25px;
-  letter-spacing:-.6px;
+  letter-spacing:-.8px;
   font-weight:600
 }
 h3 {
@@ -113,9 +113,9 @@ h3 {
   font-weight:600
 }
 header {
-  max-width:1100px;
+  max-width:920px;
   margin:auto;
-  padding:24px 32px;
+  padding:16px 28px;
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -148,36 +148,36 @@ nav button[aria-current] {
   box-shadow:var(--shadow)
 }
 main {
-  max-width:840px;
+  max-width:760px;
   margin:auto;
-  padding:38px 32px 18px
+  padding:28px 28px 14px
 }
 .page {
   min-width:0
 }
 .welcome {
-  max-width:540px;
-  margin:22px auto 46px;
+  max-width:480px;
+  margin:10px auto 20px;
   text-align:center
 }
 .welcome-mark {
-  width:66px;
-  height:66px;
+  width:48px;
+  height:48px;
   background:var(--soft);
   border:1px solid var(--border);
-  border-radius:22px;
-  margin:0 auto 30px;
+  border-radius:16px;
+  margin:0 auto 20px;
   display:grid;
   place-items:center
 }
 .welcome-mark svg {
-  width:32px;
-  height:32px
+  width:26px;
+  height:26px
 }
 .lead {
-  font-size:17px;
+  font-size:15px;
   color:var(--muted);
-  margin-bottom:26px
+  margin-bottom:20px
 }
 .muted,.hint {
   color:var(--muted)
@@ -242,7 +242,7 @@ main {
 textarea {
   width:100%;
   resize:vertical;
-  min-height:144px;
+  min-height:120px;
   max-height:60vh;
   border:1px solid var(--border);
   border-radius:16px;
@@ -295,7 +295,7 @@ progress {
   border:0;
   border-radius:8px;
   width:100%;
-  margin:32px 0 16px;
+  margin:12px 0 16px;
   accent-color:var(--accent)
 }
 progress::-webkit-progress-bar {
@@ -421,7 +421,7 @@ details[open]>summary {
 footer {
   font-size:11px;
   color:var(--muted);
-  padding:36px 0 12px;
+  padding:22px 0 8px;
   text-align:center
 }
 .sr-only {
@@ -513,4 +513,33 @@ footer {
 body.has-result textarea {
   min-height:88px;
   height:88px
+}
+
+/* Compact desktop workbench; labels remain visible for first-time users. */
+header { border-bottom:1px solid var(--border) }
+nav { padding:3px; background:var(--soft); border-radius:14px }
+nav button { border-radius:11px; min-height:36px; padding:7px 11px }
+nav button[aria-current] { box-shadow:0 1px 4px #15221c12 }
+#task-form { padding:14px 18px 8px; border:1px solid var(--border); border-radius:20px; background:var(--surface); box-shadow:var(--shadow) }
+#task-form textarea { padding:8px 0; background:transparent; border:0; border-radius:4px; box-shadow:none }
+#task-form .actions { padding-top:12px; border-top:1px solid var(--border); margin-bottom:6px }
+#task-form>.hint { margin:6px 0; font-size:11px }
+#job { margin-top:28px; padding:28px; background:var(--surface); border:1px solid var(--border); border-radius:22px; box-shadow:var(--shadow); text-align:left }
+#job h2 { font-size:21px }
+.download-numbers { display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin-top:24px }
+#job-percent { font-size:30px; font-weight:550; letter-spacing:-1px; font-variant-numeric:tabular-nums }
+#job-speed { text-align:right; font-variant-numeric:tabular-nums }
+#job .text-button { padding-left:0; margin-top:6px }
+#job-caption { margin-bottom:0 }
+.welcome .preview { font-size:12px; max-width:370px; margin:14px auto }
+@media(max-height:650px) {
+  main { padding-top:22px }
+  .welcome { margin-top:0; margin-bottom:12px }
+  .welcome-mark { margin-bottom:14px }
+  footer { padding-top:14px }
+}
+@media(max-width:600px) {
+  nav button { padding:7px 8px }
+  #task-form { padding:12px 14px 8px }
+  #job { padding:22px }
 }

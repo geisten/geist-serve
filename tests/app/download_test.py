@@ -59,6 +59,8 @@ try:
             assert app.request('/app/download', {'id': 'smollm2-360m'})[0] == 202
             app.wait(lambda s: s['received'] > 524288)
             assert app.request('/app/download', {'id': 'bitnet-2b'})[0] == 409
+            assert app.request('/app/quit-if-idle', {})[0] == 409
+            assert app.status()['busy']
             assert app.request('/app/cancel', {})[0] == 200
             app.wait(lambda s: not s['busy'])
             assert part.exists() and 0 < part.stat().st_size < fixture.stat().st_size
