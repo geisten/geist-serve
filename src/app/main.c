@@ -50,6 +50,12 @@ static const unsigned char translations[] = {
 static const unsigned char script[] = {
 #embed "../../web/app.js"
 };
+static const unsigned char marked_js[] = {
+#embed "../../web/vendor/marked.umd.js"
+};
+static const unsigned char markdown_js[] = {
+#embed "../../web/markdown.js"
+};
 #else
 /* GCC 14 supports the C23 language used here but not #embed yet. */
 #include "../../build/app_assets.h"
@@ -1311,6 +1317,14 @@ static void handle(int fd, struct app_arena *arena) {
         }
         if (strcmp(r.path, "/i18n.js") == 0) {
             response(fd, 200, "text/javascript; charset=utf-8", translations, sizeof translations);
+            return;
+        }
+        if (strcmp(r.path, "/marked.js") == 0) {
+            response(fd, 200, "text/javascript; charset=utf-8", marked_js, sizeof marked_js);
+            return;
+        }
+        if (strcmp(r.path, "/markdown.js") == 0) {
+            response(fd, 200, "text/javascript; charset=utf-8", markdown_js, sizeof markdown_js);
             return;
         }
         if (strcmp(r.path, "/app.js") == 0) {

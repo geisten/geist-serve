@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Exercise the real C23 HTTP boundary. No model or internet is required."""
+import hashlib
 import http.client
 import json
 import os
@@ -112,6 +113,14 @@ def main():
             assert "frame-ancestors 'none'" in headers["Content-Security-Policy"]
             assert "Access-Control-Allow-Origin" not in headers
             assert app.token.encode() not in html
+            manifest = json.loads((ROOT/'web/vendor/manifest.json').read_text())
+            for name, sha in manifest['files'].items():
+                assert hashlib.sha256((ROOT/'web/vendor'/name).read_bytes()).hexdigest() == sha
+            for route, source in [('/marked.js', 'vendor/marked.umd.js'), ('/markdown.js', 'markdown.js')]:
+                code, body, asset_headers = app.request(route, auth=False)
+                assert code == 200 and body == (ROOT/'web'/source).read_bytes()
+                assert asset_headers['Content-Type'].startswith('text/javascript')
+                assert "script-src 'self'" in asset_headers['Content-Security-Policy']
             assert app.request("/app/select", {"id": "../../bad"})[0] == 400
             assert app.request("/app/select", {"id": "bitnet-2b"})[0] == 409
             assert app.request("/app/generate", {"experimental": True, "prompt": "hello"})[0] == 409

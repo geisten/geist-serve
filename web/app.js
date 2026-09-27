@@ -12,6 +12,26 @@ let qualityRecords = [];
 let connectionTesting = false;
 // Page memory only. Never store prompts, answers or conversation in browser storage.
 let conversation = [], followLatest = true;
+const pendingMarkdown = new Set();
+function updateMarkdown(target, source) {
+  target.markdownSource = source;
+  pendingMarkdown.add(target);
+  flushMarkdown();
+}
+function flushMarkdown() {
+  const selection = window.getSelection();
+  for (const target of pendingMarkdown) {
+    if (!target.isConnected) { pendingMarkdown.delete(target); continue; }
+    // A changing final Markdown block must not replace a selected/focused node.
+    if (target.contains(document.activeElement) || (selection?.rangeCount && !selection.isCollapsed && selection.getRangeAt(0).intersectsNode(target))) continue;
+    chatMarkdown.render(target, target.markdownSource);
+    pendingMarkdown.delete(target);
+  }
+  scrollLatest();
+}
+document.addEventListener('selectionchange', flushMarkdown);
+document.addEventListener('focusout', () => setTimeout(flushMarkdown, 0));
+
 function chatLayout() {
   document.body.classList.toggle('chat-page', !$('test-page').hidden && !$('workspace').hidden);
   resizeComposer();
@@ -33,7 +53,7 @@ $('transcript').addEventListener('scroll', () => {
   followLatest = view.scrollHeight - view.clientHeight - view.scrollTop < 48;
   $('latest').hidden = followLatest;
 });
-$('latest').addEventListener('click', () => scrollLatest(true));
+$('latest').addEventListener('click', () => { scrollLatest(true); $('prompt').focus({preventScroll: true}); });
 window.addEventListener('resize', () => { resizeComposer(); scrollLatest(); });
 function addTurn(prompt) {
   $('chat-empty').hidden = true; $('result').hidden = false;
@@ -44,12 +64,12 @@ function addTurn(prompt) {
   user.setAttribute('aria-label', t('You')); user.append(userText);
   const answer = document.createElement('article'); answer.className = 'chat-message assistant';
   const label = document.createElement('div'); label.className = 'message-label'; label.textContent = `Geist · ${state.models.find(model => model.id === state.active_id)?.name || state.active}`;
-  const output = document.createElement('div'); output.id = 'output'; output.className = 'message-text';
+  const output = document.createElement('div'); output.id = 'output'; output.className = 'message-text markdown'; output.markdownSource = '';
   const status = document.createElement('p'); status.className = 'message-status'; status.textContent = t('Waiting for the first text…');
   const actions = document.createElement('div'); actions.className = 'message-actions';
   const copy = document.createElement('button'); copy.id = 'copy'; copy.type = 'button'; copy.className = 'text-button'; copy.disabled = true; copy.textContent = t('Copy'); copy.dataset.label = 'Copy';
   copy.addEventListener('click', async () => {
-    try { await copyText(output.textContent); copy.textContent = t('Copied'); }
+    try { await copyText(output.markdownSource); copy.textContent = t('Copied'); }
     catch { message('Copy is unavailable here. Select the result and copy it manually.'); }
   });
   actions.append(copy); answer.append(label, output, status, actions);
@@ -107,14 +127,18 @@ function buttonStates() {
   $('copy-connection').disabled = !state?.ready;
   $('connection-endpoint').textContent = t(`${location.origin}/v1`);
   $('connection-model').textContent = t(state?.active_id || 'Choose a model');
-  const ready = selectedTask && !selectedTask.url && state?.ready && !state?.busy && !requesting && !controller && allowed(state?.models.find(m => m.id === state.active_id));
+  const ready = selectedTask && !selectedTask.url && state?.ready && !state?.busy && !requesting && !controller && !connectionTesting && allowed(state?.models.find(m => m.id === state.active_id));
   $('run').disabled = !ready || !$('prompt').value.trim();
   $('run').hidden = !!controller;
   $('new-chat').disabled = !!controller;
   $('benchmark').disabled = !state?.ready || state?.busy || requesting || !!controller ||
     !allowed(state?.models.find(m => m.id === state.active_id), tasks.find(t => t.id === 'freeform'));
   $('unload').disabled = !state?.ready || state?.busy || requesting || !!controller;
+  if (!controller && document.activeElement === $('stop')) $('prompt').focus({preventScroll: true});
   $('stop').hidden = !controller;
+  document.body.classList.toggle('generating', !!controller);
+  $('runtime-state').textContent = t(controller ? 'Generating locally…' : state?.ready ? 'Ready on this device' : 'Choose a model');
+  $('runtime-model').textContent = state?.models.find(model => model.id === state.active_id)?.name || state?.active || '';
   $('language-choice').disabled = !!controller;
   $('setup-start').disabled = requesting || !!controller || !state || state.busy || state.loading || !setupCandidate().eligible;
 }
@@ -173,7 +197,8 @@ function render(next) {
   $('setup').hidden = working || usable;
   $('job').hidden = !working;
   if (usable && !working) manualChoice = null;
-  if (previouslyHidden && !$('workspace').hidden && !$('test-page').hidden) $('prompt').focus();
+  if (previouslyHidden && !$('workspace').hidden && !$('test-page').hidden &&
+      (document.activeElement === document.body || document.activeElement.closest('#setup, #job'))) $('prompt').focus({preventScroll: true});
   $('setup-detail').textContent = candidate.id ? `${candidate.name} · ${t(candidate.installed ? 'Already on this computer' : 'Download')} ${candidate.installed ? '' : bytes(Math.max(0, candidate.bytes - (candidate.partial || 0)))}` : t('No suitable model available right now.');
   $('setup-reason').textContent = manualChoice ? t(candidate.reason) : t(next.recommendation.source === 'fallback' || !next.recommendation.eligible ? next.recommendation.reason : '');
   $('preview-notice').hidden = !candidate.id || previewAccepted(candidate);
@@ -183,7 +208,6 @@ function render(next) {
   $('disk-space').textContent = t(next.hardware.disk_known ? `${bytes(next.hardware.disk)} disk space available` : 'Disk space could not be read');
   $('active-model').textContent = next.active || candidate.name || t('Choose a model');
   $('recommendation-reason').textContent = t(next.recommendation.reason);
-  $('runtime-state').textContent = t(next.ready ? 'Ready on this device' : 'Choose a model');
   next.models.forEach(modelCard);
   if (!working) { transfer.id = ''; transfer.samples = []; }
   if (working) {
@@ -241,7 +265,7 @@ function metric(id, value, unit) {
   const label = document.createElement('small'); label.textContent = t(unit); target.append(label);
 }
 
-async function run(prompt, benchmark = false) {
+async function run(prompt, benchmark = false, preserveDraft = false) {
   prompt = prompt.trim();
   const task = tasks.find(t => t.id === 'freeform');
   if (!prompt || controller || requesting || connectionTesting || state?.busy || !state?.ready || !task || !allowed(state.models.find(m => m.id === state.active_id), task)) return;
@@ -257,13 +281,14 @@ async function run(prompt, benchmark = false) {
   const turn = benchmark ? null : addTurn(prompt);
   const target = turn?.output || $('benchmark-output');
   target.hidden = false; target.textContent = '';
-  if (!benchmark) { $('prompt').value = ''; $('chat-help').open = false; resizeComposer(); $('prompt').focus(); }
+  if (!benchmark) { if (!preserveDraft) $('prompt').value = ''; $('chat-help').open = false; resizeComposer(); $('prompt').focus(); }
   buttonStates(); state.models.forEach(modelCard); message('');
   for (const [id, unit] of [['speed', 'tokens/s'], ['first-token', 'seconds'], ['elapsed', 'seconds']]) metric(id, '—', unit);
   $('measurement-note').textContent = t(benchmark ? 'Short local test running. Results apply to this model and this workload.' : 'Running on your device…');
   $('chat-announcement').textContent = t('Waiting for the first text…');
   const start = performance.now(); let first = null, done = false, reader;
-  let output = '', pending = '', limited = false;
+  let output = '', pending = '', limited = false, paintTimer = null;
+  function paint() { paintTimer = null; if (turn) updateMarkdown(target, output); else target.textContent = output; }
   function event(line) {
     if (!line.trim()) return;
     const item = JSON.parse(line);
@@ -271,8 +296,8 @@ async function run(prompt, benchmark = false) {
     if (item.response) {
       if (first === null) { first = (performance.now() - start) / 1000; metric('first-token', first.toFixed(2), 'seconds'); if (turn) turn.status.textContent = ''; }
       if (output.length + item.response.length > 131072) throw new Error('Output exceeded the display memory limit.');
-      output += item.response; target.textContent = output;
-      if (turn) scrollLatest();
+      output += item.response;
+      if (paintTimer === null) paintTimer = setTimeout(paint, 60);
     }
     if (item.done) {
       done = true; limited = item.limited === true;
@@ -305,7 +330,7 @@ async function run(prompt, benchmark = false) {
           if (controller || state?.busy) return;
           // A continuation from an older reply would target the wrong context.
           if (turn.output.id !== 'output') { message('Continue from the latest reply, or ask a new question.'); return; }
-          run(t('Continue from where you stopped.'));
+          run(t('Continue from where you stopped.'), false, true);
         });
         turn.actions.append(more);
       }
@@ -321,12 +346,13 @@ async function run(prompt, benchmark = false) {
     metric('speed', '—', 'tokens/s');
     metric('elapsed', ((performance.now() - start) / 1000).toFixed(2), 'seconds');
   } finally {
+    clearTimeout(paintTimer); paint();
     if (reader) { try { await reader.cancel(); } catch { /* connection already closed */ } }
     if (turn) {
       // Partial answers are visible and explicitly marked, so follow-ups can
       // refer to them. Failed requests without text never enter model context.
       if (output) conversation = [...messages, {role: 'assistant', content: output}];
-      else if (!$('prompt').value) { $('prompt').value = prompt; resizeComposer(); }
+      else if (!preserveDraft && !$('prompt').value) { $('prompt').value = prompt; resizeComposer(); }
       turn.copy.disabled = !output;
       scrollLatest();
     }
@@ -352,7 +378,7 @@ $('prompt').addEventListener('compositionend', () => { delete $('prompt').datase
 $('new-chat').addEventListener('click', () => {
   if (controller) return;
   if ((conversation.length || $('result').children.length || $('prompt').value) && !confirm(t('Clear this conversation and draft? They are not saved.'))) return;
-  conversation = []; $('result').replaceChildren(); $('result').hidden = true; $('chat-empty').hidden = false;
+  conversation = []; pendingMarkdown.clear(); $('result').replaceChildren(); $('result').hidden = true; $('chat-empty').hidden = false;
   $('prompt').value = ''; $('chat-help').open = false; message(''); $('chat-announcement').textContent = t('New chat started.');
   scrollLatest(true); resizeComposer(); buttonStates(); $('prompt').focus();
 });
@@ -373,7 +399,7 @@ async function loadTasks() {
   chooseTask('freeform');
   if (state) render(state);
 }
-$('stop').addEventListener('click', () => controller?.abort());
+$('stop').addEventListener('click', () => { controller?.abort(); $('prompt').focus({preventScroll: true}); });
 $('benchmark').addEventListener('click', () => run('Explain in a short paragraph how a seed grows into a plant.', true));
 $('cancel-download').addEventListener('click', async () => { try { await api('/app/cancel', {}); message('Cancelling…'); } catch (error) { message(error.message); } });
 $('unload').addEventListener('click', async () => { try { await api('/app/stop', {}); await poll(); } catch (error) { message(error.message); } });
@@ -434,7 +460,8 @@ function showPage(id) {
     else button.removeAttribute('aria-current');
   });
   chatLayout();
-  const heading = id === 'test-page' && !$('setup').hidden ? $('setup-title') : $(id).querySelector('h2'); heading.tabIndex = -1; heading.focus();
+  if (id === 'test-page' && !$('workspace').hidden) $('prompt').focus({preventScroll: true});
+  else { const heading = id === 'test-page' && !$('setup').hidden ? $('setup-title') : $(id).querySelector('h2'); heading.tabIndex = -1; heading.focus(); }
 }
 document.querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => showPage(button.dataset.page)));
 $('ui-language').value = interfaceLanguage;
@@ -460,3 +487,14 @@ async function removeModel(id) {
   catch (error) { message(error.message); }
   finally { requesting = false; await poll(); }
 }
+
+// Dismiss help without losing the user's place in the keyboard sequence.
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && $('chat-help').open) {
+    event.preventDefault(); $('chat-help').open = false;
+    $('chat-help').querySelector('summary').focus({preventScroll: true});
+  }
+});
+document.addEventListener('pointerdown', event => {
+  if (!$('chat-help').contains(event.target)) $('chat-help').open = false;
+});

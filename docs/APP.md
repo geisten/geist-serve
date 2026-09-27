@@ -20,6 +20,18 @@ with a pointer or touch; the stop button preserves a partial response. Follow-up
 messages include the visible conversation from this window. **Tips** offers
 examples for rewriting, summarizing and ideas; there is no task-mode selector.
 
+Responses render Markdown headings, lists, quotes, tables and code blocks on a
+cream-white reading surface. **Copy** retains the original Markdown; code blocks
+have a separate copy control. Wide code and tables scroll inside their blocks.
+Model-provided HTML is shown literally. Web addresses can be copied; the chat
+does not navigate to them or load remote images. No formatting service is used.
+
+Entering Chat or starting a new conversation focuses the composer. Sending and
+stopping return to it; background status updates and completed responses do not
+steal focus. Escape dismisses Tips and returns to its control. Tab follows the
+visible document order. While text is selected or a response control has focus,
+formatting changes to that response wait until selection/focus leaves it.
+
 The transcript scrolls independently above the composer. New output follows only
 while you are reading the latest message. Long drafts scroll without being cut.
 **New chat** asks before clearing the conversation and draft. Reloading or quitting
@@ -27,7 +39,7 @@ clears the page memory; nothing is saved as chat history. Closing and reopening 
 hidden desktop window can retain that window's memory until the app quits.
 
 A chat response can use up to 1,024 output tokens within the shared 4,096-token
-context. A limited answer is marked and offers **Continue response**. Context or
+context. A limited answer is marked and offers **Continue response**, which preserves any next-message draft. Context or
 request limits produce an explicit error; no earlier turns are silently dropped.
 Failed requests keep the draft; stopped partial answers remain in context. Session
 chat requires preview consent: single-task evidence does not certify follow-ups.

@@ -1,6 +1,10 @@
 'use strict';
 let interfaceLanguage = (window.geistLanguage || (() => { try { return localStorage.getItem('geist-language'); } catch { return null; } })() || navigator.language).startsWith('de') ? 'de' : 'en';
 const german = {
+  'Code': 'Code', 'Copy code': 'Code kopieren', 'Copy link': 'Link kopieren', 'Table': 'Tabelle', 'Image': 'Bild',
+  'Checked': 'Abgehakt', 'Unchecked': 'Nicht abgehakt',
+  'Answers support Markdown. Copy keeps the original formatting. Web addresses can be copied; external images are not loaded.': 'Antworten unterstützen Markdown. Kopieren behält die Formatierung bei. Webadressen lassen sich kopieren; externe Bilder werden nicht geladen.',
+
   'Your models. Your computer.': 'Deine Modelle. Dein Rechner.', 'Quality and speed': 'Qualität und Geschwindigkeit',
   'Skip to content': 'Zum Inhalt', 'Interface': 'Oberfläche', 'Interface language': 'Sprache der Oberfläche', 'Setup': 'Einrichtung',
   '1. Models': '1. Modelle', '2. Test': '2. Testen', '3. Connect': '3. Verbinden',

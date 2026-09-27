@@ -11,6 +11,7 @@ mkdir -p "$destination"
 cp geist geist-app geistd "$destination/"
 cp scripts/start-geist.sh "$destination/Start Geist.sh"
 chmod 755 "$destination/Start Geist.sh" "$destination/geist" "$destination/geist-app" "$destination/geistd"
+cp web/vendor/marked-LICENSE "$destination/marked-LICENSE"
 cp LICENSE "$destination/LICENSE"
 cp docs/APP.md "$destination/README.md"
 if [ -f build/app-build-packages.txt ]; then cp build/app-build-packages.txt "$destination/BUILD-PACKAGES.txt"; fi

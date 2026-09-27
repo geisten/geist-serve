@@ -1,0 +1,11 @@
+{
+  "name": "marked",
+  "version": "18.0.14",
+  "upstream": "https://github.com/markedjs/marked",
+  "tarball": "https://registry.npmjs.org/marked/-/marked-18.0.14.tgz",
+  "integrity": "sha512-mBHK6FBHuBAlhgRe88w9F0O1AbwwXJUcQibUbC/QcdTbVGAD7aWza+xt3N6oT/jCZx3/OMeS+8rnuiHZcQ9s7A==",
+  "files": {
+    "marked.umd.js": "21568877a938d2c4e7d74e27f18e60da96bb73a68809610ca39216e1efebae62",
+    "marked-LICENSE": "8e3a3f82f59a60958f56ca08f445647c32a4733dc7ca6c2c46f6eb898471ab9c"
+  }
+}
