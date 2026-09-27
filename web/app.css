@@ -6,9 +6,10 @@
   --ink:#292823;
   --muted:#6c675d;
   --border:#e2ddd2;
-  --accent:#405d4a;
+  --accent:#166b73;
+  --success:#427052;
   --soft:#efece4;
-  --focus:#61755f;
+  --focus:#166b73;
   --shadow:0 2px 8px #3d352604,0 8px 28px #3d352608;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   font-size:15px
@@ -208,7 +209,7 @@ main {
   display:inline-block;
   width:6px;
   height:6px;
-  background:var(--accent);
+  background:var(--success);
   border-radius:50%;
   margin-right:6px
 }
@@ -477,7 +478,7 @@ nav { gap:4px }
 nav button { border-radius:10px; min-height:36px; padding:7px 10px; color:var(--muted); font-size:12px; font-weight:500 }
 nav button[aria-current] { color:var(--ink); background:var(--soft); box-shadow:none }
 #task-form { padding:10px 16px 9px; border:1px solid var(--border); border-radius:22px; background:var(--surface); box-shadow:var(--shadow); transition:border-color .16s,box-shadow .16s }
-#task-form:focus-within { border-color:var(--focus); box-shadow:0 0 0 1px #61755f20,var(--shadow) }
+#task-form:focus-within { border-color:var(--focus); box-shadow:0 0 0 1px #166b7320,var(--shadow) }
 #task-form textarea { padding:8px 0; background:transparent; border:0; border-radius:0; box-shadow:none; outline:none }
 #task-form .actions { border:0; margin:2px 0 0; padding:0; gap:8px }
 #job { margin-top:28px; padding:28px; background:var(--surface); border:1px solid var(--border); border-radius:22px; box-shadow:var(--shadow); text-align:left }
@@ -590,3 +591,27 @@ button.markdown-copy { background:transparent; color:var(--muted); border:0; bor
   #composer-hint { margin:4px 0 0 }
   #task-form textarea { max-height:90px }
 }
+
+/* Technical detail stays one disclosure away; reading remains the main surface. */
+.performance { margin-top:4px; min-width:0 }
+.performance>summary { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:2px 16px; min-height:32px; padding:4px 6px; color:var(--muted); font-size:11px; font-weight:400; list-style:none; border-radius:8px }
+.performance>summary::-webkit-details-marker { display:none }
+.performance[open]>summary { margin-bottom:0; color:var(--accent) }
+.performance-label,.performance-values { display:inline-flex; align-items:center; flex-wrap:wrap; gap:8px }
+.performance-label svg { width:15px; height:15px }
+.performance-values { gap:12px; font-variant-numeric:tabular-nums; margin-left:auto }
+.performance-content h3 { margin:0 0 16px; font-size:16px; font-weight:600; letter-spacing:-.2px }
+.performance-content h4 { margin:18px 0 10px; font-size:12px; font-weight:600 }
+.performance-content .system-name { margin:0; font-size:14px; font-weight:550 }
+.performance-content #performance-os { margin:2px 0 16px }
+.performance-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px 24px; margin:0 }
+.performance-grid dt { font-size:11px; color:var(--muted) }
+.performance-grid dd { margin:2px 0 0; font-size:19px; font-weight:500; color:var(--accent); font-variant-numeric:tabular-nums; letter-spacing:-.3px }
+.performance-content .performance-note { margin:14px 0 0; color:var(--muted); font-size:11px; line-height:1.6 }
+.reply-metrics { align-self:center; padding:4px 2px; font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; overflow-wrap:anywhere }
+@media(max-height:480px) {
+  .performance { margin-top:0 }
+  .performance>summary { min-height:28px; padding-top:2px; padding-bottom:2px }
+}
+
+.performance-content:focus-visible { outline-offset:-3px }

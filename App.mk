@@ -6,9 +6,9 @@ APP_LDLIBS ?= -lcurl -lpthread
 ifeq ($(shell uname -s),Linux)
 APP_LDLIBS += -lcrypto
 endif
-APP_SOURCE := src/app/core.c src/app/platform.c
+APP_SOURCE := src/app/core.c src/app/platform.c src/app/resources.c
 APP_RUNTIME := src/app/daemon.c src/template.c src/app/tasks.c src/app/compat.c src/app/connection.c
-APP_HEADERS := src/app/version.h src/app/tasks.h build/app_tasks.h src/app/daemon.h src/app/compat.h src/app/connection.h clients/geistd_client.h src/jsmn.h src/template.h src/json.h
+APP_HEADERS := src/app/resources.h src/app/version.h src/app/tasks.h build/app_tasks.h src/app/daemon.h src/app/compat.h src/app/connection.h clients/geistd_client.h src/jsmn.h src/template.h src/json.h
 .PHONY: app test-app
 app: geist-app geist
 geist: src/app/version.h src/app/cli.c src/app/connection.c src/app/connection.h src/app/core.c src/app/core.h src/json.c src/json.h
@@ -18,7 +18,8 @@ geist-app: src/app/main.c $(APP_SOURCE) $(APP_RUNTIME) $(APP_HEADERS) src/app/co
 build/test_app_core: tests/app/core_test.c $(APP_SOURCE) src/app/core.h
 	@mkdir -p build
 	$(APP_CC) $(APP_CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ tests/app/core_test.c $(APP_SOURCE) $(APP_LDLIBS)
-test-app: build/geist-app-old build/geist-app-new build/geist-app-legacy geist-app geist build/test_app_core build/test_app_client build/test_app_tasks
+test-app: build/test_app_resources build/geist-app-old build/geist-app-new build/geist-app-legacy geist-app geist build/test_app_core build/test_app_client build/test_app_tasks
+	./build/test_app_resources
 	./build/test_app_core
 	./build/test_app_tasks
 	python3 tests/app/client_test.py
@@ -53,3 +54,8 @@ build/test_app_tasks: tests/app/tasks_test.c src/app/tasks.c src/app/tasks.h bui
 # The test fixtures differ only in the version reported by the real service.
 build/geist-app-old build/geist-app-new build/geist-app-legacy: src/app/main.c $(APP_SOURCE) $(APP_RUNTIME) $(APP_HEADERS) build/app_assets.h
 	$(APP_CC) $(APP_CFLAGS) -DAPP_VERSION='"$(if $(filter build/geist-app-old,$@),0.4.9,$(if $(filter build/geist-app-new,$@),0.6.0,))"' -Isrc -o $@ src/app/main.c $(APP_SOURCE) $(APP_RUNTIME) src/json.c $(APP_LDLIBS)
+
+# OS resource counters and sampling invariants, including the Linux parser on Mac.
+build/test_app_resources: tests/app/resources_test.c src/app/resources.c src/app/resources.h
+	@mkdir -p build
+	$(APP_CC) $(APP_CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ tests/app/resources_test.c src/app/resources.c

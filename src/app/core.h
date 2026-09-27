@@ -36,10 +36,10 @@ const struct app_model       *app_model_find(const char *id);
 
 enum app_device { APP_UNKNOWN, APP_APPLE_SILICON, APP_PI5 };
 struct app_hardware {
-    char            name[160], arch[32];
+    char            name[160], arch[32], os[128];
     enum app_device device;
     uint64_t        ram, available, disk;
-    unsigned        cores;
+    unsigned        cores, logical_cpus;
     bool            supported, available_known, disk_known;
 };
 [[nodiscard]] bool app_hardware_read(struct app_hardware *h, const char *directory);

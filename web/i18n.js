@@ -1,6 +1,26 @@
 'use strict';
 let interfaceLanguage = (window.geistLanguage || (() => { try { return localStorage.getItem('geist-language'); } catch { return null; } })() || navigator.language).startsWith('de') ? 'de' : 'en';
 const german = {
+  "System & performance": "System & Leistung",
+  "Model RAM · now": "Modell-RAM · aktuell",
+  "Model CPU · now": "Modell-CPU · aktuell",
+  "System RAM": "System-RAM",
+  "Available RAM": "Verfügbarer RAM",
+  "Last completed reply": "Letzte abgeschlossene Antwort",
+  "Generation": "Generierung",
+  "Output tokens": "Ausgabetoken",
+  "First text": "Erster Text",
+  "Total time": "Gesamtzeit",
+  "logical CPUs": "logische CPUs",
+  "Not available": "Nicht verfügbar",
+  "Last reply": "Letzte Antwort",
+  "Model process RAM": "RAM des Modellprozesses",
+  "tokens": "Token",
+  "tok/s": "Token/s",
+  "Measuring…": "Messung läuft…",
+  "OS snapshots, refreshed about every two seconds. Model RAM is the resident memory of geistd, including shared pages; it excludes this window. CPU: 100% means all logical CPUs. Available RAM is an OS estimate, not an allocation guarantee. GPU and power use are not measured.": "OS-Momentaufnahmen, etwa alle zwei Sekunden aktualisiert. Modell-RAM ist der residente Speicher von geistd, einschließlich geteilter Speicherseiten und ohne dieses Fenster. CPU: 100 % bedeutet alle logischen CPUs. Verfügbarer RAM ist eine OS-Schätzung, keine Speicherzusage. GPU und Energieverbrauch werden nicht gemessen.",
+  "Speed uses the model's generated tokens and generation time, including streaming. First text and total time also include input processing and the local connection. Values apply to this reply, not to answer quality.": "Die Geschwindigkeit verwendet die erzeugten Token und die Ausgabezeit des Modells einschließlich Streaming. Erster Text und Gesamtzeit enthalten auch Eingabeverarbeitung und lokale Verbindung. Die Werte gelten für diese Antwort und sagen nichts über deren Qualität aus.",
+
   'Code': 'Code', 'Copy code': 'Code kopieren', 'Copy link': 'Link kopieren', 'Table': 'Tabelle', 'Image': 'Bild',
   'Checked': 'Abgehakt', 'Unchecked': 'Nicht abgehakt',
   'Answers support Markdown. Copy keeps the original formatting. Web addresses can be copied; external images are not loaded.': 'Antworten unterstützen Markdown. Kopieren behält die Formatierung bei. Webadressen lassen sich kopieren; externe Bilder werden nicht geladen.',

@@ -11,7 +11,10 @@ desktop window. Read the preview notice and choose **Set up and start**. A
 platform check suggests one model, including a smaller fallback when needed.
 Once ready, type a message and press Enter. Shift + Enter inserts a new line.
 Follow-up questions use this window’s conversation; Tips provides examples. Optional
-models, languages and measurements live in **Customize**. The bundled
+models and languages live in **Customize**. The chat footer shows the last completed
+reply’s tokens/s and the model process’s current resident RAM. Open **System &
+performance** for OS/CPU details, available RAM, live CPU load and reply timings.
+These measurements describe performance, not answer quality. The bundled
 terminal client is `/Applications/Geist.app/Contents/MacOS/geist-cli`.
 Use its full path, or link it as `geist` in a directory on your PATH. Start at Login is
 optional. An actual distributable DMG still requires Developer ID signing and
@@ -146,3 +149,28 @@ when it is idle. A running download, model load or response blocks the handoff;
 finish it and reconnect. A newer service is never silently downgraded. For
 older releases without version discovery, finish your work and run
 `geist restart` once (the Mac app offers the equivalent migration dialog).
+
+## Reading performance values
+
+`GET /app/status` remains authenticated and local. Its `hardware` object adds
+`os` and `logical_cpus`; `cores` still means the compute-core count used by the
+model recommendation policy. No scheduling or model-selection policy changes.
+
+`resources.scope` is `geistd`: `rss_bytes` is its current resident memory,
+including shared pages, excluding the UI and manager. It is an OS snapshot, not
+peak or exclusive memory. `cpu_percent` is the CPU-time delta divided by elapsed
+monotonic wall time and logical CPU count (100% = all logical CPUs). Sampling
+uses at least 500 ms, shares the window across readers and resets after a process
+change, counter reversal or more than 10 seconds without sampling. Missing
+counters are JSON null, not zero. The UI refreshes about every 1.8 seconds.
+Mac CPU time is converted from Mach ticks with the system timebase; Linux uses
+/proc clock ticks and resident pages. The independent process-clock regression
+checks units on both platforms. Available RAM remains a conservative OS estimate.
+GPU utilization and energy are not measured.
+
+Reply speed uses the backend’s generated-token count and generation duration,
+including streaming. First text and total use the interface’s monotonic clock,
+including prompt processing and the local connection. No chunk/character-based
+estimates are shown. Incomplete streams never get a final speed. Each completed
+reply retains its own summary in this window; the current summary is cleared on
+new chat/request or model change. Benchmarks do not replace the chat summary.

@@ -25,7 +25,7 @@ for binary, expected in [(old,0),(new,44),(legacy,42)]:
             assert before['api_key']==after['api_key']
             if expected==0:
                 assert before['pid'] != after['pid'], 'old process was silently reused'
-                assert app.status()['version']=='0.5.5'
+                assert app.status()['version']=='0.5.6'
                 # Opening again must reuse the current service.
                 subprocess.run([str(cli),'start'],env=env,check=True,capture_output=True,timeout=30)
                 assert json.loads((Path(home)/'connection.json').read_text())['pid']==after['pid']

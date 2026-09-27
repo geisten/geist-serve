@@ -47,6 +47,27 @@
         <div class="actions"><details id="chat-help"><summary aria-label="What can I ask?" title="What can I ask?"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.01"/></svg><span>Tips</span></summary><div class="help-content"><p>Just describe what you need. No mode to choose.</p><ul><li>Rewrite this email in a friendlier tone: …</li><li>Summarize this text in three points: …</li><li>Suggest three ideas for …</li></ul><p>Answers support Markdown. Copy keeps the original formatting. Web addresses can be copied; external images are not loaded.</p><p>This conversation stays in this window. New chat, reloading or quitting clears it. Check answers before using them.</p></div></details><span class="spacer"></span><button id="stop" class="icon-button" type="button" aria-label="Stop response" title="Stop response" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button><button id="run" class="primary icon-button" type="submit" disabled aria-label="Send message" title="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button></div>
       </form>
       <p id="composer-hint" class="hint">Enter to send · Shift + Enter for a new line</p>
+      <details id="performance" class="performance">
+        <summary><span class="performance-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg><span>System &amp; performance</span></span><span class="performance-values"><span id="chat-speed">— tok/s</span><span id="chat-memory">— RAM</span></span></summary>
+        <div class="help-content performance-content" tabindex="0" role="region" aria-label="System &amp; performance">
+          <h3>System &amp; performance</h3><p id="performance-system" class="system-name"></p><p id="performance-os" class="hint"></p>
+          <dl class="performance-grid">
+            <div><dt>Model RAM · now</dt><dd id="performance-rss">—</dd></div>
+            <div><dt>Model CPU · now</dt><dd id="performance-cpu">—</dd></div>
+            <div><dt>System RAM</dt><dd id="performance-ram">—</dd></div>
+            <div><dt>Available RAM</dt><dd id="performance-available">—</dd></div>
+          </dl>
+          <p class="performance-note">OS snapshots, refreshed about every two seconds. Model RAM is the resident memory of geistd, including shared pages; it excludes this window. CPU: 100% means all logical CPUs. Available RAM is an OS estimate, not an allocation guarantee. GPU and power use are not measured.</p>
+          <h4>Last completed reply</h4>
+          <dl class="performance-grid">
+            <div><dt>Generation</dt><dd id="performance-speed">—</dd></div>
+            <div><dt>Output tokens</dt><dd id="performance-tokens">—</dd></div>
+            <div><dt>First text</dt><dd id="performance-first">—</dd></div>
+            <div><dt>Total time</dt><dd id="performance-total">—</dd></div>
+          </dl>
+          <p class="performance-note">Speed uses the model's generated tokens and generation time, including streaming. First text and total time also include input processing and the local connection. Values apply to this reply, not to answer quality.</p>
+        </div>
+      </details>
     </div>
     <p id="chat-announcement" class="sr-only" role="status" aria-live="polite"></p>
   </div>

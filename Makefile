@@ -21,7 +21,7 @@ GEIST_REF  ?= 25861c0bd197f1a98f17e49efe0cdc48a0e40713
 GEISTLIB   ?= geistlib
 MODE       ?= release
 
-NO_ENGINE := clean distclean help format app test-app geist-app build/test_app_core
+NO_ENGINE := clean distclean help format app test-app geist-app build/test_app_core build/test_app_resources
 ifneq (,$(filter-out $(NO_ENGINE),$(or $(MAKECMDGOALS),all)))
 
 ENGINE := $(shell GEIST_REPO='$(GEIST_REPO)' GEIST_REF='$(GEIST_REF)' \

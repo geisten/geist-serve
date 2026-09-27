@@ -39,15 +39,21 @@ bool app_hardware_read(struct app_hardware *h, const char *directory) {
     struct utsname u;
     if (uname(&u) != 0)
         return false;
+    snprintf(h->os, sizeof h->os, "%s %s", u.sysname, u.release);
     snprintf(h->arch, sizeof h->arch, "%s", u.machine);
     snprintf(h->name, sizeof h->name, "%s %s", u.sysname, u.machine);
-    long cores = sysconf(_SC_NPROCESSORS_ONLN);
-    h->cores   = cores > 0 ? (unsigned) cores : 1;
+    long cores      = sysconf(_SC_NPROCESSORS_ONLN);
+    h->cores        = cores > 0 ? (unsigned) cores : 1;
+    h->logical_cpus = cores > 0 ? (unsigned) cores : 0;
     struct statvfs disk;
     if (statvfs(directory, &disk) == 0)
         h->disk_known = !ckd_mul(&h->disk, (uint64_t) disk.f_bavail, (uint64_t) disk.f_frsize);
 #ifdef __APPLE__
-    size_t n = sizeof h->ram;
+    char   version[64] = "";
+    size_t n           = sizeof version;
+    if (sysctlbyname("kern.osproductversion", version, &n, nullptr, 0) == 0)
+        snprintf(h->os, sizeof h->os, "macOS %s", version);
+    n = sizeof h->ram;
     if (sysctlbyname("hw.memsize", &h->ram, &n, nullptr, 0) != 0)
         return false;
     n = sizeof h->name;
@@ -84,6 +90,43 @@ bool app_hardware_read(struct app_hardware *h, const char *directory) {
                 h->available       = kb * 1024;
                 h->available_known = true;
             }
+        }
+        fclose(f);
+    }
+    f = fopen("/etc/os-release", "r");
+    if (f) {
+        char line[256];
+        while (fgets(line, sizeof line, f)) {
+            if (strncmp(line, "PRETTY_NAME=", 12))
+                continue;
+            char *name                  = line + 12;
+            name[strcspn(name, "\r\n")] = 0;
+            size_t length               = strlen(name);
+            if (length >= 2 && (name[0] == '\"' || name[0] == '\'') &&
+                name[length - 1] == name[0]) {
+                name[length - 1] = 0;
+                ++name;
+            }
+            snprintf(h->os, sizeof h->os, "%s", name);
+            break;
+        }
+        fclose(f);
+    }
+    f = fopen("/proc/cpuinfo", "r");
+    if (f) {
+        char line[512];
+        while (fgets(line, sizeof line, f)) {
+            if (strncmp(line, "model name", 10))
+                continue;
+            char *name = strchr(line, ':');
+            if (!name)
+                continue;
+            ++name;
+            while (*name == ' ' || *name == '\t')
+                ++name;
+            name[strcspn(name, "\r\n")] = 0;
+            snprintf(h->name, sizeof h->name, "%s", name);
+            break;
         }
         fclose(f);
     }

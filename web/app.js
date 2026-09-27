@@ -12,6 +12,7 @@ let qualityRecords = [];
 let connectionTesting = false;
 // Page memory only. Never store prompts, answers or conversation in browser storage.
 let conversation = [], followLatest = true;
+let lastReply = null, replyPending = false;
 const pendingMarkdown = new Set();
 function updateMarkdown(target, source) {
   target.markdownSource = source;
@@ -72,9 +73,10 @@ function addTurn(prompt) {
     try { await copyText(output.markdownSource); copy.textContent = t('Copied'); }
     catch { message('Copy is unavailable here. Select the result and copy it manually.'); }
   });
-  actions.append(copy); answer.append(label, output, status, actions);
+  const metrics = document.createElement('span'); metrics.className = 'reply-metrics';
+  actions.append(copy, metrics); answer.append(label, output, status, actions);
   $('result').append(user, answer); scrollLatest(true);
-  return {output, status, actions, copy};
+  return {output, status, actions, copy, metrics};
 }
 function qualityFor(model, task = selectedTask) {
   return qualityRecords.find(r => r.model_sha256 === model?.sha256 && r.task === task?.id &&
@@ -88,6 +90,37 @@ function allowed(model, task = selectedTask) {
 }
 const bytes = n => n < 1e9 ? `${Math.round(n / 1e6)} MB` : `${(n / 1e9).toFixed(2)} GB`;
 const gib = n => `${(n / 2 ** 30).toFixed(1)} GiB`;
+
+const knownNumber = value => typeof value === 'number' && Number.isFinite(value) && value >= 0;
+const modelIdentity = () => JSON.stringify([state?.active_id, state?.active]);
+const rateText = value => `${knownNumber(value) ? value.toFixed(1) : '—'} ${t('tok/s')}`;
+const timeText = value => knownNumber(value) ? `${value.toFixed(2)} s` : '—';
+function renderReplyMetrics(element) {
+  const m = element.replyMetrics;
+  if (!m) return;
+  element.textContent = `${rateText(m.rate)} · ${knownNumber(m.tokens) ? m.tokens : '—'} ${t('tokens')} · ${timeText(m.total)}`;
+  element.title = `${t('First text')}: ${timeText(m.first)}`;
+}
+function renderPerformance() {
+  if (lastReply && lastReply.model !== modelIdentity()) lastReply = null;
+  const h = state?.hardware, r = state?.resources;
+  const rss = r?.scope === 'geistd' && knownNumber(r.rss_bytes) ? r.rss_bytes : null;
+  const cpu = r?.scope === 'geistd' && knownNumber(r.cpu_percent) ? r.cpu_percent : null;
+  $('chat-speed').textContent = replyPending ? t('Measuring…') : rateText(lastReply?.rate);
+  $('chat-speed').title = t('Last completed reply');
+  $('chat-memory').textContent = `${rss === null ? '—' : gib(rss)} RAM`;
+  $('chat-memory').title = t('Model process RAM');
+  $('performance-system').textContent = h?.name || t('Not available');
+  $('performance-os').textContent = h ? [h.os, h.arch, h.logical_cpus ? `${h.logical_cpus} ${t('logical CPUs')}` : null].filter(Boolean).join(' · ') : '—';
+  $('performance-rss').textContent = rss === null ? '—' : gib(rss);
+  $('performance-cpu').textContent = cpu === null ? '—' : `${cpu.toFixed(1)} %`;
+  $('performance-ram').textContent = knownNumber(h?.ram) ? gib(h.ram) : '—';
+  $('performance-available').textContent = h?.available_known && knownNumber(h.available) ? gib(h.available) : '—';
+  $('performance-speed').textContent = rateText(lastReply?.rate);
+  $('performance-tokens').textContent = knownNumber(lastReply?.tokens) ? String(lastReply.tokens) : '—';
+  $('performance-first').textContent = timeText(lastReply?.first);
+  $('performance-total').textContent = timeText(lastReply?.total);
+}
 
 // A rolling observation from this window, never an advertised network speed.
 // Resuming/reconnecting starts a new sample: saved bytes do not inflate it.
@@ -123,6 +156,7 @@ async function api(path, body, signal) {
 
 function message(text, local = true) { $('notice').textContent = t(text); localMessage = local; }
 function buttonStates() {
+  renderPerformance();
   $('test-connection').disabled = !state?.ready || state?.busy || connectionTesting || requesting || !!controller;
   $('copy-connection').disabled = !state?.ready;
   $('connection-endpoint').textContent = t(`${location.origin}/v1`);
@@ -279,14 +313,16 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
   }
   const activeController = new AbortController(); controller = activeController;
   const turn = benchmark ? null : addTurn(prompt);
+  const requestModel = modelIdentity();
+  if (turn) { lastReply = null; replyPending = true; }
   const target = turn?.output || $('benchmark-output');
   target.hidden = false; target.textContent = '';
-  if (!benchmark) { if (!preserveDraft) $('prompt').value = ''; $('chat-help').open = false; resizeComposer(); $('prompt').focus(); }
+  if (!benchmark) { if (!preserveDraft) $('prompt').value = ''; $('chat-help').open = false; $('performance').open = false; resizeComposer(); $('prompt').focus(); }
   buttonStates(); state.models.forEach(modelCard); message('');
   for (const [id, unit] of [['speed', 'tokens/s'], ['first-token', 'seconds'], ['elapsed', 'seconds']]) metric(id, '—', unit);
   $('measurement-note').textContent = t(benchmark ? 'Short local test running. Results apply to this model and this workload.' : 'Running on your device…');
   $('chat-announcement').textContent = t('Waiting for the first text…');
-  const start = performance.now(); let first = null, done = false, reader;
+  const start = performance.now(); let first = null, done = false, reader, completion = null;
   let output = '', pending = '', limited = false, paintTimer = null;
   function paint() { paintTimer = null; if (turn) updateMarkdown(target, output); else target.textContent = output; }
   function event(line) {
@@ -301,11 +337,7 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
     }
     if (item.done) {
       done = true; limited = item.limited === true;
-      const seconds = item.eval_duration / 1e9;
-      const rate = seconds > 0 && item.eval_count > 0 ? item.eval_count / seconds : null;
-      metric('speed', rate === null ? '—' : rate.toFixed(1), 'tokens/s');
-      metric('elapsed', ((performance.now() - start) / 1000).toFixed(2), 'seconds');
-      $('measurement-note').textContent = t(`${item.eval_count || 0} generated tokens. Speed uses geistd's generation time, including token streaming; first text and total include the local connection and prompt processing. ${benchmark ? 'A short sample, not a general benchmark.' : ''}`);
+      completion = item;
     }
   }
   try {
@@ -321,6 +353,14 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
       if (chunk.done) { if (pending.trim()) event(pending); break; }
     }
     if (!done) throw new Error('The connection ended before the model completed its response.');
+    const duration = knownNumber(completion?.eval_duration) ? completion.eval_duration / 1e9 : null;
+    const tokens = Number.isSafeInteger(completion?.eval_count) && completion.eval_count >= 0 ? completion.eval_count : null;
+    const measured = {model: requestModel, tokens, first, total: (performance.now() - start) / 1000,
+      rate: duration > 0 && tokens > 0 ? tokens / duration : null};
+    metric('speed', measured.rate === null ? '—' : measured.rate.toFixed(1), 'tokens/s');
+    metric('elapsed', measured.total.toFixed(2), 'seconds');
+    $('measurement-note').textContent = t(`${tokens ?? 0} generated tokens. Speed uses geistd's generation time, including token streaming; first text and total include the local connection and prompt processing. ${benchmark ? 'A short sample, not a general benchmark.' : ''}`);
+    if (turn) { lastReply = measured; turn.metrics.replyMetrics = measured; renderReplyMetrics(turn.metrics); }
     const status = limited ? 'Response limit reached. You can ask Geist to continue.' : output ? '' : 'The model completed without producing text. Try a different prompt.';
     if (turn) {
       turn.status.textContent = t(status);
@@ -356,7 +396,7 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
       turn.copy.disabled = !output;
       scrollLatest();
     }
-    controller = null; buttonStates(); if (state) state.models.forEach(modelCard);
+    controller = null; replyPending = false; buttonStates(); if (state) state.models.forEach(modelCard);
     if (stopped) message('Geist is stopping. Reopen the app to start it again.');
     else await poll();
   }
@@ -378,8 +418,8 @@ $('prompt').addEventListener('compositionend', () => { delete $('prompt').datase
 $('new-chat').addEventListener('click', () => {
   if (controller) return;
   if ((conversation.length || $('result').children.length || $('prompt').value) && !confirm(t('Clear this conversation and draft? They are not saved.'))) return;
-  conversation = []; pendingMarkdown.clear(); $('result').replaceChildren(); $('result').hidden = true; $('chat-empty').hidden = false;
-  $('prompt').value = ''; $('chat-help').open = false; message(''); $('chat-announcement').textContent = t('New chat started.');
+  conversation = []; lastReply = null; pendingMarkdown.clear(); $('result').replaceChildren(); $('result').hidden = true; $('chat-empty').hidden = false;
+  $('prompt').value = ''; $('chat-help').open = false; $('performance').open = false; message(''); $('chat-announcement').textContent = t('New chat started.');
   scrollLatest(true); resizeComposer(); buttonStates(); $('prompt').focus();
 });
 function chooseTask(id) {
@@ -469,6 +509,7 @@ $('language-choice').value = interfaceLanguage;
 $('ui-language').addEventListener('change', async () => {
   interfaceLanguage = $('ui-language').value;
   translateStatic();
+  document.querySelectorAll('.reply-metrics').forEach(renderReplyMetrics);
   document.querySelectorAll('[data-label]').forEach(element => { element.textContent = t(element.dataset.label); });
   if (selectedTask) chooseTask(selectedTask.id);
   updateConnectionHelp();
@@ -488,13 +529,19 @@ async function removeModel(id) {
   finally { requesting = false; await poll(); }
 }
 
-// Dismiss help without losing the user's place in the keyboard sequence.
+// Only one disclosure is open. Escape returns focus; polling never moves it.
+for (const id of ['chat-help', 'performance']) {
+  $(id).addEventListener('toggle', () => {
+    if ($(id).open) $(id === 'chat-help' ? 'performance' : 'chat-help').open = false;
+  });
+}
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && $('chat-help').open) {
-    event.preventDefault(); $('chat-help').open = false;
-    $('chat-help').querySelector('summary').focus({preventScroll: true});
+  if (event.key !== 'Escape') return;
+  for (const id of ['chat-help', 'performance']) if ($(id).open) {
+    event.preventDefault(); $(id).open = false;
+    $(id).querySelector('summary').focus({preventScroll: true});
   }
 });
 document.addEventListener('pointerdown', event => {
-  if (!$('chat-help').contains(event.target)) $('chat-help').open = false;
+  for (const id of ['chat-help', 'performance']) if (!$(id).contains(event.target)) $(id).open = false;
 });

@@ -93,6 +93,8 @@ def main():
             state = app.status()
             assert len(state["models"]) == 6 and state["hardware"]["ram"] > 0
             assert state['runtime'] == 'geistd'
+            assert state['hardware']['os'] and state['hardware']['logical_cpus'] > 0
+            assert state['resources'] == {'scope':'geistd','rss_bytes':None,'cpu_percent':None,'cpu_interval_ms':0}
             assert all("reason" in m and "performance" in m and m['quality'] == 'unverified' and m['fit'] != 0 for m in state["models"])
             assert app.request('/app/tasks', auth=False)[0] == 403
             catalog = json.loads(app.request('/app/tasks')[1])
@@ -150,7 +152,11 @@ def main():
     with tempfile.TemporaryDirectory(prefix="geist-model-") as home:
         app = App(home, model=Path(model), binary=binary)
         try:
-            app.wait(lambda state: state["ready"], timeout=60)
+            loaded = app.wait(lambda state: state["ready"], timeout=60)
+            assert loaded['resources']['rss_bytes'] > 0
+            sampled = app.wait(lambda state: state['resources']['cpu_percent'] is not None)
+            assert 0 <= sampled['resources']['cpu_percent'] <= 100
+            assert 500 <= sampled['resources']['cpu_interval_ms'] <= 10000
             assert app.request("/app/generate", {"prompt":"Hello","experimental":False})[0] == 409
             child = int(subprocess.check_output(['pgrep','-P',str(app.process.pid)],text=True).strip())
             import shlex, stat
@@ -177,7 +183,8 @@ def main():
             assert not app.status()['busy']
             assert app.request("/app/stop", {})[0] == 200
             assert not private.exists() and not private.parent.exists()
-            assert not app.status()["ready"]
+            unloaded = app.status()
+            assert not unloaded['ready'] and unloaded['resources']['rss_bytes'] is None and unloaded['resources']['cpu_percent'] is None
             print("app inference: real streaming, metrics, client abort, restart of generation and unload passed")
         finally:
             app.close()

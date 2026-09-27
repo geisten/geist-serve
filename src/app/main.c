@@ -62,6 +62,7 @@ static const unsigned char markdown_js[] = {
 #endif
 
 #include "version.h"
+#include "resources.h"
 
 #define WORKER_BYTES (256u * 1024u)
 #define REQUEST_CAP 32768u
@@ -749,6 +750,8 @@ static bool begin_job(const struct app_model *m, bool download) {
     return true;
 }
 
+static struct app_resource_window resource_window; /* protected by app.mutex */
+
 static void status_response(int fd, struct app_arena *arena) {
     char *body = app_alloc(arena, 65536, 1, 1);
     if (!body) {
@@ -782,6 +785,9 @@ static void status_response(int fd, struct app_arena *arena) {
     app_quote(&b, h.name);
     app_put(&b, ",\"arch\":");
     app_quote(&b, h.arch);
+    app_put(&b, ",\"os\":");
+    app_quote(&b, h.os);
+    app_printf(&b, ",\"logical_cpus\":%u", h.logical_cpus);
     app_put(&b, ",\"device\":");
     app_quote(&b,
               h.device == APP_APPLE_SILICON ? "apple-silicon"
@@ -797,6 +803,16 @@ static void status_response(int fd, struct app_arena *arena) {
                known ? "true" : "false",
                h.disk_known ? "true" : "false",
                h.available_known ? "true" : "false");
+    struct app_process_sample sample;
+    bool sampled = app.child > 0 && app_process_read(app.child, &sample);
+    app_resource_update(&resource_window, sampled ? &sample : nullptr, h.logical_cpus);
+    app_put(&b, "\"resources\":{\"scope\":\"geistd\",\"rss_bytes\":");
+    if (sampled) app_printf(&b, "%llu", (unsigned long long) sample.rss);
+    else app_put(&b, "null");
+    app_put(&b, ",\"cpu_percent\":");
+    if (resource_window.cpu_known) app_printf(&b, "%.2f", resource_window.cpu_percent);
+    else app_put(&b, "null");
+    app_printf(&b, ",\"cpu_interval_ms\":%.0f},", resource_window.interval_ms);
     app_put(&b, "\"runtime\":\"geistd\",\"active\":");
     app_quote(&b, app.active);
     app_put(&b, ",\"active_id\":");
