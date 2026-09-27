@@ -1,6 +1,7 @@
 'use strict';
 let interfaceLanguage = (window.geistLanguage || (() => { try { return localStorage.getItem('geist-language'); } catch { return null; } })() || navigator.language).startsWith('de') ? 'de' : 'en';
 const german = {
+  'Your models. Your computer.': 'Deine Modelle. Dein Rechner.', 'Quality and speed': 'Qualität und Geschwindigkeit',
   'Skip to content': 'Zum Inhalt', 'Interface': 'Oberfläche', 'Interface language': 'Sprache der Oberfläche', 'Setup': 'Einrichtung',
   '1. Models': '1. Modelle', '2. Test': '2. Testen', '3. Connect': '3. Verbinden',
   'Make room for your ideas.': 'Platz für deine Ideen.',

@@ -57,7 +57,7 @@ function modelCard(model) {
   if (!card) {
     card = document.createElement('article'); card.className = 'model'; card.dataset.id = model.id;
     // This template is static. Model metadata and output always use textContent.
-    card.innerHTML = '<h3></h3><span class="fit"></span><p class="specs"></p><p class="reason"></p><p class="performance"></p><p class="quality"></p><button type="button"></button><button class="remove" type="button"></button>';
+    card.innerHTML = '<h3></h3><span class="fit"></span><p class="specs"></p><p class="reason"></p><details class="model-evidence"><summary></summary><p class="performance"></p><p class="quality"></p></details><button type="button"></button><button class="remove" type="button"></button>';
     card.querySelector('button').addEventListener('click', () => choose(model.id));
     card.querySelector('.remove').addEventListener('click', () => removeModel(model.id));
     cards.set(model.id, card); $('models').append(card);
@@ -71,6 +71,7 @@ function modelCard(model) {
   card.querySelector('h3').textContent = model.name;
   const fit = card.querySelector('.fit'); fit.textContent = t(badge);
   fit.className = `fit ${['', 'conditional', 'unavailable'][fitValue]}`;
+  card.querySelector('summary').textContent = t('Quality and speed');
   card.querySelector('.specs').textContent = t(`${bytes(model.bytes)} download · ${model.ram_gib} GiB RAM guidance`);
   card.querySelector('.reason').textContent = t(`Resources: ${model.reason}`);
   card.querySelector('.quality').textContent = t(evidence ? `Task quality: ${evidence.quality} · ${evidence.cases} test cases · ${evidence.language.toUpperCase()}. ${evidence.human_complete ? 'Human sample complete.' : 'Human assessment pending.'}` : 'Task quality: unverified for this task, language and device.');
