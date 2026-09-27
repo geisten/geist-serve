@@ -15,8 +15,23 @@ Mac release still needs Developer ID signing and notarization.
 Open the Geist DMG, drag Geist to Applications, and open its desktop window.
 Read the short preview notice and choose **Set up and start**. Geist downloads,
 verifies and starts one suggested model. The input becomes available when the
-local service is ready. Ordinary typing is freeform; optional Rewrite,
-Summarize and Ideas presets change instructions without switching models.
+local service is ready. Press **Enter** to send and **Shift + Enter** for a new line. The arrow sends
+with a pointer or touch; the stop button preserves a partial response. Follow-up
+messages include the visible conversation from this window. **Tips** offers
+examples for rewriting, summarizing and ideas; there is no task-mode selector.
+
+The transcript scrolls independently above the composer. New output follows only
+while you are reading the latest message. Long drafts scroll without being cut.
+**New chat** asks before clearing the conversation and draft. Reloading or quitting
+clears the page memory; nothing is saved as chat history. Closing and reopening a
+hidden desktop window can retain that window's memory until the app quits.
+
+A chat response can use up to 1,024 output tokens within the shared 4,096-token
+context. A limited answer is marked and offers **Continue response**. Context or
+request limits produce an explicit error; no earlier turns are silently dropped.
+Failed requests keep the draft; stopped partial answers remain in context. Session
+chat requires preview consent: single-task evidence does not certify follow-ups.
+Quick speed tests remain independent of the conversation.
 
 **Customize** contains manual model selection, independent interface/answer
 languages, hardware details, measurements and service controls. **Connect**

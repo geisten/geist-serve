@@ -29,6 +29,7 @@ test-app: build/geist-app-old build/geist-app-new build/geist-app-legacy geist-a
 	python3 tests/app/remove_test.py
 	python3 tests/app/setup_test.py
 	python3 tests/app/compat_test.py
+	python3 tests/app/chat_test.py
 	python3 tests/app/cli_test.py
 	GEIST_OLD_APP="$(CURDIR)/build/geist-app-old" GEIST_NEW_APP="$(CURDIR)/build/geist-app-new" GEIST_LEGACY_APP="$(CURDIR)/build/geist-app-legacy" python3 tests/app/upgrade_test.py
 

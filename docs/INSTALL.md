@@ -9,7 +9,8 @@ loaded geistd. No model is included; choose Set up and start on first use.
 Drag Geist.app from the DMG to Applications and open it. Geist opens its own
 desktop window. Read the preview notice and choose **Set up and start**. A
 platform check suggests one model, including a smaller fallback when needed.
-Once ready, type a request or choose Rewrite, Summarize or Ideas. Optional
+Once ready, type a message and press Enter. Shift + Enter inserts a new line.
+Follow-up questions use this window’s conversation; Tips provides examples. Optional
 models, languages and measurements live in **Customize**. The bundled
 terminal client is `/Applications/Geist.app/Contents/MacOS/geist-cli`.
 Use its full path, or link it as `geist` in a directory on your PATH. Start at Login is

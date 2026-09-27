@@ -93,7 +93,7 @@ while (walker.nextNode()) {
   const node = walker.currentNode;
   if (node.textContent.trim() && !['SCRIPT', 'STYLE'].includes(node.parentElement.tagName)) staticTexts.push([node, node.textContent]);
 }
-for (const node of document.querySelectorAll('[aria-label], [placeholder]')) for (const attr of ['aria-label', 'placeholder']) if (node.hasAttribute(attr)) staticAttributes.push([node, attr, node.getAttribute(attr)]);
+for (const node of document.querySelectorAll('[aria-label], [placeholder]')) for (const attr of ['aria-label', 'placeholder', 'title']) if (node.hasAttribute(attr)) staticAttributes.push([node, attr, node.getAttribute(attr)]);
 function translateStatic() {
   document.documentElement.lang = interfaceLanguage;
   for (const [node, original] of staticTexts) if (node.isConnected) node.textContent = original.replace(original.trim(), t(original.trim()));
@@ -180,5 +180,36 @@ Object.assign(german, {
   'The platform check changed. Review the setup suggestion and retry.': 'Die Plattformprüfung hat sich geändert. Prüfe den Vorschlag und starte erneut.',
   'Choose English or German.': 'Wähle Englisch oder Deutsch.', 'Cannot save language preference.': 'Die Sprache konnte nicht gespeichert werden.',
   'Preview consent must be explicit.': 'Die Vorschau muss ausdrücklich bestätigt werden.', 'Cannot save preview consent.': 'Die Vorschau-Bestätigung konnte nicht gespeichert werden.'
+});
+Object.assign(german, {
+  "Chat": "Chat",
+  "New chat": "Neuer Chat",
+  "Conversation": "Gespräch",
+  "You": "Du",
+  "What would you like to explore?": "Was beschäftigt dich?",
+  "Ask a question, improve a text or work through an idea.": "Stelle eine Frage, überarbeite einen Text oder entwickle eine Idee.",
+  "Message Geist…": "Schreibe Geist…",
+  "Send message": "Nachricht senden",
+  "Stop response": "Antwort stoppen",
+  "Tips": "Tipps",
+  "What can I ask?": "Was kann ich fragen?",
+  "Just describe what you need. No mode to choose.": "Beschreibe einfach, was du brauchst. Du musst keinen Modus wählen.",
+  "Rewrite this email in a friendlier tone: …": "Formuliere diese E-Mail freundlicher: …",
+  "Summarize this text in three points: …": "Fasse diesen Text in drei Punkten zusammen: …",
+  "Suggest three ideas for …": "Schlage drei Ideen vor für …",
+  "This conversation stays in this window. New chat, reloading or quitting clears it. Check answers before using them.": "Das Gespräch bleibt in diesem Fenster. Neuer Chat, Neuladen oder Beenden löscht es. Prüfe Antworten vor der Verwendung.",
+  "Enter to send · Shift + Enter for a new line": "Enter zum Senden · Shift + Enter für einen Zeilenumbruch",
+  "↓ Latest message": "↓ Neueste Nachricht",
+  "Your message is too long. Shorten it before sending; your draft has been kept.": "Deine Nachricht ist zu lang. Kürze sie vor dem Senden; der Entwurf bleibt erhalten.",
+  "This conversation is full. Start a new chat to continue. The existing text has been kept.": "Dieses Gespräch ist voll. Starte einen neuen Chat. Der bisherige Text bleibt erhalten.",
+  "Response limit reached. You can ask Geist to continue.": "Antwortlimit erreicht. Du kannst Geist bitten, fortzufahren.",
+  "Continue response": "Antwort fortsetzen",
+  "Continue from where you stopped.": "Fahre dort fort, wo du aufgehört hast.",
+  "Continue from the latest reply, or ask a new question.": "Setze die neueste Antwort fort oder stelle eine neue Frage.",
+  "Response complete.": "Antwort vollständig.",
+  "This conversation does not fit the model’s context. Shorten your draft or start a new chat. No earlier messages have been removed.": "Dieses Gespräch passt nicht mehr in den Kontext des Modells. Kürze deinen Entwurf oder starte einen neuen Chat. Frühere Nachrichten wurden nicht entfernt.",
+  "Clear this conversation and draft? They are not saved.": "Gespräch und Entwurf löschen? Sie werden nicht gespeichert.",
+  "New chat started.": "Neuer Chat gestartet.",
+  "The loaded model changed. Check the model and send again.": "Das geladene Modell hat sich geändert. Prüfe es und sende erneut."
 });
 translateStatic();

@@ -9,7 +9,7 @@
 <a class="skip" href="#main">Skip to content</a>
 <header><a class="brand" href="#" aria-label="Geist home">geist<span class="local">Runs here. Stays here.</span></a>
 <nav aria-label="Navigation">
-<button data-page="test-page" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/></svg><span>Try it</span></button>
+<button data-page="test-page" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/></svg><span>Chat</span></button>
 <button data-page="connect-page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 13 4-4m-7 6-1 1a4 4 0 0 0 6 6l4-4m1-9 1-1a4 4 0 0 0-6-6L8 6"/></svg><span>Connect</span></button>
 <button data-page="models-page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h7m4 0h5M4 17h3m4 0h9M11 4v6M7 14v6"/></svg><span>Customize</span></button>
 </nav></header>
@@ -35,18 +35,20 @@
     <button id="cancel-download" class="text-button" type="button">Pause download</button>
   </div>
   <div id="workspace" hidden>
-    <div class="section-heading"><h2 id="task-title">What would you like to try?</h2><span id="runtime-state" class="state">Ready on this device</span></div>
-    <div class="chips" role="group" aria-label="Optional tasks">
-      <button data-task="rewrite" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 16-1 4 4-1L20 7l-3-3ZM14 7l3 3"/></svg><span>Rewrite</span></button>
-      <button data-task="summary" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h10M5 18h6"/></svg><span>Summarize</span></button>
-      <button data-task="ideas" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/></svg><span>Ideas</span></button>
+    <div class="chat-heading"><div><h2 id="task-title">Chat</h2><span id="runtime-state" class="state">Ready on this device</span></div><button id="new-chat" class="text-button" type="button" aria-label="New chat" title="New chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>New chat</span></button></div>
+    <div id="transcript" tabindex="0" role="region" aria-label="Conversation">
+      <div id="chat-empty"><h3>What would you like to explore?</h3><p>Ask a question, improve a text or work through an idea.</p></div>
+      <div id="result" hidden></div>
     </div>
-    <form id="task-form"><label class="sr-only" for="prompt">Your input</label>
-      <textarea id="prompt" rows="5" maxlength="12000" placeholder="Write here…" required></textarea>
-      <div class="actions"><button id="use-example" class="text-button" type="button">Use an example</button><span class="spacer"></span><button id="stop" type="button" hidden>Stop</button><button id="run" class="primary" type="submit" disabled>Run locally</button></div>
-      <p class="hint">Each request starts fresh. ⌘ / Ctrl + Enter to send.</p>
-    </form>
-    <section id="result" class="result" aria-labelledby="result-title" hidden><div class="section-heading"><h3 id="result-title">Your result</h3><button id="copy" type="button" disabled>Copy</button></div><div id="output" aria-live="off"></div></section>
+    <div class="composer-area">
+      <button id="latest" class="text-button" type="button" hidden>↓ Latest message</button>
+      <form id="task-form"><label class="sr-only" for="prompt">Your input</label>
+        <textarea id="prompt" rows="1" placeholder="Message Geist…" aria-describedby="composer-hint"></textarea>
+        <div class="actions"><details id="chat-help"><summary aria-label="What can I ask?" title="What can I ask?"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.01"/></svg><span>Tips</span></summary><div class="help-content"><p>Just describe what you need. No mode to choose.</p><ul><li>Rewrite this email in a friendlier tone: …</li><li>Summarize this text in three points: …</li><li>Suggest three ideas for …</li></ul><p>This conversation stays in this window. New chat, reloading or quitting clears it. Check answers before using them.</p></div></details><span class="spacer"></span><button id="stop" class="icon-button" type="button" aria-label="Stop response" title="Stop response" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button><button id="run" class="primary icon-button" type="submit" disabled aria-label="Send message" title="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button></div>
+      </form>
+      <p id="composer-hint" class="hint">Enter to send · Shift + Enter for a new line</p>
+    </div>
+    <p id="chat-announcement" class="sr-only" role="status" aria-live="polite"></p>
   </div>
 </section>
 <p id="notice" role="status" aria-live="polite"></p>
@@ -65,7 +67,7 @@
   <div class="settings-row"><label for="language-choice">Answer language</label><select id="language-choice"><option value="en">English</option><option value="de">Deutsch</option></select></div>
   <details class="settings"><summary>Model</summary><p id="active-model" class="muted"></p><p id="recommendation-reason" class="hint"></p><div id="models" aria-label="Available models"></div></details>
   <details class="settings"><summary>This computer</summary><h3 id="device-name"></h3><p id="device-specs"></p><p id="disk-space" class="muted"></p><p class="hint">Memory figures are planning estimates. A recommendation needs evidence for the model, task, language and device. Speed alone does not establish answer quality.</p><p class="hint">Downloads come from Hugging Face after you choose a model. Each completed download is verified with SHA-256. No account is needed.</p></details>
-  <details class="settings"><summary>Measurements</summary><div class="metrics"><div><span>Generation speed</span><strong id="speed">—</strong></div><div><span>First text</span><strong id="first-token">—</strong></div><div><span>Total time</span><strong id="elapsed">—</strong></div></div><p id="measurement-note" class="hint">Measurements appear after a run.</p><button id="benchmark" type="button" disabled>Quick speed test</button></details>
+  <details class="settings"><summary>Measurements</summary><div class="metrics"><div><span>Generation speed</span><strong id="speed">—</strong></div><div><span>First text</span><strong id="first-token">—</strong></div><div><span>Total time</span><strong id="elapsed">—</strong></div></div><p id="measurement-note" class="hint">Measurements appear after a run.</p><button id="benchmark" type="button" disabled>Quick speed test</button><div id="benchmark-output" class="message-text" hidden></div></details>
   <details class="settings"><summary>Service</summary><p class="hint">Your editor and this window use the same model. Closing the window keeps the service running.</p><div class="actions"><button id="unload" type="button" disabled>Unload model</button><button id="quit" type="button">Stop model service</button></div></details>
 </section>
 <footer>Models stay on this computer. Prompts and results are not saved as chat history.</footer>

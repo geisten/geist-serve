@@ -75,7 +75,7 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
         wait_js(desktop.view, "document.documentElement.lang === 'de'")
         spin(lambda: desktop.preferences.exists())
         assert json.loads(desktop.preferences.read_text())['language'] == 'de'
-        assert evaluate(desktop.view, "document.getElementById('task-title').textContent") == 'Was möchtest du ausprobieren?'
+        assert evaluate(desktop.view, "document.getElementById('task-title').textContent") == 'Chat'
         evaluate(desktop.view, "document.querySelector('[data-page=\"test-page\"]').click(); document.getElementById('prompt').value='Keep my input'; document.getElementById('ui-language').value='en'; document.getElementById('ui-language').dispatchEvent(new Event('change')); true")
         assert evaluate(desktop.view, "document.getElementById('prompt').value") == 'Keep my input'
         evaluate(desktop.view, "window.copyDone=false; copyText('Geist desktop clipboard test').then(() => window.copyDone=true); true")
@@ -96,10 +96,9 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
             evaluate(desktop.view, "document.getElementById('setup-start').click(); true")
             wait_js(desktop.view, "state?.ready === true && !document.getElementById('workspace').hidden", timeout=60)
             assert evaluate(desktop.view, "state.active_id === 'smollm2-360m' && state.models.find(m=>m.id===state.active_id).preview_accepted")
-            evaluate(desktop.view, "document.querySelector('[data-task=ideas]').click(); true")
-            assert evaluate(desktop.view, "selectedTask.id === 'ideas' && state.active_id === 'smollm2-360m' && !state.busy")
-            evaluate(desktop.view, "document.querySelector('[data-task=ideas]').click(); true")
-            assert evaluate(desktop.view, "selectedTask.id === 'freeform' && document.getElementById('run').getBoundingClientRect().bottom < innerHeight")
+            evaluate(desktop.view, (ROOT / 'tests/desktop/chat_checks.js').read_text())
+            wait_js(desktop.view, "window.chatChecksDone || !!window.chatChecksError")
+            assert evaluate(desktop.view, 'window.chatChecksError') is None
             evaluate(desktop.view, "document.getElementById('prompt').value='Say hello in one sentence.'; document.getElementById('task-form').requestSubmit(); true")
             wait_js(desktop.view, "document.getElementById('output').textContent.length > 0 && controller === null", timeout=90)
             assert '—' not in evaluate(desktop.view, "document.getElementById('speed').textContent")
@@ -125,9 +124,9 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
         wait_js(desktop.view, "document.querySelectorAll('.model').length === 6")
         wait_js(desktop.view, "document.documentElement.lang === 'de' && document.getElementById('language-choice').value === 'de'")
         if model:
-            wait_js(desktop.view, "state?.ready && !document.getElementById('workspace').hidden && !document.getElementById('run').disabled", timeout=60)
+            wait_js(desktop.view, "state?.ready && !document.getElementById('workspace').hidden && document.getElementById('run').disabled", timeout=60)
             assert evaluate(desktop.view, "document.getElementById('prompt').value === ''")
-        print('GTK/WebKit: real local UI, one-click setup, persistent preview consent, task chips without model switching, DE/EN, preferences, clipboard, navigation restrictions, resize, reactivation, shared-service reuse and stop/reconnect passed')
+        print('GTK/WebKit: real local UI, one-click setup, persistent preview consent, session chat, Enter/Shift-Enter/IME, long text, scrolling and stream errors, DE/EN, preferences, clipboard, navigation restrictions, resize, reactivation, shared-service reuse and stop/reconnect passed')
     finally:
         desktop.shutdown(desktop)
         if desktop.window: desktop.window.destroy()

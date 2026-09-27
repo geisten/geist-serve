@@ -808,10 +808,10 @@ static void status_response(int fd, struct app_arena *arena) {
                app.child && !app.ready ? "true" : "false",
                app.job_running || app.generating ? "true" : "false");
     for (size_t i = 0; i < APP_MODEL_COUNT; ++i) {
-        const struct app_model *m = &app_models[i];
+        const struct app_model *m         = &app_models[i];
         bool                    installed = inventory[i].installed;
         uint64_t                partial   = inventory[i].partial;
-        struct app_hardware adjusted = h;
+        struct app_hardware     adjusted  = h;
         if (partial <= m->bytes && h.disk_known && UINT64_MAX - adjusted.disk > partial)
             adjusted.disk += partial;
         struct app_assessment a =
@@ -934,6 +934,41 @@ static void generate(int fd, struct request *r, struct app_arena *arena) {
         error_response(fd, 400, "Choose English or German for this task.");
         return;
     }
+    /* Session chat is explicit: task/benchmark requests keep their pinned
+     * instructions and limits. Reuse the bounded client-message parser. */
+    struct app_chat chat;
+    bool            conversation = json_get(json, 0, "messages") >= 0;
+    if (conversation) {
+        const char *why;
+        int         code = app_chat_parse(arena, r->body, &chat, &why);
+        if (!code && (strcmp(task->id, "freeform") ||
+                      json_bool(json, json_get(json, 0, "benchmark"), false) ||
+                      chat.count >= APP_CHAT_MESSAGES || !(chat.count % 2))) {
+            code = 400;
+            why  = "Use alternating user and assistant messages ending with the current input.";
+        }
+        for (size_t i = 0; !code && i < chat.count; ++i) {
+            if (strcmp(chat.messages[i].role, i % 2 ? "assistant" : "user") ||
+                !chat.messages[i].content[0]) {
+                code = 400;
+                why  = "Use alternating nonempty user and assistant messages.";
+            }
+        }
+        if (!code && strcmp(chat.messages[chat.count - 1].content, prompt)) {
+            code = 400;
+            why  = "The final message must match the current input.";
+        }
+        if (code) {
+            free(prompt);
+            error_response(fd, code, why);
+            return;
+        }
+        memmove(chat.messages + 1, chat.messages, chat.count * sizeof *chat.messages);
+        chat.messages[0] = (struct chat_msg) {
+                .role    = "system",
+                .content = !strcmp(language, "de") ? "Answer in German." : "Answer in English."};
+        chat.count++;
+    }
     size_t composed_cap = length + strlen(task->instruction) + 128;
     char  *composed     = app_alloc(arena, composed_cap, 1, 1);
     if (!composed) {
@@ -955,13 +990,20 @@ static void generate(int fd, struct request *r, struct app_arena *arena) {
         error_response(fd, 409, "Wait until the model is ready and idle.");
         return;
     }
+    if (conversation && strcmp(chat.model, app.active_id)) {
+        pthread_mutex_unlock(&app.mutex);
+        free(prompt);
+        error_response(fd, 409, "The loaded model changed. Check the model and send again.");
+        return;
+    }
     struct app_hardware hardware;
     bool                hardware_known = app_hardware_read(&hardware, app.models);
     enum app_quality    quality = app_task_quality(app_model_find(app.active_id),
                                                    task,
                                                    language,
                                                    hardware_known ? hardware.device : APP_UNKNOWN);
-    if (quality != APP_QUALITY_PASSED &&
+    /* Single-task quality evidence does not certify multi-turn conversation. */
+    if ((conversation || quality != APP_QUALITY_PASSED) &&
         !json_bool(json, json_get(json, 0, "experimental"), false)) {
         pthread_mutex_unlock(&app.mutex);
         free(prompt);
@@ -981,14 +1023,25 @@ static void generate(int fd, struct request *r, struct app_arena *arena) {
     struct proxy         proxy = {.fd = fd, .start = monotonic_ms()};
     struct app_run_stats stats;
     char                 error[256];
-    int                  rc = app_daemon_run(app.socket_path,
-                                             composed,
-                                             benchmark ? 64 : task->output_limit,
-                                             proxy_emit,
-                                             proxy_cancel,
-                                             &proxy,
-                                             &stats,
-                                             error);
+    int                  rc = conversation ? app_daemon_chat(app.socket_path,
+                                                             chat.count,
+                                                             chat.messages,
+                                                             chat.max_tokens,
+                                                             chat.temperature,
+                                                             chat.top_p,
+                                                             proxy_emit,
+                                                             proxy_cancel,
+                                                             &proxy,
+                                                             &stats,
+                                                             error)
+                                           : app_daemon_run(app.socket_path,
+                                                            composed,
+                                                            benchmark ? 64 : task->output_limit,
+                                                            proxy_emit,
+                                                            proxy_cancel,
+                                                            &proxy,
+                                                            &stats,
+                                                            error);
     free(prompt);
     if (proxy.utf8.used || proxy.utf8.failed) {
         rc = 502;
@@ -1349,8 +1402,8 @@ static void handle(int fd, struct app_arena *arena) {
     bool setup       = strcmp(r.path, "/app/setup") == 0;
     bool preview     = strcmp(r.path, "/app/preview") == 0;
     bool preferences = strcmp(r.path, "/app/preferences") == 0;
-    bool download = strcmp(r.path, "/app/download") == 0;
-    bool remove   = strcmp(r.path, "/app/remove") == 0;
+    bool download    = strcmp(r.path, "/app/download") == 0;
+    bool remove      = strcmp(r.path, "/app/remove") == 0;
     if (!setup && !preview && !preferences && !download && !remove &&
         strcmp(r.path, "/app/select") != 0) {
         error_response(fd, 404, "Unknown action.");
