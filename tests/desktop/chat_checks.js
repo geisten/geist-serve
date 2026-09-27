@@ -91,6 +91,8 @@ window.chatChecksError = null;
     assert($('chat-memory').textContent === '1.0 GiB RAM' && $('performance-cpu').textContent === '0.0 %', 'real zero CPU differs from unknown');
     state = {...savedState, resources:{scope:'geistd', rss_bytes:null, cpu_percent:null}}; renderPerformance();
     assert($('chat-memory').textContent === '— RAM' && $('performance-cpu').textContent === '—', 'unknown resource counters are not zero');
+    state = {...savedState, hardware:{...savedState.hardware, known:false, ram:0}}; renderPerformance();
+    assert($('performance-ram').textContent === '—', 'failed system memory read is unknown, not zero');
     state = {...savedState, active:'another model'}; renderPerformance();
     assert(lastReply === null && $('performance-tokens').textContent === '—', 'model change invalidates last reply metrics');
     state = savedState; lastReply = measuredReply; renderPerformance();

@@ -114,7 +114,7 @@ function renderPerformance() {
   $('performance-os').textContent = h ? [h.os, h.arch, h.logical_cpus ? `${h.logical_cpus} ${t('logical CPUs')}` : null].filter(Boolean).join(' · ') : '—';
   $('performance-rss').textContent = rss === null ? '—' : gib(rss);
   $('performance-cpu').textContent = cpu === null ? '—' : `${cpu.toFixed(1)} %`;
-  $('performance-ram').textContent = knownNumber(h?.ram) ? gib(h.ram) : '—';
+  $('performance-ram').textContent = h?.known && knownNumber(h.ram) ? gib(h.ram) : '—';
   $('performance-available').textContent = h?.available_known && knownNumber(h.available) ? gib(h.available) : '—';
   $('performance-speed').textContent = rateText(lastReply?.rate);
   $('performance-tokens').textContent = knownNumber(lastReply?.tokens) ? String(lastReply.tokens) : '—';
