@@ -84,7 +84,7 @@ function modelCard(model) {
   const remove = card.querySelector('.remove');
   remove.textContent = t('Remove download');
   remove.hidden = !model.installed && !model.partial;
-  remove.disabled = active || state.busy || requesting || !!controller;
+  remove.disabled = (state.active_id === model.id && (state.ready || state.loading)) || state.busy || requesting || !!controller;
   remove.setAttribute('aria-label', `${t('Remove download')}: ${model.name}`);
   button.setAttribute('aria-label', `${button.textContent}: ${model.name}. ${t(model.reason)}`);
 }
@@ -309,7 +309,7 @@ $('ui-language').addEventListener('change', async () => {
 });
 async function removeModel(id) {
   const model = state?.models.find(item => item.id === id);
-  if (!model || requesting || controller || state.busy || state.active_id === id) return;
+  if (!model || requesting || controller || state.busy || (state.active_id === id && (state.ready || state.loading))) return;
   if (!confirm(t(`Remove ${model.name} from this computer? You can download it again later.`))) return;
   requesting = true; buttonStates(); state.models.forEach(modelCard);
   try { await api('/app/remove', {id}); message('', false); }

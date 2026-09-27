@@ -203,6 +203,11 @@ def main():
                 assert app.request('/app/select', {'id':'smollm2-360m'})[0] == 202
                 app.wait(lambda state: state['ready'],timeout=60)
                 assert app.request('/app/generate',{'experimental': True, 'prompt':'Say hello.'})[0] == 200
+                child = int(subprocess.check_output(['pgrep','-P',str(app.process.pid)],text=True).strip())
+                os.kill(child, signal.SIGKILL)
+                app.wait(lambda state: not state['ready'] and not state['loading'])
+                assert app.request('/app/remove', {'id':'smollm2-360m'})[0] == 200
+                assert not (directory / 'smollm2-360m-instruct-q8_0.gguf').exists()
                 assert app.request("/app/quit", {})[0] == 202
                 app.process.wait(timeout=15)
                 print("app advice: verified catalog model, actual measured speed and clean quit passed")
