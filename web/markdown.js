@@ -16,6 +16,7 @@ const chatMarkdown = (() => {
   function copyButton(value, label) {
     const button = element('button', 'markdown-copy');
     button.type = 'button'; button._markdownCopyText = value;
+    button.dataset.uiTitle = button.dataset.uiLabel = label;
     button.title = button.ariaLabel = t(label);
     const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     icon.setAttribute('viewBox', '0 0 24 24'); icon.setAttribute('aria-hidden', 'true');
@@ -43,7 +44,7 @@ const chatMarkdown = (() => {
           const toolbar = element('div', 'code-toolbar');
           const label = element('span'); label.textContent = token.lang?.split(/\s/)[0] || t('Code');
           toolbar.append(label, copyButton(token.text, 'Copy code'));
-          const pre = element('pre'); pre.tabIndex = 0; pre.ariaLabel = t('Code');
+          const pre = element('pre'); pre.tabIndex = 0; pre.dataset.uiLabel = 'Code'; pre.ariaLabel = t('Code');
           const code = element('code'); code.textContent = token.text; pre.append(code);
           node.append(toolbar, pre); parent.append(node); continue;
         }
@@ -56,11 +57,11 @@ const chatMarkdown = (() => {
           parent.append(node); continue;
         case 'checkbox':
           node = element('span', 'task-check'); node.textContent = token.checked ? '☑ ' : '☐ ';
-          node.setAttribute('role', 'img'); node.ariaLabel = t(token.checked ? 'Checked' : 'Unchecked');
+          node.setAttribute('role', 'img'); node.dataset.uiLabel = token.checked ? 'Checked' : 'Unchecked'; node.ariaLabel = t(node.dataset.uiLabel);
           parent.append(node); continue;
         case 'table': {
           node = element('div', 'table-scroll'); node.tabIndex = 0;
-          node.setAttribute('role', 'region'); node.ariaLabel = t('Table');
+          node.setAttribute('role', 'region'); node.dataset.uiLabel = 'Table'; node.ariaLabel = t('Table');
           const table = element('table'), head = element('thead'), body = element('tbody');
           const row = (cells, header) => {
             const tr = element('tr');
@@ -78,7 +79,10 @@ const chatMarkdown = (() => {
         }
         case 'link': case 'image': {
           node = element('span', 'markdown-reference');
-          if (token.type === 'image') node.append(`${t('Image')}: ${entities(token.text || '')}`);
+          if (token.type === 'image') {
+            const label = element('span'); label.dataset.uiText = 'Image'; label.textContent = t('Image');
+            node.append(label, `: ${entities(token.text || '')}`);
+          }
           else tokensInto(node, token.tokens, depth + 1);
           // Display/copy addresses, never navigate or fetch model-provided URLs.
           // The native shell's external-navigation allowlist stays unchanged.
@@ -148,7 +152,7 @@ document.addEventListener('click', async event => {
   if (!button) return;
   try {
     await copyText(button._markdownCopyText);
-    document.getElementById('chat-announcement').textContent = t('Copied');
-    button.title = t('Copied');
+    uiText(document.getElementById('chat-announcement'), 'Copied');
+    button.dataset.uiTitle = 'Copied'; button.title = t('Copied');
   } catch { message('Copy is unavailable here. Select the result and copy it manually.'); }
 });

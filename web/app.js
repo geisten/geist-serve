@@ -586,6 +586,8 @@ $('ui-language').addEventListener('change', async () => {
   interfaceLanguage = resolveLanguage(interfacePreference, systemLanguage);
   if (!state?.answer_language) $('language-choice').value = interfaceLanguage;
   translateStatic();
+  document.querySelectorAll('[data-ui-label]').forEach(element => element.setAttribute('aria-label', t(element.dataset.uiLabel)));
+  document.querySelectorAll('[data-ui-title]').forEach(element => { element.title = t(element.dataset.uiTitle); });
   document.querySelectorAll('[data-ui-text]').forEach(element => { element.textContent = t(element.dataset.uiText); });
   document.querySelectorAll('.chat-message.user').forEach(element => element.setAttribute('aria-label', t('You')));
   document.querySelectorAll('.reply-metrics').forEach(renderReplyMetrics);
