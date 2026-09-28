@@ -113,7 +113,8 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
             assert evaluate(desktop.view, "state.active_id === 'smollm2-360m' && state.models.find(m=>m.id===state.active_id).preview_accepted")
             evaluate(desktop.view, (ROOT / 'tests/desktop/chat_checks.js').read_text())
             wait_js(desktop.view, "window.chatChecksDone || !!window.chatChecksError")
-            assert evaluate(desktop.view, 'window.chatChecksError') is None
+            chat_error = evaluate(desktop.view, 'window.chatChecksError')
+            assert chat_error is None, chat_error
             evaluate(desktop.view, "document.getElementById('prompt').value='Say hello in one sentence.'; document.getElementById('task-form').requestSubmit(); true")
             wait_js(desktop.view, "document.getElementById('output').textContent.length > 0 && controller === null", timeout=90)
             assert '—' not in evaluate(desktop.view, "document.getElementById('speed').textContent")

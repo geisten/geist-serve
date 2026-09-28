@@ -86,7 +86,8 @@ window.chatChecksStage = 'locale';
     };
     const resetFixture = () => {
       fixture = JSON.parse(JSON.stringify(realState));
-      Object.assign(fixtureModel(), {installed:false, partial:0, preview_accepted:false});
+      // This is a controlled suitability fixture, independent of runner RAM.
+      Object.assign(fixtureModel(), {installed:false, partial:0, preview_accepted:false, resource_fit:0});
       modelCalls = []; render(JSON.parse(JSON.stringify(fixture)));
     };
     try {
