@@ -15,6 +15,10 @@ const formatNumber = (value, digits = 0) => new Intl.NumberFormat(interfaceLangu
   minimumFractionDigits: digits, maximumFractionDigits: digits
 }).format(value);
 const german = {
+  'Text chat': 'Textchat',
+  'Fits this computer': 'Für diesen Rechner geeignet',
+  'Unavailable on this computer': 'Auf diesem Rechner nicht ausführbar',
+  'Speech recognition': 'Spracherkennung', 'Image understanding': 'Bildverständnis',
   'Execution': 'Ausführung', 'Storage': 'Speicher',
   'CPU · bundled engine': 'CPU · mitgelieferte Engine',
   'GPU selection is not available in this app version.': 'GPU-Auswahl ist in dieser App-Version noch nicht verfügbar.',

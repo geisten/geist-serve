@@ -180,7 +180,7 @@ function buttonStates() {
   $('language-choice').disabled = !!controller;
 }
 
-const ringMarkup = '<svg viewBox="0 0 36 36" aria-hidden="true"><circle class="ring-track" cx="18" cy="18" r="14"/><circle class="ring-fill" cx="18" cy="18" r="14" pathLength="100"/><path class="ring-check" d="m12 18 4 4 8-8"/></svg>';
+const ringMarkup = '<svg viewBox="0 0 36 36" aria-hidden="true"><circle class="ring-track" cx="18" cy="18" r="14"/><circle class="ring-fill" cx="18" cy="18" r="14" pathLength="100"/><path class="ring-check" d="m12 18 4 4 8-8"/><path class="ring-download" d="M18 7v16m-6-6 6 6 6-6M8 25v4h20v-4"/><path class="ring-pause" d="M15 13v10m6-10v10"/><path class="ring-resume" d="m15 12 9 6-9 6z"/></svg>';
 function downloadState(model, current = state) {
   const total = Math.max(0, model?.bytes || 0);
   const transferring = current?.job_model === model?.id && !!current?.phase;
@@ -210,12 +210,35 @@ function renderRing(element, model, current = state) {
   return status;
 }
 
-const modelIcons = {
-  download: '<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>',
-  start: '<path d="m8 4 12 8-12 8z"/>',
-  pause: '<path d="M8 5v14M16 5v14"/>',
-  active: '<path d="m5 12 4 4L19 6"/>'
+// These are application capabilities, not claims about the model architecture.
+const capabilityIcons = {
+  chat: {label:'Text chat', path:'<path d="M4 4h16v12H9l-5 4z"/><path d="M8 8h8m-8 4h5"/>'},
+  speech_recognition: {label:'Speech recognition', path:'<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/>'},
+  vision: {label:'Image understanding', path:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1"/><path d="m3 17 6-6 4 4 3-3 5 5"/>'}
 };
+const fitIcons = [
+  '<rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 1v4m6-4v4M9 19v4m6-4v4M1 9h4m-4 6h4m14-6h4m-4 6h4m-10-3 2 2 4-4"/>',
+  '<path d="m12 3 10 18H2zM12 9v5m0 3v.01"/>',
+  '<circle cx="12" cy="12" r="9"/><path d="m6 6 12 12"/>'
+];
+function renderModelBadges(element, model) {
+  const fit = [0, 1, 2].includes(model.resource_fit) ? model.resource_fit : 1;
+  const label = ['Fits this computer', 'Limited on this computer', 'Unavailable on this computer'][fit];
+  const enabled = Object.entries(capabilityIcons).filter(([key]) => model.capabilities?.[key] === true);
+  const signature = `${fit}:${enabled.map(([key]) => key).join(',')}`;
+  if (element.dataset.icons !== signature) {
+    // All markup is local and allowlisted; metadata text is never interpreted as HTML.
+    element.innerHTML = `<span class="model-fit" data-fit="${fit}"><svg viewBox="0 0 24 24" aria-hidden="true">${fitIcons[fit]}</svg></span>` + enabled.map(([key, icon]) => `<span data-capability="${key}"><svg viewBox="0 0 24 24" aria-hidden="true">${icon.path}</svg></span>`).join('');
+    element.dataset.icons = signature;
+  }
+  const fitText = `${t(label)}${model.reason ? `: ${t(model.reason)}` : ''}`;
+  element.querySelector('.model-fit').title = fitText;
+  for (const [key, icon] of enabled) element.querySelector(`[data-capability="${key}"]`).title = t(icon.label);
+  const specification = model.bytes ? t(`${bytes(model.bytes)} download · ${model.ram_gib} GiB RAM guidance`) : t('Local model');
+  const description = [fitText, ...enabled.map(([, icon]) => t(icon.label)), specification].join(' · ');
+  element.title = description;
+  element.setAttribute('aria-label', description);
+}
 function canPause(model) {
   return state?.job_model === model.id && state.phase === 'downloading' && !state.loading;
 }
@@ -223,8 +246,8 @@ function modelCard(model) {
   let card = cards.get(model.id);
   if (!card) {
     card = document.createElement('article'); card.className = 'model'; card.dataset.id = model.id;
-    // One semantic button covers the name and icon. Details/removal are siblings.
-    card.innerHTML = '<button class="model-pick" type="button" aria-describedby="catalog-preview"><span class="model-ring"></span><span class="model-info"><span class="model-name"></span><span class="download-state"></span></span><span class="model-action" aria-hidden="true"></span></button><span class="fit"></span><span class="transfer-detail"></span><details><summary></summary><p class="specs"></p><p class="reason"></p><p class="performance"></p><p class="quality"></p></details><button class="remove text-button icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button>';
+    // One button covers the name and download state. Information and removal are siblings.
+    card.innerHTML = '<button class="model-pick" type="button"><span class="model-ring"></span><span class="model-info"><span class="model-name"></span><span class="download-state"></span></span></button><span class="model-badges" role="img" tabindex="0"></span><span class="transfer-detail"></span><button class="remove text-button icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button>';
     card.querySelector('.model-pick').addEventListener('click', event => { if (event.detail < 2) choose(model.id); });
     card.querySelector('.model-pick').addEventListener('keydown', event => {
       if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
@@ -236,40 +259,24 @@ function modelCard(model) {
   const pending = pendingModel === model.id;
   const preparing = state.job_model === model.id && (!!state.phase || state.loading);
   const paused = canPause(model);
-  const evidence = qualityFor(model);
   card.className = `model${active ? ' active' : ''}${preparing || pending ? ' preparing' : ''}${model.resource_fit === 2 ? ' unavailable' : ''}`;
   card.querySelector('.model-name').textContent = model.name;
   const download = renderRing(card.querySelector('.model-ring'), model);
   // The button's complete name exposes status; a duplicate nested progress role
   // is unnecessary to screen readers. Numeric ring attributes remain inspectable.
   card.querySelector('.model-ring').setAttribute('aria-hidden', 'true');
-  card.querySelector('.model-ring').dataset.fit = String(model.resource_fit);
-  card.querySelector('.model-ring').title = model.resource_fit ? t(model.reason || 'Limited on this computer') : t(download.text);
+  card.querySelector('.model-ring').title = t(download.text);
   const status = pending ? 'Getting ready…' : preparing && state.loading ? 'Loading model' : download.text;
   card.querySelector('.download-state').textContent = t(status);
   card.querySelector('.download-state').hidden = !pending && !preparing && (download.stage === 'missing' || download.stage === 'downloaded');
-  card.querySelector('.fit').hidden = model.resource_fit === 0 && (model.installed || model.id !== state.recommendation.id);
-  card.querySelector('.fit').textContent = t(active ? 'Running here' : model.resource_fit === 2 ? 'Unavailable' : model.id === state.recommendation.id ? 'Suggested' : model.resource_fit === 1 ? 'Conditional' : 'Available');
+  renderModelBadges(card.querySelector('.model-badges'), model);
   const detail = card.querySelector('.transfer-detail');
   detail.hidden = !preparing || state.loading;
   detail.textContent = paused ? downloadEstimate(model.id, state.received || 0, model.bytes || 0) : preparing ? t('Checking download…') : '';
-  card.querySelector('.specs').textContent = model.bytes ? t(`${bytes(model.bytes)} download · ${model.ram_gib} GiB RAM guidance`) : t('Local model');
-  card.querySelector('summary').textContent = t('Details');
-  card.querySelector('.reason').textContent = t(model.reason || '');
-  card.querySelector('.performance').textContent = t(model.measured_tps > 0 ? `Measured here: ${model.measured_tps.toFixed(1)} tokens/s · ${model.measured_tokens} tokens · this session` : model.performance || '');
-  card.querySelector('.quality').textContent = t(evidence ? `Task quality: ${evidence.quality} · ${evidence.cases} test cases · ${evidence.language.toUpperCase()}. ${evidence.human_complete ? 'Human sample complete.' : 'Human assessment pending.'}` : 'Task quality: unverified for this task, language and device.');
   const button = card.querySelector('.model-pick');
   const action = paused ? 'Pause download' : active && allowed(model) ? 'Active' : model.installed ? 'Start model' : model.partial ? 'Resume download' : 'Download and start';
-  const icon = paused ? 'pause' : active && allowed(model) ? 'active' : model.installed ? 'start' : 'download';
-  const glyph = card.querySelector('.model-action');
-  if (glyph.dataset.icon !== icon) {
-    glyph.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${modelIcons[icon]}</svg>`;
-    glyph.dataset.icon = icon;
-  }
-  glyph.hidden = icon === 'active';
   button.title = `${t(action)}: ${model.name}`;
   button.setAttribute('aria-label', `${t(action)}: ${model.name} · ${t(status)}${model.resource_fit ? ` · ${t(model.reason || 'Limited on this computer')}` : ''}`);
-  button.setAttribute('aria-describedby', 'catalog-preview');
   button.disabled = requesting || !!controller || connectionTesting || (!paused && (model.resource_fit === 2 || state.busy || state.loading || !!state.phase || (active && allowed(model))));
   const remove = card.querySelector('.remove');
   remove.title = `${t('Remove download')}: ${model.name}`;
@@ -280,7 +287,7 @@ function modelCard(model) {
 
 function visibleModels() {
   const models = state?.models || [];
-  return state?.active_id === 'custom' && state.ready ? [{id:'custom', name:state.active, installed:true, resource_fit:0}, ...models] : models;
+  return state?.active_id === 'custom' && state.ready ? [{id:'custom', name:state.active, installed:true, resource_fit:0, capabilities:{chat:true}}, ...models] : models;
 }
 function render(next) {
   const modelChanged = state && (state.active_id !== next.active_id || state.active !== next.active);
@@ -335,8 +342,8 @@ async function choose(id) {
       message('Cancelling…');
       return;
     }
-    // The deliberate row action is next to the visible preview notice and is
-    // described by it for assistive technology. Consent remains bound to a hash.
+    // A deliberate row action enables the local test for this exact model hash.
+    // It does not mark response quality as approved.
     if (id === 'custom') customPreviewAccepted = true;
     else if (!previewAccepted(model)) await api('/app/preview', {id, experimental:true});
     if (!state.ready || state.active_id !== id) {

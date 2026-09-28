@@ -93,6 +93,7 @@ def main():
             state = app.status()
             assert len(state["models"]) == 6 and state["hardware"]["ram"] > 0
             assert state['runtime'] == 'geistd'
+            assert all(m['capabilities'] == {'chat':True, 'vision':False, 'speech_recognition':False} for m in state['models'])
             assert state['hardware']['os'] and state['hardware']['logical_cpus'] > 0
             assert state['resources'] == {'scope':'geistd','rss_bytes':None,'cpu_percent':None,'cpu_interval_ms':0}
             assert all("reason" in m and "performance" in m and m['quality'] == 'unverified' and m['fit'] != 0 for m in state["models"])
@@ -111,7 +112,7 @@ def main():
             assert app.request("/app/status", headers={"Origin": f"http://localhost:{app.port}",
                                                         "Host": f"localhost:{app.port}"})[0] == 200
             code, html, headers = app.request("/", auth=False)
-            assert code == 200 and b'class="brand"' in html and b'id="catalog-preview"' in html and b'id="setup-start"' not in html
+            assert code == 200 and b'class="brand"' in html and b'id="catalog-preview"' not in html and b'id="setup-start"' not in html
             assert b'id="chat-speed"' not in html and b'id="chat-memory"' not in html
             assert html.index(b'id="runtime-model"') < html.index(b'id="performance"') < html.index(b'id="transcript"')
             assert "frame-ancestors 'none'" in headers["Content-Security-Policy"]

@@ -754,7 +754,6 @@ body.manager-page main { max-width:1180px }
 }
 
 /* The model row is the action. Progress and pause stay in that same row. */
-.catalog-note { color:var(--muted); font-size:11px; line-height:1.45; margin:2px 8px 12px }
 .model { display:block; padding:6px 4px 10px }
 .model .model-pick { display:flex; width:100%; min-width:0; min-height:48px; gap:8px; margin:0; padding:6px 4px; border:0; border-radius:8px; text-align:left; background:transparent; font-weight:400 }
 .model .model-pick:hover:not(:disabled) { background:#e7ebf2 }
@@ -795,8 +794,6 @@ body.manager-page main { max-width:1180px }
 .model .remove { position:absolute; top:12px; right:0; min-width:28px; min-height:32px; padding:5px; color:var(--muted) }
 .model .remove svg { width:15px; height:15px }
 .model .remove:hover:not(:disabled) { color:#a63333; background:#fff0f0 }
-.model-ring[data-fit="1"],.model-ring[data-fit="2"] { outline:2px solid #b77b16; outline-offset:2px; border-radius:50% }
-.model-ring[data-fit="2"] .ring-track { stroke:#b77b16 }
 .chat-heading .runtime-model { display:flex; align-items:center; gap:8px }
 .status-light { width:7px; height:7px; background:var(--success); border-radius:50%; flex:none }
 .status-light.inactive { background:var(--muted) }
@@ -808,3 +805,18 @@ body.manager-page main { max-width:1180px }
 .preferences-page .settings-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:18px 0 }
 .preferences-page .settings-row label { font-size:13px }
 @media(max-width:540px) { header { gap:8px; padding-left:14px; padding-right:14px } nav button { gap:4px; padding:6px 8px; font-size:11px } nav svg { width:16px; height:16px } }
+
+/* One leading download control; small capability badges replace detail blocks. */
+#test-page,#workspace,#transcript { background:#fff }
+.model { padding:5px 30px 7px 4px }
+.model .model-pick { min-height:40px; padding:4px; gap:8px }
+.model .remove { top:7px }
+.model-badges { display:flex; align-items:center; width:fit-content; max-width:calc(100% - 40px); gap:8px; margin:0 0 0 40px; padding:2px 3px; color:var(--muted); border-radius:4px; cursor:help }
+.model-badges>span { display:inline-flex }
+.model-badges svg { width:13px; height:13px; stroke-width:1.6 }
+.model-fit[data-fit="1"],.model-fit[data-fit="2"] { color:#96620d }
+.ring-download,.ring-pause,.ring-resume { display:none }
+.model-ring[data-stage="missing"] .ring-track { display:none }
+.model-ring[data-stage="missing"] .ring-download { display:block; stroke-width:2; color:var(--muted) }
+.model-ring[data-stage="downloading"] .ring-pause,.model-ring[data-stage="paused"] .ring-resume { display:block; stroke-width:2 }
+.model-pick:hover:not(:disabled) .ring-download,.model-pick:focus-visible .ring-download { color:var(--accent) }

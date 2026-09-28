@@ -1,7 +1,7 @@
 # Geist — Runs here. Stays here.
 
 Manage a local model and connect your terminal and editor to the same service.
-Use **+ Model** to open the catalog, then click a model to download and start it.
+All catalog models appear directly. Click a name or its leading download icon to download and start it.
 No account or separate setup step is required.
 Small models have limited capabilities: check their answers, and use the
 examples to decide whether a model meets your needs.
@@ -13,9 +13,9 @@ Mac release still needs Developer ID signing and notarization.
 ## Start on a Mac
 
 Open the Geist DMG, drag Geist to Applications, and open its desktop window.
-Open **+ Model** and click a model name or its download icon. Geist downloads, verifies and starts
+Click a model name or its leading download icon in the complete model list. Geist downloads, verifies and starts
 that model. An installed model starts directly. The same row shows progress and
-lets you pause or resume a download. The short preview notice stays above the list. The main screen stays on **Models**,
+lets you pause or resume a download. The main screen stays on **Models**,
 with the catalog on the left and **Quick test** on the right. In narrow windows
 they stack vertically. Each pane scrolls independently. **Connect a program**
 opens editor setup; the short test checks a response and its speed. Press **Enter** to send and **Shift + Enter** for a new line. The arrow sends
@@ -49,26 +49,38 @@ chat requires preview consent: single-task evidence does not certify follow-ups.
 Quick speed tests remain independent of the conversation.
 
 The **Models** screen shows every catalog model alongside the short test, including
-models not yet downloaded. Click a model name, ring or download icon to download
-and start it; installed models start directly. Deleting a download removes only
-its local files; the same row remains available to download again. Each local row has a
-delete action. Confirming deletion of an idle active model stops it first; active
-generation and download jobs reject deletion. Custom files outside the catalog
+models not yet downloaded. Click a model name or its leading download symbol to
+download and start it; installed models start directly. Deleting a download removes
+only its local files; the same row remains available to download again. Each local
+row has a delete action. Confirming deletion of an idle active model stops it first;
+active generation and download jobs reject deletion. Custom files outside the catalog
 are not removable through this interface.
-The metric row directly below the active model expands to show system and reply
-details; there is no separate performance section in the catalog. A ring before each model shows download status:
-an empty ring means no download, a partial ring shows downloaded bytes, and a
-closed green ring with a check means the model file is present. Paused transfers
-keep their percentage. File verification is a separate indeterminate state;
-receiving all bytes alone does not complete the download. Labels accompany every
-ring. Download status is separate from the model's running state and suitability.
+
+The single leading symbol changes with download state: arrow before download,
+progress ring during transfer, partial ring with resume after a pause, indeterminate
+ring during verification, and a closed green ring with a check after completion.
+Pause/resume uses the same control. A second action arrow and per-row detail
+sections are not shown. The complete action and status remain accessible labels.
+
+Small badges describe hardware fit (chip/check, warning triangle, or unavailable
+symbol) and implemented capabilities. Tooltips and keyboard-accessible descriptions
+retain the suitability reason and download/RAM guidance. These are hardware checks,
+not response-quality approval. The status API advertises only text chat today.
+Future speech-recognition and image-understanding symbols require an explicit true
+capability from the service for that model/backend; architecture support alone is
+insufficient. Unknown capability keys and nonboolean values are ignored by the UI.
+
+The metric row below the active model expands system and reply details. The test
+pane remains white; the independently scrollable model list is light gray. The
+visible preview banner is removed. A deliberate model-row action still enables the
+local preview for that exact model hash; quality evidence is not promoted.
 
 **Settings** is a separate navigation destination for language, execution and
 storage. Unload and service-stop controls are not part of this screen. Closing the
 window preserves the shared service for editors and terminals. The bundled
 engine uses the CPU; GPU selection is not yet exposed by this app. The proposed
 location for a tested backend selector is **Settings → Execution**, with automatic
-selection by default and optional per-model overrides in model details.
+selection by default.
 The existing engine environment override is a developer facility, not an app
 compatibility guarantee. **System language** is the default: German for a
 German OS locale, English for other languages. Native Mac and Ubuntu hosts supply

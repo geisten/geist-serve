@@ -857,6 +857,9 @@ static void status_response(int fd, struct app_arena *arena) {
                    a.fit,
                    app_task_fit(a.fit, APP_QUALITY_UNVERIFIED));
         app_quote(&b, a.reason);
+        /* Only modalities implemented by the bundled service are advertised. */
+        app_put(&b, ",\"capabilities\":{\"chat\":true,\"vision\":false,"
+                    "\"speech_recognition\":false}");
         app_printf(&b, ",\"preview_accepted\":%s", app.preview_accepted[i] ? "true" : "false");
         app_put(&b, ",\"performance\":");
         app_quote(&b, a.performance);
