@@ -15,12 +15,9 @@ const formatNumber = (value, digits = 0) => new Intl.NumberFormat(interfaceLangu
   minimumFractionDigits: digits, maximumFractionDigits: digits
 }).format(value);
 const german = {
-  'My models': 'Meine Modelle', 'Add model': 'Modell hinzufügen', 'Model': 'Modell',
-  'Downloaded models': 'Heruntergeladene Modelle', 'Add a model to begin.': 'Füge ein Modell hinzu.',
-  'Close': 'Schließen', 'Execution': 'Ausführung', 'Storage': 'Speicher', 'Advanced': 'Erweitert',
+  'Execution': 'Ausführung', 'Storage': 'Speicher',
   'CPU · bundled engine': 'CPU · mitgelieferte Engine',
   'GPU selection is not available in this app version.': 'GPU-Auswahl ist in dieser App-Version noch nicht verfügbar.',
-  'All available models are downloaded.': 'Alle verfügbaren Modelle sind heruntergeladen.',
   'Limited on this computer': 'Auf diesem Rechner eingeschränkt',
   'Model ready': 'Modell bereit', 'No model loaded': 'Kein Modell geladen',
   'The running model will stop. Connected programs will need another model.': 'Das laufende Modell wird beendet. Verbundene Programme benötigen anschließend ein anderes Modell.',

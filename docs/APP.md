@@ -48,9 +48,10 @@ Failed requests keep the draft; stopped partial answers remain in context. Sessi
 chat requires preview consent: single-task evidence does not certify follow-ups.
 Quick speed tests remain independent of the conversation.
 
-The **Models** screen keeps downloaded and partially downloaded models alongside the short test.
-**+ Model** opens the catalog for adding other models. Deleting a download removes
-only its local files; its catalog entry remains available. Each library row has a
+The **Models** screen shows every catalog model alongside the short test, including
+models not yet downloaded. Click a model name, ring or download icon to download
+and start it; installed models start directly. Deleting a download removes only
+its local files; the same row remains available to download again. Each local row has a
 delete action. Confirming deletion of an idle active model stops it first; active
 generation and download jobs reject deletion. Custom files outside the catalog
 are not removable through this interface.
@@ -62,8 +63,9 @@ keep their percentage. File verification is a separate indeterminate state;
 receiving all bytes alone does not complete the download. Labels accompany every
 ring. Download status is separate from the model's running state and suitability.
 
-**Settings** is a separate navigation destination. Language and storage appear
-there; model unload and shared-service stop are under **Advanced**. The bundled
+**Settings** is a separate navigation destination for language, execution and
+storage. Unload and service-stop controls are not part of this screen. Closing the
+window preserves the shared service for editors and terminals. The bundled
 engine uses the CPU; GPU selection is not yet exposed by this app. The proposed
 location for a tested backend selector is **Settings → Execution**, with automatic
 selection by default and optional per-model overrides in model details.

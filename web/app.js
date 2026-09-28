@@ -156,7 +156,7 @@ async function api(path, body, signal) {
 function uiText(element, source) {
   element.dataset.uiText = source; element.textContent = t(source);
 }
-function message(text, local = true) { uiText($('notice'), text); uiText($('catalog-notice'), text); localMessage = local; }
+function message(text, local = true) { uiText($('notice'), text); localMessage = local; }
 function buttonStates() {
   renderPerformance();
   $('test-connection').disabled = !state?.ready || state?.busy || connectionTesting || requesting || !!controller;
@@ -170,7 +170,6 @@ function buttonStates() {
   $('new-chat').hidden = !(conversation.length || $('result').children.length || $('prompt').value);
   $('benchmark').disabled = !state?.ready || state?.busy || requesting || !!controller ||
     !allowed(state?.models.find(m => m.id === state.active_id), tasks.find(t => t.id === 'freeform'));
-  $('unload').disabled = !state?.ready || state?.busy || requesting || !!controller;
   if (!controller && document.activeElement === $('stop')) $('prompt').focus({preventScroll: true});
   $('stop').hidden = !controller;
   document.body.classList.toggle('generating', !!controller);
@@ -270,7 +269,7 @@ function modelCard(model) {
   glyph.hidden = icon === 'active';
   button.title = `${t(action)}: ${model.name}`;
   button.setAttribute('aria-label', `${t(action)}: ${model.name} · ${t(status)}${model.resource_fit ? ` · ${t(model.reason || 'Limited on this computer')}` : ''}`);
-  button.setAttribute('aria-describedby', card.parentElement?.id === 'catalog-models' ? 'catalog-consent' : 'catalog-preview');
+  button.setAttribute('aria-describedby', 'catalog-preview');
   button.disabled = requesting || !!controller || connectionTesting || (!paused && (model.resource_fit === 2 || state.busy || state.loading || !!state.phase || (active && allowed(model))));
   const remove = card.querySelector('.remove');
   remove.title = `${t('Remove download')}: ${model.name}`;
@@ -309,16 +308,7 @@ function render(next) {
     (b.id === next.recommendation.id) - (a.id === next.recommendation.id) ||
     Number(b.installed) - Number(a.installed) || a.resource_fit - b.resource_fit);
   if (!working) { transfer.id = ''; transfer.samples = []; }
-  ordered.forEach(model => {
-    modelCard(model);
-    const inLibrary = model.installed || model.partial > 0 || next.active_id === model.id && next.ready || next.job_model === model.id && (!!next.phase || next.loading);
-    const parent = $(inLibrary ? 'models' : 'catalog-models');
-    const card = cards.get(model.id);
-    if (card.parentElement !== parent) parent.append(card);
-    card.querySelector('.model-pick').setAttribute('aria-describedby', inLibrary ? 'catalog-preview' : 'catalog-consent');
-  });
-  $('library-empty').hidden = $('models').children.length > 0;
-  $('catalog-empty').hidden = $('catalog-models').children.length > 0;
+  ordered.forEach(modelCard);
   if (!controller && !requesting && (!localMessage || next.message !== lastServerMessage)) message(working ? '' : next.message || '', false);
   lastServerMessage = next.message;
   buttonStates(); chatLayout();
@@ -352,7 +342,6 @@ async function choose(id) {
     if (!state.ready || state.active_id !== id) {
       await api(model.installed ? '/app/select' : '/app/download', {id});
     }
-    $('model-catalog').close();
   } catch (error) { message(error.message); }
   finally {
     // Keep the row locked until a fresh status reflects the completed action.
@@ -511,16 +500,6 @@ async function loadTasks() {
 }
 $('stop').addEventListener('click', () => { controller?.abort(); $('prompt').focus({preventScroll: true}); });
 $('benchmark').addEventListener('click', () => run('Explain in a short paragraph how a seed grows into a plant.', true));
-$('unload').addEventListener('click', async () => { try { await api('/app/stop', {}); await poll(); } catch (error) { message(error.message); } });
-$('quit').addEventListener('click', async () => {
-  if (!confirm(t('Stop the shared service? Terminal and editor connections will stop too. Downloaded models are kept.'))) return;
-  try {
-    await api('/app/quit', {}); stopped = true; clearInterval(timer); controller?.abort();
-    state = null; buttonStates(); $('runtime-state').setAttribute('aria-label', t('Stopping'));
-    document.querySelectorAll('#models button, #quit').forEach(button => { button.disabled = true; });
-    message('Geist is stopping. Reopen the app to start it again.');
-  } catch (error) { message(error.message); }
-});
 document.querySelector('.brand').addEventListener('click', event => { event.preventDefault(); showPage('models-page'); });
 document.querySelector('.skip').addEventListener('click', event => { event.preventDefault(); const main = $('main'); main.tabIndex = -1; main.focus(); });
 window.addEventListener('beforeunload', () => controller?.abort());
@@ -571,7 +550,7 @@ function showPage(id) {
     if (button.dataset.page === id) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
-  $('chat-help').open = false; $('performance').open = false; $('model-catalog').close();
+  $('chat-help').open = false; $('performance').open = false;
   chatLayout();
   if (quickTest && !$('workspace').hidden) $('prompt').focus({preventScroll: true});
   else { const heading = $(id).querySelector('h1, h2'); heading.tabIndex = -1; heading.focus({preventScroll:true}); }
@@ -581,9 +560,6 @@ function showPage(id) {
 // Native menus route only to these fixed pages, without reloading the document.
 window.geistNavigate = showPage;
 document.querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => showPage(button.dataset.page)));
-$('add-model').addEventListener('click', () => { $('model-catalog').showModal(); $('close-catalog').focus(); });
-$('close-catalog').addEventListener('click', () => $('model-catalog').close());
-$('model-catalog').addEventListener('close', () => { if (!$('models-page').hidden) $('add-model').focus({preventScroll:true}); });
 $('ui-language').value = interfacePreference;
 $('language-choice').value = interfaceLanguage;
 $('ui-language').addEventListener('change', async () => {
@@ -611,9 +587,22 @@ async function removeModel(id) {
   const warning = state.active_id === id && state.ready ? `${t('The running model will stop. Connected programs will need another model.')}\n\n` : '';
   if (!confirm(warning + t(`Remove ${model.name} from this computer? You can download it again later.`))) return;
   requesting = true; buttonStates(); visibleModels().forEach(modelCard);
-  try { await api('/app/remove', {id}); message('', false); $('add-model').focus({preventScroll:true}); }
+  const remove = cards.get(id)?.querySelector('.remove');
+  let removed = false;
+  try { await api('/app/remove', {id}); removed = true; message('', false); }
   catch (error) { message(error.message); }
-  finally { requesting = false; await poll(); }
+  finally {
+    while (polling) await new Promise(resolve => setTimeout(resolve, 40));
+    await poll();
+    requesting = false;
+    if (state) render(state); else buttonStates();
+    // The file disappears, but the same row remains a download choice.
+    if (removed && !$('models-page').hidden &&
+        (document.activeElement === remove || document.activeElement === document.body)) {
+      const pick = cards.get(id)?.querySelector('.model-pick');
+      if (pick && !pick.disabled) pick.focus({preventScroll:true});
+    }
+  }
 }
 
 function positionPerformance() {

@@ -19,7 +19,7 @@
   <aside class="model-sidebar" aria-label="Model manager" tabindex="0">
   <div class="model-overview">
     <p id="catalog-preview" class="catalog-note" title="Selecting a model starts its preview. Check answers before using them.">Preview · Check answers.</p>
-    <section id="model-chooser" aria-labelledby="available-title"><div class="library-heading"><h2 id="available-title">My models</h2><button id="add-model" type="button" class="text-button" aria-label="Add model" title="Add model"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Model</span></button></div><div id="models" aria-label="Downloaded models"></div><p id="library-empty" class="hint">Add a model to begin.</p></section>
+    <section id="model-chooser" aria-labelledby="available-title"><h2 id="available-title" class="sr-only">Available models</h2><div id="models" aria-label="Available models"></div></section>
   </div>
 
 </aside>
@@ -86,8 +86,6 @@
     <div class="settings-row"><label for="language-choice">Answer language</label><select id="language-choice"><option value="en" lang="en">English</option><option value="de" lang="de">Deutsch</option></select></div>
     <section class="preference-group" aria-labelledby="execution-title"><h3 id="execution-title">Execution</h3><p>CPU · bundled engine</p><p class="hint">GPU selection is not available in this app version.</p></section>
     <section class="preference-group" aria-labelledby="storage-title"><h3 id="storage-title">Storage</h3><p id="disk-space" class="hint"></p></section>
-    <details class="settings"><summary>Advanced</summary><p class="hint">Your editor and this window use the same model. Closing the window keeps the service running.</p><div class="actions"><button id="unload" type="button" disabled>Unload model</button><button id="quit" type="button">Stop model service</button></div></details>
   </section>
-<dialog id="model-catalog" aria-labelledby="catalog-title"><div class="catalog-heading"><h2 id="catalog-title">Add model</h2><button id="close-catalog" class="text-button icon-button" type="button" aria-label="Close" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 12"/></svg></button></div><p id="catalog-consent" class="catalog-note">Selecting a model downloads and starts its preview. Check answers before using them.</p><div id="catalog-models"></div><p id="catalog-empty" class="hint" hidden>All available models are downloaded.</p><p id="catalog-notice" role="status" aria-live="polite"></p></dialog>
 <footer>Models stay on this computer. Prompts and results are not saved as chat history.</footer>
 </main></body></html>
