@@ -15,10 +15,11 @@ windows). **Connect a program** opens connection setup. Catalog rows show downlo
 green ring and check mean downloaded; paused downloads retain their percentage.
 **Quick test** is optional: Enter sends, Shift + Enter inserts a newline, and
 follow-up questions use this window's conversation. **Clear test** clears it.
-Language preferences are in **Settings**. **System & performance**, below the
-model, shows OS/CPU details, available RAM, process RAM/CPU and reply timings.
+Language preferences are in **Settings**. The metric row below the active model
+shows speed, process RAM and file size. Click it to expand OS/CPU details, system
+and available RAM and reply timings in the same place.
 These measurements describe performance, not answer quality. The Mac menu bar
-provides **Models & performance** and **Connect a program** shortcuts.
+provides **Models** and **Connect a program** shortcuts.
 The bundled
 terminal client is `/Applications/Geist.app/Contents/MacOS/geist-cli`.
 Use its full path, or link it as `geist` in a directory on your PATH. Start at Login is

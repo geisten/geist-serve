@@ -36,7 +36,7 @@ document.addEventListener('focusout', () => setTimeout(flushMarkdown, 0));
 function chatLayout() {
   document.body.classList.toggle('manager-page', !$('models-page').hidden);
   document.body.classList.toggle('has-model', !$('workspace').hidden);
-  resizeComposer();
+  resizeComposer(); positionPerformance();
 }
 function resizeComposer() {
   const input = $('prompt');
@@ -56,7 +56,7 @@ $('transcript').addEventListener('scroll', () => {
   $('latest').hidden = followLatest;
 });
 $('latest').addEventListener('click', () => { scrollLatest(true); $('prompt').focus({preventScroll: true}); });
-window.addEventListener('resize', () => { resizeComposer(); scrollLatest(); });
+window.addEventListener('resize', () => { resizeComposer(); scrollLatest(); positionPerformance(); });
 function addTurn(prompt) {
   $('chat-empty').hidden = true; $('result').hidden = false;
   // Stable ids identify the latest response for automation/accessibility.
@@ -107,21 +107,15 @@ function renderPerformance() {
   const h = state?.hardware, r = state?.resources;
   const rss = r?.scope === 'geistd' && knownNumber(r.rss_bytes) ? r.rss_bytes : null;
   const cpu = r?.scope === 'geistd' && knownNumber(r.cpu_percent) ? r.cpu_percent : null;
-  $('chat-speed').textContent = replyPending ? t('Measuring…') : rateText(lastReply?.rate);
-  $('chat-speed').title = t('Last completed reply');
-  $('chat-memory').textContent = `${rss === null ? '—' : gib(rss)} RAM`;
-  $('chat-memory').title = t('Model process RAM');
-  $('test-speed').textContent = $('chat-speed').textContent;
-  $('test-memory').textContent = $('chat-memory').textContent;
+  $('test-speed').textContent = replyPending ? t('Measuring…') : rateText(lastReply?.rate);
+  $('test-memory').textContent = `${rss === null ? '—' : gib(rss)} RAM`;
   const model = state?.models.find(item => item.id === state.active_id);
   $('test-size').textContent = model && knownNumber(model.bytes) ? bytes(model.bytes) : '—';
   $('performance-system').textContent = h?.name || t('Not available');
   $('performance-os').textContent = h ? [h.os, h.arch, h.logical_cpus ? `${h.logical_cpus} ${t('logical CPUs')}` : null].filter(Boolean).join(' · ') : '—';
-  $('performance-rss').textContent = rss === null ? '—' : gib(rss);
   $('performance-cpu').textContent = cpu === null ? '—' : `${formatNumber(cpu, 1)} %`;
   $('performance-ram').textContent = h?.known && knownNumber(h.ram) ? gib(h.ram) : '—';
   $('performance-available').textContent = h?.available_known && knownNumber(h.available) ? gib(h.available) : '—';
-  $('performance-speed').textContent = rateText(lastReply?.rate);
   $('performance-tokens').textContent = knownNumber(lastReply?.tokens) ? String(lastReply.tokens) : '—';
   $('performance-first').textContent = timeText(lastReply?.first);
   $('performance-total').textContent = timeText(lastReply?.total);
@@ -284,6 +278,7 @@ function visibleModels() {
   return state?.active_id === 'custom' && state.ready ? [{id:'custom', name:state.active, installed:true, resource_fit:0}, ...models] : models;
 }
 function render(next) {
+  const modelChanged = state && (state.active_id !== next.active_id || state.active !== next.active);
   state = next;
   if (!languageInitialized) {
     $('language-choice').value = next.answer_language || interfaceLanguage;
@@ -292,6 +287,7 @@ function render(next) {
   const working = !!next.phase || next.loading;
   const active = next.models.find(m => m.id === next.active_id);
   const usable = next.ready && allowed(active);
+  if (modelChanged || working || !usable) $('performance').open = false;
   const previouslyHidden = $('workspace').hidden;
   $('workspace').hidden = working || !usable;
   $('test-unavailable').hidden = usable && !working;
@@ -560,7 +556,7 @@ function showPage(id) {
     if (button.dataset.page === id) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
-  $('chat-help').open = false;
+  $('chat-help').open = false; $('performance').open = false;
   chatLayout();
   if (quickTest && !$('workspace').hidden) $('prompt').focus({preventScroll: true});
   else { const heading = $(id).querySelector('h1, h2'); heading.tabIndex = -1; heading.focus({preventScroll:true}); }
@@ -605,10 +601,21 @@ async function removeModel(id) {
   finally { requesting = false; await poll(); }
 }
 
+function positionPerformance() {
+  if (!$('performance').open) return;
+  // Bound the expanded model information to the viewport, even at text zoom.
+  // It overlays the transcript without moving the composer or existing messages.
+  const bottom = $('performance').querySelector('summary').getBoundingClientRect().bottom;
+  $('performance').style.setProperty('--performance-space', `${Math.max(0, innerHeight - bottom - 18)}px`);
+}
+
 // Only one disclosure is open. Escape returns focus; polling never moves it.
 for (const id of ['chat-help', 'performance']) {
   $(id).addEventListener('toggle', () => {
-    if ($(id).open) $(id === 'chat-help' ? 'performance' : 'chat-help').open = false;
+    if ($(id).open) {
+      $(id === 'chat-help' ? 'performance' : 'chat-help').open = false;
+      if (id === 'performance') positionPerformance();
+    }
   });
 }
 document.addEventListener('keydown', event => {
@@ -619,5 +626,5 @@ document.addEventListener('keydown', event => {
   }
 });
 document.addEventListener('pointerdown', event => {
-  if (!$('chat-help').contains(event.target)) $('chat-help').open = false;
+  for (const id of ['chat-help', 'performance']) if (!$(id).contains(event.target)) $(id).open = false;
 });

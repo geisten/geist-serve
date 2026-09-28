@@ -15,6 +15,7 @@ const formatNumber = (value, digits = 0) => new Intl.NumberFormat(interfaceLangu
   minimumFractionDigits: digits, maximumFractionDigits: digits
 }).format(value);
 const german = {
+  'Model performance details': 'Details zur Modellleistung',
   'Models & quick test': 'Modelle & Kurztest',
   'Model manager': 'Modellverwaltung',
   'Models for this computer': 'Modelle für diesen Rechner',
@@ -25,8 +26,6 @@ const german = {
 
   'This test stays in this window. Clear test, reloading or quitting clears it. Check answers before using them.': 'Dieser Test bleibt in diesem Fenster. Test leeren, Neuladen oder Beenden löscht ihn. Prüfe Antworten vor der Verwendung.',
   "Models": "Modelle",
-  "Models & performance": "Modelle & Leistung",
-  "← Models & performance": "← Modelle & Leistung",
   "Your model. Ready for your tools.": "Dein Modell. Für deine Programme.",
   "One local model for your programs.": "Ein lokales Modell für deine Programme.",
   "Ready for your programs.": "Für deine Programme bereit.",
@@ -44,7 +43,6 @@ const german = {
   "Not downloaded": "Nicht heruntergeladen",
   "Checking download…": "Download wird geprüft…",
 
-  "System & performance": "System & Leistung",
   "Model RAM · now": "Modell-RAM · aktuell",
   "Model CPU · now": "Modell-CPU · aktuell",
   "System RAM": "System-RAM",

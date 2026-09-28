@@ -48,8 +48,9 @@ Failed requests keep the draft; stopped partial answers remain in context. Sessi
 chat requires preview consent: single-task evidence does not certify follow-ups.
 Quick speed tests remain independent of the conversation.
 
-The **Models** screen keeps the catalog visible alongside the short test, with a collapsed
-**System & performance** panel. A ring before each model shows download status:
+The **Models** screen keeps the catalog visible alongside the short test.
+The metric row directly below the active model expands to show system and reply
+details; there is no separate performance section in the catalog. A ring before each model shows download status:
 an empty ring means no download, a partial ring shows downloaded bytes, and a
 closed green ring with a check means the model file is present. Paused transfers
 keep their percentage. File verification is a separate indeterminate state;
@@ -67,12 +68,15 @@ language unless a separate answer preference was saved.
 The interface uses white, a light gray catalog and blue action accents. Green
 rings identify completed downloads, independently of the active model. Speed,
 process RAM and model file size appear beneath the active model name; missing
-values remain unknown. Icon controls have localized accessible names and tooltips.
+values remain unknown. Clicking that row or its chevron expands CPU, system memory
+and reply timings beneath the same model. Escape or clicking outside closes the
+details. The composer stays in place, and switching models clears old reply metrics.
+Icon controls have localized accessible names and tooltips.
 Download states, constraints and preview consent remain readable text. The trash
 icon clears the test after confirmation and is disabled for an empty test.
 **Settings** also holds service controls. **Connect**
 sets up Terminal, Continue or OpenCode text chat. On Mac, the menu bar shows the
-active model and service status; **Models & performance** and **Connect a program**
+active model and service status; **Models** and **Connect a program**
 reopen the corresponding view without reloading or clearing a test draft.
 Closing the window keeps the shared service running. Stopping it requires
 confirmation. Start at Login is optional in the native menu.

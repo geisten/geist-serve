@@ -112,6 +112,8 @@ def main():
                                                         "Host": f"localhost:{app.port}"})[0] == 200
             code, html, headers = app.request("/", auth=False)
             assert code == 200 and b'class="brand"' in html and b'id="catalog-preview"' in html and b'id="setup-start"' not in html
+            assert b'id="chat-speed"' not in html and b'id="chat-memory"' not in html
+            assert html.index(b'id="runtime-model"') < html.index(b'id="performance"') < html.index(b'id="transcript"')
             assert "frame-ancestors 'none'" in headers["Content-Security-Policy"]
             assert "Access-Control-Allow-Origin" not in headers
             assert app.token.encode() not in html

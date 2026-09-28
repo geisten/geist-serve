@@ -585,14 +585,6 @@ button.markdown-copy { background:transparent; color:var(--muted); border:0; bor
 }
 
 /* Technical detail stays one disclosure away; reading remains the main surface. */
-.performance { margin-top:4px; min-width:0 }
-.performance>summary { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:2px 16px; min-height:32px; padding:4px 6px; color:var(--muted); font-size:11px; font-weight:400; list-style:none; border-radius:8px }
-.performance>summary::-webkit-details-marker { display:none }
-.performance[open]>summary { margin-bottom:0; color:var(--accent) }
-.performance-label,.performance-values { display:inline-flex; align-items:center; flex-wrap:wrap; gap:8px }
-.performance-label svg { width:15px; height:15px }
-.performance-values { gap:12px; font-variant-numeric:tabular-nums; margin-left:auto }
-.performance-content h3 { margin:0 0 16px; font-size:16px; font-weight:600; letter-spacing:-.2px }
 .performance-content h4 { margin:18px 0 10px; font-size:12px; font-weight:600 }
 .performance-content .system-name { margin:0; font-size:14px; font-weight:550 }
 .performance-content #performance-os { margin:2px 0 16px }
@@ -601,11 +593,6 @@ button.markdown-copy { background:transparent; color:var(--muted); border:0; bor
 .performance-grid dd { margin:2px 0 0; font-size:19px; font-weight:500; color:var(--accent); font-variant-numeric:tabular-nums; letter-spacing:-.3px }
 .performance-content .performance-note { margin:14px 0 0; color:var(--muted); font-size:11px; line-height:1.6 }
 .reply-metrics { align-self:center; padding:4px 2px; font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; overflow-wrap:anywhere }
-@media(max-height:480px) {
-  .performance { margin-top:0 }
-  .performance>summary { min-height:28px; padding-top:2px; padding-bottom:2px }
-}
-
 .performance-content:focus-visible { outline-offset:-3px }
 
 /* Model manager first; the conversation is an optional local test. */
@@ -631,12 +618,10 @@ button.markdown-copy { background:transparent; color:var(--muted); border:0; bor
 .ring-check { display:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round }
 .model-ring[data-stage="downloaded"] .ring-check { display:block }
 .model-ring[data-stage="missing"] .ring-fill { display:none }
-.model-home>.performance { margin:18px 0 0; border-bottom:1px solid var(--border); padding-bottom:12px }
 .performance-content { position:static; max-height:50vh; overflow:auto; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:20px; margin-top:10px; font-size:13px }
 .performance-content:focus-visible { outline-offset:-3px }
 .model-home>.settings { padding:16px 0 }
 .model-home>.settings>summary { font-size:13px; font-weight:500; color:var(--muted) }
-.test-performance { display:flex; justify-content:center; gap:16px; color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums; margin:5px 0 0 }
 #test-unavailable { padding:30px 0 }
 #test-unavailable h2 { font-size:22px }
 @media(max-width:600px) {
@@ -676,8 +661,6 @@ body.manager-page footer { display:none }
 .model-sidebar>.settings>summary { font-size:12px; font-weight:500 }
 .model-sidebar .settings-row { display:block }
 .model-sidebar .settings-row select { width:100%; margin-top:8px; font-size:12px }
-.model-sidebar .performance { border-top:1px solid var(--border); padding-top:10px }
-.model-sidebar .performance-values { margin-left:0; font-size:10px }
 .performance-content { max-height:45vh; padding:14px }
 .performance-grid { gap:12px }
 .performance-grid dd { font-size:16px }
@@ -710,7 +693,6 @@ body.manager-page #notice { flex:none; max-height:16vh; overflow:auto; margin:6p
   #task-form { padding:5px 12px }
   .composer-area { padding-top:4px }
   #composer-hint { margin-top:4px; font-size:10px }
-  .test-performance { margin-top:2px; font-size:10px }
   #test-unavailable { padding:10px; font-size:12px }
 }
 @media(max-width:699px) {
@@ -752,7 +734,6 @@ body.manager-page main { max-width:1180px }
 #task-form textarea { font-size:15px; line-height:1.55 }
 #task-form:focus-within { box-shadow:0 0 0 2px #245edb16; border-color:var(--accent) }
 #composer-hint { font-size:10px }
-.performance-values { display:none }
 @media(max-width:699px) {
   #models-page { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,30%) minmax(0,1fr); gap:10px }
   .model-sidebar { padding:6px 8px }
@@ -791,3 +772,20 @@ body.manager-page main { max-width:1180px }
 .model details,.model details[open] { margin:4px 0 0 40px; font-size:11px }
 #test-unavailable h2 { font-size:22px; font-weight:500; color:var(--muted); margin:0; letter-spacing:-.5px }
 @media(max-width:699px) { .catalog-note { margin-bottom:6px } .model { padding:4px } }
+
+/* One performance surface: the active model's metric row expands in place. */
+.model-performance { position:relative; flex:none; min-width:0; margin:0 0 8px }
+.model-performance>summary { list-style:none; border-radius:8px; min-height:24px; padding:2px 6px; margin:0; font-weight:400; cursor:pointer }
+.model-performance>summary::-webkit-details-marker { display:none }
+.model-performance>summary:hover { background:var(--soft) }
+.model-performance>summary:focus-visible { outline:2px solid var(--focus); outline-offset:2px }
+.model-performance>summary>.metrics-chevron { width:14px; height:14px; margin-left:auto; flex:none; transition:transform .15s }
+.model-performance[open]>summary { margin:0 }
+.model-performance[open]>summary>.metrics-chevron { transform:rotate(180deg) }
+.model-performance .performance-content { position:absolute; z-index:20; top:100%; left:0; right:0; max-height:min(360px,var(--performance-space,45vh)); margin-top:4px; overflow:auto; overscroll-behavior:contain; padding:16px; border-radius:12px; box-shadow:0 8px 24px #20232916 }
+.model-performance .performance-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px }
+.model-performance .performance-grid dd { color:var(--ink); font-size:14px }
+@media(max-width:699px) {
+  .model-performance { margin-bottom:4px }
+  .model-performance>summary { min-height:20px; padding:1px 4px }
+}
