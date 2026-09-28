@@ -77,6 +77,10 @@ static struct {
     char                    home[APP_PATH_CAP], server[APP_PATH_CAP], models[APP_PATH_CAP];
     char                    token[65], message[512], active[160], active_id[64];
     char                    chosen[APP_PATH_CAP], selected[64], answer_language[3];
+    char                    execution_mode[8], backend[24], cpu_backend[24], gpu_backend[24];
+    char                    execution_notice[256];
+    bool                    gpu_available, save_execution, backend_verified;
+    double                  loading_started;
     bool                    preview_accepted[APP_MODEL_COUNT];
     unsigned                port, workers;
     char                    runtime_dir[64], socket_path[100];
@@ -92,6 +96,89 @@ static struct {
         unsigned tokens;
     } measurements[APP_MODEL_COUNT];
 } app = {.mutex = PTHREAD_MUTEX_INITIALIZER, .drained = PTHREAD_COND_INITIALIZER};
+
+static bool read_preference(const char *, char *, size_t);
+static bool save_preference(const char *, const char *);
+static bool start_child_mode(const char *, const char *, const char *);
+static void stop_child(void);
+
+/* Probe the packaged engine once. Old CPU-only daemons remain usable. */
+static void probe_backends(void) {
+#if defined(__aarch64__) || defined(__arm64__)
+    strcpy(app.cpu_backend, "cpu_neon");
+#elif defined(__x86_64__)
+    strcpy(app.cpu_backend, "cpu_x86");
+#else
+    strcpy(app.cpu_backend, "cpu_scalar");
+#endif
+    int pipefd[2];
+    if (pipe(pipefd))
+        return;
+    fcntl(pipefd[0], F_SETFD, FD_CLOEXEC);
+    fcntl(pipefd[1], F_SETFD, FD_CLOEXEC);
+    posix_spawn_file_actions_t actions;
+    if (posix_spawn_file_actions_init(&actions)) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return;
+    }
+    int rc = posix_spawn_file_actions_adddup2(&actions, pipefd[1], STDOUT_FILENO);
+    if (!rc)
+        rc = posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0);
+    char *args[] = {app.server, "--backends", nullptr};
+    pid_t child  = 0;
+    if (!rc)
+        rc = posix_spawn(&child, app.server, &actions, nullptr, args, environ);
+    posix_spawn_file_actions_destroy(&actions);
+    close(pipefd[1]);
+    char   output[1024] = {0};
+    size_t used         = 0;
+    int    status       = 0;
+    bool   ended        = false;
+    fcntl(pipefd[0], F_SETFL, O_NONBLOCK);
+    for (unsigned attempt = 0; !rc && attempt < 100; ++attempt) {
+        ssize_t n = read(pipefd[0], output + used, sizeof output - 1 - used);
+        if (n > 0)
+            used += (size_t) n;
+        if (waitpid(child, &status, WNOHANG) == child) {
+            ended = true;
+            break;
+        }
+        struct timespec pause = {.tv_nsec = 50000000};
+        nanosleep(&pause, nullptr);
+    }
+    if (!rc && !ended) {
+        kill(child, SIGKILL);
+        while (waitpid(child, nullptr, 0) < 0 && errno == EINTR) {
+        }
+    }
+    ssize_t n = read(pipefd[0], output + used, sizeof output - 1 - used);
+    if (n > 0)
+        used += (size_t) n;
+    output[used] = 0;
+    close(pipefd[0]);
+    struct json *j = calloc(1, sizeof *j);
+    if (!rc && ended && WIFEXITED(status) && WEXITSTATUS(status) == 0 && j &&
+        json_parse(j, used, output) >= 0) {
+        int   gpu  = json_get(j, 0, "gpu");
+        char *name = json_strdup(j, json_get(j, gpu, "name"));
+        if (name && (!strcmp(name, "metal") || !strcmp(name, "vulkan"))) {
+            snprintf(app.gpu_backend, sizeof app.gpu_backend, "%s", name);
+            app.gpu_available = json_bool(j, json_get(j, gpu, "available"), false);
+        }
+        free(name);
+    }
+    free(j);
+}
+
+static bool gpu_supported(const struct app_model *model) {
+    unsigned bit = !strcmp(app.gpu_backend, "metal") ? 2 : 4;
+    return app.gpu_available && model && (model->backends & bit);
+}
+static bool recommend_gpu(const struct app_model *model) {
+    /* A hardware default, not a claim of measured performance. */
+    return gpu_supported(model) && model->bytes >= APP_GIB;
+}
 
 static bool path_join(char out[static APP_PATH_CAP], const char *base, const char *name) {
     int n = snprintf(out, APP_PATH_CAP, "%s/%s", base, name);
@@ -357,10 +444,42 @@ static void poll_child(void) {
     if (!app.child)
         return;
     int   status;
-    pid_t result = waitpid(app.child, &status, WNOHANG);
-    if (result == app.child || (result < 0 && errno == ECHILD)) {
+    pid_t result    = waitpid(app.child, &status, WNOHANG);
+    bool  timed_out = !app.ready && monotonic_ms() - app.loading_started > 120000;
+    if (result == app.child || (result < 0 && errno == ECHILD) || timed_out) {
+        if (timed_out)
+            stop_child();
         app.child = 0;
         app.ready = false;
+        if (strcmp(app.backend, app.cpu_backend)) {
+            char path[APP_PATH_CAP], id[64], log[APP_PATH_CAP], archive[APP_PATH_CAP];
+            snprintf(path, sizeof path, "%s", app.chosen);
+            snprintf(id, sizeof id, "%s", app.active_id);
+            bool preserved = false;
+            if (path_join(log, app.home, "server.log") &&
+                path_join(archive, app.home, "gpu-failure-XXXXXX")) {
+                int saved = mkstemp(archive);
+                if (saved >= 0) {
+                    close(saved);
+                    preserved = rename(log, archive) == 0;
+                    if (!preserved)
+                        unlink(archive);
+                }
+            }
+            if (!preserved) {
+                snprintf(app.message,
+                         sizeof app.message,
+                         "GPU failed. Diagnostics could not be archived; the model remains "
+                         "stopped.");
+                return;
+            }
+            snprintf(app.execution_notice,
+                     sizeof app.execution_notice,
+                     "GPU stopped or failed to load. Restored CPU; diagnostics are kept in the app "
+                     "data folder.");
+            if (start_child_mode(path, id, "cpu"))
+                return;
+        }
         snprintf(app.message,
                  sizeof app.message,
                  "The model process stopped. See server.log in the app data folder.");
@@ -368,9 +487,28 @@ static void poll_child(void) {
     }
     if (app.ready)
         return;
-    if (app_daemon_ready(app.socket_path)) {
-        app.ready      = true;
-        app.message[0] = 0;
+    char reported[24];
+    if (app_daemon_ready_backend(app.socket_path, reported)) {
+        app.backend_verified = !strcmp(reported, app.backend);
+        if (reported[0] && !app.backend_verified) {
+            stop_child();
+            snprintf(app.message,
+                     sizeof app.message,
+                     "The engine reported a different processor. Reload the model.");
+            return;
+        }
+        app.ready                     = true;
+        app.message[0]                = 0;
+        const struct app_model *model = app_model_find(app.active_id);
+        if (app.save_execution && model) {
+            char key[80];
+            snprintf(key, sizeof key, "backend-%s", model->sha256);
+            if (!save_preference(key, app.execution_mode))
+                snprintf(app.execution_notice,
+                         sizeof app.execution_notice,
+                         "The model is running, but its execution preference could not be saved.");
+        }
+        app.save_execution = false;
     }
 }
 
@@ -403,7 +541,15 @@ cleanup:
     app.socket_path[0] = app.runtime_dir[0] = 0;
 }
 
-static bool start_child(const char *path, const char *id) {
+static bool start_child_mode(const char *path, const char *id, const char *mode) {
+    const struct app_model *model = app_model_find(id);
+    bool gpu = !strcmp(mode, "gpu") || (!strcmp(mode, "auto") && recommend_gpu(model));
+    if (gpu && !gpu_supported(model)) {
+        snprintf(app.message,
+                 sizeof app.message,
+                 "GPU is not supported by this model and packaged engine.");
+        return false;
+    }
     stop_child();
     struct app_hardware hardware;
     bool                known = app_hardware_read(&hardware, app.home);
@@ -445,7 +591,7 @@ static bool start_child(const char *path, const char *id) {
     size_t count = 0;
     while (environ[count])
         ++count;
-    char **env = calloc(count + 4, sizeof *env);
+    char **env = calloc(count + 5, sizeof *env);
     if (!env) {
         close(fd);
         close(log);
@@ -455,7 +601,8 @@ static bool start_child(const char *path, const char *id) {
     for (size_t i = 0; i < count; ++i)
         if (strncmp(environ[i], "LISTEN_FDS=", 11) && strncmp(environ[i], "LISTEN_PID=", 11) &&
             strncmp(environ[i], "OMP_NUM_THREADS=", 16) &&
-            strncmp(environ[i], "OMP_WAIT_POLICY=", 16))
+            strncmp(environ[i], "OMP_WAIT_POLICY=", 16) &&
+            strncmp(environ[i], "GEIST_BACKEND=", 14))
             env[used++] = environ[i];
     unsigned cores = known ? hardware.cores : 1;
     unsigned limit = known && hardware.device == APP_PI5 ? 4 : 2;
@@ -466,6 +613,12 @@ static bool start_child(const char *path, const char *id) {
     env[used++] = threads;
     env[used++] = "OMP_WAIT_POLICY=passive";
     env[used++] = "LISTEN_FDS=1";
+    char backend_env[48];
+    snprintf(backend_env,
+             sizeof backend_env,
+             "GEIST_BACKEND=%s",
+             gpu ? app.gpu_backend : app.cpu_backend);
+    env[used++] = backend_env;
     posix_spawn_file_actions_t actions;
     int                        rc = posix_spawn_file_actions_init(&actions);
     if (!rc) {
@@ -490,14 +643,33 @@ static bool start_child(const char *path, const char *id) {
     }
     snprintf(app.chosen, sizeof app.chosen, "%s", path);
     snprintf(app.active_id, sizeof app.active_id, "%s", id ? id : "custom");
-    const char *base = strrchr(path, '/');
-    base             = base ? base + 1 : path;
+    snprintf(app.execution_mode, sizeof app.execution_mode, "%s", mode);
+    snprintf(app.backend, sizeof app.backend, "%s", gpu ? app.gpu_backend : app.cpu_backend);
+    app.loading_started  = monotonic_ms();
+    app.backend_verified = false;
+    app.save_execution   = true;
+    const char *base     = strrchr(path, '/');
+    base                 = base ? base + 1 : path;
     snprintf(app.active, sizeof app.active, "%s", base);
     char *ext = strstr(app.active, ".gguf");
     if (ext)
         *ext = 0;
     snprintf(app.message, sizeof app.message, "Loading the model into memory…");
     return true;
+}
+
+static bool start_child(const char *path, const char *id) {
+    char                    mode[8] = "auto", key[80];
+    const struct app_model *model   = app_model_find(id);
+    if (model) {
+        snprintf(key, sizeof key, "backend-%s", model->sha256);
+        if (!read_preference(key, mode, sizeof mode) ||
+            (strcmp(mode, "cpu") && strcmp(mode, "gpu")) ||
+            (!strcmp(mode, "gpu") && !gpu_supported(model)))
+            strcpy(mode, "auto");
+    }
+    app.execution_notice[0] = 0;
+    return start_child_mode(path, id, mode);
 }
 
 static uint64_t regular_size(const char *path) {
@@ -553,7 +725,7 @@ static bool save_selection(const char *id) {
 }
 
 static void model_inventory(struct app_inventory items[static APP_MODEL_COUNT]) {
-    for (size_t i = 0; i < APP_MODEL_COUNT; ++i) {
+    for (size_t i = 0; i < app_model_count; ++i) {
         char path[APP_PATH_CAP], part[APP_PATH_CAP];
         bool valid = path_join(path, app.models, app_models[i].file);
         items[i]   = (struct app_inventory) {.installed = valid &&
@@ -750,6 +922,137 @@ static bool begin_job(const struct app_model *m, bool download) {
     return true;
 }
 
+static void restore_preview_preferences(void) {
+    memset(app.preview_accepted, 0, sizeof app.preview_accepted);
+    for (size_t i = 0; i < app_model_count; ++i) {
+        char key[80], value[8] = "";
+        snprintf(key, sizeof key, "preview-%s", app_models[i].sha256);
+        app.preview_accepted[i] = read_preference(key, value, sizeof value) && !strcmp(value, "v1");
+    }
+}
+static void execution_response(int fd, const char *text) {
+    struct json *j    = calloc(1, sizeof *j);
+    char        *mode = nullptr;
+    if (j && json_parse(j, strlen(text), text) >= 0)
+        mode = json_strdup(j, json_get(j, 0, "mode"));
+    free(j);
+    if (!mode || (strcmp(mode, "auto") && strcmp(mode, "cpu") && strcmp(mode, "gpu"))) {
+        free(mode);
+        error_response(fd, 400, "Choose Auto, CPU or GPU.");
+        return;
+    }
+    pthread_mutex_lock(&app.mutex);
+    poll_child();
+    const struct app_model *model = app_model_find(app.active_id);
+    int                     code  = 202;
+    const char             *error = nullptr;
+    if (!app.ready || app.generating || app.job_running) {
+        code  = 409;
+        error = "Wait until the loaded model is idle before changing execution.";
+    } else if (!strcmp(mode, "gpu") && !gpu_supported(model)) {
+        code  = 409;
+        error = "GPU is not supported by this model and packaged engine.";
+    } else {
+        bool        gpu = !strcmp(mode, "gpu") || (!strcmp(mode, "auto") && recommend_gpu(model));
+        const char *backend = gpu ? app.gpu_backend : app.cpu_backend;
+        if (!strcmp(backend, app.backend)) {
+            char key[80];
+            if (model)
+                snprintf(key, sizeof key, "backend-%s", model->sha256);
+            if (model && !save_preference(key, mode)) {
+                code  = 500;
+                error = "Cannot save execution preference.";
+            } else {
+                snprintf(app.execution_mode, sizeof app.execution_mode, "%s", mode);
+                code = 200;
+            }
+        } else {
+            char path[APP_PATH_CAP], id[64];
+            snprintf(path, sizeof path, "%s", app.chosen);
+            snprintf(id, sizeof id, "%s", app.active_id);
+            app.execution_notice[0] = 0;
+            if (model)
+                memset(&app.measurements[model - app_models], 0, sizeof app.measurements[0]);
+            if (!start_child_mode(path, id, mode)) {
+                code  = 500;
+                error = "Cannot change execution. Restoring CPU.";
+                (void) start_child_mode(path, id, "cpu");
+            }
+        }
+    }
+    pthread_mutex_unlock(&app.mutex);
+    free(mode);
+    if (error)
+        error_response(fd, code, error);
+    else
+        response(fd, code, "application/json", "{}", 2);
+}
+static void import_catalog(int fd, const char *text) {
+    char                why[256];
+    struct app_catalog *candidate = app_catalog_parse(text, why);
+    if (!candidate) {
+        error_response(fd, 400, why);
+        return;
+    }
+    pthread_mutex_lock(&app.mutex);
+    int code = 200;
+    if (app.job_running || app.generating || (app.child && !app.ready)) {
+        code = 409;
+        snprintf(why, sizeof why, "Finish the current operation before importing a catalog.");
+    } else if (app_catalog_version(candidate) <= app_catalog_revision) {
+        code = 409;
+        snprintf(why, sizeof why, "Import a catalog with a newer revision.");
+    } else {
+        const struct app_model *old  = app_model_find(app.active_id);
+        const struct app_model *next = app_catalog_find(candidate, app.active_id);
+        if (app.ready && old &&
+            (!next || strcmp(old->sha256, next->sha256) || strcmp(old->file, next->file) ||
+             old->backends != next->backends || old->bytes != next->bytes)) {
+            code = 409;
+            snprintf(why, sizeof why, "The running model must stay unchanged in this catalog.");
+        }
+        for (size_t i = 0; code == 200 && i < app_model_count; ++i) {
+            const struct app_model *previous = &app_models[i];
+            /* A filename may not be reassigned to another hash while files exist. */
+            char path[APP_PATH_CAP], part[APP_PATH_CAP];
+            for (size_t k = 0; app_catalog_entry(candidate, k); ++k) {
+                const struct app_model *replacement = app_catalog_entry(candidate, k);
+                if (replacement && !strcmp(previous->file, replacement->file) &&
+                    (strcmp(previous->sha256, replacement->sha256) ||
+                     previous->bytes != replacement->bytes) &&
+                    path_join(path, app.models, previous->file) &&
+                    (regular_size(path) ||
+                     (snprintf(part, sizeof part, "%s.part", path) < (int) sizeof part &&
+                      regular_size(part)))) {
+                    code = 409;
+                    snprintf(why,
+                             sizeof why,
+                             "Use a new filename when replacing an existing model hash.");
+                    break;
+                }
+            }
+        }
+    }
+    if (code == 200 && !save_preference("catalog.json", text)) {
+        code = 500;
+        snprintf(why, sizeof why, "Cannot save the catalog. The previous catalog is kept.");
+    }
+    if (code == 200) {
+        app_catalog_apply(candidate);
+        candidate = nullptr;
+        memset(app.measurements, 0, sizeof app.measurements);
+        restore_preview_preferences();
+        if (!app_model_find(app.selected))
+            app.selected[0] = 0;
+    }
+    pthread_mutex_unlock(&app.mutex);
+    app_catalog_discard(candidate);
+    if (code == 200)
+        response(fd, 200, "application/json", "{}", 2);
+    else
+        error_response(fd, code, why);
+}
+
 static struct app_resource_window resource_window; /* protected by app.mutex */
 
 static void status_response(int fd, struct app_arena *arena) {
@@ -769,6 +1072,7 @@ static void status_response(int fd, struct app_arena *arena) {
             app_recommend(&h, inventory, app.selected, app.ready ? app.active_id : nullptr);
     app_put(&b, "{\"version\":");
     app_quote(&b, APP_VERSION);
+    app_printf(&b, ",\"catalog_revision\":%u", app_catalog_revision);
     app_put(&b, ",\"recommendation\":{\"id\":");
     app_quote(&b, recommendation.model ? recommendation.model->id : "");
     app_put(&b, ",\"preferred_id\":");
@@ -781,6 +1085,32 @@ static void status_response(int fd, struct app_arena *arena) {
                ",\"eligible\":%s},\"answer_language\":",
                recommendation.eligible ? "true" : "false");
     app_quote(&b, app.answer_language);
+    const struct app_model *execution_model = app_model_find(app.active_id);
+    bool                    gpu             = gpu_supported(execution_model);
+    app_put(&b, ",\"execution\":{\"mode\":");
+    app_quote(&b, app.execution_mode[0] ? app.execution_mode : "auto");
+    app_put(&b, ",\"active\":");
+    app_quote(&b, app.ready ? (!strcmp(app.backend, app.cpu_backend) ? "cpu" : "gpu") : "");
+    app_put(&b, ",\"backend\":");
+    app_quote(&b, app.ready ? app.backend : "");
+    app_put(&b, ",\"recommended\":");
+    app_quote(&b, recommend_gpu(execution_model) ? "gpu" : "cpu");
+    app_printf(&b,
+               ",\"basis\":\"hardware\",\"verified\":%s,\"gpu_available\":%s,\"gpu_backend\":",
+               app.ready && app.backend_verified ? "true" : "false",
+               gpu ? "true" : "false");
+    app_quote(&b, app.gpu_backend);
+    app_put(&b, ",\"reason\":");
+    app_quote(&b,
+              !gpu ? "GPU is not supported by this model and packaged engine."
+              : recommend_gpu(execution_model)
+                      ? "GPU is suggested for this larger model. This is a hardware default, not a "
+                        "measured speed comparison."
+                      : "CPU is suggested for this small model. This is a hardware default, not a "
+                        "measured speed comparison.");
+    app_put(&b, ",\"notice\":");
+    app_quote(&b, app.execution_notice);
+    app_put(&b, "}");
     app_put(&b, ",\"hardware\":{\"name\":");
     app_quote(&b, h.name);
     app_put(&b, ",\"arch\":");
@@ -804,14 +1134,18 @@ static void status_response(int fd, struct app_arena *arena) {
                h.disk_known ? "true" : "false",
                h.available_known ? "true" : "false");
     struct app_process_sample sample;
-    bool sampled = app.child > 0 && app_process_read(app.child, &sample);
+    bool                      sampled = app.child > 0 && app_process_read(app.child, &sample);
     app_resource_update(&resource_window, sampled ? &sample : nullptr, h.logical_cpus);
     app_put(&b, "\"resources\":{\"scope\":\"geistd\",\"rss_bytes\":");
-    if (sampled) app_printf(&b, "%llu", (unsigned long long) sample.rss);
-    else app_put(&b, "null");
+    if (sampled)
+        app_printf(&b, "%llu", (unsigned long long) sample.rss);
+    else
+        app_put(&b, "null");
     app_put(&b, ",\"cpu_percent\":");
-    if (resource_window.cpu_known) app_printf(&b, "%.2f", resource_window.cpu_percent);
-    else app_put(&b, "null");
+    if (resource_window.cpu_known)
+        app_printf(&b, "%.2f", resource_window.cpu_percent);
+    else
+        app_put(&b, "null");
     app_printf(&b, ",\"cpu_interval_ms\":%.0f},", resource_window.interval_ms);
     app_put(&b, "\"runtime\":\"geistd\",\"active\":");
     app_quote(&b, app.active);
@@ -829,7 +1163,7 @@ static void status_response(int fd, struct app_arena *arena) {
                app.ready ? "true" : "false",
                app.child && !app.ready ? "true" : "false",
                app.job_running || app.generating ? "true" : "false");
-    for (size_t i = 0; i < APP_MODEL_COUNT; ++i) {
+    for (size_t i = 0; i < app_model_count; ++i) {
         const struct app_model *m         = &app_models[i];
         bool                    installed = inventory[i].installed;
         uint64_t                partial   = inventory[i].partial;
@@ -858,8 +1192,9 @@ static void status_response(int fd, struct app_arena *arena) {
                    app_task_fit(a.fit, APP_QUALITY_UNVERIFIED));
         app_quote(&b, a.reason);
         /* Only modalities implemented by the bundled service are advertised. */
-        app_put(&b, ",\"capabilities\":{\"chat\":true,\"vision\":false,"
-                    "\"speech_recognition\":false}");
+        app_put(&b,
+                ",\"capabilities\":{\"chat\":true,\"vision\":false,"
+                "\"speech_recognition\":false}");
         app_printf(&b, ",\"preview_accepted\":%s", app.preview_accepted[i] ? "true" : "false");
         app_put(&b, ",\"performance\":");
         app_quote(&b, a.performance);
@@ -1028,7 +1363,7 @@ static void generate(int fd, struct request *r, struct app_arena *arena) {
                                                    language,
                                                    hardware_known ? hardware.device : APP_UNKNOWN);
     /* Single-task quality evidence does not certify multi-turn conversation. */
-    if ((conversation || quality != APP_QUALITY_PASSED) &&
+    if ((conversation || strcmp(app.backend, app.cpu_backend) || quality != APP_QUALITY_PASSED) &&
         !json_bool(json, json_get(json, 0, "experimental"), false)) {
         pthread_mutex_unlock(&app.mutex);
         free(prompt);
@@ -1040,7 +1375,7 @@ static void generate(int fd, struct request *r, struct app_arena *arena) {
     }
     bool benchmark   = json_bool(json, json_get(json, 0, "benchmark"), false);
     int  model_index = -1;
-    for (int i = 0; i < APP_MODEL_COUNT; ++i)
+    for (size_t i = 0; i < app_model_count; ++i)
         if (strcmp(app.active_id, app_models[i].id) == 0)
             model_index = i;
     app.generating = true;
@@ -1383,6 +1718,24 @@ static void handle(int fd, struct app_arena *arena) {
         status_response(fd, arena);
         return;
     }
+    if (!strcmp(r.path, "/app/catalog")) {
+        if (!strcmp(r.method, "GET")) {
+            pthread_mutex_lock(&app.mutex);
+            response(fd, 200, "application/json", app_catalog_json, strlen(app_catalog_json));
+            pthread_mutex_unlock(&app.mutex);
+        } else if (!strcmp(r.method, "POST"))
+            import_catalog(fd, r.body);
+        else
+            error_response(fd, 405, "Use GET or POST.");
+        return;
+    }
+    if (!strcmp(r.path, "/app/execution")) {
+        if (strcmp(r.method, "POST"))
+            error_response(fd, 405, "Use POST.");
+        else
+            execution_response(fd, r.body);
+        return;
+    }
     if (!strcmp(r.path, "/app/tasks") && !strcmp(r.method, "GET")) {
         const char *catalog = app_tasks_json();
         response(fd, 200, "application/json", catalog, strlen(catalog));
@@ -1468,14 +1821,15 @@ static void handle(int fd, struct app_arena *arena) {
             response(fd, 200, "application/json", "{}", 2);
         return;
     }
-    char                   *id    = json_strdup(json, json_get(json, 0, "id"));
+    char *id = json_strdup(json, json_get(json, 0, "id"));
+    pthread_mutex_lock(&app.mutex);
     const struct app_model *model = app_model_find(id);
     free(id);
     if (!model) {
+        pthread_mutex_unlock(&app.mutex);
         error_response(fd, 400, "Choose a model from the catalog.");
         return;
     }
-    pthread_mutex_lock(&app.mutex);
     if (atomic_load(&closing) || app.job_running || app.generating) {
         pthread_mutex_unlock(&app.mutex);
         error_response(fd, 409, "Another task is active.");
@@ -1707,7 +2061,7 @@ int main(int argc, char **argv) {
                h.arch,
                (unsigned long long) (h.ram / 1048576),
                h.cores);
-        for (size_t i = 0; i < APP_MODEL_COUNT; ++i) {
+        for (size_t i = 0; i < app_model_count; ++i) {
             struct app_assessment a = app_assess(&h, &app_models[i], false);
             printf("%s: %s — %s\n",
                    app_models[i].name,
@@ -1769,14 +2123,25 @@ int main(int argc, char **argv) {
             "open the private link on your computer.\n",
             app.home,
             app.port);
+    probe_backends();
+    char *catalog_text = malloc(APP_CATALOG_BYTES + 1);
+    if (catalog_text && read_preference("catalog.json", catalog_text, APP_CATALOG_BYTES + 1)) {
+        char                why[256];
+        struct app_catalog *saved = app_catalog_parse(catalog_text, why);
+        if (saved && app_catalog_version(saved) >= app_catalog_revision)
+            app_catalog_apply(saved);
+        else {
+            app_catalog_discard(saved);
+            snprintf(app.message,
+                     sizeof app.message,
+                     "Saved catalog is invalid or older; using the bundled catalog.");
+        }
+    }
+    free(catalog_text);
     (void) read_preference("answer-language", app.answer_language, sizeof app.answer_language);
     if (strcmp(app.answer_language, "en") && strcmp(app.answer_language, "de"))
         app.answer_language[0] = 0;
-    for (size_t i = 0; i < APP_MODEL_COUNT; ++i) {
-        char key[80], value[8] = "";
-        snprintf(key, sizeof key, "preview-%s", app_models[i].sha256);
-        app.preview_accepted[i] = read_preference(key, value, sizeof value) && !strcmp(value, "v1");
-    }
+    restore_preview_preferences();
     (void) read_preference("selected", app.selected, sizeof app.selected);
     if (model) {
         pthread_mutex_lock(&app.mutex);

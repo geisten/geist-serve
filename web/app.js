@@ -80,6 +80,7 @@ function addTurn(prompt) {
   return {output, status, actions, copy, metrics};
 }
 function qualityFor(model, task = selectedTask) {
+  if (state?.execution?.active === 'gpu') return undefined;
   return qualityRecords.find(r => r.model_sha256 === model?.sha256 && r.task === task?.id &&
     r.task_version === task?.version && r.language === $('language-choice').value &&
     r.device === state?.hardware.device);
@@ -93,7 +94,7 @@ const bytes = n => n < 1e9 ? `${formatNumber(n / 1e6)} MB` : `${formatNumber(n /
 const gib = n => `${formatNumber(n / 2 ** 30, 1)} GiB`;
 
 const knownNumber = value => typeof value === 'number' && Number.isFinite(value) && value >= 0;
-const modelIdentity = () => JSON.stringify([state?.active_id, state?.active]);
+const modelIdentity = () => JSON.stringify([state?.active_id, state?.active, state?.execution?.backend]);
 const rateText = value => `${knownNumber(value) ? formatNumber(value, 1) : '—'} ${t('tok/s')}`;
 const timeText = value => knownNumber(value) ? `${formatNumber(value, 2)} s` : '—';
 function renderReplyMetrics(element) {
@@ -143,7 +144,7 @@ async function api(path, body, signal) {
   const response = await fetch(path, {
     method: body === undefined ? 'GET' : 'POST', cache: 'no-store', signal,
     headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) })
+    ...(body === undefined ? {} : { body: typeof body === 'string' ? body : JSON.stringify(body) })
   });
   if (!response.ok) {
     let error = `Request failed (${response.status}).`;
@@ -159,6 +160,7 @@ function uiText(element, source) {
 function message(text, local = true) { uiText($('notice'), text); localMessage = local; }
 function buttonStates() {
   renderPerformance();
+  renderExecution();
   $('test-connection').disabled = !state?.ready || state?.busy || connectionTesting || requesting || !!controller;
   $('copy-connection').disabled = !state?.ready;
   $('connection-endpoint').textContent = t(`${location.origin}/v1`);
@@ -308,7 +310,9 @@ function render(next) {
       (document.activeElement === document.body || document.activeElement.closest('.model-pick'))) $('prompt').focus({preventScroll:true});
   $('disk-space').textContent = t(next.hardware.disk_known ? `${bytes(next.hardware.disk)} disk space available` : 'Disk space could not be read');
   const models = visibleModels();
-  if (!models.some(model => model.id === 'custom') && cards.has('custom')) { cards.get('custom').remove(); cards.delete('custom'); }
+  for (const [id, card] of cards) if (!models.some(model => model.id === id)) { card.remove(); cards.delete(id); }
+  $('catalog-revision').textContent = next.catalog_revision ? `#${next.catalog_revision}` : '';
+  $('catalog-file').disabled = requesting || next.busy || next.loading || !!next.phase || !!controller;
   // Keep existing nodes and ordering stable while downloading and polling.
   const ordered = cards.size ? models : [...models].sort((a, b) =>
     (b.id === next.active_id) - (a.id === next.active_id) ||
@@ -638,4 +642,52 @@ document.addEventListener('keydown', event => {
 });
 document.addEventListener('pointerdown', event => {
   for (const id of ['chat-help', 'performance']) if (!$(id).contains(event.target)) $(id).open = false;
+});
+
+// Native radio semantics preserve keyboard navigation and checked state.
+function renderExecution() {
+  const execution = state?.execution;
+  const disabled = !state?.ready || state.busy || state.loading || requesting || !!controller || connectionTesting;
+  for (const input of document.querySelectorAll('[name="execution"]')) {
+    input.checked = input.value === (execution?.mode || 'auto');
+    input.disabled = disabled || (input.value === 'gpu' && !execution?.gpu_available);
+    const label = input.closest('label'), mark = label.querySelector('.recommended-mark');
+    if (mark) mark.hidden = input.value !== execution?.recommended;
+    label.title = t(input.value === 'auto' ? 'Uses the recommended processor. Changing execution reloads the model without downloading it again.' : execution?.reason || 'Load a model first.');
+  }
+  $('execution-description').textContent = t(execution?.reason || 'Load a model first.');
+  $('execution-current').textContent = execution?.active ? `${execution.active.toUpperCase()}${execution.active === 'gpu' && execution.backend === 'metal' ? ' · Metal' : ''}` : '';
+  $('execution-current').title = t('Active processor');
+  $('execution-notice').textContent = t(execution?.notice || '');
+  $('execution-notice').hidden = !execution?.notice;
+}
+for (const input of document.querySelectorAll('[name="execution"]')) input.addEventListener('change', async () => {
+  if (!input.checked || requesting) return;
+  requesting = true; buttonStates(); visibleModels().forEach(modelCard);
+  try { await api('/app/execution', {mode:input.value}); message('', false); }
+  catch (error) { message(error.message); }
+  finally {
+    while (polling) await new Promise(resolve => setTimeout(resolve, 40));
+    await poll(); requesting = false;
+    if (state) render(state); else buttonStates();
+  }
+});
+$('catalog-file').addEventListener('change', async () => {
+  const file = $('catalog-file').files[0];
+  if (!file || requesting) return;
+  requesting = true; buttonStates(); $('catalog-file').disabled = true;
+  try {
+    if (file.size > 24576) throw new Error('The catalog must be at most 24 KiB.');
+    const catalog = await file.text();
+    try { JSON.parse(catalog); }
+    catch { throw new Error('Choose a valid JSON file.'); }
+    await api('/app/catalog', catalog);
+    uiText($('catalog-result'), 'Catalog updated.');
+  } catch (error) { uiText($('catalog-result'), error.message); }
+  finally {
+    $('catalog-file').value = '';
+    while (polling) await new Promise(resolve => setTimeout(resolve, 40));
+    await poll(); requesting = false;
+    if (state) render(state); else buttonStates();
+  }
 });

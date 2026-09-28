@@ -316,3 +316,9 @@ See [installation and client setup](INSTALL.md). The authenticated `/v1/models`
 and `/v1/chat/completions` routes use the same geistd as the browser. Text
 history, streaming and usage are supported. Tool requests fail explicitly;
 this preview does not claim coding-agent support.
+
+## Model catalog and processor selection
+
+See [model catalog and execution](MODEL-CATALOG.md) for the bundled JSON source,
+validated local import, Auto/CPU/GPU policy and current platform limits.
+The [UX review](UX-MODEL-MANAGER.md) records interaction and accessibility choices.

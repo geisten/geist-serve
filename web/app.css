@@ -820,3 +820,27 @@ body.manager-page main { max-width:1180px }
 .model-ring[data-stage="missing"] .ring-download { display:block; stroke-width:2; color:var(--muted) }
 .model-ring[data-stage="downloading"] .ring-pause,.model-ring[data-stage="paused"] .ring-resume { display:block; stroke-width:2 }
 .model-pick:hover:not(:disabled) .ring-download,.model-pick:focus-visible .ring-download { color:var(--accent) }
+
+/* A small, mutually exclusive processor control belongs to the active model. */
+.execution-row { display:flex; align-items:center; flex-wrap:wrap; gap:8px 14px; margin:2px 0 10px; flex:none }
+.execution-choice { display:flex; flex-wrap:wrap; gap:3px; border:0; border-radius:10px; padding:3px; margin:0; background:#f3f4f6; min-width:0 }
+.execution-choice label { position:relative; display:flex; align-items:center; justify-content:center; gap:5px; min-height:30px; padding:4px 10px; border:1px solid transparent; border-radius:7px; font-size:12px; color:var(--muted); cursor:pointer }
+.execution-choice input { position:absolute; opacity:0; width:1px; height:1px; margin:0 }
+.execution-choice label:has(input:checked) { background:#fff; color:var(--ink); border-color:#dce0e5; box-shadow:0 1px 2px #20232908 }
+.execution-choice label:has(input:focus-visible) { outline:2px solid var(--focus); outline-offset:2px }
+.execution-choice label:has(input:disabled) { opacity:.55; cursor:default }
+.execution-choice label:hover:not(:has(input:disabled)) { color:var(--ink) }
+.recommended-mark { color:#27623c; font-size:9px; font-weight:550 }
+.execution-current { color:var(--muted); font-size:11px }
+#execution-notice { margin:0 0 8px; font-size:12px; flex:none }
+.catalog-heading { display:flex; align-items:baseline; gap:10px }
+#catalog-file { max-width:100%; font-size:12px; padding:8px 0 }
+#catalog-file::file-selector-button { background:#fff; border:1px solid var(--border); border-radius:8px; padding:8px 12px; color:var(--ink); margin-right:10px; cursor:pointer }
+#catalog-result { overflow-wrap:anywhere }
+@media (max-height:560px) { .execution-row { margin:0 0 4px } .execution-choice label { min-height:24px; padding:2px 8px } }
+@media (max-width:699px) and (max-height:480px) {
+  #models-page { grid-template-rows:minmax(0,20%) minmax(0,1fr) }
+  #task-form textarea { max-height:min(12vh,56px); min-height:28px }
+  #transcript, #transcript:has(#chat-empty:not([hidden])):has(#result[hidden]) { min-height:32px; padding-top:2px; padding-bottom:2px }
+  #chat-empty h3 { font-size:16px }
+}

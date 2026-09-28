@@ -67,15 +67,17 @@ bool app_utf8_feed(struct app_utf8 *s, const char *piece, char *out, size_t cap)
     for (const unsigned char *p = (const unsigned char *) piece; *p; ++p) {
         unsigned char c = *p;
         if (!s->used) {
-            s->need = c < 0x80 ? 1 : c >= 0xc2 && c <= 0xdf ? 2 :
-                      c >= 0xe0 && c <= 0xef ? 3 : c >= 0xf0 && c <= 0xf4 ? 4 : 0;
+            s->need = c < 0x80                 ? 1
+                      : c >= 0xc2 && c <= 0xdf ? 2
+                      : c >= 0xe0 && c <= 0xef ? 3
+                      : c >= 0xf0 && c <= 0xf4 ? 4
+                                               : 0;
             if (!s->need)
                 goto invalid;
         } else if (c < 0x80 || c > 0xbf ||
-                   (s->used == 1 && ((s->bytes[0] == 0xe0 && c < 0xa0) ||
-                                    (s->bytes[0] == 0xed && c > 0x9f) ||
-                                    (s->bytes[0] == 0xf0 && c < 0x90) ||
-                                    (s->bytes[0] == 0xf4 && c > 0x8f))))
+                   (s->used == 1 &&
+                    ((s->bytes[0] == 0xe0 && c < 0xa0) || (s->bytes[0] == 0xed && c > 0x9f) ||
+                     (s->bytes[0] == 0xf0 && c < 0x90) || (s->bytes[0] == 0xf4 && c > 0x8f))))
             goto invalid;
         s->bytes[s->used++] = c;
         if (s->used == s->need) {
@@ -93,67 +95,9 @@ invalid:
     return false;
 }
 
-/* SHA pins and sizes match the existing Mac catalog. Planning memory is
- * deliberately separate from GGUF size and is not a measured RSS claim.
- * Keep this catalog in application code, never in geistlib. */
-const struct app_model app_models[APP_MODEL_COUNT] = {
-        {"bitnet-2b",
-         "BitNet b1.58 2B",
-         "bitnet-b1.58-2B-4T-i2_s.gguf",
-         "https://huggingface.co/microsoft/bitnet-b1.58-2B-4T-gguf/resolve/main/"
-         "ggml-model-i2_s.gguf",
-         "4221b252fdd5fd25e15847adfeb5ee88886506ba50b8a34548374492884c2162",
-         1187801280,
-         2304,
-         4},
-        {"smollm2-360m",
-         "SmolLM2 360M",
-         "smollm2-360m-instruct-q8_0.gguf",
-         "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/"
-         "smollm2-360m-instruct-q8_0.gguf",
-         "48ab3034d0dd401fbc721eb1df3217902fee7dab9078992d66431f09b7750201",
-         386404992,
-         768,
-         2},
-        {"qwen3-0.6b",
-         "Qwen3 0.6B",
-         "Qwen3-0.6B-Q8_0.gguf",
-         "https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf",
-         "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031",
-         639446688,
-         1280,
-         4},
-        {"qwen35-0.8b",
-         "Qwen3.5 0.8B",
-         "Qwen3.5-0.8B-Q8_0.gguf",
-         "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q8_0.gguf",
-         "0ad885ffd4bb022fc4f0d33a3308fa108ef8613159d3b3a67e23abca056b7a6c",
-         811843840,
-         2048,
-         4},
-        {"gemma4-e2b",
-         "Gemma 4 E2B",
-         "gemma-4-E2B-it-Q4_K_M.gguf",
-         "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/"
-         "gemma-4-E2B-it-Q4_K_M.gguf",
-         "740185b21d22ceb83a11c3aa62ad5842ef32c70f6096d756bbee85a1e4ec34b8",
-         3106738272,
-         5120,
-         8},
-        {"gemma4-e4b",
-         "Gemma 4 E4B",
-         "gemma-4-E4B-it-Q4_K_M.gguf",
-         "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/"
-         "gemma-4-E4B-it-Q4_K_M.gguf",
-         "85a896a047553e842f25297ee5b031d64ff30147d9c4af17b1e4b394cd1fab87",
-         4977171584,
-         8192,
-         16},
-};
-
 const struct app_model *app_model_find(const char *id) {
     if (id)
-        for (size_t i = 0; i < APP_MODEL_COUNT; ++i)
+        for (size_t i = 0; i < app_model_count; ++i)
             if (strcmp(id, app_models[i].id) == 0)
                 return &app_models[i];
     return nullptr;
@@ -244,7 +188,13 @@ app_recommend(const struct app_hardware *h,
     const struct app_model *preferred = app_model_find(h->device == APP_APPLE_SILICON ? "gemma4-e2b"
                                                        : h->device == APP_PI5 ? "bitnet-2b"
                                                                               : "smollm2-360m");
-    const struct app_model *saved     = app_model_find(selected);
+    const struct app_model *small     = &app_models[0];
+    for (size_t i = 1; i < app_model_count; ++i)
+        if (app_models[i].working_mib < small->working_mib)
+            small = &app_models[i];
+    if (!preferred)
+        preferred = small;
+    const struct app_model *saved = app_model_find(selected);
     if (saved) {
         const char *limit = setup_limit(
                 h, saved, &inventory[saved - app_models], running && !strcmp(running, saved->id));
@@ -255,8 +205,9 @@ app_recommend(const struct app_hardware *h,
                 limit ? limit : "Your model choice is kept. Select another model below.",
                 !limit};
     }
-    const struct app_model *choices[] = {preferred, app_model_find("smollm2-360m")};
-    const char             *reason    = nullptr;
+    const struct app_model *choices[] = {
+            preferred, app_model_find("smollm2-360m") ? app_model_find("smollm2-360m") : small};
+    const char *reason = nullptr;
     for (unsigned i = 0; i < 2; ++i) {
         const struct app_model *m     = choices[i];
         const char             *limit = setup_limit(h, m, &inventory[m - app_models], false);

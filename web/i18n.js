@@ -304,4 +304,36 @@ Object.assign(german, {
   'Download and start': 'Herunterladen und starten',
   'Local model': 'Lokales Modell'
 });
+Object.assign(german, {
+  "Auto": "Auto",
+  "CPU": "CPU",
+  "GPU": "GPU",
+  "Recommended": "Empfohlen",
+  "Model catalog": "Modellkatalog",
+  "Model catalog JSON file": "JSON-Datei für den Modellkatalog",
+  "Import a newer JSON file from a source you trust. No automatic online updates.": "Neuere JSON-Datei aus einer vertrauenswürdigen Quelle importieren. Keine automatischen Online-Updates.",
+  "GPU failed. Diagnostics could not be archived; the model remains stopped.": "GPU ausgefallen. Diagnose konnte nicht archiviert werden; das Modell bleibt gestoppt.",
+  "The engine reported a different processor. Reload the model.": "Die Engine meldet einen anderen Prozessor. Lade das Modell erneut.",
+  "Catalog updated.": "Katalog aktualisiert.",
+  "The catalog must be at most 24 KiB.": "Der Katalog darf höchstens 24 KiB groß sein.",
+  "Choose a valid JSON file.": "Wähle eine gültige JSON-Datei.",
+  "Active processor": "Aktiver Prozessor",
+  "Uses the recommended processor. Changing execution reloads the model without downloading it again.": "Verwendet den empfohlenen Prozessor. Ein Wechsel lädt das Modell neu in den Speicher, ohne erneuten Download.",
+  "GPU is not supported by this model and packaged engine.": "GPU wird für dieses Modell mit der mitgelieferten Engine nicht unterstützt.",
+  "GPU is suggested for this larger model. This is a hardware default, not a measured speed comparison.": "GPU wird für dieses größere Modell empfohlen. Die Empfehlung beruht auf der Hardware, nicht auf einem gemessenen Geschwindigkeitsvergleich.",
+  "CPU is suggested for this small model. This is a hardware default, not a measured speed comparison.": "CPU wird für dieses kleine Modell empfohlen. Die Empfehlung beruht auf der Hardware, nicht auf einem gemessenen Geschwindigkeitsvergleich.",
+  "Choose Auto, CPU or GPU.": "Wähle Auto, CPU oder GPU.",
+  "Wait until the loaded model is idle before changing execution.": "Warte vor dem Wechsel, bis das geladene Modell nicht mehr beschäftigt ist.",
+  "Cannot save execution preference.": "Die Ausführungseinstellung konnte nicht gespeichert werden.",
+  "Cannot change execution. Restoring CPU.": "Ausführung konnte nicht gewechselt werden. CPU wird wiederhergestellt.",
+  "GPU stopped or failed to load. Restored CPU; diagnostics are kept in the app data folder.": "GPU beendet oder Start fehlgeschlagen. CPU wiederhergestellt; die Diagnose bleibt im App-Datenordner erhalten.",
+  "The model is running, but its execution preference could not be saved.": "Das Modell läuft, aber die Ausführungseinstellung konnte nicht gespeichert werden.",
+  "Invalid model catalog. Check schema, entries and unique IDs/files.": "Ungültiger Modellkatalog. Prüfe Schema, Einträge sowie eindeutige IDs und Dateinamen.",
+  "Finish the current operation before importing a catalog.": "Beende den laufenden Vorgang vor dem Katalogimport.",
+  "Import a catalog with a newer revision.": "Importiere einen Katalog mit einer neueren Revision.",
+  "The running model must stay unchanged in this catalog.": "Das laufende Modell muss in diesem Katalog unverändert bleiben.",
+  "Use a new filename when replacing an existing model hash.": "Verwende einen neuen Dateinamen, wenn du den Hash eines vorhandenen Modells ersetzt.",
+  "Cannot save the catalog. The previous catalog is kept.": "Katalog konnte nicht gespeichert werden. Der bisherige Katalog bleibt erhalten.",
+  "Saved catalog is invalid or older; using the bundled catalog.": "Gespeicherter Katalog ist ungültig oder älter; der mitgelieferte Katalog wird verwendet."
+});
 translateStatic();

@@ -9,7 +9,7 @@ on:
     inputs:
       package_version:
         type: string
-        default: '0.5.14'
+        default: '0.5.15'
 
 permissions:
   contents: read
@@ -110,6 +110,8 @@ jobs:
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/http_test.py
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/compat_test.py
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/chat_test.py
+          GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/catalog_test.py
+          GEIST_EXECUTION_DAEMON="$PWD/geistd" python3 tests/app/execution_test.py
           python3 tests/app/cli_test.py
           python3 tests/app/download_test.py
           python3 tests/app/daemon_test.py
@@ -117,6 +119,6 @@ jobs:
   installers:
     uses: ./.github/workflows/installers.yml
     with:
-      package_version: ${{ inputs.package_version || '0.5.14' }}
+      package_version: ${{ inputs.package_version || '0.5.15' }}
     permissions:
       contents: read

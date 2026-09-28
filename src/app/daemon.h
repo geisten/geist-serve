@@ -8,6 +8,7 @@ struct app_run_stats {
     double generation_ns, total_ns;
 };
 bool app_daemon_ready(const char *path);
+bool app_daemon_ready_backend(const char *path, char backend[static 24]);
 int  app_daemon_chat(const char           *path,
                      size_t                count,
                      const struct chat_msg messages[],

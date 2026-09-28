@@ -177,6 +177,59 @@ window.chatChecksStage = 'locale';
       if (release) { release(); await settle(); }
       api=chatAPI; render(realState); message('', false); input('');
     }
+    window.chatChecksStage = 'execution-catalog';
+    while (polling) await tick();
+    const executionRealState = state;
+    let executionFixture = JSON.parse(JSON.stringify(state)), executionCalls = [], executionFault = false;
+    const beforeExecutionAPI = api;
+    const executionIdle = async () => { for (let i=0;i<100 && (requesting || polling);i++) await tick(); assert(!requesting,'execution action settles'); };
+    try {
+      executionFixture.execution = {mode:'auto',active:'cpu',backend:'cpu_neon',recommended:'gpu',gpu_available:true,basis:'hardware',notice:'',reason:'GPU is suggested for this larger model. This is a hardware default, not a measured speed comparison.'};
+      api = async (path, body, signal) => {
+        if (path === '/app/status') return new Response(JSON.stringify(executionFixture));
+        if (path === '/app/execution') {
+          executionCalls.push(body);
+          if (executionFault) throw new Error('Controlled processor failure');
+          executionFixture.execution.mode=body.mode;
+          executionFixture.execution.active=body.mode==='auto'?'gpu':body.mode;
+          executionFixture.execution.backend=executionFixture.execution.active==='gpu'?'metal':'cpu_neon';
+          return new Response('{}');
+        }
+        if (path === '/app/catalog') {
+          const imported=JSON.parse(body);
+          if (imported.schema!==1) throw new Error('Invalid model catalog. Check schema, entries and unique IDs/files.');
+          executionFixture.models=imported.models;
+          executionFixture.catalog_revision=imported.revision;
+          return new Response('{}');
+        }
+        return beforeExecutionAPI(path,body,signal);
+      };
+      render(executionFixture); input('Keep draft across processors');
+      const cpu = document.querySelector('[name="execution"][value="cpu"]'), gpu=document.querySelector('[name="execution"][value="gpu"]');
+      assert(document.querySelector('[name="execution"]:checked').value==='auto' && !gpu.closest('label').querySelector('.recommended-mark').hidden, 'recommendation and selected mode remain distinct');
+      assert($('execution-choice').closest('#workspace') && !$('settings-page').contains($('execution-choice')), 'processor choice lives with active model only');
+      gpu.click(); await executionIdle();
+      assert(executionCalls.length===1 && executionCalls[0].mode==='gpu' && gpu.checked && $('execution-current').textContent==='GPU · Metal', 'GPU click targets real execution endpoint and renders reported backend');
+      assert($('prompt').value==='Keep draft across processors', 'backend switch preserves draft');
+      executionFault=true;cpu.click();await executionIdle();
+      assert(gpu.checked && $('notice').textContent.includes('Controlled processor failure'), 'failed change restores reported selection');
+      executionFault=false;executionFixture.busy=true;render(executionFixture);
+      assert(cpu.disabled && gpu.disabled, 'busy model disables backend changes');
+      executionFixture.busy=false;executionFixture.execution.gpu_available=false;render(executionFixture);
+      assert(gpu.disabled && !cpu.disabled && $('execution-choice').getAttribute('aria-describedby'), 'unavailable GPU is disabled and described');
+      showPage('settings-page');
+      const upload = async object => {
+        const transfer = new DataTransfer();transfer.items.add(new File([JSON.stringify(object)],'models.json',{type:'application/json'}));
+        $('catalog-file').files=transfer.files;$('catalog-file').dispatchEvent(new Event('change'));await executionIdle();
+      };
+      const catalogFixture={schema:1,revision:42,models:[...executionFixture.models,{...executionFixture.models[0],id:'imported-model',name:'Imported model',installed:false}]};
+      await upload(catalogFixture);
+      assert(cards.has('imported-model') && $('catalog-revision').textContent==='#42' && $('catalog-result').textContent===t('Catalog updated.'), 'JSON file import updates visible list and revision');
+      await upload({...catalogFixture,schema:0});
+      assert(cards.has('imported-model') && $('catalog-result').textContent===t('Invalid model catalog. Check schema, entries and unique IDs/files.'), 'invalid import keeps current catalog and explains error');
+    } finally {
+      api=beforeExecutionAPI;render(executionRealState);message('',false);input('');showPage('models-page');
+    }
     assert(window.geistNavigate('invalid') === false && !$('models-page').hidden, 'native routing is allowlisted');
     showPage('test-page');
     window.chatChecksStage = 'markdown';

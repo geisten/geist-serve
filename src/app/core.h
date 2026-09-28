@@ -3,7 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define APP_MODEL_COUNT 6
+#define APP_MODEL_COUNT 32
+#define APP_CATALOG_BYTES 24576
 #define APP_GIB UINT64_C(1073741824)
 #define APP_PATH_CAP 4096
 
@@ -22,7 +23,11 @@ void app_put(struct app_buffer *b, const char *s);
 void app_printf(struct app_buffer *b, const char *format, ...);
 void app_quote(struct app_buffer *b, const char *s);
 /* Token pieces may end inside UTF-8. Emit only complete validated code points. */
-struct app_utf8 { unsigned char bytes[4]; unsigned used, need; bool failed; };
+struct app_utf8 {
+    unsigned char bytes[4];
+    unsigned      used, need;
+    bool          failed;
+};
 [[nodiscard]] bool app_utf8_feed(struct app_utf8 *state, const char *piece, char *out, size_t cap);
 
 struct app_model {
@@ -30,9 +35,20 @@ struct app_model {
     uint64_t    bytes;
     unsigned    working_mib; /* conservative planning estimate at <=4096 context */
     unsigned    recommended_ram_gib;
+    unsigned    backends; /* 1: CPU, 2: Metal, 4: Vulkan; device probe is still required */
 };
-extern const struct app_model app_models[APP_MODEL_COUNT];
-const struct app_model       *app_model_find(const char *id);
+extern struct app_model app_models[APP_MODEL_COUNT];
+extern size_t           app_model_count;
+extern unsigned         app_catalog_revision;
+extern const char      *app_catalog_json;
+struct app_catalog;
+struct app_catalog     *app_catalog_parse(const char *text, char error[static 256]);
+const struct app_model *app_catalog_find(const struct app_catalog *catalog, const char *id);
+const struct app_model *app_catalog_entry(const struct app_catalog *catalog, size_t index);
+unsigned                app_catalog_version(const struct app_catalog *catalog);
+void app_catalog_apply(struct app_catalog *catalog); /* caller holds catalog/app lock */
+void app_catalog_discard(struct app_catalog *catalog);
+const struct app_model *app_model_find(const char *id);
 
 enum app_device { APP_UNKNOWN, APP_APPLE_SILICON, APP_PI5 };
 struct app_hardware {

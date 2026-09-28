@@ -311,12 +311,13 @@ static bool op_info(struct daemon *d, struct conn *c) {
         live += d->sess[i].live;
     sb_printf(&h,
               "],\"ctx\":%d,\"vocab\":%zu,\"add_bos\":%s,\"bos\":%d,\"template\":\"%s\","
-              "\"agent_api\":1,\"sessions\":%d,\"max_sessions\":%d}",
+              "\"agent_api\":1,\"backend\":\"%s\",\"sessions\":%d,\"max_sessions\":%d}",
               CTX_CAP,
               d->vocab,
               d->add_bos ? "true" : "false",
               geist_model_bos_token(d->m),
               chat_family_name(d->family),
+              geist_backend_name(d->be),
               live,
               d->n_max);
     return reply(c, &h, 0, nullptr);
@@ -803,21 +804,69 @@ static int usage(const char *argv0) {
             "hello first\n"
             "  --sessions N   resident sessions (default 4, max %d); --idle S  evict after S s "
             "idle (default 1800)\n"
-            "  --stdio        one connection on stdin/stdout\n",
+            "  --stdio        one connection on stdin/stdout\n"
+            "  --backend cpu|gpu   choose execution backend\n"
+            "  --backends     print available backends as JSON\n",
             argv0,
             SESS_MAX);
     return 2;
 }
 
+/* No model is loaded while probing the compiled backends. */
+static const char *backend_name_for(const char *kind) {
+    if (!strcmp(kind, "cpu")) {
+#if defined(__aarch64__) || defined(__arm64__)
+        return "cpu_neon";
+#elif defined(__x86_64__)
+        return "cpu_x86";
+#else
+        return "cpu_scalar";
+#endif
+    }
+#ifdef __APPLE__
+    if (!strcmp(kind, "gpu"))
+        return "metal";
+#else
+    if (!strcmp(kind, "gpu"))
+        return "vulkan";
+#endif
+    return nullptr;
+}
+static int print_backends(void) {
+    printf("{");
+    for (int i = 0; i < 2; ++i) {
+        const char           *kind = i ? "gpu" : "cpu", *name = backend_name_for(kind);
+        struct geist_backend *probe = nullptr;
+        bool available = geist_backend_create(name, nullptr, nullptr, &probe) == GEIST_OK;
+        printf("%s\"%s\":{\"name\":\"%s\",\"available\":%s}",
+               i ? "," : "",
+               kind,
+               name,
+               available ? "true" : "false");
+        if (!available)
+            fprintf(stderr, "%s: %s\n", name, geist_last_create_error());
+        if (probe)
+            geist_backend_destroy(probe);
+    }
+    puts("}");
+    return 0;
+}
+
 int main(int argc, char **argv) {
-    const char   *model = nullptr, *sock = nullptr, *host = nullptr;
+    if (argc == 2 && !strcmp(argv[1], "--backends"))
+        return print_backends();
+    const char   *model = nullptr, *sock = nullptr, *host = nullptr, *backend = "auto";
     int           port  = 0;
     bool          stdio = false;
     struct daemon d     = {.n_max = 4, .idle_s = 1800};
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--stdio") == 0)
             stdio = true;
-        else if (strcmp(argv[i], "--socket") == 0 && i + 1 < argc)
+        else if (strcmp(argv[i], "--backend") == 0 && i + 1 < argc) {
+            backend = backend_name_for(argv[++i]);
+            if (!backend)
+                return usage(argv[0]);
+        } else if (strcmp(argv[i], "--socket") == 0 && i + 1 < argc)
             sock = argv[++i];
         else if (strcmp(argv[i], "--host") == 0 && i + 1 < argc)
             host = argv[++i];
@@ -877,7 +926,7 @@ int main(int argc, char **argv) {
             return 1;
     }
 
-    if (geist_backend_create("auto", nullptr, nullptr, &d.be) != GEIST_OK) {
+    if (geist_backend_create(backend, nullptr, nullptr, &d.be) != GEIST_OK) {
         fprintf(stderr, "backend: %s\n", d.be ? geist_backend_errmsg(d.be) : "create failed");
         return 1;
     }

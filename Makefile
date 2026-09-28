@@ -36,13 +36,21 @@ endif
 # opts in explicitly.
 GEMM_PROVIDER ?= native
 
+ifeq ($(shell uname -s)-$(shell uname -m),Darwin-arm64)
+BACKENDS ?= cpu_neon cpu_scalar metal
+endif
 TARGET ?= $(shell $(GEISTLIB)/mk/detect-target.sh)
 include $(GEISTLIB)/mk/target-$(TARGET).mk
 include $(GEISTLIB)/mk/gemm-$(GEMM_PROVIDER).mk
 
 endif
 
-LIB := $(GEISTLIB)/lib/$(TARGET)/$(MODE)/libgeist.a
+empty :=
+space := $(empty) $(empty)
+ENGINE_FLAVOR := $(GEMM_PROVIDER)-$(subst $(space),-,$(strip $(BACKENDS)))
+ENGINE_BUILD := build/$(TARGET)/$(MODE)-$(ENGINE_FLAVOR)
+ENGINE_LIB := lib/$(TARGET)/$(MODE)-$(ENGINE_FLAVOR)
+LIB := $(GEISTLIB)/$(ENGINE_LIB)/libgeist.a
 
 # EXTRA_* are geistlib's own escape hatches; the Linux release binary links
 # with EXTRA_LDFLAGS=-static against musl.
@@ -64,7 +72,9 @@ geist-serve: src/serve.c $(SHARED) $(HDRS) $(LIB)
 	$(CC) $(CFLAGS) -o $@ src/serve.c $(SHARED) $(LIB) $(LDFLAGS) $(LDLIBS)
 
 # geistd: libgeist over a socket for agents (resident sessions, logits).
-geistd: src/geistd.c $(SHARED) $(HDRS) $(LIB)
+GEISTD_OUTPUT ?= geistd
+$(GEISTD_OUTPUT): src/geistd.c $(SHARED) $(HDRS) $(LIB)
+	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -o $@ src/geistd.c $(SHARED) $(LIB) $(LDFLAGS) $(LDLIBS)
 
 # Model-free unit test of the chat renderers; no engine needed.
@@ -76,7 +86,8 @@ build/test_template: tests/test_template.c src/template.c src/template.h
 # target goes stale on a GEIST_REF bump.
 $(LIB): FORCE
 	$(MAKE) -C $(GEISTLIB) lib TARGET=$(TARGET) MODE=$(MODE) \
-		GEMM_PROVIDER=$(GEMM_PROVIDER)
+		GEMM_PROVIDER=$(GEMM_PROVIDER) BACKENDS="$(BACKENDS)" \
+		BUILD_DIR="$(ENGINE_BUILD)" LIB_DIR="$(ENGINE_LIB)"
 
 FORCE:
 

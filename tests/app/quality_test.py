@@ -94,7 +94,7 @@ class QualityTests(unittest.TestCase):
         # they are never installed as model evidence.
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder).resolve()
-            for directory in ('src','clients','tasks','quality'):
+            for directory in ('src','clients','tasks','models','quality'):
                 shutil.copytree(ROOT/directory,root/directory,ignore=shutil.ignore_patterns('__pycache__','bundles'))
             for name in ('Makefile','App.mk'):shutil.copyfile(ROOT/name,root/name)
             bundle=root/'quality/bundles/unit-test';bundle.mkdir(parents=True)

@@ -5,12 +5,26 @@
 #include "../../clients/geistd_client.h"
 
 bool app_daemon_ready(const char *path) {
+    char backend[24];
+    return app_daemon_ready_backend(path, backend);
+}
+
+bool app_daemon_ready_backend(const char *path, char backend[static 24]) {
+    backend[0]       = 0;
     struct geistd *g = geistd_connect_unix(path, nullptr);
     if (!g)
         return false;
     geistd_limits(g, 150, nullptr, nullptr);
-    char info[2048];
-    bool ok = geistd_info(g, sizeof info, info) == 0;
+    char         info[2048];
+    bool         ok = geistd_info(g, sizeof info, info) == 0;
+    struct json *j  = calloc(1, sizeof *j);
+    if (ok && j && json_parse(j, strlen(info), info) >= 0) {
+        char *name = json_strdup(j, json_get(j, 0, "backend"));
+        if (name)
+            snprintf(backend, 24, "%s", name);
+        free(name);
+    }
+    free(j);
     geistd_close(g);
     return ok;
 }

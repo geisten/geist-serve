@@ -16,7 +16,7 @@ def sha(path):
 def source_hash():
     digest = hashlib.sha256()
     paths = sorted([* (ROOT / 'src').rglob('*.c'), *(ROOT / 'src').rglob('*.h'),
-                    ROOT / 'clients/geistd_client.h', ROOT / 'tasks/catalog.json', ROOT / 'Makefile', ROOT / 'App.mk'])
+                    ROOT / 'clients/geistd_client.h', ROOT / 'tasks/catalog.json', ROOT / 'models/catalog.json', ROOT / 'Makefile', ROOT / 'App.mk'])
     for path in paths:
         digest.update(str(path.relative_to(ROOT)).encode() + b'\0' + path.read_bytes() + b'\0')
     return digest.hexdigest()
@@ -75,8 +75,7 @@ def load_bundle(path):
         if run.get(field) != sha(ROOT/'quality'/name) or sha(path/name) != sha(ROOT/'quality'/name):
             raise ValueError('Evidence corpus is not the current frozen corpus')
     pin = re.search(r'^GEIST_REF\s*\?=\s*([a-f0-9]{40})$', (ROOT/'Makefile').read_text(), re.M).group(1)
-    models = re.findall(r'\{"([^"]+)",\s*"[^"]+",\s*"[^"]+".*?"([a-f0-9]{64})"',
-                        (ROOT/'src/app/core.c').read_text().split('const struct app_model app_models')[1].split('\n};',1)[0], re.S)
+    models = [(m['id'],m['sha256']) for m in json.loads((ROOT/'models/catalog.json').read_text())['models']]
     versions = {t['id']:t['version'] for t in json.loads((ROOT/'tasks/catalog.json').read_text())['tasks']}
     if (run.get('engine_ref') != pin or (run.get('model_id'),run.get('model_sha256')) not in models
         or run.get('device') not in ('apple-silicon','pi5') or run.get('task_versions') != versions):
