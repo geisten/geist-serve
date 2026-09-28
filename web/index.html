@@ -11,7 +11,7 @@
 <nav aria-label="Navigation">
 <button data-page="models-page" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 1v4m6-4v4M9 19v4m6-4v4M1 9h4m-4 6h4m14-6h4m-4 6h4"/></svg><span>Models</span></button>
 <button id="open-tools" data-page="connect-page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 13 4-4m-7 6-1 1a4 4 0 0 0 6 6l4-4m1-9 1-1a4 4 0 0 0-6-6L8 6"/></svg><span>Connect</span></button>
-<button id="open-preferences" class="icon-button" type="button" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3-1 3-3 1 1 3-2 2 2 2-1 3 3 1 1 3h6l1-3 3-1-1-3 2-2-2-2 1-3-3-1-1-3z"/><circle cx="12" cy="12" r="3"/></svg></button>
+<button id="open-preferences" data-page="settings-page" type="button" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3-1 3-3 1 1 3-2 2 2 2-1 3 3 1 1 3h6l1-3 3-1-1-3 2-2-2-2 1-3-3-1-1-3z"/><circle cx="12" cy="12" r="3"/></svg><span>Settings</span></button>
 </nav></header>
 <main id="main">
 <section id="models-page" class="page model-home" aria-labelledby="models-title">
@@ -19,19 +19,15 @@
   <aside class="model-sidebar" aria-label="Model manager" tabindex="0">
   <div class="model-overview">
     <p id="catalog-preview" class="catalog-note" title="Selecting a model starts its preview. Check answers before using them.">Preview · Check answers.</p>
-    <section id="model-chooser" aria-labelledby="available-title"><h2 id="available-title" class="sr-only">Models for this computer</h2><div id="models" aria-label="Available models"></div><details class="recommendation"><summary>How we suggest a model</summary><p id="recommendation-reason" class="hint"></p></details></section>
+    <section id="model-chooser" aria-labelledby="available-title"><div class="library-heading"><h2 id="available-title">My models</h2><button id="add-model" type="button" class="text-button" aria-label="Add model" title="Add model"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Model</span></button></div><div id="models" aria-label="Downloaded models"></div><p id="library-empty" class="hint">Add a model to begin.</p></section>
   </div>
-  <details id="preferences" class="settings"><summary>Settings</summary><p id="disk-space" class="hint"></p><p class="hint">Downloads come from Hugging Face after you choose a model. Each completed download is verified with SHA-256. No account is needed.</p>  <div class="settings-row"><label for="ui-language">Interface language</label><select id="ui-language"><option value="system">System language</option><option value="en" lang="en">English</option><option value="de" lang="de">Deutsch</option></select></div>
-  <div class="settings-row"><label for="language-choice">Answer language</label><select id="language-choice"><option value="en" lang="en">English</option><option value="de" lang="de">Deutsch</option></select></div>
-  <details class="settings"><summary>Service</summary><p class="hint">Your editor and this window use the same model. Closing the window keeps the service running.</p><div class="actions"><button id="unload" type="button" disabled>Unload model</button><button id="quit" type="button">Stop model service</button></div></details>
-</details>
 
 </aside>
 
 <section id="test-page" aria-labelledby="task-title">
   <div id="test-unavailable"><h2 id="model-prompt">Choose a model to begin.</h2></div>
   <div id="workspace" hidden>
-    <div class="chat-heading"><div><h2 id="task-title" class="sr-only">Quick test</h2><h2 id="runtime-model" class="runtime-model"></h2><span id="runtime-state" class="state">Ready on this device</span></div><button id="new-chat" class="text-button" type="button" aria-label="Clear test" title="Clear test"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button></div>
+    <div class="chat-heading"><div><h2 id="task-title" class="sr-only">Quick test</h2><h2 id="runtime-model" class="runtime-model"><span id="runtime-state" class="status-light" role="img" aria-label="Model ready" title="Model ready"></span><span id="runtime-name"></span></h2></div></div>
     <details id="performance" class="model-performance">
     <summary class="model-metrics" aria-label="Model performance details" aria-describedby="test-speed test-memory test-size" title="Model performance details">
       <span title="Last completed reply" aria-label="Generation speed"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19a10 10 0 1 1 16 0M12 12l5-5"/><circle cx="12" cy="12" r="1"/></svg><span id="test-speed">— tok/s</span></span>
@@ -65,7 +61,7 @@
       <button id="latest" class="text-button" type="button" hidden>↓ Latest message</button>
       <form id="task-form"><label class="sr-only" for="prompt">Your input</label>
         <textarea id="prompt" rows="1" placeholder="Message Geist…" aria-describedby="composer-hint"></textarea>
-        <div class="actions"><details id="chat-help"><summary aria-label="What can I ask?" title="What can I ask?"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.01"/></svg></summary><div class="help-content"><p>Just describe what you need. No mode to choose.</p><ul><li>Rewrite this email in a friendlier tone: …</li><li>Summarize this text in three points: …</li><li>Suggest three ideas for …</li></ul><p>Answers support Markdown. Copy keeps the original formatting. Web addresses can be copied; external images are not loaded.</p><p>This test stays in this window. Clear test, reloading or quitting clears it. Check answers before using them.</p></div></details><span class="spacer"></span><button id="stop" class="icon-button" type="button" aria-label="Stop response" title="Stop response" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button><button id="run" class="primary icon-button" type="submit" disabled aria-label="Send message" title="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button></div>
+        <div class="actions"><details id="chat-help"><summary aria-label="What can I ask?" title="What can I ask?"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.01"/></svg></summary><div class="help-content"><p>Just describe what you need. No mode to choose.</p><ul><li>Rewrite this email in a friendlier tone: …</li><li>Summarize this text in three points: …</li><li>Suggest three ideas for …</li></ul><p>Answers support Markdown. Copy keeps the original formatting. Web addresses can be copied; external images are not loaded.</p><p>This test stays in this window. Clear test, reloading or quitting clears it. Check answers before using them.</p></div></details><button id="new-chat" class="text-button" type="button" aria-label="Clear test" title="Clear test"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11a8 8 0 1 1 2 7M4 4v7h7"/></svg></button><span class="spacer"></span><button id="stop" class="icon-button" type="button" aria-label="Stop response" title="Stop response" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button><button id="run" class="primary icon-button" type="submit" disabled aria-label="Send message" title="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button></div>
       </form>
       <p id="composer-hint" class="hint">↵ Send · ⇧↵ New line</p>
 
@@ -84,5 +80,14 @@
     <details class="settings"><summary>Home Assistant</summary><p class="hint">Use the existing Home Assistant integration. Device permissions and execution stay in Home Assistant. Product validation is still in progress.</p><a href="https://github.com/geisten/geist-home-assistant" target="_blank" rel="noreferrer">Open Home Assistant integration ↗</a></details>
   </section>
 
+  <section id="settings-page" class="page preferences-page" aria-labelledby="settings-title" hidden>
+    <h2 id="settings-title">Settings</h2>
+    <div class="settings-row"><label for="ui-language">Interface language</label><select id="ui-language"><option value="system">System language</option><option value="en" lang="en">English</option><option value="de" lang="de">Deutsch</option></select></div>
+    <div class="settings-row"><label for="language-choice">Answer language</label><select id="language-choice"><option value="en" lang="en">English</option><option value="de" lang="de">Deutsch</option></select></div>
+    <section class="preference-group" aria-labelledby="execution-title"><h3 id="execution-title">Execution</h3><p>CPU · bundled engine</p><p class="hint">GPU selection is not available in this app version.</p></section>
+    <section class="preference-group" aria-labelledby="storage-title"><h3 id="storage-title">Storage</h3><p id="disk-space" class="hint"></p></section>
+    <details class="settings"><summary>Advanced</summary><p class="hint">Your editor and this window use the same model. Closing the window keeps the service running.</p><div class="actions"><button id="unload" type="button" disabled>Unload model</button><button id="quit" type="button">Stop model service</button></div></details>
+  </section>
+<dialog id="model-catalog" aria-labelledby="catalog-title"><div class="catalog-heading"><h2 id="catalog-title">Add model</h2><button id="close-catalog" class="text-button icon-button" type="button" aria-label="Close" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 12"/></svg></button></div><p id="catalog-consent" class="catalog-note">Selecting a model downloads and starts its preview. Check answers before using them.</p><div id="catalog-models"></div><p id="catalog-empty" class="hint" hidden>All available models are downloaded.</p><p id="catalog-notice" role="status" aria-live="polite"></p></dialog>
 <footer>Models stay on this computer. Prompts and results are not saved as chat history.</footer>
 </main></body></html>

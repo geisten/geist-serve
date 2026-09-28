@@ -1,7 +1,7 @@
 # Geist — Runs here. Stays here.
 
 Manage a local model and connect your terminal and editor to the same service.
-Click the suggested model to download and start it, then work offline.
+Use **+ Model** to open the catalog, then click a model to download and start it.
 No account or separate setup step is required.
 Small models have limited capabilities: check their answers, and use the
 examples to decide whether a model meets your needs.
@@ -13,7 +13,7 @@ Mac release still needs Developer ID signing and notarization.
 ## Start on a Mac
 
 Open the Geist DMG, drag Geist to Applications, and open its desktop window.
-Click a model name or its download icon. Geist downloads, verifies and starts
+Open **+ Model** and click a model name or its download icon. Geist downloads, verifies and starts
 that model. An installed model starts directly. The same row shows progress and
 lets you pause or resume a download. The short preview notice stays above the list. The main screen stays on **Models**,
 with the catalog on the left and **Quick test** on the right. In narrow windows
@@ -48,7 +48,12 @@ Failed requests keep the draft; stopped partial answers remain in context. Sessi
 chat requires preview consent: single-task evidence does not certify follow-ups.
 Quick speed tests remain independent of the conversation.
 
-The **Models** screen keeps the catalog visible alongside the short test.
+The **Models** screen keeps downloaded and partially downloaded models alongside the short test.
+**+ Model** opens the catalog for adding other models. Deleting a download removes
+only its local files; its catalog entry remains available. Each library row has a
+delete action. Confirming deletion of an idle active model stops it first; active
+generation and download jobs reject deletion. Custom files outside the catalog
+are not removable through this interface.
 The metric row directly below the active model expands to show system and reply
 details; there is no separate performance section in the catalog. A ring before each model shows download status:
 an empty ring means no download, a partial ring shows downloaded bytes, and a
@@ -57,7 +62,13 @@ keep their percentage. File verification is a separate indeterminate state;
 receiving all bytes alone does not complete the download. Labels accompany every
 ring. Download status is separate from the model's running state and suitability.
 
-The gear opens **Settings**. **System language** is the default: German for a
+**Settings** is a separate navigation destination. Language and storage appear
+there; model unload and shared-service stop are under **Advanced**. The bundled
+engine uses the CPU; GPU selection is not yet exposed by this app. The proposed
+location for a tested backend selector is **Settings → Execution**, with automatic
+selection by default and optional per-model overrides in model details.
+The existing engine environment override is a developer facility, not an app
+compatibility guarantee. **System language** is the default: German for a
 German OS locale, English for other languages. Native Mac and Ubuntu hosts supply
 the OS language; a browser-only session uses its browser language. Explicit
 **Deutsch** or **English** overrides persist; choosing **System language** restores
@@ -73,10 +84,14 @@ and reply timings beneath the same model. Escape or clicking outside closes the
 details. The composer stays in place, and switching models clears old reply metrics.
 Icon controls have localized accessible names and tooltips.
 Download states, constraints and preview consent remain readable text. The trash
-icon clears the test after confirmation and is disabled for an empty test.
+icons in model rows remove the local download after confirmation. A reset icon
+in the composer clears a nonempty test. The active model heading has only a
+green status dot before its name; its accessible name explains the status.
+An amber outer ring marks constrained or unavailable models, accompanied by a
+textual reason; unavailable models cannot start.
 **Settings** also holds service controls. **Connect**
 sets up Terminal, Continue or OpenCode text chat. On Mac, the menu bar shows the
-active model and service status; **Models** and **Connect a program**
+active model and service status; **Models**, **Settings** (⌘,) and **Connect a program**
 reopen the corresponding view without reloading or clearing a test draft.
 Closing the window keeps the shared service running. Stopping it requires
 confirmation. Start at Login is optional in the native menu.

@@ -156,7 +156,7 @@ async function api(path, body, signal) {
 function uiText(element, source) {
   element.dataset.uiText = source; element.textContent = t(source);
 }
-function message(text, local = true) { uiText($('notice'), text); localMessage = local; }
+function message(text, local = true) { uiText($('notice'), text); uiText($('catalog-notice'), text); localMessage = local; }
 function buttonStates() {
   renderPerformance();
   $('test-connection').disabled = !state?.ready || state?.busy || connectionTesting || requesting || !!controller;
@@ -167,14 +167,17 @@ function buttonStates() {
   $('run').disabled = !ready || !$('prompt').value.trim();
   $('run').hidden = !!controller;
   $('new-chat').disabled = !!controller || !(conversation.length || $('result').children.length || $('prompt').value);
+  $('new-chat').hidden = !(conversation.length || $('result').children.length || $('prompt').value);
   $('benchmark').disabled = !state?.ready || state?.busy || requesting || !!controller ||
     !allowed(state?.models.find(m => m.id === state.active_id), tasks.find(t => t.id === 'freeform'));
   $('unload').disabled = !state?.ready || state?.busy || requesting || !!controller;
   if (!controller && document.activeElement === $('stop')) $('prompt').focus({preventScroll: true});
   $('stop').hidden = !controller;
   document.body.classList.toggle('generating', !!controller);
-  $('runtime-state').textContent = t(controller ? 'Generating locally…' : state?.ready ? 'Ready on this device' : 'Choose a model');
-  $('runtime-model').textContent = state?.models.find(model => model.id === state.active_id)?.name || state?.active || '';
+  const runtimeStatus = t(controller ? 'Generating locally…' : state?.ready ? 'Model ready' : 'No model loaded');
+  $('runtime-state').setAttribute('aria-label', runtimeStatus); $('runtime-state').title = runtimeStatus;
+  $('runtime-state').classList.toggle('inactive', !state?.ready);
+  $('runtime-name').textContent = state?.models.find(model => model.id === state.active_id)?.name || state?.active || '';
   $('language-choice').disabled = !!controller;
 }
 
@@ -222,7 +225,7 @@ function modelCard(model) {
   if (!card) {
     card = document.createElement('article'); card.className = 'model'; card.dataset.id = model.id;
     // One semantic button covers the name and icon. Details/removal are siblings.
-    card.innerHTML = '<button class="model-pick" type="button" aria-describedby="catalog-preview"><span class="model-ring"></span><span class="model-info"><span class="model-name"></span><span class="download-state"></span></span><span class="model-action" aria-hidden="true"></span></button><span class="fit"></span><span class="transfer-detail"></span><details><summary></summary><p class="specs"></p><p class="reason"></p><p class="performance"></p><p class="quality"></p><button class="remove" type="button"></button></details>';
+    card.innerHTML = '<button class="model-pick" type="button" aria-describedby="catalog-preview"><span class="model-ring"></span><span class="model-info"><span class="model-name"></span><span class="download-state"></span></span><span class="model-action" aria-hidden="true"></span></button><span class="fit"></span><span class="transfer-detail"></span><details><summary></summary><p class="specs"></p><p class="reason"></p><p class="performance"></p><p class="quality"></p></details><button class="remove text-button icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button>';
     card.querySelector('.model-pick').addEventListener('click', event => { if (event.detail < 2) choose(model.id); });
     card.querySelector('.model-pick').addEventListener('keydown', event => {
       if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
@@ -241,10 +244,12 @@ function modelCard(model) {
   // The button's complete name exposes status; a duplicate nested progress role
   // is unnecessary to screen readers. Numeric ring attributes remain inspectable.
   card.querySelector('.model-ring').setAttribute('aria-hidden', 'true');
+  card.querySelector('.model-ring').dataset.fit = String(model.resource_fit);
+  card.querySelector('.model-ring').title = model.resource_fit ? t(model.reason || 'Limited on this computer') : t(download.text);
   const status = pending ? 'Getting ready…' : preparing && state.loading ? 'Loading model' : download.text;
   card.querySelector('.download-state').textContent = t(status);
-  card.querySelector('.download-state').hidden = !pending && !preparing && (download.stage === 'missing' || (active && allowed(model)));
-  card.querySelector('.fit').hidden = !active && model.resource_fit === 0 && model.id !== state.recommendation.id;
+  card.querySelector('.download-state').hidden = !pending && !preparing && (download.stage === 'missing' || download.stage === 'downloaded');
+  card.querySelector('.fit').hidden = model.resource_fit === 0 && (model.installed || model.id !== state.recommendation.id);
   card.querySelector('.fit').textContent = t(active ? 'Running here' : model.resource_fit === 2 ? 'Unavailable' : model.id === state.recommendation.id ? 'Suggested' : model.resource_fit === 1 ? 'Conditional' : 'Available');
   const detail = card.querySelector('.transfer-detail');
   detail.hidden = !preparing || state.loading;
@@ -264,12 +269,13 @@ function modelCard(model) {
   }
   glyph.hidden = icon === 'active';
   button.title = `${t(action)}: ${model.name}`;
-  button.setAttribute('aria-label', `${t(action)}: ${model.name} · ${t(status)}`);
+  button.setAttribute('aria-label', `${t(action)}: ${model.name} · ${t(status)}${model.resource_fit ? ` · ${t(model.reason || 'Limited on this computer')}` : ''}`);
+  button.setAttribute('aria-describedby', card.parentElement?.id === 'catalog-models' ? 'catalog-consent' : 'catalog-preview');
   button.disabled = requesting || !!controller || connectionTesting || (!paused && (model.resource_fit === 2 || state.busy || state.loading || !!state.phase || (active && allowed(model))));
   const remove = card.querySelector('.remove');
-  remove.textContent = t('Remove download');
+  remove.title = `${t('Remove download')}: ${model.name}`;
   remove.hidden = model.id === 'custom' || (!model.installed && !model.partial);
-  remove.disabled = (state.active_id === model.id && (state.ready || state.loading)) || state.busy || requesting || !!controller;
+  remove.disabled = state.busy || state.loading || !!state.phase || requesting || !!controller || connectionTesting;
   remove.setAttribute('aria-label', `${t('Remove download')}: ${model.name}`);
 }
 
@@ -295,7 +301,6 @@ function render(next) {
   if (previouslyHidden && !$('workspace').hidden && !$('models-page').hidden &&
       (document.activeElement === document.body || document.activeElement.closest('.model-pick'))) $('prompt').focus({preventScroll:true});
   $('disk-space').textContent = t(next.hardware.disk_known ? `${bytes(next.hardware.disk)} disk space available` : 'Disk space could not be read');
-  $('recommendation-reason').textContent = t(next.recommendation.reason);
   const models = visibleModels();
   if (!models.some(model => model.id === 'custom') && cards.has('custom')) { cards.get('custom').remove(); cards.delete('custom'); }
   // Keep existing nodes and ordering stable while downloading and polling.
@@ -304,7 +309,16 @@ function render(next) {
     (b.id === next.recommendation.id) - (a.id === next.recommendation.id) ||
     Number(b.installed) - Number(a.installed) || a.resource_fit - b.resource_fit);
   if (!working) { transfer.id = ''; transfer.samples = []; }
-  ordered.forEach(modelCard);
+  ordered.forEach(model => {
+    modelCard(model);
+    const inLibrary = model.installed || model.partial > 0 || next.active_id === model.id && next.ready || next.job_model === model.id && (!!next.phase || next.loading);
+    const parent = $(inLibrary ? 'models' : 'catalog-models');
+    const card = cards.get(model.id);
+    if (card.parentElement !== parent) parent.append(card);
+    card.querySelector('.model-pick').setAttribute('aria-describedby', inLibrary ? 'catalog-preview' : 'catalog-consent');
+  });
+  $('library-empty').hidden = $('models').children.length > 0;
+  $('catalog-empty').hidden = $('catalog-models').children.length > 0;
   if (!controller && !requesting && (!localMessage || next.message !== lastServerMessage)) message(working ? '' : next.message || '', false);
   lastServerMessage = next.message;
   buttonStates(); chatLayout();
@@ -338,6 +352,7 @@ async function choose(id) {
     if (!state.ready || state.active_id !== id) {
       await api(model.installed ? '/app/select' : '/app/download', {id});
     }
+    $('model-catalog').close();
   } catch (error) { message(error.message); }
   finally {
     // Keep the row locked until a fresh status reflects the completed action.
@@ -501,7 +516,7 @@ $('quit').addEventListener('click', async () => {
   if (!confirm(t('Stop the shared service? Terminal and editor connections will stop too. Downloaded models are kept.'))) return;
   try {
     await api('/app/quit', {}); stopped = true; clearInterval(timer); controller?.abort();
-    state = null; buttonStates(); $('runtime-state').textContent = t('Stopping');
+    state = null; buttonStates(); $('runtime-state').setAttribute('aria-label', t('Stopping'));
     document.querySelectorAll('#models button, #quit').forEach(button => { button.disabled = true; });
     message('Geist is stopping. Reopen the app to start it again.');
   } catch (error) { message(error.message); }
@@ -548,7 +563,7 @@ if (!/^[a-f0-9]{64}$/.test(token)) message('Open Geist using the private link fr
 else { loadTasks().catch(error => message(error.message)); poll(); timer = setInterval(poll, 1800); }
 
 function showPage(id) {
-  if (!['models-page', 'connect-page', 'test-page'].includes(id)) return false;
+  if (!['models-page', 'connect-page', 'settings-page', 'test-page'].includes(id)) return false;
   const quickTest = id === 'test-page';
   if (quickTest) id = 'models-page'; // Native quick-test shortcut focuses the shared pane.
   document.querySelectorAll('.page').forEach(page => { page.hidden = page.id !== id; });
@@ -556,7 +571,7 @@ function showPage(id) {
     if (button.dataset.page === id) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
-  $('chat-help').open = false; $('performance').open = false;
+  $('chat-help').open = false; $('performance').open = false; $('model-catalog').close();
   chatLayout();
   if (quickTest && !$('workspace').hidden) $('prompt').focus({preventScroll: true});
   else { const heading = $(id).querySelector('h1, h2'); heading.tabIndex = -1; heading.focus({preventScroll:true}); }
@@ -566,10 +581,9 @@ function showPage(id) {
 // Native menus route only to these fixed pages, without reloading the document.
 window.geistNavigate = showPage;
 document.querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => showPage(button.dataset.page)));
-$('open-preferences').addEventListener('click', () => {
-  showPage('models-page'); $('preferences').open = true;
-  $('ui-language').focus({preventScroll:true}); $('ui-language').scrollIntoView({block:'nearest'});
-});
+$('add-model').addEventListener('click', () => { $('model-catalog').showModal(); $('close-catalog').focus(); });
+$('close-catalog').addEventListener('click', () => $('model-catalog').close());
+$('model-catalog').addEventListener('close', () => { if (!$('models-page').hidden) $('add-model').focus({preventScroll:true}); });
 $('ui-language').value = interfacePreference;
 $('language-choice').value = interfaceLanguage;
 $('ui-language').addEventListener('change', async () => {
@@ -593,10 +607,11 @@ $('ui-language').addEventListener('change', async () => {
 });
 async function removeModel(id) {
   const model = state?.models.find(item => item.id === id);
-  if (!model || requesting || controller || state.busy || (state.active_id === id && (state.ready || state.loading))) return;
-  if (!confirm(t(`Remove ${model.name} from this computer? You can download it again later.`))) return;
+  if (!model || requesting || controller || state.busy || state.loading || state.phase || connectionTesting) return;
+  const warning = state.active_id === id && state.ready ? `${t('The running model will stop. Connected programs will need another model.')}\n\n` : '';
+  if (!confirm(warning + t(`Remove ${model.name} from this computer? You can download it again later.`))) return;
   requesting = true; buttonStates(); visibleModels().forEach(modelCard);
-  try { await api('/app/remove', {id}); message('', false); }
+  try { await api('/app/remove', {id}); message('', false); $('add-model').focus({preventScroll:true}); }
   catch (error) { message(error.message); }
   finally { requesting = false; await poll(); }
 }

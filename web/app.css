@@ -789,3 +789,33 @@ body.manager-page main { max-width:1180px }
   .model-performance { margin-bottom:4px }
   .model-performance>summary { min-height:20px; padding:1px 4px }
 }
+
+/* Library, catalog and preferences are distinct tasks. */
+.library-heading,.catalog-heading { display:flex; align-items:center; justify-content:space-between; gap:8px }
+.library-heading { position:sticky; top:-6px; z-index:2; background:#f5f6f8; padding:4px 0 8px }
+.library-heading h2 { font-size:13px; letter-spacing:0; margin:0 4px }
+.library-heading button { font-size:12px; padding:4px 8px; min-height:32px }
+#library-empty { font-size:12px; padding:12px 8px }
+.model { position:relative; padding-right:30px }
+.model .remove { position:absolute; top:12px; right:0; min-width:28px; min-height:32px; padding:5px; color:var(--muted) }
+.model .remove svg { width:15px; height:15px }
+.model .remove:hover:not(:disabled) { color:#a63333; background:#fff0f0 }
+.model-ring[data-fit="1"],.model-ring[data-fit="2"] { outline:2px solid #b77b16; outline-offset:2px; border-radius:50% }
+.model-ring[data-fit="2"] .ring-track { stroke:#b77b16 }
+.chat-heading .runtime-model { display:flex; align-items:center; gap:8px }
+.status-light { width:7px; height:7px; background:var(--success); border-radius:50%; flex:none }
+.status-light.inactive { background:var(--muted) }
+#new-chat { color:var(--muted) }
+.preferences-page { max-width:520px; margin:0 auto; padding:8px 0 24px }
+.preference-group { margin-top:24px; padding-top:20px; border-top:1px solid var(--border) }
+.preference-group h3 { font-size:13px }
+.preference-group p { font-size:13px; margin-bottom:8px }
+.preferences-page .settings-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:18px 0 }
+.preferences-page .settings-row label { font-size:13px }
+#model-catalog { color:var(--ink); background:var(--surface); width:min(480px,calc(100vw - 28px)); max-height:calc(100dvh - 32px); padding:20px; border:1px solid var(--border); border-radius:16px; overflow:auto; box-shadow:0 12px 50px #20232926 }
+#model-catalog::backdrop { background:#20232940 }
+.catalog-heading { position:sticky; top:-20px; z-index:2; background:var(--surface); padding:0 0 12px }
+.catalog-heading h2 { margin:0; font-size:18px }
+#catalog-models .model { border-bottom:1px solid var(--border); padding-top:10px; padding-bottom:12px }
+#catalog-notice { font-size:12px; color:#9d3939; margin:8px 0 0 }
+@media(max-width:540px) { header { gap:8px; padding-left:14px; padding-right:14px } nav button { gap:4px; padding:6px 8px; font-size:11px } nav svg { width:16px; height:16px } }

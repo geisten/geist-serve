@@ -56,6 +56,22 @@ window.chatChecksStage = 'locale';
     assert([...document.querySelectorAll('.model .model-ring')].length === state.models.length, 'each model exposes download state before its name');
     assert(document.documentElement.scrollWidth <= innerWidth, 'model picker fits a small or zoomed window');
     assert($('model-chooser').tagName === 'SECTION', 'model list is visible without a disclosure');
+    assert(!$('recommendation-reason') && !$('preferences'), 'no recommendation explanation or nested settings section');
+    assert(!$('new-chat').closest('.chat-heading') && $('runtime-state').parentElement === $('runtime-model') && !$('runtime-state').textContent, 'status dot precedes model name without redundant text or header trash');
+    for (const card of $('models').children) {
+      const m = state.models.find(m => m.id === card.dataset.id);
+      assert(m?.installed || m?.partial || card.dataset.id === state.active_id, 'main library contains local models only');
+    }
+    input('Keep this draft through settings');
+    $('open-preferences').click();
+    assert(!$('settings-page').hidden && $('models-page').hidden && $('open-preferences').getAttribute('aria-current') === 'page', 'settings is a separate navigation destination');
+    assert($('ui-language').closest('#settings-page') && $('unload').closest('#settings-page'), 'preferences and advanced service actions belong to settings');
+    window.geistNavigate('models-page');
+    assert($('prompt').value === 'Keep this draft through settings', 'settings navigation keeps the draft'); input('');
+    $('add-model').click();
+    assert($('model-catalog').open && document.activeElement === $('close-catalog'), 'catalog opens as a labelled modal');
+    $('close-catalog').click(); await tick();
+    assert(!$('model-catalog').open && document.activeElement === $('add-model'), 'catalog close restores focus');
     const panes = [$('models-page').querySelector('.model-sidebar').getBoundingClientRect(), $('test-page').getBoundingClientRect()];
     assert(innerWidth < 700 ? panes[0].bottom <= panes[1].top : panes[0].right <= panes[1].left, 'panes stack on small windows and sit side by side on wide ones');
     // Model-row interactions use deterministic transport only; no test fetches a
@@ -82,7 +98,7 @@ window.chatChecksStage = 'locale';
     try {
       api = async (path, body, signal) => {
         if (path === '/app/status') return new Response(JSON.stringify(fixture));
-        if (!['/app/preview','/app/download','/app/select','/app/cancel'].includes(path)) return chatAPI(path, body, signal);
+        if (!['/app/preview','/app/download','/app/select','/app/cancel','/app/remove'].includes(path)) return chatAPI(path, body, signal);
         modelCalls.push([path, body]);
         if (fault === path) throw new Error('Controlled model action failure');
         if (path === '/app/preview') fixtureModel().preview_accepted = true;
@@ -94,15 +110,18 @@ window.chatChecksStage = 'locale';
           fixtureModel().partial = fixture.received;
           Object.assign(fixture, {busy:false, phase:'', job_model:''});
         }
+        if (path === '/app/remove') { fixtureModel().installed=false; fixtureModel().partial=0; if (fixture.active_id === modelID) Object.assign(fixture, {active_id:'', active:'', ready:false}); }
         if (path === '/app/select') Object.assign(fixture, {active_id:modelID, active:fixtureModel().name, ready:true, busy:false, phase:'', job_model:''});
         return new Response('{}');
       };
-      resetFixture(); input('Draft survives model changes');
+      resetFixture(); input('Draft survives model changes'); $('add-model').click();
+      assert(pick().closest('#catalog-models'), 'undownloaded model is offered only in the catalog');
       assert(!$('setup-start') && !$('setup') && !$('go-setup'), 'no second setup or start control');
       assert(pick().querySelector('.download-state').hidden && pick().getAttribute('aria-label').includes(t('Not downloaded')), 'missing state uses symbols while retaining an accessible explanation');
       pick().querySelector('.model-name').click(); await settle();
       assert(JSON.stringify(modelCalls.map(([path]) => path)) === JSON.stringify(['/app/preview','/app/download']), 'one name click grants preview and starts exactly one download');
       assert(modelCalls.every(([, body]) => body.id === modelID), 'action keeps the explicitly requested model');
+      assert(!$('model-catalog').open && pick().closest('#models'), 'download closes catalog and moves live progress into library');
       assert(pick().getAttribute('aria-label').includes(t('Pause download')) && pick().querySelector('.model-ring').getAttribute('aria-valuenow') === '50', 'same row exposes real progress and pause');
       const count = modelCalls.length;
       pick().dispatchEvent(new MouseEvent('click', {bubbles:true, detail:2})); await tick();
@@ -120,13 +139,20 @@ window.chatChecksStage = 'locale';
       pick().querySelector('.model-name').click(); await settle();
       assert(modelCalls.length === 1 && modelCalls[0][0] === '/app/select', 'installed model starts with one click and no download');
       assert(pick().disabled && !$('workspace').hidden && $('prompt').value === 'Draft survives model changes', 'active model has no redundant action and retains the draft');
+      const remove = pick().closest('.model').querySelector('.remove');
+      assert(!remove.hidden && !remove.disabled && !remove.closest('details'), 'each local model has a direct delete action, including the active model');
+      window.confirm = () => false; remove.click(); await settle();
+      assert(fixtureModel().installed, 'cancelled deletion keeps the file');
+      window.confirm = () => true; remove.click(); await settle();
+      assert(modelCalls.at(-1)[0] === '/app/remove' && pick().closest('#catalog-models') && !fixtureModel().installed, 'deletion keeps the model as a catalog download choice');
+      window.confirm = originalConfirm;
       resetFixture();
       const details = pick().closest('.model').querySelector('details');
       details.querySelector('summary').click(); await tick();
       assert(details.open && !modelCalls.length, 'opening details never starts a download'); details.open=false;
       fixtureModel().resource_fit=2; render(JSON.parse(JSON.stringify(fixture)));
       pick().click(); await choose(modelID);
-      assert(pick().disabled && !modelCalls.length, 'unsuitable models cannot start');
+      assert(pick().disabled && !modelCalls.length && pick().querySelector('.model-ring').dataset.fit === '2', 'unsuitable models retain warning and cannot start');
       resetFixture(); fixture.busy=true; render(JSON.parse(JSON.stringify(fixture)));
       pick().click(); await choose(modelID);
       assert(!modelCalls.length, 'another busy operation prevents switching');

@@ -15,11 +15,20 @@ const formatNumber = (value, digits = 0) => new Intl.NumberFormat(interfaceLangu
   minimumFractionDigits: digits, maximumFractionDigits: digits
 }).format(value);
 const german = {
+  'My models': 'Meine Modelle', 'Add model': 'Modell hinzufügen', 'Model': 'Modell',
+  'Downloaded models': 'Heruntergeladene Modelle', 'Add a model to begin.': 'Füge ein Modell hinzu.',
+  'Close': 'Schließen', 'Execution': 'Ausführung', 'Storage': 'Speicher', 'Advanced': 'Erweitert',
+  'CPU · bundled engine': 'CPU · mitgelieferte Engine',
+  'GPU selection is not available in this app version.': 'GPU-Auswahl ist in dieser App-Version noch nicht verfügbar.',
+  'All available models are downloaded.': 'Alle verfügbaren Modelle sind heruntergeladen.',
+  'Limited on this computer': 'Auf diesem Rechner eingeschränkt',
+  'Model ready': 'Modell bereit', 'No model loaded': 'Kein Modell geladen',
+  'The running model will stop. Connected programs will need another model.': 'Das laufende Modell wird beendet. Verbundene Programme benötigen anschließend ein anderes Modell.',
+  'Selecting a model downloads and starts its preview. Check answers before using them.': 'Die Auswahl lädt das Modell herunter und startet seine Vorschau. Prüfe Antworten vor der Verwendung.',
   'Model performance details': 'Details zur Modellleistung',
   'Models & quick test': 'Modelle & Kurztest',
   'Model manager': 'Modellverwaltung',
   'Models for this computer': 'Modelle für diesen Rechner',
-  'How we suggest a model': 'Wie wir ein Modell vorschlagen',
   'Set up a model to check its response and speed here.': 'Richte ein Modell ein, um hier die Antwort und Geschwindigkeit zu prüfen.',
   'Go to model setup': 'Zur Modelleinrichtung',
   'Suggested': 'Vorgeschlagen', 'Active': 'Aktiv', 'Selected': 'Ausgewählt',

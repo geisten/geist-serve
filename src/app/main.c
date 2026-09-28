@@ -1498,10 +1498,9 @@ static void handle(int fd, struct app_arena *arena) {
     bool valid     = path_join(path, app.models, model->file);
     bool installed = valid && regular_size(path) == model->bytes;
     if (remove) {
-        if (!valid ||
-            (app.child > 0 && (!strcmp(app.active_id, model->id) || !strcmp(app.chosen, path)))) {
+        if (!valid) {
             pthread_mutex_unlock(&app.mutex);
-            error_response(fd, 409, "Unload this model before removing it.");
+            error_response(fd, 409, "Cannot remove this download safely.");
             return;
         }
         // Catalog filenames only; never follow a replaced directory or a symlink.
@@ -1518,6 +1517,13 @@ static void handle(int fd, struct app_arena *arena) {
             else
                 safe = errno == ENOENT;
         }
+        /* Deletion is explicit. Validate paths before stopping the owned model,
+         * and hold the same lock through stop/removal so no client can start a
+         * new generation between those operations. Busy requests are rejected
+         * above. The catalog entry itself is immutable and remains available. */
+        if (safe && app.child > 0 &&
+            (!strcmp(app.active_id, model->id) || !strcmp(app.chosen, path)))
+            stop_child();
         for (unsigned i = 0; safe && i < 2; ++i)
             if (unlinkat(directory, names[i], 0) != 0 && errno != ENOENT)
                 safe = false;

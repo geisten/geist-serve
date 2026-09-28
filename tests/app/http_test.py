@@ -202,7 +202,6 @@ def main():
             try:
                 assert app.request("/app/select", {"id": "smollm2-360m"})[0] == 202
                 app.wait(lambda state: state["ready"], timeout=60)
-                assert app.request("/app/remove", {"id": "smollm2-360m"})[0] == 409
                 code, body, _ = app.request("/app/generate", {
                     "experimental": True,
                     "prompt": "Write a detailed paragraph about how a garden changes through the seasons.",
