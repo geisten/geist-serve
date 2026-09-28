@@ -46,6 +46,14 @@ def wait_js(view, condition, timeout=30):
         raise AssertionError(f'{condition}: {details}') from error
 
 
+for locale in ('de', 'de-DE', 'de_AT.UTF-8', 'DE-ch', 'de@euro'):
+    assert d.resolve_language('system', locale) == 'de'
+for locale in ('en-US', 'fr-FR', 'debug', '', None):
+    assert d.resolve_language(None, locale) == 'en'
+assert d.resolve_language('en', 'de-DE') == 'en'
+assert d.resolve_language('de', 'en-US') == 'de'
+assert d.resolve_language('invalid', 'de-DE') == 'de'
+
 with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
     os.environ['GEIST_HOME'] = temporary
     os.environ['GEIST_PORT'] = '0'
@@ -67,6 +75,12 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
         assert desktop.view.get_network_session().is_ephemeral()
         assert evaluate(desktop.view, "document.getElementById('workspace').hidden && !document.getElementById('setup').hidden && !document.getElementById('experimental')")
         assert evaluate(desktop.view, "state.models.every(m => !m.preview_accepted)")
+        evaluate(desktop.view, "document.getElementById('ui-language').value='system'; document.getElementById('ui-language').dispatchEvent(new Event('change')); true")
+        spin(lambda: desktop.preferences.exists() and json.loads(desktop.preferences.read_text())['language'] == 'system')
+        assert desktop.language == desktop.system_language
+        evaluate(desktop.view, "window.beforeLanguageReload=true; true")
+        desktop.view.reload()
+        wait_js(desktop.view, "typeof window.beforeLanguageReload === 'undefined' && typeof state !== 'undefined' && state && document.getElementById('ui-language').value === 'system' && document.documentElement.lang === resolveLanguage('system', window.geistSystemLanguage)")
         connection = json.loads((Path(temporary) / 'connection.json').read_text())
         desktop.activate()
         spin(lambda: not desktop.working)

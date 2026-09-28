@@ -19,18 +19,18 @@ with the catalog on the left and **Quick test** on the right. In narrow windows
 they stack vertically. Each pane scrolls independently. **Connect a program**
 opens editor setup; the short test checks a response and its speed. Press **Enter** to send and **Shift + Enter** for a new line. The arrow sends
 with a pointer or touch; the stop button preserves a partial response. Follow-up
-messages include the visible conversation from this window. **Tips** offers
+messages include the visible conversation from this window. The **ⓘ** control offers
 examples for rewriting, summarizing and ideas; there is no task-mode selector.
 
 Responses render Markdown headings, lists, quotes, tables and code blocks on a
-cream-white reading surface. **Copy** retains the original Markdown; code blocks
+white reading surface. **Copy** retains the original Markdown; code blocks
 have a separate copy control. Wide code and tables scroll inside their blocks.
 Model-provided HTML is shown literally. Web addresses can be copied; the chat
 does not navigate to them or load remote images. No formatting service is used.
 
 Entering Quick test or clearing the test focuses the composer. Sending and
 stopping return to it; background status updates and completed responses do not
-steal focus. Escape dismisses Tips and returns to its control. Tab follows the
+steal focus. Escape dismisses the help panel and returns to its control. Tab follows the
 visible document order. While text is selected or a response control has focus,
 formatting changes to that response wait until selection/focus leaves it.
 
@@ -55,7 +55,21 @@ keep their percentage. File verification is a separate indeterminate state;
 receiving all bytes alone does not complete the download. Labels accompany every
 ring. Download status is separate from the model's running state and suitability.
 
-**Settings** holds interface/answer languages and service controls. **Connect**
+The gear opens **Settings**. **System language** is the default: German for a
+German OS locale, English for other languages. Native Mac and Ubuntu hosts supply
+the OS language; a browser-only session uses its browser language. Explicit
+**Deutsch** or **English** overrides persist; choosing **System language** restores
+automatic detection. Existing explicit language choices remain respected. Native
+menu labels follow the preference. Answer language starts with the interface
+language unless a separate answer preference was saved.
+
+The interface uses white, a light gray catalog and blue action accents. Green
+rings identify completed downloads, independently of the active model. Speed,
+process RAM and model file size appear beneath the active model name; missing
+values remain unknown. Icon controls have localized accessible names and tooltips.
+Download states, constraints and preview consent remain readable text. The trash
+icon clears the test after confirmation and is disabled for an empty test.
+**Settings** also holds service controls. **Connect**
 sets up Terminal, Continue or OpenCode text chat. On Mac, the menu bar shows the
 active model and service status; **Models & performance** and **Connect a program**
 reopen the corresponding view without reloading or clearing a test draft.

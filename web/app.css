@@ -1,15 +1,15 @@
 @charset "UTF-8";
 :root {
   color-scheme:light;
-  --bg:#faf8f2;
-  --surface:#fffdf8;
-  --ink:#292823;
-  --muted:#6c675d;
-  --border:#e2ddd2;
-  --accent:#166b73;
-  --success:#427052;
-  --soft:#efece4;
-  --focus:#166b73;
+  --bg:#ffffff;
+  --surface:#ffffff;
+  --ink:#202329;
+  --muted:#626873;
+  --border:#e4e7ec;
+  --accent:#245edb;
+  --success:#287447;
+  --soft:#f1f3f6;
+  --focus:#245edb;
   --shadow:0 2px 8px #3d352604,0 8px 28px #3d352608;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   font-size:15px
@@ -478,7 +478,7 @@ nav { gap:4px }
 nav button { border-radius:10px; min-height:36px; padding:7px 10px; color:var(--muted); font-size:12px; font-weight:500 }
 nav button[aria-current] { color:var(--ink); background:var(--soft); box-shadow:none }
 #task-form { padding:10px 16px 9px; border:1px solid var(--border); border-radius:22px; background:var(--surface); box-shadow:var(--shadow); transition:border-color .16s,box-shadow .16s }
-#task-form:focus-within { border-color:var(--focus); box-shadow:0 0 0 1px #166b7320,var(--shadow) }
+#task-form:focus-within { border-color:var(--focus); box-shadow:0 0 0 1px #245edb20,var(--shadow) }
 #task-form textarea { padding:8px 0; background:transparent; border:0; border-radius:0; box-shadow:none; outline:none }
 #task-form .actions { border:0; margin:2px 0 0; padding:0; gap:8px }
 #job { margin-top:28px; padding:28px; background:var(--surface); border:1px solid var(--border); border-radius:22px; box-shadow:var(--shadow); text-align:left }
@@ -756,4 +756,58 @@ body.manager-page #notice { flex:none; max-height:16vh; overflow:auto; margin:6p
   .model .choose-model { grid-row:1; align-self:center }
   .model details { grid-row:2; grid-column:2; margin:0 }
   .model details[open] { grid-row:3; grid-column:1 / -1; margin-left:35px }
+}
+
+/* Quiet model manager: compact controls, one readiness label and inline metrics. */
+body.manager-page header { padding:12px 22px; max-width:1180px }
+body.manager-page main { max-width:1180px }
+.brand { font-size:25px; letter-spacing:-1px }
+#models-page { gap:20px; grid-template-columns:minmax(205px,28%) minmax(0,1fr) }
+.model-sidebar { background:#f6f7f9; border-radius:14px; padding:12px 10px }
+#model-ready { margin:0 }
+#model-chooser { margin-top:0 }
+.model { border:0; padding:12px 8px; border-radius:10px; margin:2px 0; gap:3px 5px }
+.model.active,.model.selected { background:#eaf0fd }
+.model-heading { grid-column:1; gap:8px }
+.model-heading h3 { font-size:13px; font-weight:550 }
+.model .download-state,.model .fit { font-size:11px }
+.model .fit { margin-left:36px; grid-column:1; grid-row:2 }
+.model .choose-model { grid-column:2; grid-row:1 / 3; align-self:center; background:transparent; border:0; min-width:32px; padding:6px }
+.model details { grid-column:1 / -1; grid-row:3; margin-left:36px; margin-top:2px }
+.model details[open] { grid-row:3 }
+.model .specs { font-size:11px }
+.model.active .fit { color:var(--accent) }
+.recommendation { margin:12px 8px; font-size:11px }
+#test-page { border:0; padding:0; min-width:0 }
+.chat-heading { padding:4px 4px 6px; align-items:flex-start }
+.chat-heading .runtime-model { font-size:19px; line-height:1.3; font-weight:550; color:var(--ink); overflow-wrap:anywhere }
+.chat-heading .state { font-size:11px; margin-top:5px }
+#new-chat { min-width:32px; min-height:32px; padding:6px }
+.model-metrics { display:flex; flex:none; flex-wrap:wrap; gap:5px 14px; margin:0 4px 8px; font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums }
+.model-metrics>span { display:inline-flex; align-items:center; gap:5px }
+.model-metrics svg { width:14px; height:14px; flex:none }
+#chat-empty { margin:auto; padding:24px 12px }
+#chat-empty h3 { font-size:22px; font-weight:500; letter-spacing:-.5px; color:var(--muted) }
+#task-form { border-radius:16px; box-shadow:0 2px 10px #20232906 }
+#task-form textarea { font-size:15px; line-height:1.55 }
+#task-form:focus-within { box-shadow:0 0 0 2px #245edb16; border-color:var(--accent) }
+#composer-hint { font-size:10px }
+.performance-values { display:none }
+@media(max-width:699px) {
+  #models-page { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,30%) minmax(0,1fr); gap:10px }
+  .model-sidebar { padding:6px 8px }
+  .model { padding:8px 6px }
+  .chat-heading { padding:0 2px 3px }
+  .chat-heading .runtime-model { font-size:16px }
+  .model-metrics { gap:4px 10px; font-size:10px; margin-bottom:4px }
+  #chat-empty { padding:8px }
+  #chat-empty h3 { font-size:18px }
+}
+
+#transcript:has(#chat-empty:not([hidden])):has(#result[hidden]) { display:flex; align-items:center; justify-content:center; min-height:48px; padding:4px 6px }
+#chat-empty { margin:0; padding:6px }
+#chat-empty h3 { margin:0 }
+
+@media(max-width:699px) and (max-height:480px) {
+  #models-page { grid-template-rows:minmax(0,26%) minmax(0,1fr) }
 }

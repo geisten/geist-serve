@@ -13,6 +13,19 @@ window.chatChecksError = null;
   const emit = item => stream.enqueue(new TextEncoder().encode(JSON.stringify(item) + '\n'));
   const finish = limited => { emit({done:true, limited, eval_count:32, eval_duration:1e9}); stream.close(); };
   try {
+    // Locale resolution does not depend on the developer or CI machine's language.
+    for (const locale of ['de', 'de-DE', 'de_AT.UTF-8', 'DE-ch', 'de@euro']) assert(resolveLanguage('system', locale) === 'de', `German system locale: ${locale}`);
+    for (const locale of ['en-US', 'fr-FR', 'debug', '', undefined]) assert(resolveLanguage('system', locale) === 'en', `English fallback: ${locale}`);
+    assert(resolveLanguage('en', 'de-DE') === 'en' && resolveLanguage('de', 'en-US') === 'de', 'manual preference overrides OS');
+    assert(resolveLanguage('invalid', 'de-DE') === 'de', 'invalid preference returns to system');
+    const international = new Set(['Geist', 'geist', 'English', 'Deutsch', 'Home Assistant', 'Terminal', 'VS Code · Continue', '—', '— tok/s', '— RAM']);
+    const sources = [...staticTexts.map(([, text]) => text.trim()), ...staticAttributes.map(([, , text]) => text)];
+    const missing = [...new Set(sources.filter(text => !international.has(text) && !Object.hasOwn(german, text)))];
+    assert(!missing.length, `Missing German interface translations: ${missing.join(' | ')}`);
+    assert($('new-chat').querySelector('svg') && !$('new-chat').textContent.trim(), 'clear test uses a labelled trash icon');
+    assert($('new-chat').getAttribute('aria-label') === t('Clear test'), 'trash accessible label follows locale');
+    assert($('test-speed').closest('.model-metrics') && $('test-size').closest('.model-metrics'), 'speed and model size live in the model header');
+    assert(new Set([...document.querySelectorAll('[id]')].map(el => el.id)).size === document.querySelectorAll('[id]').length, 'unique IDs preserve control bindings');
     api = async (path, body, signal) => {
       if (path !== '/app/generate') return originalAPI(path, body, signal);
       calls.push(body);
@@ -118,6 +131,15 @@ window.chatChecksError = null;
     assert($('prompt').value === 'My next draft', 'generation does not overwrite next draft');
     assert(lastReply.tokens === 32 && lastReply.rate === 32 && $('chat-speed').textContent === rateText(32), 'speed uses backend tokens, not streamed chunks');
     assert(document.querySelector('.reply-metrics').textContent.includes('32'), 'completed reply retains its own metrics');
+    const untranslatedAnswer = $('output').markdownSource;
+    uiText($('connection-result'), 'Copied. The configuration contains your private local key.');
+    $('ui-language').value='de'; $('ui-language').dispatchEvent(new Event('change')); await tick();
+    assert(document.documentElement.lang === 'de' && $('new-chat').title === 'Test leeren', 'language switch updates document and icon tooltips');
+    assert(rateText(32.5) === '32,5 Token/s' && bytes(1500000000) === '1,50 GB', 'German numbers and units');
+    assert($('connection-result').textContent === t('Copied. The configuration contains your private local key.'), 'existing interface statuses switch language');
+    assert($('output').markdownSource === untranslatedAnswer && $('prompt').value === 'My next draft', 'language change leaves answer and draft untouched');
+    $('ui-language').value='en'; $('ui-language').dispatchEvent(new Event('change')); await tick();
+    assert(rateText(32.5) === '32.5 tok/s' && $('new-chat').title === 'Clear test', 'switching back restores English');
     const measuredReply = lastReply;
     const savedState = state;
     state = {...savedState, resources:{scope:'geistd', rss_bytes:2**30, cpu_percent:0}}; renderPerformance();
@@ -148,6 +170,9 @@ window.chatChecksError = null;
     assert(lastReply === null && $('chat-speed').textContent === rateText(null), 'aborted reply never reports final generation speed');
     window.confirm = () => false; $('new-chat').click(); assert(conversation.length === 8, 'cancel new chat keeps text');
     window.confirm = () => true; $('new-chat').click(); assert(conversation.length === 0 && !$('chat-empty').hidden && !$('prompt').value, 'new chat clears only this session');
+    await tick();
+    const empty = $('chat-empty').querySelector('h3').getBoundingClientRect(), transcript = $('transcript').getBoundingClientRect();
+    assert(empty.top >= transcript.top && empty.bottom <= transcript.bottom, `empty-state label is fully visible: ${JSON.stringify({empty:empty.toJSON(), transcript:transcript.toJSON(), scroll:$('transcript').scrollTop})}`);
     $('chat-help').open = true;
     const help = document.querySelector('.help-content').getBoundingClientRect();
     assert(help.top >= 0 && help.bottom <= innerHeight && help.left >= 0 && help.right <= innerWidth, 'help readable inside window');
@@ -166,7 +191,7 @@ window.chatChecksError = null;
     showPage('test-page');
     $('prompt').focus();
     const computed = getComputedStyle(document.body);
-    assert(computed.backgroundColor === 'rgb(250, 248, 242)', 'cream background is consistent across system appearances');
+    assert(computed.backgroundColor === 'rgb(255, 255, 255)', 'white background is consistent across system appearances');
     window.chatChecksDone = true;
   } catch (error) { window.chatChecksError = error.message; }
   finally { api = originalAPI; window.confirm = originalConfirm; }

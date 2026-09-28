@@ -67,7 +67,7 @@ function addTurn(prompt) {
   const answer = document.createElement('article'); answer.className = 'chat-message assistant';
   const label = document.createElement('div'); label.className = 'message-label'; label.textContent = `Geist · ${state.models.find(model => model.id === state.active_id)?.name || state.active}`;
   const output = document.createElement('div'); output.id = 'output'; output.className = 'message-text markdown'; output.markdownSource = '';
-  const status = document.createElement('p'); status.className = 'message-status'; status.textContent = t('Waiting for the first text…');
+  const status = document.createElement('p'); status.className = 'message-status'; uiText(status, 'Waiting for the first text…');
   const actions = document.createElement('div'); actions.className = 'message-actions';
   const copy = document.createElement('button'); copy.id = 'copy'; copy.type = 'button'; copy.className = 'text-button'; copy.disabled = true; copy.textContent = t('Copy'); copy.dataset.label = 'Copy';
   copy.addEventListener('click', async () => {
@@ -89,13 +89,13 @@ function allowed(model, task = selectedTask) {
   // Freeform now includes session history; old single-task ratings do not certify it.
   return previewAccepted(model) || (task?.id !== 'freeform' && qualityFor(model, task)?.quality === 'passed');
 }
-const bytes = n => n < 1e9 ? `${Math.round(n / 1e6)} MB` : `${(n / 1e9).toFixed(2)} GB`;
-const gib = n => `${(n / 2 ** 30).toFixed(1)} GiB`;
+const bytes = n => n < 1e9 ? `${formatNumber(n / 1e6)} MB` : `${formatNumber(n / 1e9, 2)} GB`;
+const gib = n => `${formatNumber(n / 2 ** 30, 1)} GiB`;
 
 const knownNumber = value => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 const modelIdentity = () => JSON.stringify([state?.active_id, state?.active]);
-const rateText = value => `${knownNumber(value) ? value.toFixed(1) : '—'} ${t('tok/s')}`;
-const timeText = value => knownNumber(value) ? `${value.toFixed(2)} s` : '—';
+const rateText = value => `${knownNumber(value) ? formatNumber(value, 1) : '—'} ${t('tok/s')}`;
+const timeText = value => knownNumber(value) ? `${formatNumber(value, 2)} s` : '—';
 function renderReplyMetrics(element) {
   const m = element.replyMetrics;
   if (!m) return;
@@ -113,10 +113,12 @@ function renderPerformance() {
   $('chat-memory').title = t('Model process RAM');
   $('test-speed').textContent = $('chat-speed').textContent;
   $('test-memory').textContent = $('chat-memory').textContent;
+  const model = state?.models.find(item => item.id === state.active_id);
+  $('test-size').textContent = model && knownNumber(model.bytes) ? bytes(model.bytes) : '—';
   $('performance-system').textContent = h?.name || t('Not available');
   $('performance-os').textContent = h ? [h.os, h.arch, h.logical_cpus ? `${h.logical_cpus} ${t('logical CPUs')}` : null].filter(Boolean).join(' · ') : '—';
   $('performance-rss').textContent = rss === null ? '—' : gib(rss);
-  $('performance-cpu').textContent = cpu === null ? '—' : `${cpu.toFixed(1)} %`;
+  $('performance-cpu').textContent = cpu === null ? '—' : `${formatNumber(cpu, 1)} %`;
   $('performance-ram').textContent = h?.known && knownNumber(h.ram) ? gib(h.ram) : '—';
   $('performance-available').textContent = h?.available_known && knownNumber(h.available) ? gib(h.available) : '—';
   $('performance-speed').textContent = rateText(lastReply?.rate);
@@ -157,7 +159,10 @@ async function api(path, body, signal) {
   return response;
 }
 
-function message(text, local = true) { $('notice').textContent = t(text); localMessage = local; }
+function uiText(element, source) {
+  element.dataset.uiText = source; element.textContent = t(source);
+}
+function message(text, local = true) { uiText($('notice'), text); localMessage = local; }
 function buttonStates() {
   renderPerformance();
   $('test-connection').disabled = !state?.ready || state?.busy || connectionTesting || requesting || !!controller;
@@ -167,7 +172,7 @@ function buttonStates() {
   const ready = selectedTask && !selectedTask.url && state?.ready && !state?.busy && !requesting && !controller && !connectionTesting && allowed(state?.models.find(m => m.id === state.active_id));
   $('run').disabled = !ready || !$('prompt').value.trim();
   $('run').hidden = !!controller;
-  $('new-chat').disabled = !!controller;
+  $('new-chat').disabled = !!controller || !(conversation.length || $('result').children.length || $('prompt').value);
   $('benchmark').disabled = !state?.ready || state?.busy || requesting || !!controller ||
     !allowed(state?.models.find(m => m.id === state.active_id), tasks.find(t => t.id === 'freeform'));
   $('unload').disabled = !state?.ready || state?.busy || requesting || !!controller;
@@ -227,6 +232,7 @@ function modelCard(model) {
   card.querySelector('h3').textContent = model.name;
   const download = renderRing(card.querySelector('.model-ring'), model);
   card.querySelector('.download-state').textContent = t(download.text);
+  card.querySelector('.fit').hidden = !active && !selected && model.resource_fit === 0 && model.id !== state.recommendation.id;
   card.querySelector('.fit').textContent = t(active ? 'Running here' : selected ? 'Selected for setup' : model.resource_fit === 2 ? 'Unavailable' : model.id === state.recommendation.id ? 'Suggested' : model.resource_fit === 1 ? 'Conditional' : 'Available');
   card.querySelector('.specs').textContent = t(`${bytes(model.bytes)} download · ${model.ram_gib} GiB RAM guidance`);
   card.querySelector('summary').textContent = t('Details');
@@ -234,10 +240,13 @@ function modelCard(model) {
   card.querySelector('.performance').textContent = t(model.measured_tps > 0 ? `Measured here: ${model.measured_tps.toFixed(1)} tokens/s · ${model.measured_tokens} tokens · this session` : model.performance);
   card.querySelector('.quality').textContent = t(evidence ? `Task quality: ${evidence.quality} · ${evidence.cases} test cases · ${evidence.language.toUpperCase()}. ${evidence.human_complete ? 'Human sample complete.' : 'Human assessment pending.'}` : 'Task quality: unverified for this task, language and device.');
   const button = card.querySelector('button');
-  button.textContent = t(active ? 'Active' : selected ? 'Selected' : 'Choose');
+  const action = active ? 'Active' : selected ? 'Selected' : model.installed ? 'Select to load' : model.partial ? 'Select to resume' : 'Select to set up';
+  button.innerHTML = active || selected ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>' : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>';
+  button.hidden = active && allowed(model);
+  button.title = `${t(action)}: ${model.name}`;
   button.setAttribute('aria-pressed', String(active || selected));
   button.disabled = model.resource_fit === 2 || state.busy || state.loading || requesting || !!controller || (active && allowed(model)) || selected;
-  button.setAttribute('aria-label', `${button.textContent}: ${model.name}`);
+  button.setAttribute('aria-label', `${t(action)}: ${model.name}`);
   const remove = card.querySelector('.remove');
   remove.textContent = t('Remove download');
   remove.hidden = !model.installed && !model.partial;
@@ -369,8 +378,8 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
   if (!benchmark) { if (!preserveDraft) $('prompt').value = ''; $('chat-help').open = false; $('performance').open = false; resizeComposer(); $('prompt').focus(); }
   buttonStates(); state.models.forEach(modelCard); message('');
   for (const [id, unit] of [['speed', 'tokens/s'], ['first-token', 'seconds'], ['elapsed', 'seconds']]) metric(id, '—', unit);
-  $('measurement-note').textContent = t(benchmark ? 'Short local test running. Results apply to this model and this workload.' : 'Running on your device…');
-  $('chat-announcement').textContent = t('Waiting for the first text…');
+  uiText($('measurement-note'), benchmark ? 'Short local test running. Results apply to this model and this workload.' : 'Running on your device…');
+  uiText($('chat-announcement'), 'Waiting for the first text…');
   const start = performance.now(); let first = null, done = false, reader, completion = null;
   let output = '', pending = '', limited = false, paintTimer = null;
   function paint() { paintTimer = null; if (turn) updateMarkdown(target, output); else target.textContent = output; }
@@ -408,11 +417,11 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
       rate: duration > 0 && tokens > 0 ? tokens / duration : null};
     metric('speed', measured.rate === null ? '—' : measured.rate.toFixed(1), 'tokens/s');
     metric('elapsed', measured.total.toFixed(2), 'seconds');
-    $('measurement-note').textContent = t(`${tokens ?? 0} generated tokens. Speed uses geistd's generation time, including token streaming; first text and total include the local connection and prompt processing. ${benchmark ? 'A short sample, not a general benchmark.' : ''}`);
+    uiText($('measurement-note'), `${tokens ?? 0} generated tokens. Speed uses geistd's generation time, including token streaming; first text and total include the local connection and prompt processing. ${benchmark ? 'A short sample, not a general benchmark.' : ''}`);
     if (turn) { lastReply = measured; turn.metrics.replyMetrics = measured; renderReplyMetrics(turn.metrics); }
     const status = limited ? 'Response limit reached. You can ask Geist to continue.' : output ? '' : 'The model completed without producing text. Try a different prompt.';
     if (turn) {
-      turn.status.textContent = t(status);
+      uiText(turn.status, status);
       if (limited) {
         const more = document.createElement('button'); more.type = 'button'; more.className = 'text-button'; more.textContent = t('Continue response'); more.dataset.label = 'Continue response';
         more.addEventListener('click', () => {
@@ -424,14 +433,14 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
         turn.actions.append(more);
       }
     } else message(status);
-    $('chat-announcement').textContent = t(status || 'Response complete.');
+    uiText($('chat-announcement'), status || 'Response complete.');
   } catch (error) {
     activeController.abort();
     let status = error.name === 'AbortError' ? 'Stopped. Partial output is kept here.' : error.message;
     if (status.includes("does not fit this model's context")) status = 'This test does not fit the model’s context. Shorten your draft or use Clear test to start again. No earlier messages have been removed.';
-    if (turn) turn.status.textContent = t(status); else message(status);
-    $('chat-announcement').textContent = t(status);
-    $('measurement-note').textContent = t('Run incomplete. No final generation speed is reported.');
+    if (turn) uiText(turn.status, status); else message(status);
+    uiText($('chat-announcement'), status);
+    uiText($('measurement-note'), 'Run incomplete. No final generation speed is reported.');
     metric('speed', '—', 'tokens/s');
     metric('elapsed', ((performance.now() - start) / 1000).toFixed(2), 'seconds');
   } finally {
@@ -468,8 +477,8 @@ $('new-chat').addEventListener('click', () => {
   if (controller) return;
   if ((conversation.length || $('result').children.length || $('prompt').value) && !confirm(t('Clear this conversation and draft? They are not saved.'))) return;
   conversation = []; lastReply = null; pendingMarkdown.clear(); $('result').replaceChildren(); $('result').hidden = true; $('chat-empty').hidden = false;
-  $('prompt').value = ''; $('chat-help').open = false; $('performance').open = false; message(''); $('chat-announcement').textContent = t('Test cleared.');
-  scrollLatest(true); resizeComposer(); buttonStates(); $('prompt').focus();
+  $('prompt').value = ''; $('chat-help').open = false; $('performance').open = false; message(''); uiText($('chat-announcement'), 'Test cleared.');
+  resizeComposer(); buttonStates(); followLatest = true; $('latest').hidden = true; $('transcript').scrollTop = 0; $('prompt').focus();
 });
 function chooseTask(id) {
   selectedTask = tasks.find(task => task.id === id && !task.url);
@@ -527,16 +536,16 @@ $('copy-connection').addEventListener('click', async () => {
       config = `curl ${quote(`${base}/chat/completions`)} -H ${quote(`Authorization: Bearer ${c.api_key}`)} -H 'Content-Type: application/json' --data ${quote(JSON.stringify({model: c.model, messages: [{role: 'user', content: 'Hello'}], max_tokens: 64}))}`;
     }
     await copyText(typeof config === 'string' ? config : JSON.stringify(config, null, 2));
-    $('connection-result').textContent = t('Copied. The configuration contains your private local key.');
-  } catch (error) { $('connection-result').textContent = t(error.message); }
+    uiText($('connection-result'), 'Copied. The configuration contains your private local key.');
+  } catch (error) { uiText($('connection-result'), error.message); }
 });
 $('test-connection').addEventListener('click', async () => {
-  connectionTesting = true; buttonStates(); $('connection-result').textContent = t('Asking the loaded model through the editor endpoint…');
+  connectionTesting = true; buttonStates(); uiText($('connection-result'), 'Asking the loaded model through the editor endpoint…');
   try {
     const result = await (await api('/v1/chat/completions', {model: state.active_id, messages: [{role: 'user', content: 'Say hello in one sentence.'}], max_tokens: 32})).json();
     if (!result.choices?.[0]?.message?.content || !(result.usage?.completion_tokens > 0)) throw new Error('The model completed without text. Try another model.');
-    $('connection-result').textContent = t(`Connected. The shared model returned ${result.usage.completion_tokens} tokens. Now test the configuration in your chosen client.`);
-  } catch (error) { $('connection-result').textContent = t(error.message); }
+    uiText($('connection-result'), `Connected. The shared model returned ${result.usage.completion_tokens} tokens. Now test the configuration in your chosen client.`);
+  } catch (error) { uiText($('connection-result'), error.message); }
   finally { connectionTesting = false; buttonStates(); }
 });
 if (!/^[a-f0-9]{64}$/.test(token)) message('Open Geist using the private link from the app or Pi launcher. The link contains your private local API key.');
@@ -566,20 +575,28 @@ $('go-setup').addEventListener('click', () => {
   target.scrollIntoView({block:'nearest'});
 });
 document.querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => showPage(button.dataset.page)));
-$('ui-language').value = interfaceLanguage;
+$('open-preferences').addEventListener('click', () => {
+  showPage('models-page'); $('preferences').open = true;
+  $('ui-language').focus({preventScroll:true}); $('ui-language').scrollIntoView({block:'nearest'});
+});
+$('ui-language').value = interfacePreference;
 $('language-choice').value = interfaceLanguage;
 $('ui-language').addEventListener('change', async () => {
-  interfaceLanguage = $('ui-language').value;
+  interfacePreference = languagePreference($('ui-language').value);
+  interfaceLanguage = resolveLanguage(interfacePreference, systemLanguage);
+  if (!state?.answer_language) $('language-choice').value = interfaceLanguage;
   translateStatic();
+  document.querySelectorAll('[data-ui-text]').forEach(element => { element.textContent = t(element.dataset.uiText); });
+  document.querySelectorAll('.chat-message.user').forEach(element => element.setAttribute('aria-label', t('You')));
   document.querySelectorAll('.reply-metrics').forEach(renderReplyMetrics);
   document.querySelectorAll('[data-label]').forEach(element => { element.textContent = t(element.dataset.label); });
   if (selectedTask) chooseTask(selectedTask.id);
   updateConnectionHelp();
   if (state) render(state);
   try {
-    if (window.geistDesktop) await desktopMessage('language', interfaceLanguage);
-    else localStorage.setItem('geist-language', interfaceLanguage);
-  } catch { message(t('The language applies to this window but could not be saved.')); }
+    if (window.geistDesktop) await desktopMessage('language', interfacePreference);
+    else localStorage.setItem('geist-language', interfacePreference);
+  } catch { message('The language applies to this window but could not be saved.'); }
 });
 async function removeModel(id) {
   const model = state?.models.find(item => item.id === id);

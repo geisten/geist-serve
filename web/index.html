@@ -7,10 +7,11 @@
 </head>
 <body class="manager-page">
 <a class="skip" href="#main">Skip to content</a>
-<header><a class="brand" href="#" aria-label="Geist home">geist<span class="local">Runs here. Stays here.</span></a>
+<header><a class="brand" href="#" aria-label="Geist home">geist</a>
 <nav aria-label="Navigation">
 <button data-page="models-page" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 1v4m6-4v4M9 19v4m6-4v4M1 9h4m-4 6h4m14-6h4m-4 6h4"/></svg><span>Models</span></button>
-<button data-page="connect-page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 13 4-4m-7 6-1 1a4 4 0 0 0 6 6l4-4m1-9 1-1a4 4 0 0 0-6-6L8 6"/></svg><span>Connect</span></button>
+<button id="open-tools" data-page="connect-page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 13 4-4m-7 6-1 1a4 4 0 0 0 6 6l4-4m1-9 1-1a4 4 0 0 0-6-6L8 6"/></svg><span>Connect</span></button>
+<button id="open-preferences" class="icon-button" type="button" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3-1 3-3 1 1 3-2 2 2 2-1 3 3 1 1 3h6l1-3 3-1-1-3 2-2-2-2 1-3-3-1-1-3z"/><circle cx="12" cy="12" r="3"/></svg></button>
 </nav></header>
 <main id="main">
 <section id="models-page" class="page model-home" aria-labelledby="models-title">
@@ -21,9 +22,9 @@
   <div id="setup" class="model-setup">
     <p id="setup-detail" class="muted" role="status">Checking this computer…</p>
     <p id="setup-reason" class="hint"></p>
-    <p id="preview-notice" class="preview">Preview: answers can be wrong. By starting, you agree to try this model and review its answers.</p>
+    <p id="preview-notice" class="preview">Preview: check answers before using them. Start to accept this preview.</p>
     <button id="setup-start" class="primary" type="button" disabled aria-describedby="setup-detail preview-notice">Set up and start</button>
-    <p class="hint">No account. No cloud processing.</p>
+    <p class="hint">Local processing. No account.</p>
   </div>
   <div id="job" class="model-setup" hidden>
     <h2 id="job-title">Getting ready…</h2>
@@ -34,8 +35,8 @@
     <button id="cancel-download" class="text-button" type="button">Pause download</button>
   </div>
 
-    <div id="model-ready" hidden><p id="model-ready-note" class="state">Ready for your programs.</p><div class="actions"><button id="open-tools" class="primary" data-page="connect-page" type="button">Connect a program</button></div></div>
-    <section id="model-chooser" aria-labelledby="available-title"><h2 id="available-title">Models for this computer</h2><div id="models" aria-label="Available models"></div><details class="recommendation"><summary>How we suggest a model</summary><p id="recommendation-reason" class="hint"></p></details></section>
+    <div id="model-ready" hidden><p id="model-ready-note" class="sr-only" role="status">Ready for your programs.</p></div>
+    <section id="model-chooser" aria-labelledby="available-title"><h2 id="available-title" class="sr-only">Models for this computer</h2><div id="models" aria-label="Available models"></div><details class="recommendation"><summary>How we suggest a model</summary><p id="recommendation-reason" class="hint"></p></details></section>
   </div>
       <details id="performance" class="performance">
         <summary><span class="performance-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg><span>System &amp; performance</span></span><span class="performance-values"><span id="chat-speed">— tok/s</span><span id="chat-memory">— RAM</span></span></summary>
@@ -59,8 +60,8 @@
   <details class="settings"><summary>Measurements</summary><div class="metrics"><div><span>Generation speed</span><strong id="speed">—</strong></div><div><span>First text</span><strong id="first-token">—</strong></div><div><span>Total time</span><strong id="elapsed">—</strong></div></div><p id="measurement-note" class="hint">Measurements appear after a run.</p><button id="benchmark" type="button" disabled>Quick speed test</button><div id="benchmark-output" class="message-text" hidden></div></details>
         </div>
       </details>
-  <details id="preferences" class="settings"><summary>Settings</summary><p id="disk-space" class="hint"></p><p class="hint">Downloads come from Hugging Face after you choose a model. Each completed download is verified with SHA-256. No account is needed.</p>  <div class="settings-row"><label for="ui-language">Interface language</label><select id="ui-language"><option value="en">English</option><option value="de">Deutsch</option></select></div>
-  <div class="settings-row"><label for="language-choice">Answer language</label><select id="language-choice"><option value="en">English</option><option value="de">Deutsch</option></select></div>
+  <details id="preferences" class="settings"><summary>Settings</summary><p id="disk-space" class="hint"></p><p class="hint">Downloads come from Hugging Face after you choose a model. Each completed download is verified with SHA-256. No account is needed.</p>  <div class="settings-row"><label for="ui-language">Interface language</label><select id="ui-language"><option value="system">System language</option><option value="en" lang="en">English</option><option value="de" lang="de">Deutsch</option></select></div>
+  <div class="settings-row"><label for="language-choice">Answer language</label><select id="language-choice"><option value="en" lang="en">English</option><option value="de" lang="de">Deutsch</option></select></div>
   <details class="settings"><summary>Service</summary><p class="hint">Your editor and this window use the same model. Closing the window keeps the service running.</p><div class="actions"><button id="unload" type="button" disabled>Unload model</button><button id="quit" type="button">Stop model service</button></div></details>
 </details>
 
@@ -69,19 +70,24 @@
 <section id="test-page" aria-labelledby="task-title">
   <div id="test-unavailable"><h2>Try your model.</h2><p>Set up a model to check its response and speed here.</p><button id="go-setup" type="button">Go to model setup</button></div>
   <div id="workspace" hidden>
-    <div class="chat-heading"><div><h2 id="task-title">Quick test</h2><span id="runtime-model" class="runtime-model"></span><span id="runtime-state" class="state">Ready on this device</span></div><button id="new-chat" class="text-button" type="button" aria-label="Clear test" title="Clear test"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Clear test</span></button></div>
+    <div class="chat-heading"><div><h2 id="task-title" class="sr-only">Quick test</h2><h2 id="runtime-model" class="runtime-model"></h2><span id="runtime-state" class="state">Ready on this device</span></div><button id="new-chat" class="text-button" type="button" aria-label="Clear test" title="Clear test"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button></div>
+    <div class="model-metrics" role="group" aria-label="System &amp; performance">
+      <span title="Last completed reply" aria-label="Generation speed"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19a10 10 0 1 1 16 0M12 12l5-5"/><circle cx="12" cy="12" r="1"/></svg><span id="test-speed">— tok/s</span></span>
+      <span title="Model process RAM" aria-label="Model process RAM"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 10v4m5-4v4m5-4v4M6 3v4m6-4v4m6-4v4M6 17v4m6-4v4m6-4v4"/></svg><span id="test-memory">— RAM</span></span>
+      <span title="Download size" aria-label="Download size"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 15h18M16 18h1"/></svg><span id="test-size">—</span></span>
+    </div>
     <div id="transcript" tabindex="0" role="region" aria-label="Conversation">
-      <div id="chat-empty"><h3>Try your model.</h3><p>Send a short message to check its response and speed.</p></div>
+      <div id="chat-empty"><h3>Test a message.</h3></div>
       <div id="result" hidden></div>
     </div>
     <div class="composer-area">
       <button id="latest" class="text-button" type="button" hidden>↓ Latest message</button>
       <form id="task-form"><label class="sr-only" for="prompt">Your input</label>
         <textarea id="prompt" rows="1" placeholder="Message Geist…" aria-describedby="composer-hint"></textarea>
-        <div class="actions"><details id="chat-help"><summary aria-label="What can I ask?" title="What can I ask?"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.01"/></svg><span>Tips</span></summary><div class="help-content"><p>Just describe what you need. No mode to choose.</p><ul><li>Rewrite this email in a friendlier tone: …</li><li>Summarize this text in three points: …</li><li>Suggest three ideas for …</li></ul><p>Answers support Markdown. Copy keeps the original formatting. Web addresses can be copied; external images are not loaded.</p><p>This test stays in this window. Clear test, reloading or quitting clears it. Check answers before using them.</p></div></details><span class="spacer"></span><button id="stop" class="icon-button" type="button" aria-label="Stop response" title="Stop response" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button><button id="run" class="primary icon-button" type="submit" disabled aria-label="Send message" title="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button></div>
+        <div class="actions"><details id="chat-help"><summary aria-label="What can I ask?" title="What can I ask?"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.01"/></svg></summary><div class="help-content"><p>Just describe what you need. No mode to choose.</p><ul><li>Rewrite this email in a friendlier tone: …</li><li>Summarize this text in three points: …</li><li>Suggest three ideas for …</li></ul><p>Answers support Markdown. Copy keeps the original formatting. Web addresses can be copied; external images are not loaded.</p><p>This test stays in this window. Clear test, reloading or quitting clears it. Check answers before using them.</p></div></details><span class="spacer"></span><button id="stop" class="icon-button" type="button" aria-label="Stop response" title="Stop response" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button><button id="run" class="primary icon-button" type="submit" disabled aria-label="Send message" title="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button></div>
       </form>
-      <p id="composer-hint" class="hint">Enter to send · Shift + Enter for a new line</p>
-      <p class="test-performance"><span id="test-speed">— tok/s</span><span id="test-memory">— RAM</span></p>
+      <p id="composer-hint" class="hint">↵ Send · ⇧↵ New line</p>
+
     </div>
     <p id="chat-announcement" class="sr-only" role="status" aria-live="polite"></p>
   </div>

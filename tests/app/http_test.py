@@ -111,7 +111,7 @@ def main():
             assert app.request("/app/status", headers={"Origin": f"http://localhost:{app.port}",
                                                         "Host": f"localhost:{app.port}"})[0] == 200
             code, html, headers = app.request("/", auth=False)
-            assert code == 200 and b"Runs here." in html and b"Set up and start" in html
+            assert code == 200 and b'class="brand"' in html and b"Set up and start" in html
             assert "frame-ancestors 'none'" in headers["Content-Security-Policy"]
             assert "Access-Control-Allow-Origin" not in headers
             assert app.token.encode() not in html

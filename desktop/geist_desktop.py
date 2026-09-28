@@ -35,23 +35,34 @@ def external_url(uri):
     return value.scheme == 'https' and value.hostname == 'github.com' and value.path.startswith('/geisten/') and not value.username and not value.password and not value.fragment
 
 
+def resolve_language(preference, system):
+    if preference in ('de', 'en'): return preference
+    return 'de' if re.match(r'^de(?:[-_.@]|$)', system or '', re.IGNORECASE) else 'en'
+
+
 class Desktop(Gtk.Application):
     def __init__(self, cli='/usr/bin/geist', application_id='com.geisten.Geist', preferences=None):
         super().__init__(application_id=application_id, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
         self.cli = str(cli)
         self.preferences = Path(preferences or Path(GLib.get_user_config_dir()) / 'geist' / 'interface.json')
-        self.language = 'de' if GLib.get_language_names()[0].startswith('de') else 'en'
+        self.system_language = resolve_language(None, next(iter(GLib.get_language_names()), 'en'))
+        self.language_preference = 'system'
         try:
             saved = json.loads(self.preferences.read_text())['language']
-            if saved in ('de', 'en'): self.language = saved
+            if saved in ('de', 'en'): self.language_preference = saved
         except (OSError, ValueError, KeyError, TypeError):
             pass
+        self.language = resolve_language(self.language_preference, self.system_language)
         self.window = self.view = None
         self.origin = self.loaded = None
         self.working = False
         self.timer = None
         self.connect('activate', self.activate_window)
         self.connect('shutdown', self.shutdown)
+
+    def language_script(self):
+        # Only bounded language identifiers enter the native document-start script.
+        return f"window.geistSystemLanguage = '{self.system_language}'; window.geistLanguagePreference = '{self.language_preference}'; window.geistDesktop = 'linux';"
 
     def text(self, en, de):
         return de if self.language == 'de' else en
@@ -68,14 +79,15 @@ class Desktop(Gtk.Application):
             self.retry = Gtk.Button(label=self.text('Start / reconnect', 'Starten / neu verbinden'))
             self.retry.connect('clicked', lambda _: self.start())
             box.append(self.status); box.append(self.retry)
-            box.append(Gtk.Label(label=self.text('Closing the window keeps the model service running.', 'Beim Schließen läuft der Modelldienst weiter.'), wrap=True))
+            self.help = Gtk.Label(label=self.text('Closing the window keeps the model service running.', 'Beim Schließen läuft der Modelldienst weiter.'), wrap=True)
+            box.append(self.help)
             self.stack.add_named(box, 'status')
             manager = WebKit.UserContentManager.new()
             manager.connect('script-message-received::desktop', self.message)
             if not manager.register_script_message_handler('desktop', None):
                 raise RuntimeError('Cannot register desktop messages')
             manager.add_script(WebKit.UserScript.new(
-                f"window.geistLanguage = '{self.language}'; window.geistDesktop = 'linux';",
+                self.language_script(),
                 WebKit.UserContentInjectedFrames.TOP_FRAME, WebKit.UserScriptInjectionTime.START, None, None))
             session = WebKit.NetworkSession.new_ephemeral()
             session.connect('download-started', lambda _, download: download.cancel())
@@ -200,17 +212,20 @@ class Desktop(Gtk.Application):
             action, text = message.get('action'), message.get('value')
             if not isinstance(text, str) or len(text.encode()) > 131072: raise ValueError('Invalid text')
             if action == 'copy': self.view.get_clipboard().set(text)
-            elif action == 'language' and text in ('de', 'en'):
+            elif action == 'language' and text in ('system', 'de', 'en'):
                 self.preferences.parent.mkdir(parents=True, exist_ok=True)
                 temporary = self.preferences.with_suffix('.tmp')
                 fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
                 with os.fdopen(fd, 'w') as target: json.dump({'language': text}, target)
                 os.replace(temporary, self.preferences)
-                self.language = text
+                self.language_preference = text
+                self.language = resolve_language(text, self.system_language)
+                self.retry.set_label(self.text('Start / reconnect', 'Starten / neu verbinden'))
+                self.help.set_text(self.text('Closing the window keeps the model service running.', 'Beim Schließen läuft der Modelldienst weiter.'))
                 manager = self.view.get_user_content_manager()
                 manager.remove_all_scripts()
                 manager.add_script(WebKit.UserScript.new(
-                    f"window.geistLanguage = '{text}'; window.geistDesktop = 'linux';",
+                    self.language_script(),
                     WebKit.UserContentInjectedFrames.TOP_FRAME,
                     WebKit.UserScriptInjectionTime.START, None, None))
             else: raise ValueError('Unknown desktop action')

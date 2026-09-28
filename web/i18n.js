@@ -1,5 +1,19 @@
 'use strict';
-let interfaceLanguage = (window.geistLanguage || (() => { try { return localStorage.getItem('geist-language'); } catch { return null; } })() || navigator.language).startsWith('de') ? 'de' : 'en';
+// Native hosts provide the OS locale separately from the saved user preference.
+// Browser-only sessions use the browser locale. Unknown languages fall back to English.
+function resolveLanguage(preference, systemLanguage) {
+  if (preference === 'de' || preference === 'en') return preference;
+  return /^de(?:[-_.@]|$)/i.test(systemLanguage || '') ? 'de' : 'en';
+}
+function languagePreference(value) { return ['de', 'en'].includes(value) ? value : 'system'; }
+const systemLanguage = window.geistSystemLanguage || navigator.language || 'en';
+let interfacePreference = languagePreference(window.geistLanguagePreference ?? window.geistLanguage ?? (() => {
+  try { return localStorage.getItem('geist-language'); } catch { return null; }
+})());
+let interfaceLanguage = resolveLanguage(interfacePreference, systemLanguage);
+const formatNumber = (value, digits = 0) => new Intl.NumberFormat(interfaceLanguage, {
+  minimumFractionDigits: digits, maximumFractionDigits: digits
+}).format(value);
 const german = {
   'Models & quick test': 'Modelle & Kurztest',
   'Model manager': 'Modellverwaltung',
@@ -120,7 +134,7 @@ const germanPatterns = [
   [/^Downloading · (\d+)%$/, (_, n) => `Wird geladen · ${n}%`],
   [/^Paused · (\d+)%$/, (_, n) => `Pausiert · ${n}%`],
   [/^About (\d+) min left$/, (_, n) => `Noch etwa ${n} Min.`],
-  [/^([\d.]+ [MG]B) of ([\d.]+ [MG]B)$/, (_, a, b) => `${a} von ${b}`],
+  [/^([\d.,\s]+ [MG]B) of ([\d.,\s]+ [MG]B)$/, (_, a, b) => `${a} von ${b}`],
   [/^(.+) download · (.+) GiB RAM guidance$/, (_, a, b) => `${a} Download · ${b} GiB RAM empfohlen`],
   [/^Download · (.+)$/, (_, a) => `Herunterladen · ${a}`],
   [/^(.+) disk space available$/, (_, a) => `${a} Speicherplatz verfügbar`],
@@ -148,7 +162,7 @@ while (walker.nextNode()) {
   const node = walker.currentNode;
   if (node.textContent.trim() && !['SCRIPT', 'STYLE'].includes(node.parentElement.tagName)) staticTexts.push([node, node.textContent]);
 }
-for (const node of document.querySelectorAll('[aria-label], [placeholder]')) for (const attr of ['aria-label', 'placeholder', 'title']) if (node.hasAttribute(attr)) staticAttributes.push([node, attr, node.getAttribute(attr)]);
+for (const node of document.querySelectorAll('[aria-label], [placeholder], [title]')) for (const attr of ['aria-label', 'placeholder', 'title']) if (node.hasAttribute(attr)) staticAttributes.push([node, attr, node.getAttribute(attr)]);
 function translateStatic() {
   document.documentElement.lang = interfaceLanguage;
   for (const [node, original] of staticTexts) if (node.isConnected) node.textContent = original.replace(original.trim(), t(original.trim()));
@@ -266,5 +280,14 @@ Object.assign(german, {
   "Clear this conversation and draft? They are not saved.": "Gespräch und Entwurf löschen? Sie werden nicht gespeichert.",
   "Test cleared.": "Test geleert.",
   "The loaded model changed. Check the model and send again.": "Das geladene Modell hat sich geändert. Prüfe es und sende erneut."
+});
+Object.assign(german, {
+  'System language': 'Systemsprache', 'Navigation': 'Navigation', 'Geist home': 'Geist Startseite',
+  'Service': 'Dienst', 'Download size': 'Dateigröße', 'Test a message.': 'Teste eine Nachricht.',
+  'Select to set up': 'Zum Einrichten auswählen', 'Select to load': 'Zum Laden auswählen',
+  'Select to resume': 'Zum Fortsetzen auswählen',
+  'Preview: check answers before using them. Start to accept this preview.': 'Vorschau: Prüfe die Antworten. Mit dem Start akzeptierst du diese Vorschau.',
+  'Local processing. No account.': 'Lokale Verarbeitung. Ohne Konto.',
+  '↵ Send · ⇧↵ New line': '↵ Senden · ⇧↵ Neue Zeile'
 });
 translateStatic();
