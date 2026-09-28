@@ -844,3 +844,18 @@ body.manager-page main { max-width:1180px }
   #transcript, #transcript:has(#chat-empty:not([hidden])):has(#result[hidden]) { min-height:32px; padding-top:2px; padding-bottom:2px }
   #chat-empty h3 { font-size:16px }
 }
+
+/* A fixed-size status slot keeps the heading stable while the daemon reloads. */
+.status-light { width:12px; height:12px; border:3px solid #fff; box-sizing:border-box }
+.status-light.loading { background:transparent; border:2px solid #d9e7de; border-top-color:var(--success); animation:processor-loading .9s linear infinite }
+@keyframes processor-loading { to { transform:rotate(360deg) } }
+.processor-speeds { display:inline-flex; flex-wrap:wrap; gap:4px 12px }
+.processor-speeds>span { white-space:nowrap }
+.processor-speeds .current { color:var(--ink); font-weight:550 }
+.processor-history { font-size:11px; font-variant-numeric:tabular-nums; margin-top:14px }
+.comparison-title { text-align:left; font-weight:550; margin-bottom:6px }
+.processor-history [role="row"] { display:grid; grid-template-columns:minmax(0,1.4fr) repeat(2,minmax(0,1fr)); gap:6px; border-bottom:1px solid var(--border) }
+.processor-history [role="row"]>span { text-align:right; padding:5px 0; overflow-wrap:anywhere }
+.processor-history [role="row"]>span:first-child { text-align:left }
+.processor-history [role="columnheader"] { font-weight:550 }
+@media(prefers-reduced-motion:reduce) { .status-light.loading { animation:none; border-style:dashed; border-color:var(--success) } }

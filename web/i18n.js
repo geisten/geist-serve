@@ -15,6 +15,14 @@ const formatNumber = (value, digits = 0) => new Intl.NumberFormat(interfaceLangu
   minimumFractionDigits: digits, maximumFractionDigits: digits
 }).format(value);
 const german = {
+  'Performance could not be saved. Values remain available until quitting.': 'Messwerte konnten nicht gespeichert werden. Sie bleiben bis zum Beenden verfügbar.',
+  'Switching processor…': 'Prozessor wird gewechselt…',
+  'Not measured yet': 'Noch nicht gemessen',
+  'Last completed reply per processor': 'Letzte abgeschlossene Antwort je Prozessor',
+  'Model RAM · after reply': 'Modell-RAM · nach Antwort',
+  'Measured': 'Gemessen',
+  'Last successful measurements, saved locally without chat contents. Different prompts and contexts are not a controlled benchmark. First text and total time are measured by the service; RAM is a process snapshot after the reply, not peak or GPU memory.': 'Letzte erfolgreiche Messwerte, lokal ohne Chat-Inhalte gespeichert. Unterschiedliche Eingaben und Kontexte sind kein kontrollierter Benchmark. Erster Text und Gesamtzeit werden vom Dienst gemessen; RAM ist eine Prozess-Momentaufnahme nach der Antwort, weder Höchstwert noch GPU-Speicher.',
+
   'Text chat': 'Textchat',
   'Fits this computer': 'Für diesen Rechner geeignet',
   'Unavailable on this computer': 'Auf diesem Rechner nicht ausführbar',

@@ -33,13 +33,13 @@
         <label><input type="radio" name="execution" value="cpu"><span>CPU</span><small class="recommended-mark" hidden>Recommended</small></label>
         <label><input type="radio" name="execution" value="gpu"><span>GPU</span><small class="recommended-mark" hidden>Recommended</small></label>
       </fieldset>
-      <span id="execution-current" class="execution-current"></span>
+      <span id="execution-current" class="execution-current" role="status" aria-live="polite"></span>
       <span id="execution-description" class="sr-only"></span>
     </div>
     <p id="execution-notice" class="hint" role="status" hidden></p>
     <details id="performance" class="model-performance">
     <summary class="model-metrics" aria-label="Model performance details" aria-describedby="test-speed test-memory test-size" title="Model performance details">
-      <span title="Last completed reply" aria-label="Generation speed"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19a10 10 0 1 1 16 0M12 12l5-5"/><circle cx="12" cy="12" r="1"/></svg><span id="test-speed">— tok/s</span></span>
+      <span title="Last completed reply" aria-label="Generation speed"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19a10 10 0 1 1 16 0M12 12l5-5"/><circle cx="12" cy="12" r="1"/></svg><span id="test-speed" class="processor-speeds"><span id="history-cpu">CPU <span id="history-cpu-rate">— tok/s</span></span><span id="history-gpu">GPU <span id="history-gpu-rate">— tok/s</span></span></span></span>
       <span title="Model process RAM" aria-label="Model process RAM"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 10v4m5-4v4m5-4v4M6 3v4m6-4v4m6-4v4M6 17v4m6-4v4m6-4v4"/></svg><span id="test-memory">— RAM</span></span>
       <span title="Download size" aria-label="Download size"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 15h18M16 18h1"/></svg><span id="test-size">—</span></span>
       <svg class="metrics-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
@@ -52,13 +52,14 @@
             <div><dt>Available RAM</dt><dd id="performance-available">—</dd></div>
           </dl>
           <p class="performance-note">OS snapshots, refreshed about every two seconds. Model RAM is the resident memory of geistd, including shared pages; it excludes this window. CPU: 100% means all logical CPUs. Available RAM is an OS estimate, not an allocation guarantee. GPU and power use are not measured.</p>
-          <h4>Last completed reply</h4>
-          <dl class="performance-grid">
-            <div><dt>Output tokens</dt><dd id="performance-tokens">—</dd></div>
-            <div><dt>First text</dt><dd id="performance-first">—</dd></div>
-            <div><dt>Total time</dt><dd id="performance-total">—</dd></div>
-          </dl>
-          <p class="performance-note">Speed uses the model's generated tokens and generation time, including streaming. First text and total time also include input processing and the local connection. Values apply to this reply, not to answer quality.</p>
+          <div class="processor-history" role="table" aria-labelledby="processor-history-title"><div id="processor-history-title" class="comparison-title">Last completed reply per processor</div><div role="row"><span role="columnheader"></span><span role="columnheader">CPU</span><span role="columnheader">GPU</span></div>
+            <div role="row"><span role="rowheader">First text</span><span role="cell" id="history-cpu-first">—</span><span role="cell" id="history-gpu-first">—</span></div>
+            <div role="row"><span role="rowheader">Total time</span><span role="cell" id="history-cpu-total">—</span><span role="cell" id="history-gpu-total">—</span></div>
+            <div role="row"><span role="rowheader">Output tokens</span><span role="cell" id="history-cpu-tokens">—</span><span role="cell" id="history-gpu-tokens">—</span></div>
+            <div role="row"><span role="rowheader">Model RAM · after reply</span><span role="cell" id="history-cpu-ram">—</span><span role="cell" id="history-gpu-ram">—</span></div>
+            <div role="row"><span role="rowheader">Measured</span><span role="cell" id="history-cpu-time">—</span><span role="cell" id="history-gpu-time">—</span></div>
+          </div>
+          <p class="performance-note">Last successful measurements, saved locally without chat contents. Different prompts and contexts are not a controlled benchmark. First text and total time are measured by the service; RAM is a process snapshot after the reply, not peak or GPU memory.</p>
   <details class="settings"><summary>Measurements</summary><div class="metrics"><div><span>Generation speed</span><strong id="speed">—</strong></div><div><span>First text</span><strong id="first-token">—</strong></div><div><span>Total time</span><strong id="elapsed">—</strong></div></div><p id="measurement-note" class="hint">Measurements appear after a run.</p><button id="benchmark" type="button" disabled>Quick speed test</button><div id="benchmark-output" class="message-text" hidden></div></details>
         </div>
     </details>

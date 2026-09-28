@@ -13,6 +13,7 @@
 #include <curl/curl.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <math.h>
 #include <netinet/in.h>
 #include <poll.h>
 #include <pthread.h>
@@ -71,6 +72,9 @@ static const unsigned char markdown_js[] = {
 #define REQUEST_TIMEOUT_MS 5000
 static volatile sig_atomic_t interrupted;
 static atomic_bool           closing, cancelled;
+struct processor_measurement {
+    double rate, first, total, tokens, rss, recorded;
+};
 static struct {
     pthread_mutex_t         mutex;
     pthread_cond_t          drained;
@@ -95,6 +99,8 @@ static struct {
         double   tps;
         unsigned tokens;
     } measurements[APP_MODEL_COUNT];
+    struct processor_measurement history[APP_MODEL_COUNT][2];
+    char                         measurement_identity[512];
 } app = {.mutex = PTHREAD_MUTEX_INITIALIZER, .drained = PTHREAD_COND_INITIALIZER};
 
 static bool read_preference(const char *, char *, size_t);
@@ -717,6 +723,84 @@ static bool save_preference(const char *name, const char *value) {
     return ok;
 }
 
+/* Numeric observations only, keyed by model SHA, actual backend, app version
+ * and hardware/OS. Keep one successful reply per processor, never prompts. */
+static void measurement_key(char key[128], const struct app_model *model, unsigned slot) {
+    snprintf(
+            key, 128, "performance-%s-%s", model->sha256, slot ? app.gpu_backend : app.cpu_backend);
+}
+static bool valid_measurement(const struct processor_measurement *m) {
+    return isfinite(m->rate) && m->rate > 0 && m->rate <= 1e9 && isfinite(m->first) &&
+           m->first >= 0 && m->first <= 3600 && isfinite(m->total) && m->total >= m->first &&
+           m->total <= 3600 && isfinite(m->tokens) && m->tokens >= 1 && m->tokens <= 1000000 &&
+           m->tokens == (double) (uint64_t) m->tokens && isfinite(m->rss) && m->rss >= 0 &&
+           m->rss <= 1e15 && isfinite(m->recorded) && m->recorded > 0 &&
+           m->recorded <= (double) time(nullptr) + 300;
+}
+static void restore_measurements(void) {
+    memset(app.history, 0, sizeof app.history);
+    if (!app.measurement_identity[0])
+        return;
+    size_t prefix = strlen(app.measurement_identity);
+    for (size_t i = 0; i < app_model_count; ++i) {
+        for (unsigned slot = 0; slot < 2; ++slot) {
+            if (slot && !app.gpu_backend[0])
+                continue;
+            char key[128], text[1024];
+            measurement_key(key, &app_models[i], slot);
+            if (!read_preference(key, text, sizeof text) ||
+                strncmp(text, app.measurement_identity, prefix))
+                continue;
+            struct processor_measurement m    = {0};
+            int                          used = 0;
+            if (sscanf(text + prefix,
+                       "%lf %lf %lf %lf %lf %lf%n",
+                       &m.rate,
+                       &m.first,
+                       &m.total,
+                       &m.tokens,
+                       &m.rss,
+                       &m.recorded,
+                       &used) == 6 &&
+                text[prefix + used] == 0 && valid_measurement(&m))
+                app.history[i][slot] = m;
+        }
+    }
+}
+static void
+remember_measurement(size_t index, double first, double total, const struct app_run_stats *stats) {
+    if (!app.measurement_identity[0] || !stats->tokens || stats->generation_ns <= 0)
+        return;
+    struct app_process_sample    process;
+    bool                         sampled = app.child > 0 && app_process_read(app.child, &process);
+    struct processor_measurement m       = {.rate     = stats->tokens / (stats->generation_ns / 1e9),
+                                            .first    = first / 1000,
+                                            .total    = total / 1000,
+                                            .tokens   = (double) stats->tokens,
+                                            .rss      = sampled ? (double) process.rss : 0,
+                                            .recorded = (double) time(nullptr)};
+    if (!valid_measurement(&m))
+        return;
+    unsigned slot = strcmp(app.backend, app.cpu_backend) ? 1 : 0;
+    char     key[128], text[1024];
+    measurement_key(key, &app_models[index], slot);
+    snprintf(text,
+             sizeof text,
+             "%s%.17g %.17g %.17g %.17g %.17g %.17g",
+             app.measurement_identity,
+             m.rate,
+             m.first,
+             m.total,
+             m.tokens,
+             m.rss,
+             m.recorded);
+    app.history[index][slot] = m;
+    if (!save_preference(key, text))
+        snprintf(app.execution_notice,
+                 sizeof app.execution_notice,
+                 "Performance could not be saved. Values remain available until quitting.");
+}
+
 static bool save_selection(const char *id) {
     if (!save_preference("selected", id))
         return false;
@@ -1042,6 +1126,7 @@ static void import_catalog(int fd, const char *text) {
         candidate = nullptr;
         memset(app.measurements, 0, sizeof app.measurements);
         restore_preview_preferences();
+        restore_measurements();
         if (!app_model_find(app.selected))
             app.selected[0] = 0;
     }
@@ -1111,6 +1196,31 @@ static void status_response(int fd, struct app_arena *arena) {
     app_put(&b, ",\"notice\":");
     app_quote(&b, app.execution_notice);
     app_put(&b, "}");
+    app_put(&b, ",\"performance_history\":[");
+    bool comma = false;
+    if (execution_model) {
+        for (unsigned slot = 0; slot < 2; ++slot) {
+            const struct processor_measurement *m =
+                    &app.history[execution_model - app_models][slot];
+            if (!m->recorded)
+                continue;
+            if (comma)
+                app_put(&b, ",");
+            comma = true;
+            app_printf(&b, "{\"processor\":\"%s\",\"backend\":", slot ? "gpu" : "cpu");
+            app_quote(&b, slot ? app.gpu_backend : app.cpu_backend);
+            app_printf(&b,
+                       ",\"rate\":%.6f,\"first\":%.6f,\"total\":%.6f,\"tokens\":%.0f,"
+                       "\"rss_bytes\":%.0f,\"recorded_at\":%.0f}",
+                       m->rate,
+                       m->first,
+                       m->total,
+                       m->tokens,
+                       m->rss,
+                       m->recorded);
+        }
+    }
+    app_put(&b, "]");
     app_put(&b, ",\"hardware\":{\"name\":");
     app_quote(&b, h.name);
     app_put(&b, ",\"arch\":");
@@ -1214,7 +1324,7 @@ static void status_response(int fd, struct app_arena *arena) {
 struct proxy {
     int             fd;
     bool            started;
-    double          start;
+    double          start, first;
     struct app_utf8 utf8;
 };
 static bool proxy_cancel(void *opaque) {
@@ -1233,6 +1343,8 @@ static bool proxy_emit(void *opaque, const char *piece) {
         return false;
     if (!decoded[0] && piece[0])
         return true;
+    if (decoded[0] && !p->first)
+        p->first = monotonic_ms() - p->start;
     if (!p->started) {
         const char *head = "HTTP/1.1 200 OK\r\nContent-Type: application/x-ndjson\r\n"
                            "Cache-Control: no-store\r\nConnection: "
@@ -1427,11 +1539,15 @@ static void generate(int fd, struct request *r, struct app_arena *arena) {
                           stats.prompt_tokens,
                           stats.reused,
                           stats.limited ? "true" : "false");
-        (void) send_bytes(fd, final, (size_t) n);
-        if (model_index >= 0 && stats.tokens >= 16 && stats.generation_ns > 1e6) {
+        bool delivered = send_bytes(fd, final, (size_t) n);
+        if (delivered && model_index >= 0) {
             pthread_mutex_lock(&app.mutex);
-            app.measurements[model_index].tps    = stats.tokens / (stats.generation_ns / 1e9);
-            app.measurements[model_index].tokens = (unsigned) stats.tokens;
+            if (stats.tokens >= 16 && stats.generation_ns > 1e6) {
+                app.measurements[model_index].tps    = stats.tokens / (stats.generation_ns / 1e9);
+                app.measurements[model_index].tokens = (unsigned) stats.tokens;
+            }
+            remember_measurement(
+                    (size_t) model_index, proxy.first, monotonic_ms() - proxy.start, &stats);
             pthread_mutex_unlock(&app.mutex);
         }
     }
@@ -2124,6 +2240,20 @@ int main(int argc, char **argv) {
             app.home,
             app.port);
     probe_backends();
+    struct app_hardware measurement_hardware;
+    if (app_hardware_read(&measurement_hardware, app.models)) {
+        int n = snprintf(app.measurement_identity,
+                         sizeof app.measurement_identity,
+                         "v1 %s\n%s|%s|%s|%llu|%u\n",
+                         APP_VERSION,
+                         measurement_hardware.name,
+                         measurement_hardware.arch,
+                         measurement_hardware.os,
+                         (unsigned long long) measurement_hardware.ram,
+                         measurement_hardware.logical_cpus);
+        if (n < 0 || (size_t) n >= sizeof app.measurement_identity)
+            app.measurement_identity[0] = 0;
+    }
     char *catalog_text = malloc(APP_CATALOG_BYTES + 1);
     if (catalog_text && read_preference("catalog.json", catalog_text, APP_CATALOG_BYTES + 1)) {
         char                why[256];
@@ -2142,6 +2272,7 @@ int main(int argc, char **argv) {
     if (strcmp(app.answer_language, "en") && strcmp(app.answer_language, "de"))
         app.answer_language[0] = 0;
     restore_preview_preferences();
+    restore_measurements();
     (void) read_preference("selected", app.selected, sizeof app.selected);
     if (model) {
         pthread_mutex_lock(&app.mutex);

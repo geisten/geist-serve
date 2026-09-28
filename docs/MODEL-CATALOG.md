@@ -69,3 +69,16 @@ has a 120-second deadline. The API is `POST /app/execution` with
 
 CPU quality evidence is not used to certify GPU answers. No new human quality
 rating or 24-hour acceptance result is implied by these functional tests.
+
+## Remembered processor measurements
+
+Successful short-test replies retain one numeric observation per model SHA and
+actual processor backend. The service writes private atomic `performance-*`
+files: rate, first-text latency, total time, output tokens, a post-reply process
+RAM snapshot and timestamp. Prompts and responses are never included. Files are
+scoped to the application version and hardware/OS identity; different versions,
+corrupt/nonfinite values and mismatched identities are ignored. Failed/cancelled
+replies do not replace a previous observation. Model switching and application
+restart retain valid observations; importing changed model hashes cannot reuse
+old measurements. `performance_history` in authenticated status describes only
+the selected model. External editor replies are not recorded in this comparison.

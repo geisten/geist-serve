@@ -13,6 +13,7 @@ let connectionTesting = false;
 // Page memory only. Never store prompts, answers or conversation in browser storage.
 let conversation = [], followLatest = true;
 let lastReply = null, replyPending = false;
+let workspaceModel = null, pendingExecution = null;
 const pendingMarkdown = new Set();
 function updateMarkdown(target, source) {
   target.markdownSource = source;
@@ -95,6 +96,8 @@ const gib = n => `${formatNumber(n / 2 ** 30, 1)} GiB`;
 
 const knownNumber = value => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 const modelIdentity = () => JSON.stringify([state?.active_id, state?.active, state?.execution?.backend]);
+const workspaceIdentity = () => JSON.stringify([state?.active_id, state?.active, state?.models.find(m => m.id === state.active_id)?.sha256]);
+const executionLoading = () => pendingExecution !== null || !!state?.loading;
 const rateText = value => `${knownNumber(value) ? formatNumber(value, 1) : '—'} ${t('tok/s')}`;
 const timeText = value => knownNumber(value) ? `${formatNumber(value, 2)} s` : '—';
 function renderReplyMetrics(element) {
@@ -108,7 +111,6 @@ function renderPerformance() {
   const h = state?.hardware, r = state?.resources;
   const rss = r?.scope === 'geistd' && knownNumber(r.rss_bytes) ? r.rss_bytes : null;
   const cpu = r?.scope === 'geistd' && knownNumber(r.cpu_percent) ? r.cpu_percent : null;
-  $('test-speed').textContent = replyPending ? t('Measuring…') : rateText(lastReply?.rate);
   $('test-memory').textContent = `${rss === null ? '—' : gib(rss)} RAM`;
   const model = state?.models.find(item => item.id === state.active_id);
   $('test-size').textContent = model && knownNumber(model.bytes) ? bytes(model.bytes) : '—';
@@ -117,9 +119,22 @@ function renderPerformance() {
   $('performance-cpu').textContent = cpu === null ? '—' : `${formatNumber(cpu, 1)} %`;
   $('performance-ram').textContent = h?.known && knownNumber(h.ram) ? gib(h.ram) : '—';
   $('performance-available').textContent = h?.available_known && knownNumber(h.available) ? gib(h.available) : '—';
-  $('performance-tokens').textContent = knownNumber(lastReply?.tokens) ? String(lastReply.tokens) : '—';
-  $('performance-first').textContent = timeText(lastReply?.first);
-  $('performance-total').textContent = timeText(lastReply?.total);
+  // Service-owned, numeric-only observations survive processor and app restarts.
+  // They describe separate replies, not a controlled CPU/GPU benchmark.
+  const history = state?.performance_history || [];
+  for (const mode of ['cpu', 'gpu']) {
+    const sample = history.find(item => item.processor === mode);
+    $(`history-${mode}-rate`).textContent = rateText(sample?.rate);
+    $(`history-${mode}-first`).textContent = timeText(sample?.first);
+    $(`history-${mode}-total`).textContent = timeText(sample?.total);
+    $(`history-${mode}-tokens`).textContent = knownNumber(sample?.tokens) ? String(sample.tokens) : '—';
+    $(`history-${mode}-ram`).textContent = sample?.rss_bytes > 0 ? gib(sample.rss_bytes) : '—';
+    $(`history-${mode}-time`).textContent = sample?.recorded_at ? new Intl.DateTimeFormat(interfaceLanguage, {dateStyle:'short',timeStyle:'short'}).format(new Date(sample.recorded_at * 1000)) : '—';
+    const label = `${mode.toUpperCase()}: ${sample ? t('Last completed reply') : t('Not measured yet')}`;
+    $(`history-${mode}`).title = label;
+    $(`history-${mode}`).setAttribute('aria-label', `${label} · ${rateText(sample?.rate)}`);
+    $(`history-${mode}`).classList.toggle('current', state?.execution?.active === mode);
+  }
 }
 
 // A rolling observation from this window, never an advertised network speed.
@@ -175,9 +190,11 @@ function buttonStates() {
   if (!controller && document.activeElement === $('stop')) $('prompt').focus({preventScroll: true});
   $('stop').hidden = !controller;
   document.body.classList.toggle('generating', !!controller);
-  const runtimeStatus = t(controller ? 'Generating locally…' : state?.ready ? 'Model ready' : 'No model loaded');
+  const loading = executionLoading();
+  const runtimeStatus = t(loading ? 'Switching processor…' : controller ? 'Generating locally…' : state?.ready ? 'Model ready' : 'No model loaded');
   $('runtime-state').setAttribute('aria-label', runtimeStatus); $('runtime-state').title = runtimeStatus;
   $('runtime-state').classList.toggle('inactive', !state?.ready);
+  $('runtime-state').classList.toggle('loading', loading);
   $('runtime-name').textContent = state?.models.find(model => model.id === state.active_id)?.name || state?.active || '';
   $('language-choice').disabled = !!controller;
 }
@@ -257,7 +274,7 @@ function modelCard(model) {
     card.querySelector('.remove').addEventListener('click', () => removeModel(model.id));
     cards.set(model.id, card); $('models').append(card);
   }
-  const active = state.active_id === model.id && state.ready;
+  const active = state.active_id === model.id && (state.ready || state.loading);
   const pending = pendingModel === model.id;
   const preparing = state.job_model === model.id && (!!state.phase || state.loading);
   const paused = canPause(model);
@@ -301,10 +318,12 @@ function render(next) {
   const working = !!next.phase || next.loading;
   const active = next.models.find(m => m.id === next.active_id);
   const usable = next.ready && allowed(active);
-  if (modelChanged || working || !usable) $('performance').open = false;
+  if (usable) workspaceModel = workspaceIdentity();
+  const retained = workspaceModel === workspaceIdentity() && !!active && allowed(active);
+  if (modelChanged || (!usable && !retained)) $('performance').open = false;
   const previouslyHidden = $('workspace').hidden;
-  $('workspace').hidden = working || !usable;
-  $('test-unavailable').hidden = usable && !working;
+  $('workspace').hidden = !usable && !retained;
+  $('test-unavailable').hidden = !$('workspace').hidden;
   $('model-prompt').textContent = t(working ? 'Getting ready…' : 'Choose a model to begin.');
   if (previouslyHidden && !$('workspace').hidden && !$('models-page').hidden &&
       (document.activeElement === document.body || document.activeElement.closest('.model-pick'))) $('prompt').focus({preventScroll:true});
@@ -649,26 +668,27 @@ function renderExecution() {
   const execution = state?.execution;
   const disabled = !state?.ready || state.busy || state.loading || requesting || !!controller || connectionTesting;
   for (const input of document.querySelectorAll('[name="execution"]')) {
-    input.checked = input.value === (execution?.mode || 'auto');
+    input.checked = input.value === (pendingExecution || execution?.mode || 'auto');
     input.disabled = disabled || (input.value === 'gpu' && !execution?.gpu_available);
     const label = input.closest('label'), mark = label.querySelector('.recommended-mark');
     if (mark) mark.hidden = input.value !== execution?.recommended;
     label.title = t(input.value === 'auto' ? 'Uses the recommended processor. Changing execution reloads the model without downloading it again.' : execution?.reason || 'Load a model first.');
   }
   $('execution-description').textContent = t(execution?.reason || 'Load a model first.');
-  $('execution-current').textContent = execution?.active ? `${execution.active.toUpperCase()}${execution.active === 'gpu' && execution.backend === 'metal' ? ' · Metal' : ''}` : '';
+  const status = executionLoading() ? t('Switching processor…') : execution?.active ? `${execution.active.toUpperCase()}${execution.active === 'gpu' && execution.backend === 'metal' ? ' · Metal' : ''}` : t('No model loaded');
+  if ($('execution-current').textContent !== status) $('execution-current').textContent = status;
   $('execution-current').title = t('Active processor');
   $('execution-notice').textContent = t(execution?.notice || '');
   $('execution-notice').hidden = !execution?.notice;
 }
 for (const input of document.querySelectorAll('[name="execution"]')) input.addEventListener('change', async () => {
   if (!input.checked || requesting) return;
-  requesting = true; buttonStates(); visibleModels().forEach(modelCard);
-  try { await api('/app/execution', {mode:input.value}); message('', false); }
+  requesting = true; pendingExecution = input.value; buttonStates(); visibleModels().forEach(modelCard);
+  try { await api('/app/execution', {mode:pendingExecution}); message('', false); }
   catch (error) { message(error.message); }
   finally {
     while (polling) await new Promise(resolve => setTimeout(resolve, 40));
-    await poll(); requesting = false;
+    await poll(); requesting = false; pendingExecution = null;
     if (state) render(state); else buttonStates();
   }
 });

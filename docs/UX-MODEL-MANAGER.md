@@ -47,3 +47,16 @@ fewer clicks.
 The palette stays white, neutral gray, restrained blue for selection/focus and
 green for confirmed download/readiness. System typography, compact headings and
 consistent spacing avoid a separate visual style for each widget.
+
+## Processor changes and retained measurements
+
+CPU/GPU reloads keep the same transcript, composer and expanded metrics in place.
+The fixed-size status dot becomes a rotating ring; reduced-motion users get a
+static dashed ring. A polite status announces the transition. Sending and a
+second processor change are disabled until readiness; drafting and reading stay
+available. Failure preserves context and reports the existing CPU recovery path.
+
+The metric row shows the last successful CPU and GPU generation rates together.
+Expanded details compare service-observed first text, total time, output tokens,
+post-reply process RAM and timestamp. These are independent replies, not a fair
+benchmark or a new automatic recommendation. No fastest badge is inferred.
