@@ -134,7 +134,8 @@ The Pi 5 BitNet reference of 17.8 tokens/s comes from the existing
 reference, never as a measurement of the current machine. All other initial
 speed advice is qualitative. Local results of at least 16 generated tokens
 update the model's card for the current app session. They are not saved.
-The quick test generates at most 64 tokens; normal tasks at most 256.
+The quick speed test generates at most 64 tokens; individual task API requests
+at most 256. The optional conversation test uses up to 1,024 output tokens.
 Tokens/s uses geistd generation wall time (including token streaming), not answer quality or time to first text. End-to-end time includes tokenization and prefill.
 
 ## Shared platform selection
