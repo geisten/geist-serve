@@ -75,14 +75,16 @@ pane remains white; the independently scrollable model list is light gray. The
 visible preview banner is removed. A deliberate model-row action still enables the
 local preview for that exact model hash; quality evidence is not promoted.
 
-**Settings** is a separate navigation destination for language, execution and
-storage. Unload and service-stop controls are not part of this screen. Closing the
-window preserves the shared service for editors and terminals. The bundled
-engine uses the CPU; GPU selection is not yet exposed by this app. The proposed
-location for a tested backend selector is **Settings → Execution**, with automatic
-selection by default.
-The existing engine environment override is a developer facility, not an app
-compatibility guarantee. **System language** is the default: German for a
+**Settings** is a separate navigation destination for languages, JSON catalog
+import and storage. Unload and service-stop controls are not part of this screen.
+Closing the window preserves the shared service for editors and terminals.
+**Auto · CPU · GPU** lives directly below the active model. Apple Silicon packages
+include Metal; GPU availability also requires catalog support and a successful
+device probe. Linux packages currently expose CPU only. Auto uses a hardware
+heuristic, not a measured performance comparison. See
+[execution and catalog details](MODEL-CATALOG.md).
+
+**System language** is the default: German for a
 German OS locale, English for other languages. Native Mac and Ubuntu hosts supply
 the OS language; a browser-only session uses its browser language. Explicit
 **Deutsch** or **English** overrides persist; choosing **System language** restores

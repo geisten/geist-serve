@@ -34,7 +34,7 @@ narrow; token speed and nonempty output are never sufficient quality evidence.
 ## Run and review
 
 Build the app and daemon from the same checkout. Model files must match the
-catalog's SHA-256. Run all six catalog models sequentially for screening:
+catalog's SHA-256. Run the models in `models/catalog.json` sequentially for screening:
 
 ```sh
 python3 quality/screen.py --models /path/to/catalog-files \
