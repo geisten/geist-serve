@@ -22,7 +22,7 @@ with tempfile.TemporaryDirectory(prefix='geist-catalog-') as temporary:
         invalid=[]
         for key,value in [('schema',2),('revision',0),('models',[]),('extra',True)]:
             bad=copy.deepcopy(good);bad[key]=value;invalid.append(bad)
-        for key,value in [('id','../escape'),('file','../escape.gguf'),('file','model.sh'),('url','https://evil.example/model.gguf'),('sha256','0'*63),('backends',['metal']),('backends',['cpu','cpu']),('bytes',-1),('bytes',1.5),('name','bad\nname')]:
+        for key,value in [('id','../escape'),('file','../escape.gguf'),('file','model.sh'),('url','https://evil.example/model.gguf'),('sha256','0'*63),('backends',['metal']),('backends',['cpu','cpu']),('backends',['cpu\x00suffix']),('backends',['cpu','metal\x00suffix']),('bytes',-1),('bytes',1.5),('name','bad\nname')]:
             bad=copy.deepcopy(good);bad['models'][0][key]=value;invalid.append(bad)
         bad=copy.deepcopy(good);bad['models'].append(bad['models'][0]);invalid.append(bad)
         for bad in invalid:

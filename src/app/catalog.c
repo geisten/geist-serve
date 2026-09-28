@@ -149,14 +149,16 @@ struct app_catalog *app_catalog_parse(const char *text, char error[static 256]) 
         for (int k = backends + 1; k < j->n && j->tok[k].start < j->tok[backends].end; ++k) {
             if (j->tok[k].parent != backends)
                 continue;
-            char    *name = json_strdup(j, k);
-            unsigned bit  = 0;
-            if (name)
-                bit = !strcmp(name, "cpu")      ? 1
-                      : !strcmp(name, "metal")  ? 2
-                      : !strcmp(name, "vulkan") ? 4
-                                                : 0;
-            free(name);
+            /* Compare complete raw enum tokens; decoded NUL must not truncate
+             * an unrecognized name into a supported backend. */
+            if (!json_is_str(j, k))
+                goto bad;
+            const char *name   = j->src + j->tok[k].start;
+            size_t      length = (size_t) (j->tok[k].end - j->tok[k].start);
+            unsigned    bit    = length == 3 && !memcmp(name, "cpu", 3)      ? 1
+                                 : length == 5 && !memcmp(name, "metal", 5)  ? 2
+                                 : length == 6 && !memcmp(name, "vulkan", 6) ? 4
+                                                                             : 0;
             if (!bit || (m->backends & bit))
                 goto bad;
             m->backends |= bit;
