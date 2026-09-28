@@ -9,12 +9,16 @@ loaded geistd. No model is included; choose Set up and start on first use.
 Drag Geist.app from the DMG to Applications and open it. Geist opens its own
 desktop window. Read the preview notice and choose **Set up and start**. A
 platform check suggests one model, including a smaller fallback when needed.
-Once ready, type a message and press Enter. Shift + Enter inserts a new line.
-Follow-up questions use this window’s conversation; Tips provides examples. Optional
-models and languages live in **Customize**. The chat footer shows the last completed
-reply’s tokens/s and the model process’s current resident RAM. Open **System &
-performance** for OS/CPU details, available RAM, live CPU load and reply timings.
-These measurements describe performance, not answer quality. The bundled
+Once ready, the main screen shows the model and **Connect a program**.
+**Change model** shows all catalog models with download progress rings. A closed
+green ring and check mean downloaded; paused downloads retain their percentage.
+**Quick test** is optional: Enter sends, Shift + Enter inserts a newline, and
+follow-up questions use this window's conversation. **Clear test** clears it.
+Language preferences are in **Settings**. **System & performance**, below the
+model, shows OS/CPU details, available RAM, process RAM/CPU and reply timings.
+These measurements describe performance, not answer quality. The Mac menu bar
+provides **Models & performance** and **Connect a program** shortcuts.
+The bundled
 terminal client is `/Applications/Geist.app/Contents/MacOS/geist-cli`.
 Use its full path, or link it as `geist` in a directory on your PATH. Start at Login is
 optional. An actual distributable DMG still requires Developer ID signing and

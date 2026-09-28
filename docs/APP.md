@@ -1,6 +1,6 @@
 # Geist — Runs here. Stays here.
 
-Try rewriting, summarizing and generating ideas on your own computer.
+Manage a local model and connect your terminal and editor to the same service.
 Select **Set up and start** to download the platform suggestion, then work offline.
 No account or initial task/model/language selection is required.
 Small models have limited capabilities: check their answers, and use the
@@ -14,8 +14,9 @@ Mac release still needs Developer ID signing and notarization.
 
 Open the Geist DMG, drag Geist to Applications, and open its desktop window.
 Read the short preview notice and choose **Set up and start**. Geist downloads,
-verifies and starts one suggested model. The input becomes available when the
-local service is ready. Press **Enter** to send and **Shift + Enter** for a new line. The arrow sends
+verifies and starts one suggested model. The main screen stays on **Models**,
+with **Connect a program** as the next action. **Quick test** opens an optional
+conversation to check a response and its speed. Press **Enter** to send and **Shift + Enter** for a new line. The arrow sends
 with a pointer or touch; the stop button preserves a partial response. Follow-up
 messages include the visible conversation from this window. **Tips** offers
 examples for rewriting, summarizing and ideas; there is no task-mode selector.
@@ -26,7 +27,7 @@ have a separate copy control. Wide code and tables scroll inside their blocks.
 Model-provided HTML is shown literally. Web addresses can be copied; the chat
 does not navigate to them or load remote images. No formatting service is used.
 
-Entering Chat or starting a new conversation focuses the composer. Sending and
+Entering Quick test or clearing the test focuses the composer. Sending and
 stopping return to it; background status updates and completed responses do not
 steal focus. Escape dismisses Tips and returns to its control. Tab follows the
 visible document order. While text is selected or a response control has focus,
@@ -34,7 +35,7 @@ formatting changes to that response wait until selection/focus leaves it.
 
 The transcript scrolls independently above the composer. New output follows only
 while you are reading the latest message. Long drafts scroll without being cut.
-**New chat** asks before clearing the conversation and draft. Reloading or quitting
+**Clear test** asks before clearing the conversation and draft. Reloading or quitting
 clears the page memory; nothing is saved as chat history. Closing and reopening a
 hidden desktop window can retain that window's memory until the app quits.
 
@@ -45,16 +46,25 @@ Failed requests keep the draft; stopped partial answers remain in context. Sessi
 chat requires preview consent: single-task evidence does not certify follow-ups.
 Quick speed tests remain independent of the conversation.
 
-**Customize** contains manual model selection, independent interface/answer
-languages, hardware details, measurements and service controls. **Connect**
-sets up Terminal, Continue or OpenCode text chat. Closing the window keeps the
-shared service running; stopping it requires confirmation. Start at Login is
-optional in the native menu.
+The **Models** screen combines the current model, **Change model**, and a collapsed
+**System & performance** panel. A ring before each model shows download status:
+an empty ring means no download, a partial ring shows downloaded bytes, and a
+closed green ring with a check means the model file is present. Paused transfers
+keep their percentage. File verification is a separate indeterminate state;
+receiving all bytes alone does not complete the download. Labels accompany every
+ring. Download status is separate from the model's running state and suitability.
+
+**Settings** holds interface/answer languages and service controls. **Connect**
+sets up Terminal, Continue or OpenCode text chat. On Mac, the menu bar shows the
+active model and service status; **Models & performance** and **Connect a program**
+reopen the corresponding view without reloading or clearing a test draft.
+Closing the window keeps the shared service running. Stopping it requires
+confirmation. Start at Login is optional in the native menu.
 
 Apple Silicon and macOS 14 or later are required by the Mac app.
 Previously downloaded catalog files in the Geist data folder are reused
 after verification. The former Swift application's selected-model preference
-is not migrated: choose the model once under Customize. The new Connections panel and bundled `geist` terminal client use the same
+is not migrated: choose the model once under Change model. The new Connections panel and bundled `geist` terminal client use the same
 loaded daemon. The older standalone geist-serve server is a separate legacy
 entry point; do not start it to connect an editor to the manager.
 
@@ -153,7 +163,7 @@ at least the working-memory estimate, and remaining download space plus
 256 MiB. Existing partial bytes are credited, installed files reused and
 verified. If no candidate fits, setup is blocked. `/app/setup` rechecks the
 recommendation before accepting the displayed model ID. Manual conditional
-choices remain available in Customize; they never become automatic fallbacks.
+choices remain available under Change model; they never become automatic fallbacks.
 
 The private `selected` file preserves an explicit choice across restarts and
 policy updates. Resource pressure can block that choice but cannot silently

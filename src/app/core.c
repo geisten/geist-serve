@@ -252,7 +252,7 @@ app_recommend(const struct app_hardware *h,
                 saved,
                 preferred,
                 "saved",
-                limit ? limit : "Your model choice is kept. Change it in Customize.",
+                limit ? limit : "Your model choice is kept. Select another model below.",
                 !limit};
     }
     const struct app_model *choices[] = {preferred, app_model_find("smollm2-360m")};

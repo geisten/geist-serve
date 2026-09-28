@@ -110,6 +110,8 @@ function renderPerformance() {
   $('chat-speed').title = t('Last completed reply');
   $('chat-memory').textContent = `${rss === null ? '—' : gib(rss)} RAM`;
   $('chat-memory').title = t('Model process RAM');
+  $('test-speed').textContent = $('chat-speed').textContent;
+  $('test-memory').textContent = $('chat-memory').textContent;
   $('performance-system').textContent = h?.name || t('Not available');
   $('performance-os').textContent = h ? [h.os, h.arch, h.logical_cpus ? `${h.logical_cpus} ${t('logical CPUs')}` : null].filter(Boolean).join(' · ') : '—';
   $('performance-rss').textContent = rss === null ? '—' : gib(rss);
@@ -161,6 +163,7 @@ function buttonStates() {
   $('copy-connection').disabled = !state?.ready;
   $('connection-endpoint').textContent = t(`${location.origin}/v1`);
   $('connection-model').textContent = t(state?.active_id || 'Choose a model');
+  $('open-test').disabled = !state?.ready || (state?.busy && !controller) || requesting;
   const ready = selectedTask && !selectedTask.url && state?.ready && !state?.busy && !requesting && !controller && !connectionTesting && allowed(state?.models.find(m => m.id === state.active_id));
   $('run').disabled = !ready || !$('prompt').value.trim();
   $('run').hidden = !!controller;
@@ -177,12 +180,42 @@ function buttonStates() {
   $('setup-start').disabled = requesting || !!controller || !state || state.busy || state.loading || !setupCandidate().eligible;
 }
 
+const ringMarkup = '<svg viewBox="0 0 36 36" aria-hidden="true"><circle class="ring-track" cx="18" cy="18" r="14"/><circle class="ring-fill" cx="18" cy="18" r="14" pathLength="100"/><path class="ring-check" d="m12 18 4 4 8-8"/></svg>';
+function downloadState(model, current = state) {
+  const total = Math.max(0, model?.bytes || 0);
+  const transferring = current?.job_model === model?.id && !!current?.phase;
+  const checking = transferring && current.phase === 'verifying';
+  const received = Math.max(0, transferring ? current.received || 0 : model?.partial || 0);
+  const percent = total ? Math.min(100, Math.floor(received / total * 100)) : 0;
+  if (checking) return {stage:'verifying', percent:null, text:'Checking download…'};
+  if (transferring) return {stage:'downloading', percent, text:`Downloading · ${percent}%`};
+  if (model?.installed) return {stage:'downloaded', percent:100, text:'Downloaded'};
+  if (received) return {stage:'paused', percent, text:`Paused · ${percent}%`};
+  return {stage:'missing', percent:0, text:'Not downloaded'};
+}
+function renderRing(element, model, current = state) {
+  const status = downloadState(model, current);
+  if (!element.firstChild) element.innerHTML = ringMarkup; // Fixed, local markup only.
+  element.dataset.stage = status.stage;
+  element.style.setProperty('--ring-progress', status.percent === null ? 72 : status.percent);
+  const progress = ['downloading', 'paused', 'verifying'].includes(status.stage);
+  element.setAttribute('role', progress ? 'progressbar' : 'img');
+  element.removeAttribute('aria-hidden');
+  element.setAttribute('aria-label', `${model?.name || ''}: ${t(status.text)}`);
+  if (progress) element.setAttribute('aria-valuetext', t(status.text));
+  else element.removeAttribute('aria-valuetext');
+  if (progress && status.percent !== null) {
+    element.setAttribute('aria-valuemin', '0'); element.setAttribute('aria-valuemax', '100'); element.setAttribute('aria-valuenow', String(status.percent));
+  } else for (const attribute of ['aria-valuemin', 'aria-valuemax', 'aria-valuenow']) element.removeAttribute(attribute);
+  return status;
+}
+
 function modelCard(model) {
   let card = cards.get(model.id);
   if (!card) {
     card = document.createElement('article'); card.className = 'model'; card.dataset.id = model.id;
     // Static template only; metadata and generated output always use textContent.
-    card.innerHTML = '<h3></h3><span class="fit"></span><p class="specs"></p><span></span><details><summary></summary><p class="reason"></p><p class="performance"></p><p class="quality"></p></details><button type="button"></button><button class="remove" type="button"></button>';
+    card.innerHTML = '<div class="model-heading"><span class="model-ring"></span><div><h3></h3><p class="download-state"></p></div></div><span class="fit"></span><p class="specs"></p><span></span><details><summary></summary><p class="reason"></p><p class="performance"></p><p class="quality"></p></details><button type="button"></button><button class="remove" type="button"></button>';
     card.querySelector('button').addEventListener('click', () => choose(model.id));
     card.querySelector('.remove').addEventListener('click', () => removeModel(model.id));
     cards.set(model.id, card); $('models').append(card);
@@ -191,8 +224,10 @@ function modelCard(model) {
   const evidence = qualityFor(model);
   card.className = `model${active ? ' active' : ''}${model.resource_fit === 2 ? ' unavailable' : ''}`;
   card.querySelector('h3').textContent = model.name;
+  const download = renderRing(card.querySelector('.model-ring'), model);
+  card.querySelector('.download-state').textContent = t(download.text);
   card.querySelector('.fit').textContent = t(active ? 'Running here' : model.resource_fit === 2 ? 'Unavailable' : model.id === state.recommendation.id ? 'Selected for setup' : model.resource_fit === 1 ? 'Conditional' : 'Available');
-  card.querySelector('.specs').textContent = `${bytes(model.bytes)} · ${model.ram_gib} GiB RAM`;
+  card.querySelector('.specs').textContent = t(`${bytes(model.bytes)} download · ${model.ram_gib} GiB RAM guidance`);
   card.querySelector('summary').textContent = t('Details');
   card.querySelector('.reason').textContent = t(model.reason);
   card.querySelector('.performance').textContent = t(model.measured_tps > 0 ? `Measured here: ${model.measured_tps.toFixed(1)} tokens/s · ${model.measured_tokens} tokens · this session` : model.performance);
@@ -228,6 +263,9 @@ function render(next) {
   const usable = next.ready && allowed(active) && (!manualChoice || manualChoice === next.active_id);
   const previouslyHidden = $('workspace').hidden;
   $('workspace').hidden = working || !usable;
+  $('test-unavailable').hidden = usable && !working;
+  const readyWasHidden = $('model-ready').hidden;
+  $('model-ready').hidden = working || !usable;
   $('setup').hidden = working || usable;
   $('job').hidden = !working;
   if (usable && !working) manualChoice = null;
@@ -237,10 +275,13 @@ function render(next) {
   $('setup-reason').textContent = manualChoice ? t(candidate.reason) : t(next.recommendation.source === 'fallback' || !next.recommendation.eligible ? next.recommendation.reason : '');
   $('preview-notice').hidden = !candidate.id || previewAccepted(candidate);
   $('setup-start').textContent = t(next.ready && candidate.id === next.active_id ? 'Try preview' : candidate.installed ? 'Start model' : candidate.partial ? 'Resume download' : 'Set up and start');
-  $('device-name').textContent = t(next.hardware.name || 'Hardware information unavailable');
-  $('device-specs').textContent = `${gib(next.hardware.ram)} RAM · ${next.hardware.cores} ${t('compute cores')} · ${next.hardware.arch}`;
   $('disk-space').textContent = t(next.hardware.disk_known ? `${bytes(next.hardware.disk)} disk space available` : 'Disk space could not be read');
-  $('active-model').textContent = next.active || candidate.name || t('Choose a model');
+  const shownModel = next.models.find(m => m.id === next.job_model) || candidate;
+  $('active-model').textContent = shownModel.name || t('Choose a model');
+  const download = renderRing($('current-model-ring'), shownModel);
+  $('current-model-status').textContent = t(download.text);
+  $('model-ready-note').textContent = t(next.busy ? 'Model in use by a program.' : 'Ready for your programs.');
+  if (readyWasHidden && !$('model-ready').hidden && !$('models-page').hidden && document.activeElement.closest('#setup, #job')) $('open-tools').focus({preventScroll:true});
   $('recommendation-reason').textContent = t(next.recommendation.reason);
   next.models.forEach(modelCard);
   if (!working) { transfer.id = ''; transfer.samples = []; }
@@ -274,7 +315,8 @@ function choose(id) {
   if (requesting || controller || state?.busy || state?.loading) return;
   manualChoice = id;
   render(state);
-  showPage('test-page');
+  $('model-chooser').open = false;
+  showPage('models-page');
 }
 $('setup-start').addEventListener('click', async () => {
   const candidate = setupCandidate();
@@ -309,7 +351,7 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
   const payload = {prompt, benchmark, language: $('language-choice').value, experimental, task: 'freeform', task_version: task.version,
     ...(!benchmark ? {model: state.active_id, messages, max_tokens: 1024} : {})};
   if (!benchmark && (messages.length > 63 || new TextEncoder().encode(JSON.stringify(payload)).length > 32768)) {
-    message('This conversation is full. Start a new chat to continue. The existing text has been kept.'); return;
+    message('This test is full. Use Clear test to start again. The existing text has been kept.'); return;
   }
   const activeController = new AbortController(); controller = activeController;
   const turn = benchmark ? null : addTurn(prompt);
@@ -379,7 +421,7 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
   } catch (error) {
     activeController.abort();
     let status = error.name === 'AbortError' ? 'Stopped. Partial output is kept here.' : error.message;
-    if (status.includes("does not fit this model's context")) status = 'This conversation does not fit the model’s context. Shorten your draft or start a new chat. No earlier messages have been removed.';
+    if (status.includes("does not fit this model's context")) status = 'This test does not fit the model’s context. Shorten your draft or use Clear test to start again. No earlier messages have been removed.';
     if (turn) turn.status.textContent = t(status); else message(status);
     $('chat-announcement').textContent = t(status);
     $('measurement-note').textContent = t('Run incomplete. No final generation speed is reported.');
@@ -419,7 +461,7 @@ $('new-chat').addEventListener('click', () => {
   if (controller) return;
   if ((conversation.length || $('result').children.length || $('prompt').value) && !confirm(t('Clear this conversation and draft? They are not saved.'))) return;
   conversation = []; lastReply = null; pendingMarkdown.clear(); $('result').replaceChildren(); $('result').hidden = true; $('chat-empty').hidden = false;
-  $('prompt').value = ''; $('chat-help').open = false; $('performance').open = false; message(''); $('chat-announcement').textContent = t('New chat started.');
+  $('prompt').value = ''; $('chat-help').open = false; $('performance').open = false; message(''); $('chat-announcement').textContent = t('Test cleared.');
   scrollLatest(true); resizeComposer(); buttonStates(); $('prompt').focus();
 });
 function chooseTask(id) {
@@ -452,7 +494,7 @@ $('quit').addEventListener('click', async () => {
     message('Geist is stopping. Reopen the app to start it again.');
   } catch (error) { message(error.message); }
 });
-document.querySelector('.brand').addEventListener('click', event => { event.preventDefault(); showPage('test-page'); });
+document.querySelector('.brand').addEventListener('click', event => { event.preventDefault(); showPage('models-page'); });
 document.querySelector('.skip').addEventListener('click', event => { event.preventDefault(); const main = $('main'); main.tabIndex = -1; main.focus(); });
 window.addEventListener('beforeunload', () => controller?.abort());
 const connectionHelp = {
@@ -494,15 +536,21 @@ if (!/^[a-f0-9]{64}$/.test(token)) message('Open Geist using the private link fr
 else { loadTasks().catch(error => message(error.message)); poll(); timer = setInterval(poll, 1800); }
 
 function showPage(id) {
+  if (!['models-page', 'connect-page', 'test-page'].includes(id)) return false;
   document.querySelectorAll('.page').forEach(page => { page.hidden = page.id !== id; });
-  document.querySelectorAll('[data-page]').forEach(button => {
+  document.querySelectorAll('nav [data-page]').forEach(button => {
     if (button.dataset.page === id) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
+  $('chat-help').open = false;
   chatLayout();
   if (id === 'test-page' && !$('workspace').hidden) $('prompt').focus({preventScroll: true});
-  else { const heading = id === 'test-page' && !$('setup').hidden ? $('setup-title') : $(id).querySelector('h2'); heading.tabIndex = -1; heading.focus(); }
+  else { const heading = $(id).querySelector('h1, h2'); heading.tabIndex = -1; heading.focus({preventScroll:true}); }
+  window.scrollTo(0, 0);
+  return true;
 }
+// Native menus route only to these fixed pages, without reloading the document.
+window.geistNavigate = showPage;
 document.querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => showPage(button.dataset.page)));
 $('ui-language').value = interfaceLanguage;
 $('language-choice').value = interfaceLanguage;
@@ -543,5 +591,5 @@ document.addEventListener('keydown', event => {
   }
 });
 document.addEventListener('pointerdown', event => {
-  for (const id of ['chat-help', 'performance']) if (!$(id).contains(event.target)) $(id).open = false;
+  if (!$('chat-help').contains(event.target)) $('chat-help').open = false;
 });

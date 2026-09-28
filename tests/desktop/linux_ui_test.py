@@ -75,8 +75,8 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
         wait_js(desktop.view, "document.documentElement.lang === 'de'")
         spin(lambda: desktop.preferences.exists())
         assert json.loads(desktop.preferences.read_text())['language'] == 'de'
-        assert evaluate(desktop.view, "document.getElementById('task-title').textContent") == 'Chat'
-        evaluate(desktop.view, "document.querySelector('[data-page=\"test-page\"]').click(); document.getElementById('prompt').value='Keep my input'; document.getElementById('ui-language').value='en'; document.getElementById('ui-language').dispatchEvent(new Event('change')); true")
+        assert evaluate(desktop.view, "document.getElementById('task-title').textContent") == 'Kurz testen'
+        evaluate(desktop.view, "showPage('test-page'); document.getElementById('prompt').value='Keep my input'; document.getElementById('ui-language').value='en'; document.getElementById('ui-language').dispatchEvent(new Event('change')); true")
         assert evaluate(desktop.view, "document.getElementById('prompt').value") == 'Keep my input'
         evaluate(desktop.view, "window.copyDone=false; copyText('Geist desktop clipboard test').then(() => window.copyDone=true); true")
         wait_js(desktop.view, 'window.copyDone')
@@ -93,8 +93,9 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
         desktop.window.set_default_size(540, 600)
         assert evaluate(desktop.view, 'document.documentElement.scrollWidth <= innerWidth')
         if model:
-            evaluate(desktop.view, "document.getElementById('setup-start').click(); true")
+            evaluate(desktop.view, "showPage('models-page'); document.getElementById('setup-start').click(); true")
             wait_js(desktop.view, "state?.ready === true && !document.getElementById('workspace').hidden", timeout=60)
+            assert evaluate(desktop.view, "!document.getElementById('models-page').hidden && document.getElementById('test-page').hidden")
             assert evaluate(desktop.view, "state.active_id === 'smollm2-360m' && state.models.find(m=>m.id===state.active_id).preview_accepted")
             evaluate(desktop.view, (ROOT / 'tests/desktop/chat_checks.js').read_text())
             wait_js(desktop.view, "window.chatChecksDone || !!window.chatChecksError")

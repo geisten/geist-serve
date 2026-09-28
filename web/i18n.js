@@ -1,6 +1,27 @@
 'use strict';
 let interfaceLanguage = (window.geistLanguage || (() => { try { return localStorage.getItem('geist-language'); } catch { return null; } })() || navigator.language).startsWith('de') ? 'de' : 'en';
 const german = {
+  'This test stays in this window. Clear test, reloading or quitting clears it. Check answers before using them.': 'Dieser Test bleibt in diesem Fenster. Test leeren, Neuladen oder Beenden löscht ihn. Prüfe Antworten vor der Verwendung.',
+  "Models": "Modelle",
+  "Models & performance": "Modelle & Leistung",
+  "← Models & performance": "← Modelle & Leistung",
+  "Your model. Ready for your tools.": "Dein Modell. Für deine Programme.",
+  "One local model for your programs.": "Ein lokales Modell für deine Programme.",
+  "Ready for your programs.": "Für deine Programme bereit.",
+  "Model in use by a program.": "Ein Programm verwendet das Modell.",
+  "Connect a program": "Programm verbinden",
+  "Quick test": "Kurz testen",
+  "Change model": "Modell wechseln",
+  "Settings": "Einstellungen",
+  "Clear test": "Test leeren",
+  "Load a model to try it.": "Lade ein Modell für den Kurztest.",
+  "Try your model.": "Probiere dein Modell aus.",
+  "Send a short message to check its response and speed.": "Prüfe mit einer kurzen Nachricht die Antwort und Geschwindigkeit.",
+  "Connect your program.": "Verbinde dein Programm.",
+  "Downloaded": "Heruntergeladen",
+  "Not downloaded": "Nicht heruntergeladen",
+  "Checking download…": "Download wird geprüft…",
+
   "System & performance": "System & Leistung",
   "Model RAM · now": "Modell-RAM · aktuell",
   "Model CPU · now": "Modell-CPU · aktuell",
@@ -88,6 +109,8 @@ Object.assign(german, {
   'Less than a minute left': 'Noch weniger als eine Minute'
 });
 const germanPatterns = [
+  [/^Downloading · (\d+)%$/, (_, n) => `Wird geladen · ${n}%`],
+  [/^Paused · (\d+)%$/, (_, n) => `Pausiert · ${n}%`],
   [/^About (\d+) min left$/, (_, n) => `Noch etwa ${n} Min.`],
   [/^([\d.]+ [MG]B) of ([\d.]+ [MG]B)$/, (_, a, b) => `${a} von ${b}`],
   [/^(.+) download · (.+) GiB RAM guidance$/, (_, a, b) => `${a} Download · ${b} GiB RAM empfohlen`],
@@ -197,7 +220,7 @@ Object.assign(german, {
   'Starting the local service…': 'Lokaler Dienst wird gestartet…',
   'Cannot check available memory or disk space. Retry the platform check.': 'Verfügbarer Arbeits- oder Festplattenspeicher konnte nicht geprüft werden. Die Prüfung wird wiederholt.',
   "Not enough total RAM for this model's planning budget.": 'Der Arbeitsspeicher reicht für das geplante Speicherbudget dieses Modells nicht aus.',
-  'Your model choice is kept. Change it in Customize.': 'Deine Modellauswahl bleibt erhalten. Du kannst sie unter Anpassen ändern.',
+  'Your model choice is kept. Select another model below.': 'Deine Modellauswahl bleibt erhalten. Hier kannst du ein anderes Modell wählen.',
   'Local performance is below the interactive setup target.': 'Die lokale Leistung liegt unter dem Zielwert für interaktive Nutzung.',
   'A smaller model fits the available resources better.': 'Ein kleineres Modell passt besser zu den verfügbaren Ressourcen.',
   'Platform default. Memory is estimated; answer quality is still unverified.': 'Standard für diese Plattform. Speicherbedarf geschätzt; Antwortqualität noch nicht bestätigt.',
@@ -225,15 +248,15 @@ Object.assign(german, {
   "Enter to send · Shift + Enter for a new line": "Enter zum Senden · Shift + Enter für einen Zeilenumbruch",
   "↓ Latest message": "↓ Neueste Nachricht",
   "Your message is too long. Shorten it before sending; your draft has been kept.": "Deine Nachricht ist zu lang. Kürze sie vor dem Senden; der Entwurf bleibt erhalten.",
-  "This conversation is full. Start a new chat to continue. The existing text has been kept.": "Dieses Gespräch ist voll. Starte einen neuen Chat. Der bisherige Text bleibt erhalten.",
+  "This test is full. Use Clear test to start again. The existing text has been kept.": "Dieser Test ist voll. Nutze „Test leeren“ für einen neuen Versuch. Der bisherige Text bleibt erhalten.",
   "Response limit reached. You can ask Geist to continue.": "Antwortlimit erreicht. Du kannst Geist bitten, fortzufahren.",
   "Continue response": "Antwort fortsetzen",
   "Continue from where you stopped.": "Fahre dort fort, wo du aufgehört hast.",
   "Continue from the latest reply, or ask a new question.": "Setze die neueste Antwort fort oder stelle eine neue Frage.",
   "Response complete.": "Antwort vollständig.",
-  "This conversation does not fit the model’s context. Shorten your draft or start a new chat. No earlier messages have been removed.": "Dieses Gespräch passt nicht mehr in den Kontext des Modells. Kürze deinen Entwurf oder starte einen neuen Chat. Frühere Nachrichten wurden nicht entfernt.",
+  "This test does not fit the model’s context. Shorten your draft or use Clear test to start again. No earlier messages have been removed.": "Dieser Test passt nicht mehr in den Kontext des Modells. Kürze deinen Entwurf oder beginne mit „Test leeren“ erneut. Frühere Nachrichten wurden nicht entfernt.",
   "Clear this conversation and draft? They are not saved.": "Gespräch und Entwurf löschen? Sie werden nicht gespeichert.",
-  "New chat started.": "Neuer Chat gestartet.",
+  "Test cleared.": "Test geleert.",
   "The loaded model changed. Check the model and send again.": "Das geladene Modell hat sich geändert. Prüfe es und sende erneut."
 });
 translateStatic();
