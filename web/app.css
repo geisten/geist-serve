@@ -481,13 +481,6 @@ nav button[aria-current] { color:var(--ink); background:var(--soft); box-shadow:
 #task-form:focus-within { border-color:var(--focus); box-shadow:0 0 0 1px #245edb20,var(--shadow) }
 #task-form textarea { padding:8px 0; background:transparent; border:0; border-radius:0; box-shadow:none; outline:none }
 #task-form .actions { border:0; margin:2px 0 0; padding:0; gap:8px }
-#job { margin-top:28px; padding:28px; background:var(--surface); border:1px solid var(--border); border-radius:22px; box-shadow:var(--shadow); text-align:left }
-#job h2 { font-size:21px }
-.download-numbers { display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin-top:24px }
-#job-percent { font-size:30px; font-weight:550; letter-spacing:-1px; font-variant-numeric:tabular-nums }
-#job-speed { text-align:right; font-variant-numeric:tabular-nums }
-#job .text-button { padding-left:0; margin-top:6px }
-#job-caption { margin-bottom:0 }
 .welcome .preview { font-size:12px; max-width:370px; margin:14px auto }
 
 /* One scrollable transcript. Drafts, tables and code have their own overflow;
@@ -578,7 +571,6 @@ button.markdown-copy { background:transparent; color:var(--muted); border:0; bor
   body.chat-page header { padding:12px 18px }
   nav button { padding:7px 8px }
   #task-form { padding:9px 13px 7px }
-  #job { padding:22px }
   .chat-heading { padding-bottom:8px }
   #chat-empty h3 { font-size:23px }
 }
@@ -620,21 +612,6 @@ button.markdown-copy { background:transparent; color:var(--muted); border:0; bor
 .model-home>h1 { font-size:25px; line-height:1.3; letter-spacing:-.6px; font-weight:550; margin:0 0 6px }
 .home-intro { color:var(--muted); margin:0 0 24px; font-size:14px }
 .model-overview { padding:24px; border:1px solid var(--border); border-radius:22px; background:var(--surface); box-shadow:var(--shadow) }
-.current-model { display:flex; align-items:center; gap:14px; min-width:0 }
-.current-model h2 { margin:0; font-size:21px; letter-spacing:-.4px; overflow-wrap:anywhere }
-#current-model-status { margin:2px 0 0; font-size:12px }
-.model-setup { margin-top:18px }
-.model-setup .preview { margin:12px 0; font-size:12px; max-width:510px }
-.model-setup .hint:last-child { margin-bottom:0 }
-#setup-detail { font-size:13px; margin-bottom:8px }
-#setup-reason:empty { display:none }
-#model-ready { margin-top:16px }
-#model-ready .state { text-align:left; font-size:12px; margin:0 0 16px; max-width:none }
-#model-ready .actions { margin:0; border:0; padding:0 }
-#job { margin:18px 0 0; padding:0; border:0; box-shadow:none; border-radius:0; background:none }
-#job h2 { font-size:16px }
-#job .download-numbers { margin-top:12px }
-#job-percent { font-size:24px }
 #model-chooser { border-top:1px solid var(--border); margin-top:20px; padding-top:16px }
 #model-chooser>summary { font-size:13px; font-weight:500; color:var(--muted) }
 #model-chooser[open]>summary { margin-bottom:12px }
@@ -646,7 +623,6 @@ button.markdown-copy { background:transparent; color:var(--muted); border:0; bor
 .model .specs { grid-column:1 / -1; margin-left:44px }
 .model .specs+span { display:none }
 .model-ring { --ring-progress:0; color:var(--accent); width:32px; height:32px; display:inline-flex; flex:0 0 auto }
-.current-model>.model-ring { width:42px; height:42px }
 .model-ring svg { display:block; width:100%; height:100%; overflow:visible; stroke-width:2.5 }
 .ring-track { stroke:var(--border) }
 .ring-fill { stroke:currentColor; stroke-dasharray:var(--ring-progress) 100; transform:rotate(-90deg); transform-origin:18px 18px; stroke-linecap:round }
@@ -680,15 +656,6 @@ body.manager-page footer { display:none }
 .model-sidebar { min-width:0; min-height:0; overflow:auto; padding:4px 10px 8px 4px; scrollbar-gutter:stable; overscroll-behavior:contain; border-radius:12px }
 .model-sidebar:focus-visible { outline-offset:-2px }
 .model-overview { padding:0; border:0; background:transparent; box-shadow:none; border-radius:0 }
-.current-model { gap:10px }
-.current-model h2 { font-size:17px }
-.has-model .current-model { display:none }
-.model-setup { margin-top:12px }
-.model-setup button { font-size:12px; width:100% }
-.model-setup .preview { font-size:11px }
-#model-ready { margin:0 0 14px }
-#model-ready .state { font-size:11px; margin:0 0 6px }
-#model-ready button { width:100%; font-size:12px }
 #model-chooser { border:0; margin-top:18px; padding:0 }
 #available-title { font-size:13px; font-weight:600; margin:0 0 12px; letter-spacing:0 }
 .model { padding:12px 2px; grid-template-columns:minmax(0,1fr) auto; gap:4px 6px }
@@ -697,7 +664,6 @@ body.manager-page footer { display:none }
 .model-ring { width:28px; height:28px }
 .model .download-state { font-size:10px }
 .model .fit { grid-column:1; grid-row:2; text-align:left; max-width:none; font-size:10px; margin-left:35px }
-.model .choose-model { grid-column:2; grid-row:2 / 4; min-height:30px; font-size:11px; padding:4px 8px; margin:0; align-self:start }
 .model details { grid-column:1; margin-left:35px; font-size:11px; min-width:0 }
 .model details[open] { grid-column:1 / -1 }
 .model .specs { margin:8px 0; font-size:11px }
@@ -736,9 +702,6 @@ body.manager-page #notice { flex:none; max-height:16vh; overflow:auto; margin:6p
   #models-page { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,30%) minmax(0,1fr); gap:12px }
   .model-sidebar { padding:4px 6px; border-bottom:1px solid var(--border) }
   #test-page { border:0; padding:0 }
-  #model-ready { display:flex; align-items:center; gap:8px; margin-bottom:8px }
-  #model-ready .state { flex:1; margin:0 }
-  #model-ready button { width:auto }
   #model-chooser { margin-top:10px }
   #transcript { min-height:36px; padding-top:4px }
   .chat-heading { padding-bottom:4px }
@@ -753,7 +716,6 @@ body.manager-page #notice { flex:none; max-height:16vh; overflow:auto; margin:6p
 @media(max-width:699px) {
   .model { padding:8px 2px }
   .model-heading { grid-column:1; grid-row:1 }
-  .model .choose-model { grid-row:1; align-self:center }
   .model details { grid-row:2; grid-column:2; margin:0 }
   .model details[open] { grid-row:3; grid-column:1 / -1; margin-left:35px }
 }
@@ -764,7 +726,6 @@ body.manager-page main { max-width:1180px }
 .brand { font-size:25px; letter-spacing:-1px }
 #models-page { gap:20px; grid-template-columns:minmax(205px,28%) minmax(0,1fr) }
 .model-sidebar { background:#f6f7f9; border-radius:14px; padding:12px 10px }
-#model-ready { margin:0 }
 #model-chooser { margin-top:0 }
 .model { border:0; padding:12px 8px; border-radius:10px; margin:2px 0; gap:3px 5px }
 .model.active,.model.selected { background:#eaf0fd }
@@ -772,7 +733,6 @@ body.manager-page main { max-width:1180px }
 .model-heading h3 { font-size:13px; font-weight:550 }
 .model .download-state,.model .fit { font-size:11px }
 .model .fit { margin-left:36px; grid-column:1; grid-row:2 }
-.model .choose-model { grid-column:2; grid-row:1 / 3; align-self:center; background:transparent; border:0; min-width:32px; padding:6px }
 .model details { grid-column:1 / -1; grid-row:3; margin-left:36px; margin-top:2px }
 .model details[open] { grid-row:3 }
 .model .specs { font-size:11px }
@@ -811,3 +771,23 @@ body.manager-page main { max-width:1180px }
 @media(max-width:699px) and (max-height:480px) {
   #models-page { grid-template-rows:minmax(0,26%) minmax(0,1fr) }
 }
+
+/* The model row is the action. Progress and pause stay in that same row. */
+.catalog-note { color:var(--muted); font-size:11px; line-height:1.45; margin:2px 8px 12px }
+.model { display:block; padding:6px 4px 10px }
+.model .model-pick { display:flex; width:100%; min-width:0; min-height:48px; gap:8px; margin:0; padding:6px 4px; border:0; border-radius:8px; text-align:left; background:transparent; font-weight:400 }
+.model .model-pick:hover:not(:disabled) { background:#e7ebf2 }
+.model .model-pick:disabled { opacity:1; color:inherit }
+.model.unavailable .model-pick { opacity:.5 }
+.model.preparing { background:#eef2f9 }
+.model-info { display:flex; flex-direction:column; flex:1; min-width:0; gap:2px }
+.model-name { font-size:13px; line-height:1.45; font-weight:550; overflow-wrap:anywhere }
+.model .download-state { display:block; margin:0; font-size:11px; font-weight:400 }
+.model-action { width:22px; flex:none; color:var(--muted); display:flex; align-items:center; justify-content:center }
+.model-action svg { width:17px; height:17px }
+.model.active .model-action { color:var(--accent) }
+.model .fit { display:block; margin:2px 0 0 40px; font-size:11px }
+.model .transfer-detail { display:block; margin:3px 4px 4px 40px; font-size:10px; color:var(--muted); font-variant-numeric:tabular-nums }
+.model details,.model details[open] { margin:4px 0 0 40px; font-size:11px }
+#test-unavailable h2 { font-size:22px; font-weight:500; color:var(--muted); margin:0; letter-spacing:-.5px }
+@media(max-width:699px) { .catalog-note { margin-bottom:6px } .model { padding:4px } }

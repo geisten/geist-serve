@@ -5,7 +5,7 @@ const token = location.hash.slice(1);
 const cards = new Map();
 let state = null, controller = null, requesting = false, polling = false;
 let lastServerMessage = '', localMessage = false;
-let manualChoice = null, languageInitialized = false, customPreviewAccepted = false;
+let pendingModel = null, languageInitialized = false, customPreviewAccepted = false;
 let stopped = false, timer;
 let tasks = [], selectedTask = null;
 let qualityRecords = [];
@@ -182,7 +182,6 @@ function buttonStates() {
   $('runtime-state').textContent = t(controller ? 'Generating locally…' : state?.ready ? 'Ready on this device' : 'Choose a model');
   $('runtime-model').textContent = state?.models.find(model => model.id === state.active_id)?.name || state?.active || '';
   $('language-choice').disabled = !!controller;
-  $('setup-start').disabled = requesting || !!controller || !state || state.busy || state.loading || !setupCandidate().eligible;
 }
 
 const ringMarkup = '<svg viewBox="0 0 36 36" aria-hidden="true"><circle class="ring-track" cx="18" cy="18" r="14"/><circle class="ring-fill" cx="18" cy="18" r="14" pathLength="100"/><path class="ring-check" d="m12 18 4 4 8-8"/></svg>';
@@ -215,105 +214,101 @@ function renderRing(element, model, current = state) {
   return status;
 }
 
+const modelIcons = {
+  download: '<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>',
+  start: '<path d="m8 4 12 8-12 8z"/>',
+  pause: '<path d="M8 5v14M16 5v14"/>',
+  active: '<path d="m5 12 4 4L19 6"/>'
+};
+function canPause(model) {
+  return state?.job_model === model.id && state.phase === 'downloading' && !state.loading;
+}
 function modelCard(model) {
   let card = cards.get(model.id);
   if (!card) {
     card = document.createElement('article'); card.className = 'model'; card.dataset.id = model.id;
-    // Static template only; metadata and generated output always use textContent.
-    card.innerHTML = '<div class="model-heading"><span class="model-ring"></span><div><h3></h3><p class="download-state"></p></div></div><button class="choose-model" type="button"></button><span class="fit"></span><details><summary></summary><p class="specs"></p><p class="reason"></p><p class="performance"></p><p class="quality"></p><button class="remove" type="button"></button></details>';
-    card.querySelector('button').addEventListener('click', () => choose(model.id));
+    // One semantic button covers the name and icon. Details/removal are siblings.
+    card.innerHTML = '<button class="model-pick" type="button" aria-describedby="catalog-preview"><span class="model-ring"></span><span class="model-info"><span class="model-name"></span><span class="download-state"></span></span><span class="model-action" aria-hidden="true"></span></button><span class="fit"></span><span class="transfer-detail"></span><details><summary></summary><p class="specs"></p><p class="reason"></p><p class="performance"></p><p class="quality"></p><button class="remove" type="button"></button></details>';
+    card.querySelector('.model-pick').addEventListener('click', event => { if (event.detail < 2) choose(model.id); });
+    card.querySelector('.model-pick').addEventListener('keydown', event => {
+      if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
+    });
     card.querySelector('.remove').addEventListener('click', () => removeModel(model.id));
     cards.set(model.id, card); $('models').append(card);
   }
   const active = state.active_id === model.id && state.ready;
-  const selected = manualChoice === model.id;
+  const pending = pendingModel === model.id;
+  const preparing = state.job_model === model.id && (!!state.phase || state.loading);
+  const paused = canPause(model);
   const evidence = qualityFor(model);
-  card.className = `model${active ? ' active' : ''}${selected ? ' selected' : ''}${model.resource_fit === 2 ? ' unavailable' : ''}`;
-  card.querySelector('h3').textContent = model.name;
+  card.className = `model${active ? ' active' : ''}${preparing || pending ? ' preparing' : ''}${model.resource_fit === 2 ? ' unavailable' : ''}`;
+  card.querySelector('.model-name').textContent = model.name;
   const download = renderRing(card.querySelector('.model-ring'), model);
-  card.querySelector('.download-state').textContent = t(download.text);
-  card.querySelector('.fit').hidden = !active && !selected && model.resource_fit === 0 && model.id !== state.recommendation.id;
-  card.querySelector('.fit').textContent = t(active ? 'Running here' : selected ? 'Selected for setup' : model.resource_fit === 2 ? 'Unavailable' : model.id === state.recommendation.id ? 'Suggested' : model.resource_fit === 1 ? 'Conditional' : 'Available');
-  card.querySelector('.specs').textContent = t(`${bytes(model.bytes)} download · ${model.ram_gib} GiB RAM guidance`);
+  // The button's complete name exposes status; a duplicate nested progress role
+  // is unnecessary to screen readers. Numeric ring attributes remain inspectable.
+  card.querySelector('.model-ring').setAttribute('aria-hidden', 'true');
+  const status = pending ? 'Getting ready…' : preparing && state.loading ? 'Loading model' : download.text;
+  card.querySelector('.download-state').textContent = t(status);
+  card.querySelector('.download-state').hidden = !pending && !preparing && (download.stage === 'missing' || (active && allowed(model)));
+  card.querySelector('.fit').hidden = !active && model.resource_fit === 0 && model.id !== state.recommendation.id;
+  card.querySelector('.fit').textContent = t(active ? 'Running here' : model.resource_fit === 2 ? 'Unavailable' : model.id === state.recommendation.id ? 'Suggested' : model.resource_fit === 1 ? 'Conditional' : 'Available');
+  const detail = card.querySelector('.transfer-detail');
+  detail.hidden = !preparing || state.loading;
+  detail.textContent = paused ? downloadEstimate(model.id, state.received || 0, model.bytes || 0) : preparing ? t('Checking download…') : '';
+  card.querySelector('.specs').textContent = model.bytes ? t(`${bytes(model.bytes)} download · ${model.ram_gib} GiB RAM guidance`) : t('Local model');
   card.querySelector('summary').textContent = t('Details');
-  card.querySelector('.reason').textContent = t(model.reason);
-  card.querySelector('.performance').textContent = t(model.measured_tps > 0 ? `Measured here: ${model.measured_tps.toFixed(1)} tokens/s · ${model.measured_tokens} tokens · this session` : model.performance);
+  card.querySelector('.reason').textContent = t(model.reason || '');
+  card.querySelector('.performance').textContent = t(model.measured_tps > 0 ? `Measured here: ${model.measured_tps.toFixed(1)} tokens/s · ${model.measured_tokens} tokens · this session` : model.performance || '');
   card.querySelector('.quality').textContent = t(evidence ? `Task quality: ${evidence.quality} · ${evidence.cases} test cases · ${evidence.language.toUpperCase()}. ${evidence.human_complete ? 'Human sample complete.' : 'Human assessment pending.'}` : 'Task quality: unverified for this task, language and device.');
-  const button = card.querySelector('button');
-  const action = active ? 'Active' : selected ? 'Selected' : model.installed ? 'Select to load' : model.partial ? 'Select to resume' : 'Select to set up';
-  button.innerHTML = active || selected ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>' : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>';
-  button.hidden = active && allowed(model);
+  const button = card.querySelector('.model-pick');
+  const action = paused ? 'Pause download' : active && allowed(model) ? 'Active' : model.installed ? 'Start model' : model.partial ? 'Resume download' : 'Download and start';
+  const icon = paused ? 'pause' : active && allowed(model) ? 'active' : model.installed ? 'start' : 'download';
+  const glyph = card.querySelector('.model-action');
+  if (glyph.dataset.icon !== icon) {
+    glyph.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${modelIcons[icon]}</svg>`;
+    glyph.dataset.icon = icon;
+  }
+  glyph.hidden = icon === 'active';
   button.title = `${t(action)}: ${model.name}`;
-  button.setAttribute('aria-pressed', String(active || selected));
-  button.disabled = model.resource_fit === 2 || state.busy || state.loading || requesting || !!controller || (active && allowed(model)) || selected;
-  button.setAttribute('aria-label', `${t(action)}: ${model.name}`);
+  button.setAttribute('aria-label', `${t(action)}: ${model.name} · ${t(status)}`);
+  button.disabled = requesting || !!controller || connectionTesting || (!paused && (model.resource_fit === 2 || state.busy || state.loading || !!state.phase || (active && allowed(model))));
   const remove = card.querySelector('.remove');
   remove.textContent = t('Remove download');
-  remove.hidden = !model.installed && !model.partial;
+  remove.hidden = model.id === 'custom' || (!model.installed && !model.partial);
   remove.disabled = (state.active_id === model.id && (state.ready || state.loading)) || state.busy || requesting || !!controller;
   remove.setAttribute('aria-label', `${t('Remove download')}: ${model.name}`);
 }
 
-function setupCandidate() {
-  if (!state) return {eligible: false};
-  const id = manualChoice || (state.active_id === 'custom' ? 'custom' : state.recommendation.id);
-  if (id === 'custom') return {id, name: state.active, eligible: state.ready, installed: true};
-  const model = state.models.find(m => m.id === id);
-  return {...model, eligible: !!model && (manualChoice ? model.resource_fit !== 2 : state.recommendation.eligible)};
+function visibleModels() {
+  const models = state?.models || [];
+  return state?.active_id === 'custom' && state.ready ? [{id:'custom', name:state.active, installed:true, resource_fit:0}, ...models] : models;
 }
-
 function render(next) {
   state = next;
   if (!languageInitialized) {
     $('language-choice').value = next.answer_language || interfaceLanguage;
     languageInitialized = true;
   }
-  const candidate = setupCandidate();
   const working = !!next.phase || next.loading;
   const active = next.models.find(m => m.id === next.active_id);
-  const usable = next.ready && allowed(active) && (!manualChoice || manualChoice === next.active_id);
+  const usable = next.ready && allowed(active);
   const previouslyHidden = $('workspace').hidden;
   $('workspace').hidden = working || !usable;
   $('test-unavailable').hidden = usable && !working;
-  const readyWasHidden = $('model-ready').hidden;
-  $('model-ready').hidden = working || !usable;
-  $('setup').hidden = working || usable;
-  $('job').hidden = !working;
-  if (usable && !working) manualChoice = null;
-  if (previouslyHidden && !$('workspace').hidden && !$('test-page').hidden &&
-      (document.activeElement === document.body || document.activeElement.closest('#setup, #job'))) $('prompt').focus({preventScroll: true});
-  $('setup-detail').textContent = candidate.id ? `${candidate.name} · ${t(candidate.installed ? 'Already on this computer' : 'Download')} ${candidate.installed ? '' : bytes(Math.max(0, candidate.bytes - (candidate.partial || 0)))}` : t('No suitable model available right now.');
-  $('setup-reason').textContent = manualChoice ? t(candidate.reason) : t(next.recommendation.source === 'fallback' || !next.recommendation.eligible ? next.recommendation.reason : '');
-  $('preview-notice').hidden = !candidate.id || previewAccepted(candidate);
-  $('setup-start').textContent = t(next.ready && candidate.id === next.active_id ? 'Try preview' : candidate.installed ? 'Start model' : candidate.partial ? 'Resume download' : 'Set up and start');
+  $('model-prompt').textContent = t(working ? 'Getting ready…' : 'Choose a model to begin.');
+  if (previouslyHidden && !$('workspace').hidden && !$('models-page').hidden &&
+      (document.activeElement === document.body || document.activeElement.closest('.model-pick'))) $('prompt').focus({preventScroll:true});
   $('disk-space').textContent = t(next.hardware.disk_known ? `${bytes(next.hardware.disk)} disk space available` : 'Disk space could not be read');
-  const shownModel = next.models.find(m => m.id === next.job_model) || (usable && active ? active : candidate);
-  $('active-model').textContent = shownModel.name || t('Choose a model');
-  const download = renderRing($('current-model-ring'), shownModel);
-  $('current-model-status').textContent = t(download.text);
-  $('model-ready-note').textContent = t(next.busy ? 'Model in use by a program.' : 'Ready for your programs.');
-  if (readyWasHidden && !$('model-ready').hidden && !$('models-page').hidden && document.activeElement.closest('#setup, #job')) $('open-tools').focus({preventScroll:true});
   $('recommendation-reason').textContent = t(next.recommendation.reason);
-  // Stable nodes preserve focus and open details through status polling.
-  const ordered = cards.size ? next.models : [...next.models].sort((a, b) =>
+  const models = visibleModels();
+  if (!models.some(model => model.id === 'custom') && cards.has('custom')) { cards.get('custom').remove(); cards.delete('custom'); }
+  // Keep existing nodes and ordering stable while downloading and polling.
+  const ordered = cards.size ? models : [...models].sort((a, b) =>
     (b.id === next.active_id) - (a.id === next.active_id) ||
     (b.id === next.recommendation.id) - (a.id === next.recommendation.id) ||
     Number(b.installed) - Number(a.installed) || a.resource_fit - b.resource_fit);
-  ordered.forEach(modelCard);
   if (!working) { transfer.id = ''; transfer.samples = []; }
-  if (working) {
-    const model = next.models.find(m => m.id === next.job_model);
-    const verifying = next.phase === 'verifying';
-    $('job-title').textContent = t(next.loading ? 'Loading model' : verifying ? 'Verifying model' : 'Downloading model');
-    if (verifying || next.loading) $('download-progress').removeAttribute('value');
-    else $('download-progress').value = Math.min(1, next.received / (model?.bytes || 1));
-    const downloading = !verifying && !next.loading;
-    $('job-percent').textContent = downloading ? `${Math.min(100, Math.floor(next.received / (model?.bytes || 1) * 100))}%` : '';
-    $('job-speed').textContent = downloading ? downloadEstimate(next.job_model, next.received, model?.bytes || 0) : '';
-    $('job-caption').hidden = !downloading;
-    $('job-detail').textContent = t(next.loading ? 'Starting the local service…' : verifying ? 'Checking the complete file before it can run.' : `${bytes(next.received)} of ${bytes(model?.bytes || 0)}`);
-    $('cancel-download').hidden = next.loading;
-  }
+  ordered.forEach(modelCard);
   if (!controller && !requesting && (!localMessage || next.message !== lastServerMessage)) message(working ? '' : next.message || '', false);
   lastServerMessage = next.message;
   buttonStates(); chatLayout();
@@ -327,30 +322,36 @@ async function poll() {
   finally { polling = false; }
 }
 
-function choose(id) {
-  if (requesting || controller || state?.busy || state?.loading) return;
-  manualChoice = id;
-  render(state);
-  showPage('models-page');
-  if (!$('setup').hidden) $('setup-start').focus();
-}
-$('setup-start').addEventListener('click', async () => {
-  const candidate = setupCandidate();
-  if (!candidate.eligible || requesting || controller || state?.busy || state?.loading) return;
-  const manual = !!manualChoice;
-  requesting = true; buttonStates(); message('', false);
+async function choose(id) {
+  const model = visibleModels().find(item => item.id === id);
+  if (!model || stopped || requesting || controller || connectionTesting) return;
+  const pause = canPause(model);
+  if (!pause && (state.busy || state.loading || state.phase || model.resource_fit === 2)) return;
+  if (!pause && state.ready && state.active_id === id && allowed(model)) return;
+  requesting = true; pendingModel = id; buttonStates(); visibleModels().forEach(modelCard); message('', false);
   try {
-    // This button is next to the explicit preview notice. Store consent per
-    // immutable model hash; generation still sends its own experimental flag.
-    if (candidate.id === 'custom') customPreviewAccepted = true;
-    else if (!previewAccepted(candidate)) await api('/app/preview', {id: candidate.id, experimental: true});
-    if (!state.ready || state.active_id !== candidate.id) {
-      await api(manual ? candidate.installed ? '/app/select' : '/app/download' : '/app/setup', {id: candidate.id});
+    if (pause) {
+      await api('/app/cancel', {});
+      message('Cancelling…');
+      return;
     }
-    manualChoice = null;
+    // The deliberate row action is next to the visible preview notice and is
+    // described by it for assistive technology. Consent remains bound to a hash.
+    if (id === 'custom') customPreviewAccepted = true;
+    else if (!previewAccepted(model)) await api('/app/preview', {id, experimental:true});
+    if (!state.ready || state.active_id !== id) {
+      await api(model.installed ? '/app/select' : '/app/download', {id});
+    }
   } catch (error) { message(error.message); }
-  finally { requesting = false; await poll(); }
-});
+  finally {
+    // Keep the row locked until a fresh status reflects the completed action.
+    // A periodic poll already in flight may still describe the previous state.
+    while (polling) await new Promise(resolve => setTimeout(resolve, 40));
+    await poll();
+    requesting = false; pendingModel = null;
+    if (state) render(state); else buttonStates();
+  }
+}
 
 function metric(id, value, unit) {
   const target = $(id); target.replaceChildren(document.createTextNode(value));
@@ -376,7 +377,7 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
   const target = turn?.output || $('benchmark-output');
   target.hidden = false; target.textContent = '';
   if (!benchmark) { if (!preserveDraft) $('prompt').value = ''; $('chat-help').open = false; $('performance').open = false; resizeComposer(); $('prompt').focus(); }
-  buttonStates(); state.models.forEach(modelCard); message('');
+  buttonStates(); visibleModels().forEach(modelCard); message('');
   for (const [id, unit] of [['speed', 'tokens/s'], ['first-token', 'seconds'], ['elapsed', 'seconds']]) metric(id, '—', unit);
   uiText($('measurement-note'), benchmark ? 'Short local test running. Results apply to this model and this workload.' : 'Running on your device…');
   uiText($('chat-announcement'), 'Waiting for the first text…');
@@ -454,7 +455,7 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
       turn.copy.disabled = !output;
       scrollLatest();
     }
-    controller = null; replyPending = false; buttonStates(); if (state) state.models.forEach(modelCard);
+    controller = null; replyPending = false; buttonStates(); if (state) visibleModels().forEach(modelCard);
     if (stopped) message('Geist is stopping. Reopen the app to start it again.');
     else await poll();
   }
@@ -483,7 +484,7 @@ $('new-chat').addEventListener('click', () => {
 function chooseTask(id) {
   selectedTask = tasks.find(task => task.id === id && !task.url);
   $('prompt').placeholder = t('Message Geist…');
-  buttonStates(); if (state) state.models.forEach(modelCard);
+  buttonStates(); if (state) visibleModels().forEach(modelCard);
 }
 $('language-choice').addEventListener('change', async () => {
   try { await api('/app/preferences', {language: $('language-choice').value}); }
@@ -499,7 +500,6 @@ async function loadTasks() {
 }
 $('stop').addEventListener('click', () => { controller?.abort(); $('prompt').focus({preventScroll: true}); });
 $('benchmark').addEventListener('click', () => run('Explain in a short paragraph how a seed grows into a plant.', true));
-$('cancel-download').addEventListener('click', async () => { try { await api('/app/cancel', {}); message('Cancelling…'); } catch (error) { message(error.message); } });
 $('unload').addEventListener('click', async () => { try { await api('/app/stop', {}); await poll(); } catch (error) { message(error.message); } });
 $('quit').addEventListener('click', async () => {
   if (!confirm(t('Stop the shared service? Terminal and editor connections will stop too. Downloaded models are kept.'))) return;
@@ -569,11 +569,6 @@ function showPage(id) {
 }
 // Native menus route only to these fixed pages, without reloading the document.
 window.geistNavigate = showPage;
-$('go-setup').addEventListener('click', () => {
-  const target = !$('setup').hidden ? $('setup-start') : $('available-title');
-  target.tabIndex = target.tagName === 'BUTTON' ? 0 : -1; target.focus();
-  target.scrollIntoView({block:'nearest'});
-});
 document.querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => showPage(button.dataset.page)));
 $('open-preferences').addEventListener('click', () => {
   showPage('models-page'); $('preferences').open = true;
@@ -604,8 +599,8 @@ async function removeModel(id) {
   const model = state?.models.find(item => item.id === id);
   if (!model || requesting || controller || state.busy || (state.active_id === id && (state.ready || state.loading))) return;
   if (!confirm(t(`Remove ${model.name} from this computer? You can download it again later.`))) return;
-  requesting = true; buttonStates(); state.models.forEach(modelCard);
-  try { await api('/app/remove', {id}); if (manualChoice === id) manualChoice = null; message('', false); }
+  requesting = true; buttonStates(); visibleModels().forEach(modelCard);
+  try { await api('/app/remove', {id}); message('', false); }
   catch (error) { message(error.message); }
   finally { requesting = false; await poll(); }
 }

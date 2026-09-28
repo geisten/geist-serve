@@ -2,13 +2,14 @@
 
 These are development candidates, not a published release or Apple-approved
 distribution. The desktop manager, terminal and compatible editor share one
-loaded geistd. No model is included; choose Set up and start on first use.
+loaded geistd. No model is included; click a suggested model on first use.
 
 ## macOS (Apple Silicon, macOS 14+)
 
 Drag Geist.app from the DMG to Applications and open it. Geist opens its own
-desktop window. Read the preview notice and choose **Set up and start**. A
-platform check suggests one model, including a smaller fallback when needed.
+desktop window. Click a model name or its download icon to download and start it.
+An installed model starts directly; progress, pause and resume stay in its row.
+A platform check suggests one model, including a smaller fallback when needed.
 The main screen shows the catalog beside **Quick test** (stacked in narrow
 windows). **Connect a program** opens connection setup. Catalog rows show download progress rings. A closed
 green ring and check mean downloaded; paused downloads retain their percentage.

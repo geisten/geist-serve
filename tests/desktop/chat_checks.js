@@ -53,13 +53,90 @@ window.chatChecksError = null;
     assert($('model-chooser').tagName === 'SECTION', 'model list is visible without a disclosure');
     const panes = [$('models-page').querySelector('.model-sidebar').getBoundingClientRect(), $('test-page').getBoundingClientRect()];
     assert(innerWidth < 700 ? panes[0].bottom <= panes[1].top : panes[0].right <= panes[1].left, 'panes stack on small windows and sit side by side on wide ones');
-    const activeID = state.active_id, alternative = state.models.find(m => m.id !== activeID && m.resource_fit !== 2);
-    if (alternative) {
-      input('Draft survives model selection'); choose(alternative.id);
-      assert(manualChoice === alternative.id && !$('setup').hidden && state.active_id === activeID && document.activeElement === $('setup-start'), 'choosing a row prepares explicit setup; it neither downloads nor switches the daemon');
-      choose(activeID);
-      assert(!$('workspace').hidden && $('prompt').value === 'Draft survives model selection', 'return to the current model retains the draft');
-      input('');
+    // Model-row interactions use deterministic transport only; no test fetches a
+    // catalog-sized model. The host separately loads a real installed GGUF.
+    const chatAPI = api;
+    while (polling) await tick();
+    const realState = state;
+    let fixture = JSON.parse(JSON.stringify(realState)), modelCalls = [], fault = '', release;
+    const alternative = fixture.models.find(m => m.id !== fixture.active_id && m.resource_fit !== 2);
+    assert(alternative, 'catalog offers an alternative for direct-action tests');
+    const modelID = alternative.id;
+    const fixtureModel = () => fixture.models.find(m => m.id === modelID);
+    const pick = () => document.querySelector(`[data-id="${modelID}"] .model-pick`);
+    const settle = async () => {
+      for (let i=0; i<200 && (requesting || polling); i++) await tick();
+      assert(!requesting && !polling, 'model action settles');
+    };
+    const resetFixture = () => {
+      fixture = JSON.parse(JSON.stringify(realState));
+      Object.assign(fixtureModel(), {installed:false, partial:0, preview_accepted:false});
+      modelCalls = []; render(JSON.parse(JSON.stringify(fixture)));
+    };
+    try {
+      api = async (path, body, signal) => {
+        if (path === '/app/status') return new Response(JSON.stringify(fixture));
+        if (!['/app/preview','/app/download','/app/select','/app/cancel'].includes(path)) return chatAPI(path, body, signal);
+        modelCalls.push([path, body]);
+        if (fault === path) throw new Error('Controlled model action failure');
+        if (path === '/app/preview') fixtureModel().preview_accepted = true;
+        if (path === '/app/download') {
+          if (fault === 'hold') await new Promise(resolve => { release=resolve; });
+          Object.assign(fixture, {busy:true, phase:'downloading', job_model:modelID, received:fixtureModel().bytes / 2});
+        }
+        if (path === '/app/cancel') {
+          fixtureModel().partial = fixture.received;
+          Object.assign(fixture, {busy:false, phase:'', job_model:''});
+        }
+        if (path === '/app/select') Object.assign(fixture, {active_id:modelID, active:fixtureModel().name, ready:true, busy:false, phase:'', job_model:''});
+        return new Response('{}');
+      };
+      resetFixture(); input('Draft survives model changes');
+      assert(!$('setup-start') && !$('setup') && !$('go-setup'), 'no second setup or start control');
+      assert(pick().querySelector('.download-state').hidden && pick().getAttribute('aria-label').includes(t('Not downloaded')), 'missing state uses symbols while retaining an accessible explanation');
+      pick().querySelector('.model-name').click(); await settle();
+      assert(JSON.stringify(modelCalls.map(([path]) => path)) === JSON.stringify(['/app/preview','/app/download']), 'one name click grants preview and starts exactly one download');
+      assert(modelCalls.every(([, body]) => body.id === modelID), 'action keeps the explicitly requested model');
+      assert(pick().getAttribute('aria-label').includes(t('Pause download')) && pick().querySelector('.model-ring').getAttribute('aria-valuenow') === '50', 'same row exposes real progress and pause');
+      const count = modelCalls.length;
+      pick().dispatchEvent(new MouseEvent('click', {bubbles:true, detail:2})); await tick();
+      assert(modelCalls.length === count, 'second click of a double click cannot pause a new download');
+      const repeated = new KeyboardEvent('keydown', {key:'Enter', repeat:true, cancelable:true}); pick().dispatchEvent(repeated);
+      assert(repeated.defaultPrevented, 'held Enter cannot repeatedly toggle the model');
+      pick().querySelector('.model-action').click(); await settle();
+      assert(modelCalls.at(-1)[0] === '/app/cancel' && pick().querySelector('.model-ring').dataset.stage === 'paused', 'pause icon retains the partial download');
+      pick().querySelector('.model-ring').click(); await settle();
+      assert(modelCalls.at(-1)[0] === '/app/download' && modelCalls.filter(([path]) => path === '/app/preview').length === 1, 'ring resumes directly without another preview step');
+      fixture.phase='verifying'; render(JSON.parse(JSON.stringify(fixture)));
+      assert(pick().disabled && pick().querySelector('.model-ring').dataset.stage === 'verifying', 'verification is not presented as completed or pausable');
+      Object.assign(fixture, {busy:false, phase:'', job_model:''}); fixtureModel().installed=true;
+      render(JSON.parse(JSON.stringify(fixture))); modelCalls=[];
+      pick().querySelector('.model-name').click(); await settle();
+      assert(modelCalls.length === 1 && modelCalls[0][0] === '/app/select', 'installed model starts with one click and no download');
+      assert(pick().disabled && !$('workspace').hidden && $('prompt').value === 'Draft survives model changes', 'active model has no redundant action and retains the draft');
+      resetFixture();
+      const details = pick().closest('.model').querySelector('details');
+      details.querySelector('summary').click(); await tick();
+      assert(details.open && !modelCalls.length, 'opening details never starts a download'); details.open=false;
+      fixtureModel().resource_fit=2; render(JSON.parse(JSON.stringify(fixture)));
+      pick().click(); await choose(modelID);
+      assert(pick().disabled && !modelCalls.length, 'unsuitable models cannot start');
+      resetFixture(); fixture.busy=true; render(JSON.parse(JSON.stringify(fixture)));
+      pick().click(); await choose(modelID);
+      assert(!modelCalls.length, 'another busy operation prevents switching');
+      resetFixture(); fault='/app/preview'; pick().click(); await settle();
+      assert(modelCalls.length === 1 && modelCalls[0][0] === '/app/preview' && $('notice').textContent.includes('Controlled model action failure'), 'failed preview prevents download and explains failure');
+      resetFixture(); fault='/app/download'; pick().click(); await settle();
+      assert(!pick().disabled && $('notice').textContent.includes('Controlled model action failure') && $('prompt').value === 'Draft survives model changes', 'download failure leaves a retryable row and keeps the draft');
+      resetFixture(); fault='hold'; pick().click();
+      for (let i=0; i<50 && !release; i++) await tick();
+      assert(release && pick().disabled, 'pending request locks its row');
+      await choose(modelID); pick().click();
+      assert(modelCalls.filter(([path]) => path === '/app/download').length === 1, 'pending request cannot create duplicate downloads');
+      release(); release=null; await settle(); fault='';
+    } finally {
+      if (release) { release(); await settle(); }
+      api=chatAPI; render(realState); message('', false); input('');
     }
     assert(window.geistNavigate('invalid') === false && !$('models-page').hidden, 'native routing is allowlisted');
     showPage('test-page');
@@ -118,8 +195,9 @@ window.chatChecksError = null;
     assert(!$('test-page').hidden && controller && $('prompt').value === 'My next draft', 'returning to a running quick test preserves the draft and keeps Stop reachable');
     await tick();
     const answer = 'A complete visible line.\n'.repeat(90) + '<script>never executed</script>' + 'z'.repeat(1400);
-    emit({response:answer}); await tick();
-    assert($('output').markdownSource === answer && $('output').textContent.includes('z'.repeat(1400)) && !$('output').querySelector('script'), 'full safe Markdown rendering');
+    emit({response:answer});
+    for (let i=0; i<100 && (!$('output').textContent.includes('z'.repeat(1400))); i++) await tick();
+    assert($('output').markdownSource === answer && $('output').textContent.includes('z'.repeat(1400)) && !$('output').querySelector('script'), `full safe Markdown rendering: ${JSON.stringify({source:$('output').markdownSource?.length,expected:answer.length,text:$('output').textContent.length,focus:document.activeElement?.tagName,pending:pendingMarkdown.size})}`);
     assert($('transcript').scrollHeight > $('transcript').clientHeight, 'history scrollable');
     assert(document.documentElement.scrollWidth <= innerWidth, 'long reply wraps');
     $('transcript').scrollTop = 0; $('transcript').dispatchEvent(new Event('scroll'));

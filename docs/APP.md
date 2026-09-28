@@ -1,8 +1,8 @@
 # Geist — Runs here. Stays here.
 
 Manage a local model and connect your terminal and editor to the same service.
-Select **Set up and start** to download the platform suggestion, then work offline.
-No account or initial task/model/language selection is required.
+Click the suggested model to download and start it, then work offline.
+No account or separate setup step is required.
 Small models have limited capabilities: check their answers, and use the
 examples to decide whether a model meets your needs.
 
@@ -13,8 +13,9 @@ Mac release still needs Developer ID signing and notarization.
 ## Start on a Mac
 
 Open the Geist DMG, drag Geist to Applications, and open its desktop window.
-Read the short preview notice and choose **Set up and start**. Geist downloads,
-verifies and starts one suggested model. The main screen stays on **Models**,
+Click a model name or its download icon. Geist downloads, verifies and starts
+that model. An installed model starts directly. The same row shows progress and
+lets you pause or resume a download. The short preview notice stays above the list. The main screen stays on **Models**,
 with the catalog on the left and **Quick test** on the right. In narrow windows
 they stack vertically. Each pane scrolls independently. **Connect a program**
 opens editor setup; the short test checks a response and its speed. Press **Enter** to send and **Shift + Enter** for a new line. The arrow sends

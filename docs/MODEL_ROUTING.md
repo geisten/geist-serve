@@ -28,6 +28,8 @@ can start a previously downloaded, verified and permitted model on demand.
   low memory, retries, model eviction protection and shutdown. A single successful
   chat is insufficient evidence for automatic model switching.
 
-The unified desktop catalog is implemented separately from this proposal. Choosing
-another row prepares setup; the explicit setup button starts/downloads it. Model
-selection does not change the daemon or download files by itself.
+The unified desktop catalog is implemented separately from this proposal. Clicking
+a model name or icon explicitly downloads and starts it, or starts its installed
+file. Progress, pause and resume remain in that row. The manager rechecks resources
+and keeps preview consent bound to the catalog hash. Chat requests do not trigger
+this action.

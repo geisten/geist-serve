@@ -73,7 +73,7 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
         assert evaluate(desktop.view, 'false') is False
         assert desktop.window.get_visible()
         assert desktop.view.get_network_session().is_ephemeral()
-        assert evaluate(desktop.view, "document.getElementById('workspace').hidden && !document.getElementById('setup').hidden && !document.getElementById('experimental')")
+        assert evaluate(desktop.view, "document.getElementById('workspace').hidden && !document.getElementById('setup-start') && document.querySelectorAll('.model-pick').length === 6 && !document.getElementById('experimental')")
         assert evaluate(desktop.view, "state.models.every(m => !m.preview_accepted)")
         evaluate(desktop.view, "document.getElementById('ui-language').value='system'; document.getElementById('ui-language').dispatchEvent(new Event('change')); true")
         spin(lambda: desktop.preferences.exists() and json.loads(desktop.preferences.read_text())['language'] == 'system')
@@ -107,7 +107,7 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
         desktop.window.set_default_size(540, 600)
         assert evaluate(desktop.view, 'document.documentElement.scrollWidth <= innerWidth')
         if model:
-            evaluate(desktop.view, "showPage('models-page'); document.getElementById('setup-start').click(); true")
+            evaluate(desktop.view, "showPage('models-page'); document.querySelector('[data-id=\"smollm2-360m\"] .model-name').click(); true")
             wait_js(desktop.view, "state?.ready === true && !document.getElementById('workspace').hidden", timeout=60)
             assert evaluate(desktop.view, "!document.getElementById('models-page').hidden && !document.getElementById('test-page').hidden")
             assert evaluate(desktop.view, "state.active_id === 'smollm2-360m' && state.models.find(m=>m.id===state.active_id).preview_accepted")

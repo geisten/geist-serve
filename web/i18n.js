@@ -290,4 +290,10 @@ Object.assign(german, {
   'Local processing. No account.': 'Lokale Verarbeitung. Ohne Konto.',
   '↵ Send · ⇧↵ New line': '↵ Senden · ⇧↵ Neue Zeile'
 });
+Object.assign(german, {
+  'Preview · Check answers.': 'Vorschau · Antworten prüfen.',
+  'Selecting a model starts its preview. Check answers before using them.': 'Mit der Modellauswahl startest du die Vorschau. Prüfe die Antworten vor der Verwendung.',
+  'Download and start': 'Herunterladen und starten',
+  'Local model': 'Lokales Modell'
+});
 translateStatic();

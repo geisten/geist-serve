@@ -18,24 +18,7 @@
   <h1 id="models-title" class="sr-only">Models &amp; quick test</h1>
   <aside class="model-sidebar" aria-label="Model manager" tabindex="0">
   <div class="model-overview">
-    <div class="current-model"><span id="current-model-ring" class="model-ring" aria-hidden="true"></span><div><h2 id="active-model"></h2><p id="current-model-status" class="hint"></p></div></div>
-  <div id="setup" class="model-setup">
-    <p id="setup-detail" class="muted" role="status">Checking this computer…</p>
-    <p id="setup-reason" class="hint"></p>
-    <p id="preview-notice" class="preview">Preview: check answers before using them. Start to accept this preview.</p>
-    <button id="setup-start" class="primary" type="button" disabled aria-describedby="setup-detail preview-notice">Set up and start</button>
-    <p class="hint">Local processing. No account.</p>
-  </div>
-  <div id="job" class="model-setup" hidden>
-    <h2 id="job-title">Getting ready…</h2>
-    <div class="download-numbers"><strong id="job-percent" aria-hidden="true"></strong><span id="job-speed" class="hint"></span></div>
-    <progress id="download-progress" max="1" value="0" aria-label="Download progress"></progress>
-    <p id="job-detail" class="muted" role="status"></p>
-    <p id="job-caption" class="hint">One download. Then ready offline.</p>
-    <button id="cancel-download" class="text-button" type="button">Pause download</button>
-  </div>
-
-    <div id="model-ready" hidden><p id="model-ready-note" class="sr-only" role="status">Ready for your programs.</p></div>
+    <p id="catalog-preview" class="catalog-note" title="Selecting a model starts its preview. Check answers before using them.">Preview · Check answers.</p>
     <section id="model-chooser" aria-labelledby="available-title"><h2 id="available-title" class="sr-only">Models for this computer</h2><div id="models" aria-label="Available models"></div><details class="recommendation"><summary>How we suggest a model</summary><p id="recommendation-reason" class="hint"></p></details></section>
   </div>
       <details id="performance" class="performance">
@@ -68,7 +51,7 @@
 </aside>
 
 <section id="test-page" aria-labelledby="task-title">
-  <div id="test-unavailable"><h2>Try your model.</h2><p>Set up a model to check its response and speed here.</p><button id="go-setup" type="button">Go to model setup</button></div>
+  <div id="test-unavailable"><h2 id="model-prompt">Choose a model to begin.</h2></div>
   <div id="workspace" hidden>
     <div class="chat-heading"><div><h2 id="task-title" class="sr-only">Quick test</h2><h2 id="runtime-model" class="runtime-model"></h2><span id="runtime-state" class="state">Ready on this device</span></div><button id="new-chat" class="text-button" type="button" aria-label="Clear test" title="Clear test"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button></div>
     <div class="model-metrics" role="group" aria-label="System &amp; performance">
