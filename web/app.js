@@ -34,7 +34,8 @@ document.addEventListener('selectionchange', flushMarkdown);
 document.addEventListener('focusout', () => setTimeout(flushMarkdown, 0));
 
 function chatLayout() {
-  document.body.classList.toggle('chat-page', !$('test-page').hidden && !$('workspace').hidden);
+  document.body.classList.toggle('manager-page', !$('models-page').hidden);
+  document.body.classList.toggle('has-model', !$('workspace').hidden);
   resizeComposer();
 }
 function resizeComposer() {
@@ -163,7 +164,6 @@ function buttonStates() {
   $('copy-connection').disabled = !state?.ready;
   $('connection-endpoint').textContent = t(`${location.origin}/v1`);
   $('connection-model').textContent = t(state?.active_id || 'Choose a model');
-  $('open-test').disabled = !state?.ready || (state?.busy && !controller) || requesting;
   const ready = selectedTask && !selectedTask.url && state?.ready && !state?.busy && !requesting && !controller && !connectionTesting && allowed(state?.models.find(m => m.id === state.active_id));
   $('run').disabled = !ready || !$('prompt').value.trim();
   $('run').hidden = !!controller;
@@ -215,26 +215,28 @@ function modelCard(model) {
   if (!card) {
     card = document.createElement('article'); card.className = 'model'; card.dataset.id = model.id;
     // Static template only; metadata and generated output always use textContent.
-    card.innerHTML = '<div class="model-heading"><span class="model-ring"></span><div><h3></h3><p class="download-state"></p></div></div><span class="fit"></span><p class="specs"></p><span></span><details><summary></summary><p class="reason"></p><p class="performance"></p><p class="quality"></p></details><button type="button"></button><button class="remove" type="button"></button>';
+    card.innerHTML = '<div class="model-heading"><span class="model-ring"></span><div><h3></h3><p class="download-state"></p></div></div><button class="choose-model" type="button"></button><span class="fit"></span><details><summary></summary><p class="specs"></p><p class="reason"></p><p class="performance"></p><p class="quality"></p><button class="remove" type="button"></button></details>';
     card.querySelector('button').addEventListener('click', () => choose(model.id));
     card.querySelector('.remove').addEventListener('click', () => removeModel(model.id));
     cards.set(model.id, card); $('models').append(card);
   }
   const active = state.active_id === model.id && state.ready;
+  const selected = manualChoice === model.id;
   const evidence = qualityFor(model);
-  card.className = `model${active ? ' active' : ''}${model.resource_fit === 2 ? ' unavailable' : ''}`;
+  card.className = `model${active ? ' active' : ''}${selected ? ' selected' : ''}${model.resource_fit === 2 ? ' unavailable' : ''}`;
   card.querySelector('h3').textContent = model.name;
   const download = renderRing(card.querySelector('.model-ring'), model);
   card.querySelector('.download-state').textContent = t(download.text);
-  card.querySelector('.fit').textContent = t(active ? 'Running here' : model.resource_fit === 2 ? 'Unavailable' : model.id === state.recommendation.id ? 'Selected for setup' : model.resource_fit === 1 ? 'Conditional' : 'Available');
+  card.querySelector('.fit').textContent = t(active ? 'Running here' : selected ? 'Selected for setup' : model.resource_fit === 2 ? 'Unavailable' : model.id === state.recommendation.id ? 'Suggested' : model.resource_fit === 1 ? 'Conditional' : 'Available');
   card.querySelector('.specs').textContent = t(`${bytes(model.bytes)} download · ${model.ram_gib} GiB RAM guidance`);
   card.querySelector('summary').textContent = t('Details');
   card.querySelector('.reason').textContent = t(model.reason);
   card.querySelector('.performance').textContent = t(model.measured_tps > 0 ? `Measured here: ${model.measured_tps.toFixed(1)} tokens/s · ${model.measured_tokens} tokens · this session` : model.performance);
   card.querySelector('.quality').textContent = t(evidence ? `Task quality: ${evidence.quality} · ${evidence.cases} test cases · ${evidence.language.toUpperCase()}. ${evidence.human_complete ? 'Human sample complete.' : 'Human assessment pending.'}` : 'Task quality: unverified for this task, language and device.');
   const button = card.querySelector('button');
-  button.textContent = t(active ? 'Running here' : 'Choose');
-  button.disabled = model.resource_fit === 2 || state.busy || state.loading || requesting || !!controller || (active && allowed(model));
+  button.textContent = t(active ? 'Active' : selected ? 'Selected' : 'Choose');
+  button.setAttribute('aria-pressed', String(active || selected));
+  button.disabled = model.resource_fit === 2 || state.busy || state.loading || requesting || !!controller || (active && allowed(model)) || selected;
   button.setAttribute('aria-label', `${button.textContent}: ${model.name}`);
   const remove = card.querySelector('.remove');
   remove.textContent = t('Remove download');
@@ -276,14 +278,19 @@ function render(next) {
   $('preview-notice').hidden = !candidate.id || previewAccepted(candidate);
   $('setup-start').textContent = t(next.ready && candidate.id === next.active_id ? 'Try preview' : candidate.installed ? 'Start model' : candidate.partial ? 'Resume download' : 'Set up and start');
   $('disk-space').textContent = t(next.hardware.disk_known ? `${bytes(next.hardware.disk)} disk space available` : 'Disk space could not be read');
-  const shownModel = next.models.find(m => m.id === next.job_model) || candidate;
+  const shownModel = next.models.find(m => m.id === next.job_model) || (usable && active ? active : candidate);
   $('active-model').textContent = shownModel.name || t('Choose a model');
   const download = renderRing($('current-model-ring'), shownModel);
   $('current-model-status').textContent = t(download.text);
   $('model-ready-note').textContent = t(next.busy ? 'Model in use by a program.' : 'Ready for your programs.');
   if (readyWasHidden && !$('model-ready').hidden && !$('models-page').hidden && document.activeElement.closest('#setup, #job')) $('open-tools').focus({preventScroll:true});
   $('recommendation-reason').textContent = t(next.recommendation.reason);
-  next.models.forEach(modelCard);
+  // Stable nodes preserve focus and open details through status polling.
+  const ordered = cards.size ? next.models : [...next.models].sort((a, b) =>
+    (b.id === next.active_id) - (a.id === next.active_id) ||
+    (b.id === next.recommendation.id) - (a.id === next.recommendation.id) ||
+    Number(b.installed) - Number(a.installed) || a.resource_fit - b.resource_fit);
+  ordered.forEach(modelCard);
   if (!working) { transfer.id = ''; transfer.samples = []; }
   if (working) {
     const model = next.models.find(m => m.id === next.job_model);
@@ -315,8 +322,8 @@ function choose(id) {
   if (requesting || controller || state?.busy || state?.loading) return;
   manualChoice = id;
   render(state);
-  $('model-chooser').open = false;
   showPage('models-page');
+  if (!$('setup').hidden) $('setup-start').focus();
 }
 $('setup-start').addEventListener('click', async () => {
   const candidate = setupCandidate();
@@ -537,6 +544,8 @@ else { loadTasks().catch(error => message(error.message)); poll(); timer = setIn
 
 function showPage(id) {
   if (!['models-page', 'connect-page', 'test-page'].includes(id)) return false;
+  const quickTest = id === 'test-page';
+  if (quickTest) id = 'models-page'; // Native quick-test shortcut focuses the shared pane.
   document.querySelectorAll('.page').forEach(page => { page.hidden = page.id !== id; });
   document.querySelectorAll('nav [data-page]').forEach(button => {
     if (button.dataset.page === id) button.setAttribute('aria-current', 'page');
@@ -544,13 +553,18 @@ function showPage(id) {
   });
   $('chat-help').open = false;
   chatLayout();
-  if (id === 'test-page' && !$('workspace').hidden) $('prompt').focus({preventScroll: true});
+  if (quickTest && !$('workspace').hidden) $('prompt').focus({preventScroll: true});
   else { const heading = $(id).querySelector('h1, h2'); heading.tabIndex = -1; heading.focus({preventScroll:true}); }
   window.scrollTo(0, 0);
   return true;
 }
 // Native menus route only to these fixed pages, without reloading the document.
 window.geistNavigate = showPage;
+$('go-setup').addEventListener('click', () => {
+  const target = !$('setup').hidden ? $('setup-start') : $('available-title');
+  target.tabIndex = target.tagName === 'BUTTON' ? 0 : -1; target.focus();
+  target.scrollIntoView({block:'nearest'});
+});
 document.querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => showPage(button.dataset.page)));
 $('ui-language').value = interfaceLanguage;
 $('language-choice').value = interfaceLanguage;

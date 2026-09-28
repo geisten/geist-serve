@@ -95,7 +95,7 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
         if model:
             evaluate(desktop.view, "showPage('models-page'); document.getElementById('setup-start').click(); true")
             wait_js(desktop.view, "state?.ready === true && !document.getElementById('workspace').hidden", timeout=60)
-            assert evaluate(desktop.view, "!document.getElementById('models-page').hidden && document.getElementById('test-page').hidden")
+            assert evaluate(desktop.view, "!document.getElementById('models-page').hidden && !document.getElementById('test-page').hidden")
             assert evaluate(desktop.view, "state.active_id === 'smollm2-360m' && state.models.find(m=>m.id===state.active_id).preview_accepted")
             evaluate(desktop.view, (ROOT / 'tests/desktop/chat_checks.js').read_text())
             wait_js(desktop.view, "window.chatChecksDone || !!window.chatChecksError")

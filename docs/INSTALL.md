@@ -9,8 +9,8 @@ loaded geistd. No model is included; choose Set up and start on first use.
 Drag Geist.app from the DMG to Applications and open it. Geist opens its own
 desktop window. Read the preview notice and choose **Set up and start**. A
 platform check suggests one model, including a smaller fallback when needed.
-Once ready, the main screen shows the model and **Connect a program**.
-**Change model** shows all catalog models with download progress rings. A closed
+The main screen shows the catalog beside **Quick test** (stacked in narrow
+windows). **Connect a program** opens connection setup. Catalog rows show download progress rings. A closed
 green ring and check mean downloaded; paused downloads retain their percentage.
 **Quick test** is optional: Enter sends, Shift + Enter inserts a newline, and
 follow-up questions use this window's conversation. **Clear test** clears it.

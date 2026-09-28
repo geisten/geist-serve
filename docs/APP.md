@@ -15,8 +15,9 @@ Mac release still needs Developer ID signing and notarization.
 Open the Geist DMG, drag Geist to Applications, and open its desktop window.
 Read the short preview notice and choose **Set up and start**. Geist downloads,
 verifies and starts one suggested model. The main screen stays on **Models**,
-with **Connect a program** as the next action. **Quick test** opens an optional
-conversation to check a response and its speed. Press **Enter** to send and **Shift + Enter** for a new line. The arrow sends
+with the catalog on the left and **Quick test** on the right. In narrow windows
+they stack vertically. Each pane scrolls independently. **Connect a program**
+opens editor setup; the short test checks a response and its speed. Press **Enter** to send and **Shift + Enter** for a new line. The arrow sends
 with a pointer or touch; the stop button preserves a partial response. Follow-up
 messages include the visible conversation from this window. **Tips** offers
 examples for rewriting, summarizing and ideas; there is no task-mode selector.
@@ -46,7 +47,7 @@ Failed requests keep the draft; stopped partial answers remain in context. Sessi
 chat requires preview consent: single-task evidence does not certify follow-ups.
 Quick speed tests remain independent of the conversation.
 
-The **Models** screen combines the current model, **Change model**, and a collapsed
+The **Models** screen keeps the catalog visible alongside the short test, with a collapsed
 **System & performance** panel. A ring before each model shows download status:
 an empty ring means no download, a partial ring shows downloaded bytes, and a
 closed green ring with a check means the model file is present. Paused transfers
@@ -64,7 +65,7 @@ confirmation. Start at Login is optional in the native menu.
 Apple Silicon and macOS 14 or later are required by the Mac app.
 Previously downloaded catalog files in the Geist data folder are reused
 after verification. The former Swift application's selected-model preference
-is not migrated: choose the model once under Change model. The new Connections panel and bundled `geist` terminal client use the same
+is not migrated: choose the model once in the model list. The new Connections panel and bundled `geist` terminal client use the same
 loaded daemon. The older standalone geist-serve server is a separate legacy
 entry point; do not start it to connect an editor to the manager.
 
@@ -164,7 +165,7 @@ at least the working-memory estimate, and remaining download space plus
 256 MiB. Existing partial bytes are credited, installed files reused and
 verified. If no candidate fits, setup is blocked. `/app/setup` rechecks the
 recommendation before accepting the displayed model ID. Manual conditional
-choices remain available under Change model; they never become automatic fallbacks.
+choices remain available in the model list; they never become automatic fallbacks.
 
 The private `selected` file preserves an explicit choice across restarts and
 policy updates. Resource pressure can block that choice but cannot silently

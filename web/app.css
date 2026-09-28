@@ -669,3 +669,91 @@ button.markdown-copy { background:transparent; color:var(--muted); border:0; bor
  .model { column-gap:10px }
  .model .fit { max-width:95px; font-size:11px }
 }
+
+/* The catalog and short test share one workspace. Each pane scrolls without
+   hiding long names, setup explanations or the message composer. */
+body.manager-page { height:100vh; height:100dvh; display:flex; flex-direction:column }
+body.manager-page header { flex:none; width:100%; max-width:1040px; padding:12px 22px }
+body.manager-page main { flex:1; min-height:0; width:100%; max-width:1040px; display:flex; flex-direction:column; padding:8px 20px 14px }
+body.manager-page footer { display:none }
+#models-page { flex:1; min-height:0; display:grid; grid-template-columns:minmax(210px,30%) minmax(0,1fr); gap:24px }
+.model-sidebar { min-width:0; min-height:0; overflow:auto; padding:4px 10px 8px 4px; scrollbar-gutter:stable; overscroll-behavior:contain; border-radius:12px }
+.model-sidebar:focus-visible { outline-offset:-2px }
+.model-overview { padding:0; border:0; background:transparent; box-shadow:none; border-radius:0 }
+.current-model { gap:10px }
+.current-model h2 { font-size:17px }
+.has-model .current-model { display:none }
+.model-setup { margin-top:12px }
+.model-setup button { font-size:12px; width:100% }
+.model-setup .preview { font-size:11px }
+#model-ready { margin:0 0 14px }
+#model-ready .state { font-size:11px; margin:0 0 6px }
+#model-ready button { width:100%; font-size:12px }
+#model-chooser { border:0; margin-top:18px; padding:0 }
+#available-title { font-size:13px; font-weight:600; margin:0 0 12px; letter-spacing:0 }
+.model { padding:12px 2px; grid-template-columns:minmax(0,1fr) auto; gap:4px 6px }
+.model-heading { gap:7px; grid-column:1 / -1 }
+.model-heading h3 { font-size:12px; line-height:1.45 }
+.model-ring { width:28px; height:28px }
+.model .download-state { font-size:10px }
+.model .fit { grid-column:1; grid-row:2; text-align:left; max-width:none; font-size:10px; margin-left:35px }
+.model .choose-model { grid-column:2; grid-row:2 / 4; min-height:30px; font-size:11px; padding:4px 8px; margin:0; align-self:start }
+.model details { grid-column:1; margin-left:35px; font-size:11px; min-width:0 }
+.model details[open] { grid-column:1 / -1 }
+.model .specs { margin:8px 0; font-size:11px }
+.model .remove { min-height:32px; padding:5px 8px; font-size:11px }
+.model.active .fit { color:var(--success) }
+.model.selected { background:var(--soft); border-radius:10px }
+.recommendation { margin:12px 0; font-size:11px; color:var(--muted) }
+.recommendation summary { font-weight:400 }
+.model-sidebar>.settings { padding:12px 0; font-size:12px }
+.model-sidebar>.settings>summary { font-size:12px; font-weight:500 }
+.model-sidebar .settings-row { display:block }
+.model-sidebar .settings-row select { width:100%; margin-top:8px; font-size:12px }
+.model-sidebar .performance { border-top:1px solid var(--border); padding-top:10px }
+.model-sidebar .performance-values { margin-left:0; font-size:10px }
+.performance-content { max-height:45vh; padding:14px }
+.performance-grid { gap:12px }
+.performance-grid dd { font-size:16px }
+#test-page,#workspace { display:flex; flex-direction:column; min-width:0; min-height:0; flex:1 }
+#test-page { border-left:1px solid var(--border); padding-left:22px }
+#test-unavailable { margin:auto; padding:30px 10px; text-align:center; color:var(--muted); max-width:340px }
+#test-unavailable h2 { color:var(--ink); font-size:23px }
+#test-unavailable p { font-size:13px }
+#test-unavailable button { font-size:12px }
+.chat-heading { gap:6px; padding:2px 4px 10px }
+.chat-heading h2 { font-size:13px; letter-spacing:0; margin:0 0 2px }
+.runtime-model { font-size:11px; color:var(--muted) }
+.chat-heading .state { font-size:10px }
+.chat-heading button { font-size:11px; padding:4px }
+#chat-empty { margin:clamp(12px,7vh,50px) auto 20px }
+#chat-empty h3 { font-size:23px }
+#chat-empty p { font-size:13px }
+body.manager-page #notice { flex:none; max-height:16vh; overflow:auto; margin:6px 0 0; font-size:12px }
+@media(max-width:699px) {
+  body.manager-page header { padding:8px 18px }
+  body.manager-page main { padding:4px 16px 10px }
+  #models-page { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,30%) minmax(0,1fr); gap:12px }
+  .model-sidebar { padding:4px 6px; border-bottom:1px solid var(--border) }
+  #test-page { border:0; padding:0 }
+  #model-ready { display:flex; align-items:center; gap:8px; margin-bottom:8px }
+  #model-ready .state { flex:1; margin:0 }
+  #model-ready button { width:auto }
+  #model-chooser { margin-top:10px }
+  #transcript { min-height:36px; padding-top:4px }
+  .chat-heading { padding-bottom:4px }
+  .chat-heading .state { display:none }
+  #task-form textarea { max-height:min(18vh,90px); min-height:36px }
+  #task-form { padding:5px 12px }
+  .composer-area { padding-top:4px }
+  #composer-hint { margin-top:4px; font-size:10px }
+  .test-performance { margin-top:2px; font-size:10px }
+  #test-unavailable { padding:10px; font-size:12px }
+}
+@media(max-width:699px) {
+  .model { padding:8px 2px }
+  .model-heading { grid-column:1; grid-row:1 }
+  .model .choose-model { grid-row:1; align-self:center }
+  .model details { grid-row:2; grid-column:2; margin:0 }
+  .model details[open] { grid-row:3; grid-column:1 / -1; margin-left:35px }
+}

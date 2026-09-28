@@ -5,7 +5,7 @@
 <title>Geist</title><link rel="stylesheet" href="/app.css">
 <script src="/i18n.js" defer></script><script src="/marked.js" defer></script><script src="/markdown.js" defer></script><script src="/app.js" defer></script>
 </head>
-<body>
+<body class="manager-page">
 <a class="skip" href="#main">Skip to content</a>
 <header><a class="brand" href="#" aria-label="Geist home">geist<span class="local">Runs here. Stays here.</span></a>
 <nav aria-label="Navigation">
@@ -14,8 +14,8 @@
 </nav></header>
 <main id="main">
 <section id="models-page" class="page model-home" aria-labelledby="models-title">
-  <h1 id="models-title">Your model. Ready for your tools.</h1>
-  <p class="home-intro">One local model for your programs.</p>
+  <h1 id="models-title" class="sr-only">Models &amp; quick test</h1>
+  <aside class="model-sidebar" aria-label="Model manager" tabindex="0">
   <div class="model-overview">
     <div class="current-model"><span id="current-model-ring" class="model-ring" aria-hidden="true"></span><div><h2 id="active-model"></h2><p id="current-model-status" class="hint"></p></div></div>
   <div id="setup" class="model-setup">
@@ -34,8 +34,8 @@
     <button id="cancel-download" class="text-button" type="button">Pause download</button>
   </div>
 
-    <div id="model-ready" hidden><p id="model-ready-note" class="state">Ready for your programs.</p><div class="actions"><button id="open-tools" class="primary" data-page="connect-page" type="button">Connect a program</button><button id="open-test" class="text-button" data-page="test-page" type="button">Quick test</button></div></div>
-    <details id="model-chooser"><summary>Change model</summary><p id="recommendation-reason" class="hint"></p><div id="models" aria-label="Available models"></div></details>
+    <div id="model-ready" hidden><p id="model-ready-note" class="state">Ready for your programs.</p><div class="actions"><button id="open-tools" class="primary" data-page="connect-page" type="button">Connect a program</button></div></div>
+    <section id="model-chooser" aria-labelledby="available-title"><h2 id="available-title">Models for this computer</h2><div id="models" aria-label="Available models"></div><details class="recommendation"><summary>How we suggest a model</summary><p id="recommendation-reason" class="hint"></p></details></section>
   </div>
       <details id="performance" class="performance">
         <summary><span class="performance-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg><span>System &amp; performance</span></span><span class="performance-values"><span id="chat-speed">— tok/s</span><span id="chat-memory">— RAM</span></span></summary>
@@ -64,12 +64,12 @@
   <details class="settings"><summary>Service</summary><p class="hint">Your editor and this window use the same model. Closing the window keeps the service running.</p><div class="actions"><button id="unload" type="button" disabled>Unload model</button><button id="quit" type="button">Stop model service</button></div></details>
 </details>
 
-</section>
+</aside>
 
-<section id="test-page" class="page" aria-labelledby="task-title" hidden>
-  <div id="test-unavailable"><h2>Load a model to try it.</h2><button type="button" data-page="models-page">Choose a model</button></div>
+<section id="test-page" aria-labelledby="task-title">
+  <div id="test-unavailable"><h2>Try your model.</h2><p>Set up a model to check its response and speed here.</p><button id="go-setup" type="button">Go to model setup</button></div>
   <div id="workspace" hidden>
-    <div class="chat-heading"><div><h2 id="task-title" class="sr-only">Quick test</h2><span id="runtime-model" class="runtime-model"></span><span id="runtime-state" class="state">Ready on this device</span></div><button id="new-chat" class="text-button" type="button" aria-label="Clear test" title="Clear test"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Clear test</span></button></div>
+    <div class="chat-heading"><div><h2 id="task-title">Quick test</h2><span id="runtime-model" class="runtime-model"></span><span id="runtime-state" class="state">Ready on this device</span></div><button id="new-chat" class="text-button" type="button" aria-label="Clear test" title="Clear test"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Clear test</span></button></div>
     <div id="transcript" tabindex="0" role="region" aria-label="Conversation">
       <div id="chat-empty"><h3>Try your model.</h3><p>Send a short message to check its response and speed.</p></div>
       <div id="result" hidden></div>
@@ -85,6 +85,7 @@
     </div>
     <p id="chat-announcement" class="sr-only" role="status" aria-live="polite"></p>
   </div>
+</section>
 </section>
 <p id="notice" role="status" aria-live="polite"></p>
   <section id="connect-page" class="page connections" aria-labelledby="connections-title" hidden>

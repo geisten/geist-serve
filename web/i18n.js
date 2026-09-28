@@ -1,6 +1,14 @@
 'use strict';
 let interfaceLanguage = (window.geistLanguage || (() => { try { return localStorage.getItem('geist-language'); } catch { return null; } })() || navigator.language).startsWith('de') ? 'de' : 'en';
 const german = {
+  'Models & quick test': 'Modelle & Kurztest',
+  'Model manager': 'Modellverwaltung',
+  'Models for this computer': 'Modelle für diesen Rechner',
+  'How we suggest a model': 'Wie wir ein Modell vorschlagen',
+  'Set up a model to check its response and speed here.': 'Richte ein Modell ein, um hier die Antwort und Geschwindigkeit zu prüfen.',
+  'Go to model setup': 'Zur Modelleinrichtung',
+  'Suggested': 'Vorgeschlagen', 'Active': 'Aktiv', 'Selected': 'Ausgewählt',
+
   'This test stays in this window. Clear test, reloading or quitting clears it. Check answers before using them.': 'Dieser Test bleibt in diesem Fenster. Test leeren, Neuladen oder Beenden löscht ihn. Prüfe Antworten vor der Verwendung.',
   "Models": "Modelle",
   "Models & performance": "Modelle & Leistung",
