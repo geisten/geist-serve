@@ -124,6 +124,64 @@ async function checkDownloadRingMotion(assert) {
     window.downloadRingMotionEvidence = report;
   } finally { ring.remove(); }
 }
+async function checkActivityUX(assert, tick) {
+  while(polling) await tick();
+  const saved=state, savedAPI=api, savedDraft=$('prompt').value;
+  let fixture=structuredClone(saved), cancels=[];
+  const operation=(id,stage,extra={})=>({id,generation:8,sequence:2,stage,elapsed_ms:21000,stage_elapsed_ms:19000,event_age_ms:19000,runtime_alive:true,progress_events:0,outcome:'',backend:'cpu_neon',model:saved.active_id,phases:[{stage:'connect',offset_ms:0,duration_ms:2000},{stage,offset_ms:2000,duration_ms:19000}],...extra});
+  const update=(request,load=null,download=null)=>{
+    fixture={...saved,activity:{instance:'numeric-activity-fixture',request,load,download}};
+    render(structuredClone(fixture));
+  };
+  try {
+    api=async(path,body,signal)=>{
+      if(path==='/app/status') return new Response(JSON.stringify(fixture));
+      if(path==='/app/activity/cancel') {cancels.push(body.id);fixture.activity.load={...fixture.activity.load,outcome:'cancelled',sequence:5,stage:'stopping'};return new Response('{}',{status:202});}
+      return savedAPI(path,body,signal);
+    };
+    $('prompt').value='Unsent multiline\ndraft'; $('prompt').setSelectionRange(2,9);resizeComposer();chatLayout();
+    const rect=()=>[$('transcript'),$('task-form')].map(x=>{const r=x.getBoundingClientRect();return [r.top,r.height];});
+    const before=rect();
+    const started=performance.now();requesting=true;acceptActivity(null);renderActivity();
+    assert($('activity-label').textContent===t('Waiting for service') && performance.now()-started<200,'pending acknowledges interaction without claiming admission');requesting=false;
+    update(operation(100,'prefill'),null,operation(101,'download'));
+    assert(currentActivity().id===100 && $('activity-label').textContent===t('Processing input'),'background download cannot replace request activity');
+    assert(!$('activity-stop').hidden && !$('activity-stop').disabled && $('runtime-state').classList.contains('working'),'blocked phase has Stop and a non-ready activity indicator');
+    assert(!$('activity-cpu-hint').hidden,'long CPU wait explained in the ordinary view');
+    assert($('activity-label').getAttribute('aria-live')==='polite' && $('activity-time').getAttribute('aria-hidden')==='true','timer does not announce every second');
+    assert(rect().flat().every((value,i)=>Math.abs(value-before.flat()[i])<=1),`activity keeps transcript and composer geometry: ${JSON.stringify({before,after:rect()})}`);
+    const labelNode=$('activity-label').firstChild;renderActivity();assert($('activity-label').firstChild===labelNode,'unchanged stage does not repeat the live announcement');
+    const previous=activitySnapshot.request;
+    acceptActivity({...fixture.activity,request:operation(99,'answer',{generation:7})});renderActivity();
+    assert(currentActivity()===previous,'older generation and operation rejected');
+    acceptActivity({...fixture.activity,request:operation(100,'answer',{sequence:1})});renderActivity();
+    assert(currentActivity()===previous,'out-of-order phase rejected');
+    update(operation(100,'prefill',{event_age_ms:20000}));
+    assert(currentActivity().progress_events===0 && currentActivity().event_age_ms===20000,'heartbeat does not erase no-progress age');
+    activitySnapshot.request.receivedAt=performance.now()-7001;renderActivity();
+    assert($('activity-label').textContent===t('Status unavailable') && $('activity-stop').disabled,'stale telemetry differs from live blocked operation');
+    update(operation(100,'preparing',{sequence:3,progress_events:5}));
+    assert($('activity-label').textContent===t('Preparing answer'),'preparation requires recognized data');
+    $('open-activity').focus();$('open-activity').click();await tick();
+    assert($('activity-dialog').open && document.activeElement===$('close-activity'),'inspector uses modal focus');
+    assert($('activity-summary').textContent.includes(t('Last progress report')) && !$('activity-summary').textContent.includes('Unsent'),'inspector is numeric and private');
+    document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));await tick();
+    assert(!$('activity-dialog').open && document.activeElement===$('open-activity'),'Escape returns focus');
+    update(operation(100,'prefill',{sequence:4,outcome:'failed',error_code:504}));
+    $('open-activity').click();renderActivity();
+    assert($('activity-summary').textContent.includes(t('Processing input')) && $('activity-summary').textContent.includes('504'),'failure retains actual failed phase');
+    $('close-activity').click();await tick();
+    update(operation(100,'prefill',{sequence:5,outcome:'cancelled'}),operation(102,'loading',{generation:9}));
+    $('activity-stop').click();for(let i=0;i<30&&cancellingActivity;i++)await tick();
+    assert(cancels.length===1&&cancels[0]===102&&currentActivity().outcome==='cancelled','Stop addresses current owned load exactly once');
+    assert($('prompt').value==='Unsent multiline\ndraft' && $('prompt').selectionStart===2,'activity and cancellation preserve draft selection');
+    const animation=getComputedStyle($('runtime-state')).animationName;
+    if(matchMedia('(prefers-reduced-motion:reduce)').matches)assert(animation==='none','reduced motion has static status');
+  } finally {
+    if($('activity-dialog').open)$('activity-dialog').close();
+    requesting=false;api=savedAPI;activityInstance='';acceptActivity(null);render(saved);$('prompt').value=savedDraft;
+  }
+}
 (async () => {
   const originalAPI = api, originalConfirm = window.confirm;
   const assert = (ok, detail) => { if (!ok) throw new Error(detail); };
@@ -200,6 +258,8 @@ async function checkDownloadRingMotion(assert) {
     assert(innerWidth < 700 ? panes[0].bottom <= panes[1].top : panes[0].right <= panes[1].left, 'panes stack on small windows and sit side by side on wide ones');
     // Model-row interactions use deterministic transport only; no test fetches a
     // catalog-sized model. The host separately loads a real installed GGUF.
+    window.chatChecksStage = 'runtime-activity';
+    await checkActivityUX(assert,tick);
     window.chatChecksStage = 'model-actions';
     const chatAPI = api;
     while (polling) await tick();

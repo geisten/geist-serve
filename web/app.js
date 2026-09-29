@@ -18,6 +18,8 @@ let connectionTesting = false;
 let conversation = [], followLatest = true;
 let lastReply = null, replyPending = false;
 let workspaceModel = null, pendingExecution = null;
+let activityInstance='', activitySnapshot=null, activityAt=0, requestAfter=0, activeTurn=null, cancellingActivity=false, activityReturn=null;
+const activitySequences = new Map();
 const pendingMarkdown = new Set();
 function updateMarkdown(target, source) {
   target.markdownSource = source;
@@ -80,7 +82,7 @@ function addTurn(prompt) {
   const answer = document.createElement('article'); answer.className = 'chat-message assistant';
   const label = document.createElement('div'); label.className = 'message-label'; label.textContent = `Geist · ${modelLabel(state.models.find(model => model.id === state.active_id))}`;
   const output = document.createElement('div'); output.id = 'output'; output.className = 'message-text markdown'; output.markdownSource = '';
-  const status = document.createElement('p'); status.className = 'message-status'; uiText(status, 'Preparing answer…');
+  const status = document.createElement('p'); status.className = 'message-status'; uiText(status, 'Sending…');
   const actions = document.createElement('div'); actions.className = 'message-actions';
   const copy = document.createElement('button'); copy.id = 'copy'; copy.type = 'button'; copy.className = 'text-button reply-copy'; copy.disabled = true;
   renderReplyCopy(copy);
@@ -232,7 +234,7 @@ async function api(path, body, signal) {
 }
 
 function uiText(element, source) {
-  element.dataset.uiText = source; element.textContent = t(source);
+  element.dataset.uiText = source; const text=t(source); if(element.textContent!==text) element.textContent=text;
 }
 function message(text, local = true) { uiText($('notice'), text); localMessage = local; }
 // File transfers and inference have independent lifecycles. Preserve the old
@@ -261,7 +263,8 @@ function buttonStates() {
   $('runtime-state').setAttribute('aria-label', runtimeStatus); $('runtime-state').title = runtimeStatus;
   $('runtime-state').classList.toggle('inactive', !state?.ready);
   $('runtime-state').classList.toggle('loading', loading);
-  $('runtime-name').textContent = modelLabel(state?.models.find(model => model.id === state.active_id));
+  $('runtime-name').textContent = modelLabel(state?.models.find(model => model.id === (state.active_id || state.job_model)));
+  renderActivity();
   $('language-choice').disabled = !!controller;
 }
 
@@ -449,6 +452,7 @@ function visibleModels() {
 function render(next) {
   const modelChanged = state && (state.active_id !== next.active_id || state.active !== next.active);
   state = next;
+  acceptActivity(next.activity);
   if (!languageInitialized) {
     $('language-choice').value = next.answer_language || interfaceLanguage;
     languageInitialized = true;
@@ -460,10 +464,10 @@ function render(next) {
   const retained = workspaceModel !== null && ((workspaceModel === workspaceIdentity() && !!active && allowed(active)) || working);
   if (modelChanged || (!usable && !retained)) closeMeasurements();
   const previouslyHidden = $('workspace').hidden;
-  $('workspace').hidden = !usable && !retained;
+  $('workspace').hidden = !usable && !retained && !(next.activity?.load && !next.activity.load.outcome);
   $('test-unavailable').hidden = !$('workspace').hidden;
   $('model-prompt').textContent = t(working ? 'Getting ready…' : 'Choose a model to begin.');
-  if (previouslyHidden && !$('workspace').hidden && !$('models-page').hidden &&
+  if (usable && previouslyHidden && !$('workspace').hidden && !$('models-page').hidden &&
       (document.activeElement === document.body || document.activeElement.closest('.model-pick'))) $('prompt').focus({preventScroll:true});
   $('disk-space').textContent = t(next.hardware.disk_known ? `${bytes(next.hardware.disk)} disk space available` : 'Disk space could not be read');
   const models = visibleModels();
@@ -528,15 +532,15 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
   if (!benchmark && (messages.length > 63 || new TextEncoder().encode(JSON.stringify(payload)).length > 32768)) {
     message('This test is full. Use Clear chat to start again. The existing text has been kept.'); return;
   }
-  const activeController = new AbortController(); controller = activeController;
-  const turn = benchmark ? null : addTurn(prompt);
+  const activeController = new AbortController(); controller = activeController; requestAfter=activitySnapshot?.request?.id || 0;
+  const turn = benchmark ? null : addTurn(prompt); activeTurn=turn;
   const requestModel = modelIdentity();
   if (turn) { lastReply = null; replyPending = true; }
   const target = turn.output;
   target.hidden = false; target.textContent = '';
   if (!benchmark) { if (!preserveDraft) $('prompt').value = ''; $('chat-help').open = false; closeMeasurements(); resizeComposer(); $('prompt').focus(); }
   buttonStates(); visibleModels().forEach(modelCard); message('');
-  uiText($('chat-announcement'), 'Preparing answer…');
+  uiText($('chat-announcement'), 'Sending…');
   const start = performance.now(); let first = null, done = false, reader, completion = null;
   let output = '', pending = '', limited = false, paintTimer = null;
   function paint() { paintTimer = null; if (turn) updateMarkdown(target, output); else target.textContent = output; }
@@ -546,6 +550,7 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
     if (item.error) throw new Error(typeof item.error === 'string' ? item.error : 'The model returned an error.');
     if (item.phase === 'preparing' && first === null && turn) uiText(turn.status, 'Preparing answer…');
     if (item.response) {
+      if (turn) turn.answerSeen=true;
       if (first === null) { first = (performance.now() - start) / 1000; if (turn) turn.status.textContent = ''; }
       if (output.length + item.response.length > 131072) throw new Error('Output exceeded the display memory limit.');
       output += item.response;
@@ -605,7 +610,7 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
       turn.copy.disabled = !output.trim();
       scrollLatest();
     }
-    controller = null; replyPending = false; buttonStates(); if (state) visibleModels().forEach(modelCard);
+    controller = null; activeTurn=null; replyPending = false; buttonStates(); if (state) visibleModels().forEach(modelCard);
     if (stopped) message('Geist is stopping. Reopen the app to start it again.');
     else await poll();
   }
@@ -785,6 +790,7 @@ async function removeModel(id) {
 let measurementReturn = null, measurementDraft = null;
 function openMeasurements() {
   if ($('performance').open) return;
+  if ($('activity-dialog').open) $('activity-dialog').close();
   measurementReturn = document.activeElement;
   measurementDraft = {value:$('prompt').value, selection:[$('prompt').selectionStart, $('prompt').selectionEnd, $('prompt').selectionDirection]};
   $('chat-help').open = false;
@@ -802,8 +808,9 @@ $('performance').addEventListener('close', () => {
   measurementReturn = null; measurementDraft = null;
 });
 document.addEventListener('keydown', event => {
-  if (event.key === 'Tab' && $('performance').open) {
-    const controls = [...$('performance').querySelectorAll('button,[tabindex="0"]')]
+  const modal = document.querySelector('dialog[open]');
+  if (event.key === 'Tab' && modal) {
+    const controls = [...modal.querySelectorAll('button,[tabindex="0"]')]
       .filter(node => !node.disabled && node.getClientRects().length && !node.closest('[hidden]'));
     const first = controls[0], last = controls.at(-1);
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
@@ -811,7 +818,8 @@ document.addEventListener('keydown', event => {
     return;
   }
   if (event.key !== 'Escape') return;
-  if ($('performance').open) { event.preventDefault(); closeMeasurements(); }
+  if ($('activity-dialog').open) { event.preventDefault(); $('activity-dialog').close(); }
+  else if ($('performance').open) { event.preventDefault(); closeMeasurements(); }
   else if ($('chat-help').open) {
     event.preventDefault(); $('chat-help').open = false;
     $('chat-help').querySelector('summary').focus({preventScroll:true});
@@ -895,3 +903,64 @@ $('catalog-file').addEventListener('change', async () => {
     if (state) render(state); else buttonStates();
   }
 });
+
+
+// Polling restores the current snapshot; it never starts or replays work.
+const activityLabels={receipt:'Validating local artifact',hash:'Checking model',download:'Downloading model',stopping:'Stopping',starting:'Starting runtime',loading:'Loading model',ready:'Ready',connect:'Connecting',open:'Opening session',tokenize:'Reading input',prefill:'Processing input',generate:'Generating',preparing:'Preparing answer',answer:'Answering'};
+function acceptActivity(snapshot) {
+  if (!snapshot?.instance) { activitySnapshot=null; activitySequences.clear(); return; }
+  if (activityInstance!==snapshot.instance) { activitySequences.clear(); activityInstance=snapshot.instance; requestAfter=0; }
+  const accepted={...snapshot};
+  for (const kind of ['load','request','download']) {
+    const next=snapshot[kind], previous=activitySequences.get(kind);
+    if (previous && (!next || next.id<previous.id || next.generation<previous.generation ||
+        (next.id===previous.id && (next.sequence<previous.sequence ||
+         (next.sequence===previous.sequence && next.event_age_ms<previous.event_age_ms))))) accepted[kind]=previous;
+    else if (next) { accepted[kind]={...next,receivedAt:performance.now()}; activitySequences.set(kind,accepted[kind]); }
+  }
+  activitySnapshot=accepted;activityAt=performance.now();
+}
+function currentActivity() {
+  const a=activitySnapshot;
+  if (a?.request && !a.request.outcome && (!controller || a.request.id>requestAfter)) return a.request;
+  if (a?.load && !a.load.outcome) return a.load;
+  if (controller || runtimeRequest()) return null;
+  return [a?.request,a?.load].filter(Boolean).sort((x,y)=>y.id-x.id)[0] || null;
+}
+function renderActivity() {
+  const a=currentActivity(), pending=!a&&(!!controller||runtimeRequest());
+  const running=!!a&&!a.outcome;
+  const age=performance.now()-(a?.receivedAt??activityAt), stale=!!a&&(!state||age>6000);
+  const elapsed=a ? (a.stage_elapsed_ms+(running&&!stale?age:0))/1000 : 0;
+  const phase=pending?'Waiting for service':!a?'Ready':a.outcome==='failed'?'Failed':a.outcome==='cancelled'?'Stopped':a.outcome?'Ready':activityLabels[a.stage] || 'Working';
+  const label=stale?'Status unavailable':phase;
+  if ($('activity-label').dataset.uiText!==label) uiText($('activity-label'),label);
+  $('activity-time').textContent=running&&!stale ? `${a.backend?.startsWith('cpu')?'CPU':backendName(a.backend)} · ${formatNumber(elapsed,0)} s` : '';
+  $('activity-stop').hidden=!running&&!pending;
+  $('activity-stop').disabled=cancellingActivity||(!a&&!controller)||a?.stage==='stopping'||stale;
+  $('runtime-state').classList.toggle('working',running||pending);
+  if (activeTurn && !activeTurn.answerSeen && running && a===activitySnapshot?.request) uiText(activeTurn.status,label);
+  const longCPU=running&&!stale&&elapsed>=15&&a.backend?.startsWith('cpu');
+  $('activity-cpu-hint').hidden=!longCPU;
+  if (longCPU) uiText($('activity-cpu-hint'),'Large models can take time on CPU.');
+  if (!$('activity-dialog').open) return;
+  const text=stale?'Status is stale. Reconnect to see current activity.':a?.outcome==='failed'?'The operation failed. Retry the model or choose another processor.':running&&elapsed>=15&&a.backend?.startsWith('cpu')?'Large models can take time on CPU.':'No progress report available';
+  $('activity-hint').textContent=t(text);
+  const summary=[['Operation',a?.id ? `${activityInstance} / ${a.id}` : t('Not available')],['Stage',t(activityLabels[a?.stage]||phase)],['Phase elapsed',timeText(a?elapsed:null)],['Total elapsed',timeText(a?(a.elapsed_ms+(running&&!stale?age:0))/1000:null)],['Last progress report',a?timeText((a.event_age_ms+age)/1000):'—'],['Runtime',t(a?.runtime_alive?'Process alive':'Not running')],['Processor',a?.backend||'—'],['Error code',a?.error_code||'—']];
+  $('activity-summary').replaceChildren(...summary.flatMap(([key,value])=>{const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=t(key);dd.textContent=value;return [dt,dd];}));
+  const phases=a?.phases||[];
+  $('activity-phases').replaceChildren(...phases.map(p=>{const row=document.createElement('li');row.textContent=`${t(activityLabels[p.stage]||'Working')} · ${timeText(p.duration_ms/1000)}`;return row;}));
+  const engine=a?.engine?.geistlib;
+  $('activity-engine').textContent=`geistlib ${engine?.version||t('Unknown')} · ${engine?.revision?.slice(0,12)||t('Unknown')}`;
+}
+$('open-activity').addEventListener('click',()=>{activityReturn=document.activeElement;closeMeasurements();$('activity-dialog').showModal();$('close-activity').focus({preventScroll:true});renderActivity();});
+$('close-activity').addEventListener('click',()=>$('activity-dialog').close());
+$('activity-dialog').addEventListener('close',()=>{if(activityReturn?.isConnected&&(document.activeElement===document.body||$('activity-dialog').contains(document.activeElement)||document.activeElement===activityReturn))activityReturn.focus({preventScroll:true});activityReturn=null;});
+$('activity-stop').addEventListener('click',async()=>{
+  const a=currentActivity();if(!a){controller?.abort();return;}if(a.outcome||cancellingActivity)return;
+  cancellingActivity=true;renderActivity();
+  try {await api('/app/activity/cancel',{id:a.id,generation:a.generation,instance:activityInstance});controller?.abort();await poll();}
+  catch(error){message(error.message);}
+  finally {cancellingActivity=false;renderActivity();}
+});
+setInterval(renderActivity,1000);

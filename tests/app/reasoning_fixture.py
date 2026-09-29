@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """Controlled daemon peer for HTTP adapter tests. Never used as model evidence."""
-import json,os,socket,struct,sys,time
+import json,os,socket,struct,sys,time,signal
 from pathlib import Path
 if '--backends' in sys.argv:
     print(json.dumps({'cpu':{'name':'cpu_neon'},'gpu':{'name':'metal','available':False}}));sys.exit()
 root=Path(sys.argv[1]).parent.parent
+startup=json.loads((root/'fixture.json').read_text())
+if startup.get('ignore_term'):signal.signal(signal.SIGTERM,signal.SIG_IGN)
+(root/'fixture-pid').write_text(str(os.getpid()))
+if startup.get('load_pause'):
+    (root/'load-started').write_text('yes');time.sleep(startup['load_pause'])
 server=socket.socket(fileno=3)
 def exact(conn,n):
     data=b''
@@ -21,6 +26,8 @@ while True:
         try:
             a,b=struct.unpack('<II',exact(conn,8));r=json.loads(exact(conn,a));payload=exact(conn,b)
             config=json.loads((root/'fixture.json').read_text());op=r['op']
+            (root/(op+'-started')).write_text('yes')
+            if op!='prefill':time.sleep(config.get(op+'_pause',0))
             if op=='info':frame(conn,{'ok':True,'ctx':4096,'template':'chatml','backend':os.environ.get('GEIST_BACKEND','cpu_neon')})
             elif op=='open':frame(conn,{'ok':True,'session':'0123456789abcdef'})
             elif op=='tokenize' and config.get('fail')=='context':frame(conn,{'ok':False,'error':'tokenize: text too long for the context'})
