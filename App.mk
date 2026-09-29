@@ -6,9 +6,9 @@ APP_LDLIBS ?= -lcurl -lpthread
 ifeq ($(shell uname -s),Linux)
 APP_LDLIBS += -lcrypto -lm
 endif
-APP_SOURCE := src/app/catalog.c src/app/core.c src/app/platform.c src/app/resources.c
+APP_SOURCE := src/app/engine.c src/app/catalog.c src/app/core.c src/app/platform.c src/app/resources.c
 APP_RUNTIME := src/app/output.c src/app/performance.c src/app/daemon.c src/template.c src/app/tasks.c src/app/compat.c src/app/connection.c
-APP_HEADERS := src/app/output.h src/app/performance.h build/app_models.h src/app/resources.h src/app/version.h src/app/tasks.h build/app_tasks.h src/app/daemon.h src/app/compat.h src/app/connection.h clients/geistd_client.h src/jsmn.h src/template.h src/json.h
+APP_HEADERS := src/app/engine.h src/app/output.h src/app/performance.h build/app_models.h src/app/resources.h src/app/version.h src/app/tasks.h build/app_tasks.h src/app/daemon.h src/app/compat.h src/app/connection.h clients/geistd_client.h src/jsmn.h src/template.h src/json.h
 .PHONY: app test-app
 app: geist-app geist
 geist: build/app_models.h src/app/catalog.c src/app/version.h src/app/cli.c src/app/connection.c src/app/connection.h src/app/core.c src/app/core.h src/json.c src/json.h
@@ -18,7 +18,9 @@ geist-app: src/app/main.c $(APP_SOURCE) $(APP_RUNTIME) $(APP_HEADERS) src/app/co
 build/test_app_core: build/app_models.h tests/app/core_test.c $(APP_SOURCE) src/app/core.h
 	@mkdir -p build
 	$(APP_CC) $(APP_CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ tests/app/core_test.c $(APP_SOURCE) src/json.c $(APP_LDLIBS)
-test-app: build/test_app_output build/test_app_engine_identity build/test_app_performance build/test_app_resources build/geist-app-old build/geist-app-new build/geist-app-legacy build/geist-app-test geist-app geist build/test_app_core build/test_app_client build/test_app_tasks
+test-app: build/test_app_engine build/test_app_output build/test_app_engine_identity build/test_app_performance build/test_app_resources build/geist-app-old build/geist-app-new build/geist-app-legacy build/geist-app-test geist-app geist build/test_app_core build/test_app_client build/test_app_tasks
+	./build/test_app_engine
+	python3 tests/app/engine_provenance_test.py
 	./build/test_app_output
 	./build/test_app_resources
 	./build/test_app_core
@@ -82,3 +84,7 @@ build/test_app_engine_identity: tests/app/engine_identity_test.c $(APP_SOURCE) s
 
 build/test_app_output: tests/app/output_test.c src/app/output.c src/app/output.h
 	$(APP_CC) $(APP_CFLAGS) -g -fsanitize=address,undefined -o $@ tests/app/output_test.c src/app/output.c
+
+build/test_app_engine: tests/app/engine_test.c $(APP_SOURCE) src/json.c
+	@mkdir -p build
+	$(APP_CC) $(APP_CFLAGS) -g -fsanitize=address,undefined -o $@ $^ $(APP_LDLIBS)

@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import tempfile
 import time
 from http_test import App, ROOT
@@ -16,9 +17,12 @@ with tempfile.TemporaryDirectory(prefix='geist-performance-real-') as temporary:
     home=Path(temporary);(home/'models').mkdir()
     shutil.copyfile(model,home/'models/smollm2-360m-instruct-q8_0.gguf')
     (home/'selected').write_text('smollm2-360m')
-    app=App(home,binary=ROOT/'build/geist-app-test',server=Path(os.environ.get('GEIST_EXECUTION_DAEMON',ROOT/'build/geistd-execution')))
+    app=App(home,binary=Path(os.environ.get('GEIST_APP_TEST_BINARY',ROOT/'build/geist-app-test')),server=Path(os.environ.get('GEIST_EXECUTION_DAEMON',ROOT/'build/geistd-execution')).resolve())
     try:
-        app.wait(lambda s:s['ready'] and not s['busy'],timeout=90)
+        state=app.wait(lambda s:s['ready'] and not s['busy'],timeout=90)
+        daemon=Path(os.environ.get('GEIST_EXECUTION_DAEMON',ROOT/'build/geistd-execution'))
+        build=json.loads(subprocess.check_output([str(daemon.resolve()),'--build-info']))
+        assert state['engine']['geistlib']==build['geistlib']
         for mode in ('cpu','gpu'):
             if mode=='gpu' and not app.status()['execution']['gpu_available']:continue
             assert app.request('/app/execution',{'mode':mode})[0] in (200,202)
@@ -35,6 +39,7 @@ with tempfile.TemporaryDirectory(prefix='geist-performance-real-') as temporary:
         assert state['comparison']['result']=='completed' and state['ready'] and state['execution']['mode']==before,state['comparison']
         code,data,_=app.request('/app/performance/export');assert code==200
         rows=[json.loads(line) for line in data.splitlines()]
+        assert all(r['schema']==2 and r['engine']['geistlib']==build['geistlib'] and len(r['engine']['payload_sha256'])==64 for r in rows)
         runs=[r for r in rows if r['source']=='controlled_test']
         assert len(runs)==(8 if state['execution']['gpu_available'] else 4)
         assert all(r['outcome']=='completed' and r['output']>0 and r['generation_ns']>0 and r['first_ns']>0 for r in runs)
@@ -47,7 +52,7 @@ with tempfile.TemporaryDirectory(prefix='geist-performance-real-') as temporary:
             (target/'real-observations.jsonl').write_bytes(data)
             (target/'real-profile.json').write_text(json.dumps(state['performance_profile'],indent=2)+'\n')
     finally:app.close()
-    app=App(home,binary=ROOT/'geist-app',server=Path(os.environ.get('GEIST_EXECUTION_DAEMON',ROOT/'build/geistd-execution')))
+    app=App(home,binary=ROOT/'geist-app',server=Path(os.environ.get('GEIST_EXECUTION_DAEMON',ROOT/'build/geistd-execution')).resolve())
     try:
         state=app.wait(lambda s:s['ready'] and not s['busy'],timeout=90)
         code,data,_=app.request('/app/performance/export');restored=[json.loads(line) for line in data.splitlines()]

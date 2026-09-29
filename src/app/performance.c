@@ -37,8 +37,9 @@ static bool token(const char *s, size_t cap) {
     return n > 0 && n < cap;
 }
 static bool valid(const struct perf_record *r) {
-    return token(r->id, sizeof r->id) && token(r->artifact, sizeof r->artifact) &&
-           token(r->series, sizeof r->series) && token(r->backend, sizeof r->backend) &&
+    return app_engine_valid(&r->engine) && token(r->id, sizeof r->id) &&
+           token(r->artifact, sizeof r->artifact) && token(r->series, sizeof r->series) &&
+           token(r->backend, sizeof r->backend) &&
            (!strcmp(r->source, "app") || !strcmp(r->source, "api") ||
             !strcmp(r->source, "controlled_test") || !strcmp(r->source, "legacy_last_reply")) &&
            (!strcmp(r->outcome, "no_answer") || !strcmp(r->outcome, "completed") ||
@@ -75,7 +76,14 @@ static void number(struct app_buffer *b, double n) {
         app_printf(b, "%.17g", n);
 }
 static void record_json(struct app_buffer *b, const struct perf_record *r) {
-    app_printf(b, "{\"schema\":1,\"reasoning\":%s", r->reasoning ? "true" : "false");
+    app_printf(b,
+               "{\"schema\":%u,\"reasoning\":%s",
+               r->schema == 1 ? 1 : 2,
+               r->reasoning ? "true" : "false");
+    if (r->schema != 1) {
+        app_put(b, ",\"engine\":");
+        app_engine_json(b, &r->engine);
+    }
 #define S(k)                    \
     app_put(b, ",\"" #k "\":"); \
     app_quote(b, r->k)
@@ -125,9 +133,14 @@ static bool parse(const char *line, struct perf_record *r) {
     struct json *j  = calloc(1, sizeof *j);
     bool         ok = false;
     if (!j || json_parse(j, strlen(line), line) < 0 ||
-        json_num(j, json_get(j, 0, "schema"), 0) != 1)
+        (json_num(j, json_get(j, 0, "schema"), 0) != 1 &&
+         json_num(j, json_get(j, 0, "schema"), 0) != 2))
         goto end;
     memset(r, 0, sizeof *r);
+    r->schema = (unsigned) json_num(j, json_get(j, 0, "schema"), 0);
+    if (r->schema == 2 && (json_get(j, 0, "engine") < 0 ||
+                           !app_engine_parse(&r->engine, j, json_get(j, 0, "engine"))))
+        goto end;
     r->reasoning = json_bool(j, json_get(j, 0, "reasoning"), false);
 #define S(k)                                          \
     do {                                              \
@@ -474,6 +487,7 @@ void perf_init(const char *home) {
         p.error = true;
 }
 void perf_begin(struct perf_record *r) {
+    r->schema = 2;
     pthread_mutex_lock(&p.mutex);
     r->epoch   = p.epoch;
     r->enabled = p.enabled;
@@ -546,6 +560,8 @@ static void aggregate(struct app_buffer *b, const struct perf_record *rs, size_t
     double values[30];
     app_printf(b, "{\"count\":%zu,\"backend\":", n);
     app_quote(b, rs[0].backend);
+    app_put(b, ",\"engine\":");
+    app_engine_json(b, &rs[0].engine);
 #define AGG(name, expr)                          \
     do {                                         \
         size_t used = 0;                         \
@@ -607,6 +623,8 @@ void perf_view(struct app_buffer *b,
             continue;
         if (!group.id[0])
             group = *r;
+        if (memcmp(&r->engine, &group.engine, sizeof r->engine))
+            continue;
         if (perf_group(r) != perf_group(&group))
             continue;
         if (!strcmp(r->source, "controlled_test") && strcmp(r->run, group.run))
@@ -651,6 +669,8 @@ void perf_view(struct app_buffer *b,
         app_quote(b, r->source);
         app_put(b, ",\"outcome\":");
         app_quote(b, r->outcome);
+        app_put(b, ",\"engine\":");
+        app_engine_json(b, &r->engine);
         app_printf(b,
                    ",\"timestamp\":%.0f,\"generation_ns\":%.0f,\"input\":%llu,\"output\":%llu,"
                    "\"warmup\":%s,\"contention\":%s,\"historical\":%s}",
@@ -660,7 +680,10 @@ void perf_view(struct app_buffer *b,
                    (unsigned long long) r->output,
                    r->warmup ? "true" : "false",
                    r->contention ? "true" : "false",
-                   strcmp(r->series, series) ? "true" : "false");
+                   (strcmp(r->series, series) ||
+                    (group.id[0] && memcmp(&r->engine, &group.engine, sizeof r->engine)))
+                           ? "true"
+                           : "false");
     }
     app_put(b, "]}");
     free(samples);

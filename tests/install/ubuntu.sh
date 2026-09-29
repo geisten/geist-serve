@@ -9,6 +9,13 @@ source_root=$(realpath "${2:?source checkout}")
 apt-get update -qq
 apt-get install -y -qq ca-certificates python3 systemd dbus-user-session desktop-file-utils procps >/dev/null
 apt-get install -y -qq "$package" >/dev/null
+python3 - <<'CHECK_ENGINE'
+import json, subprocess
+from pathlib import Path
+manifest=json.loads(Path('/usr/share/doc/geist/ENGINE.json').read_text())
+assert json.loads(subprocess.check_output(['/usr/lib/geist/geistd','--build-info']))==manifest
+assert manifest['geistlib']['source_state']=='clean'
+CHECK_ENGINE
 test ! -e /usr/share/applications/geist.desktop # GUI is a separate optional package.
 systemd-analyze verify --man=no /usr/lib/systemd/user/geist.service
 useradd -m geist-acceptance
@@ -27,6 +34,9 @@ if test -n "${GEIST_TEST_MODEL:-}"; then
 fi
 runuser -u geist-acceptance -- env GEIST_TEST_MODEL="${GEIST_TEST_MODEL:-}" python3 "$testroot/tests/app/compat_test.py"
 runuser -u geist-acceptance -- env GEIST_TEST_MODEL="${GEIST_TEST_MODEL:-}" python3 "$testroot/tests/app/cli_test.py"
+runuser -u geist-acceptance -- env GEIST_TEST_MODEL="${GEIST_TEST_MODEL:-}" \
+    GEIST_APP_TEST_BINARY="$testroot/geist-app" GEIST_EXECUTION_DAEMON="$testroot/geistd" \
+    python3 "$testroot/tests/app/performance_real_test.py"
 as_user() {
     runuser -u geist-acceptance -- env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" "$@"
 }

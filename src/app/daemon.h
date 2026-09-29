@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "../template.h"
+#include "engine.h"
 struct app_run_stats {
     bool        limited, reasoning, no_answer;
     unsigned    max_tokens;
@@ -10,6 +11,7 @@ struct app_run_stats {
     size_t      tokens, prompt_tokens, reused;
     double      generation_ns, total_ns, prefill_ns;
 };
+bool app_daemon_identity(const char *path, char backend[static 24], struct app_engine *engine);
 bool app_daemon_ready(const char *path);
 bool app_daemon_ready_backend(const char *path, char backend[static 24]);
 int  app_daemon_chat(const char           *path,

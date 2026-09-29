@@ -47,7 +47,7 @@ def peer():
                     header, length = struct.unpack('<II', exact(conn, 8))
                     request = json.loads(exact(conn, header)); data = exact(conn, length)
                     op = request['op']
-                    if op == 'info': reply(conn, {'backend': os.environ['GEIST_BACKEND'], 'ctx':4096, 'template':'chatml'})
+                    if op == 'info': reply(conn, {'backend': os.environ['GEIST_BACKEND'], 'ctx':4096, 'template':'chatml', **({'engine':json.loads(os.environ['GEIST_PEER_ENGINE'])} if os.environ.get('GEIST_PEER_ENGINE') else {})})
                     elif op == 'open': reply(conn, {'session':'1234567890abcdef'})
                     elif op == 'tokenize': reply(conn, {}, struct.pack('<iii',1,2,3))
                     elif op == 'prefill': reply(conn, {'prefilled':len(data)//4})

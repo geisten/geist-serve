@@ -14,6 +14,7 @@ chmod 755 "$destination/Start Geist.sh" "$destination/geist" "$destination/geist
 cp web/vendor/marked-LICENSE "$destination/marked-LICENSE"
 cp web/vendor/katex-LICENSE "$destination/katex-LICENSE"
 cp LICENSE "$destination/LICENSE"
+python3 scripts/engine-provenance.py package ./geistd --require-clean --output "$destination/ENGINE.json"
 cp docs/APP.md "$destination/README.md"
 if [ -f build/app-build-packages.txt ]; then cp build/app-build-packages.txt "$destination/BUILD-PACKAGES.txt"; fi
 if [ "${platform#linux}" != "$platform" ]; then

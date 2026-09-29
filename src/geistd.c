@@ -12,6 +12,7 @@
  * Serial, one process, like geist-serve. Unix socket by default, TCP with
  * --host/--port (a shared token is required off loopback), --stdio and
  * LISTEN_FDS as in geist-serve. */
+#include "engine-build.h"
 #include <geist.h>
 #include <geist_util.h>
 
@@ -297,6 +298,22 @@ static bool hist_push(struct sess *x, size_t n, const geist_token_t ids[static n
     return true;
 }
 
+static void engine_info(struct sb *b) {
+    sb_puts(b, "{\"geistlib\":{\"version\":");
+    const char *version = geist_version_string();
+    sb_json_str(b, strlen(version), version);
+    sb_puts(b, ",\"revision\":");
+    if (GEIST_SOURCE_REVISION[0])
+        sb_json_str(b, strlen(GEIST_SOURCE_REVISION), GEIST_SOURCE_REVISION);
+    else
+        sb_puts(b, "null");
+    sb_puts(b, ",\"source_state\":");
+    sb_json_str(b, strlen(GEIST_SOURCE_STATE), GEIST_SOURCE_STATE);
+    sb_puts(b, "},\"archive_sha256\":");
+    sb_json_str(b, strlen(GEIST_ARCHIVE_SHA256), GEIST_ARCHIVE_SHA256);
+    sb_puts(b, "}");
+}
+
 static bool op_info(struct daemon *d, struct conn *c) {
     struct sb h = {};
     sb_printf(&h,
@@ -311,7 +328,7 @@ static bool op_info(struct daemon *d, struct conn *c) {
         live += d->sess[i].live;
     sb_printf(&h,
               "],\"ctx\":%d,\"vocab\":%zu,\"add_bos\":%s,\"bos\":%d,\"template\":\"%s\","
-              "\"agent_api\":1,\"backend\":\"%s\",\"sessions\":%d,\"max_sessions\":%d}",
+              "\"agent_api\":1,\"backend\":\"%s\",\"sessions\":%d,\"max_sessions\":%d,\"engine\":",
               CTX_CAP,
               d->vocab,
               d->add_bos ? "true" : "false",
@@ -320,6 +337,8 @@ static bool op_info(struct daemon *d, struct conn *c) {
               geist_backend_name(d->be),
               live,
               d->n_max);
+    engine_info(&h);
+    sb_puts(&h, "}");
     return reply(c, &h, 0, nullptr);
 }
 
@@ -806,7 +825,8 @@ static int usage(const char *argv0) {
             "idle (default 1800)\n"
             "  --stdio        one connection on stdin/stdout\n"
             "  --backend cpu|gpu   choose execution backend\n"
-            "  --backends     print available backends as JSON\n",
+            "  --backends     print available backends as JSON\n"
+            "  --build-info   print linked engine provenance without loading a model\n",
             argv0,
             SESS_MAX);
     return 2;
@@ -853,6 +873,18 @@ static int print_backends(void) {
 }
 
 int main(int argc, char **argv) {
+    if (strcmp(geist_version_string(), GEIST_HEADER_VERSION)) {
+        fprintf(stderr, "Linked library/header version mismatch; rebuild the engine\n");
+        return 1;
+    }
+    if (argc == 2 && !strcmp(argv[1], "--build-info")) {
+        struct sb info = {};
+        engine_info(&info);
+        puts(info.p);
+        sb_free(&info);
+        return 0;
+    }
+
     if (argc == 2 && !strcmp(argv[1], "--backends"))
         return print_backends();
     const char   *model = nullptr, *sock = nullptr, *host = nullptr, *backend = "auto";

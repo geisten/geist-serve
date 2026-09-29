@@ -2,6 +2,7 @@
 """Exercise old/current/new services using real processes and isolated user data."""
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -10,6 +11,7 @@ from http_test import App, ROOT
 old = Path(os.environ['GEIST_OLD_APP'])
 new = Path(os.environ['GEIST_NEW_APP'])
 legacy = Path(os.environ['GEIST_LEGACY_APP'])
+current = re.search(r'#define APP_VERSION "([^"]+)"', (ROOT/'src/app/version.h').read_text())[1]
 for binary, expected in [(old,0),(new,44),(legacy,42)]:
     with tempfile.TemporaryDirectory(prefix='geist-upgrade-') as home:
         app=App(home,binary=binary)
@@ -25,7 +27,7 @@ for binary, expected in [(old,0),(new,44),(legacy,42)]:
             assert before['api_key']==after['api_key']
             if expected==0:
                 assert before['pid'] != after['pid'], 'old process was silently reused'
-                assert app.status()['version']=='0.5.25'
+                assert app.status()['version']==current
                 # Opening again must reuse the current service.
                 subprocess.run([str(cli),'start'],env=env,check=True,capture_output=True,timeout=30)
                 assert json.loads((Path(home)/'connection.json').read_text())['pid']==after['pid']

@@ -10,6 +10,12 @@ bool app_daemon_ready(const char *path) {
 }
 
 bool app_daemon_ready_backend(const char *path, char backend[static 24]) {
+    struct app_engine ignored;
+    return app_daemon_identity(path, backend, &ignored);
+}
+
+bool app_daemon_identity(const char *path, char backend[static 24], struct app_engine *engine) {
+    *engine          = (struct app_engine) {0};
     backend[0]       = 0;
     struct geistd *g = geistd_connect_unix(path, nullptr);
     if (!g)
@@ -23,7 +29,9 @@ bool app_daemon_ready_backend(const char *path, char backend[static 24]) {
         if (name)
             snprintf(backend, 24, "%s", name);
         free(name);
-    }
+        ok = app_engine_parse(engine, j, json_get(j, 0, "engine"));
+    } else
+        ok = false;
     free(j);
     geistd_close(g);
     return ok;

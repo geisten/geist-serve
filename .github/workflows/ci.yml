@@ -9,7 +9,7 @@ on:
     inputs:
       package_version:
         type: string
-        default: '0.5.25'
+        default: '0.5.26'
 
 permissions:
   contents: read
@@ -125,6 +125,6 @@ jobs:
   installers:
     uses: ./.github/workflows/installers.yml
     with:
-      package_version: ${{ inputs.package_version || '0.5.25' }}
+      package_version: ${{ inputs.package_version || '0.5.26' }}
     permissions:
       contents: read
