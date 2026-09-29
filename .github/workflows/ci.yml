@@ -9,7 +9,7 @@ on:
     inputs:
       package_version:
         type: string
-        default: '0.5.17'
+        default: '0.5.25'
 
 permissions:
   contents: read
@@ -105,7 +105,9 @@ jobs:
           GEIST_TEST_MODEL: geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf
         run: |
           if [ "${{ runner.os }}" = Linux ]; then export APP_CC=gcc-14; fi
-          make -f App.mk app build/geist-app-test
+          make -f App.mk app build/geist-app-test build/test_app_performance build/test_app_engine_identity build/test_app_output
+          ./build/test_app_output
+          GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/reasoning_test.py
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/deadline_test.py
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/http_test.py
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/compat_test.py
@@ -113,6 +115,9 @@ jobs:
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/catalog_test.py
           GEIST_EXECUTION_DAEMON="$PWD/geistd" python3 tests/app/execution_test.py
           python3 tests/app/cli_test.py
+          GEIST_EXECUTION_DAEMON="$PWD/geistd" python3 tests/app/engine_identity_test.py
+          python3 tests/app/performance_test.py
+          GEIST_EXECUTION_DAEMON="$PWD/geistd" python3 tests/app/performance_real_test.py
           python3 tests/app/verification_test.py
           python3 tests/app/download_test.py
           python3 tests/app/daemon_test.py
@@ -120,6 +125,6 @@ jobs:
   installers:
     uses: ./.github/workflows/installers.yml
     with:
-      package_version: ${{ inputs.package_version || '0.5.17' }}
+      package_version: ${{ inputs.package_version || '0.5.25' }}
     permissions:
       contents: read

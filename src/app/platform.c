@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/statvfs.h>
+#include <sys/stat.h>
 #include <sys/utsname.h>
 #include <unistd.h>
 #include <stdckdint.h>
@@ -191,4 +192,83 @@ bool app_sha256_interruptible(const char *path, char out[static 65], bool (*canc
 
 bool app_sha256(const char *path, char out[static 65]) {
     return app_sha256_interruptible(path, out, nullptr);
+}
+
+/* Compatibility identity, not signature verification. Mach-O signatures and
+ * their size metadata change during notarized UI-only repackaging. Hash every
+ * executable/link-edit payload byte while canonicalizing only that envelope.
+ * Unknown formats use the ordinary file hash; model integrity always does. */
+bool app_engine_sha256(const char *path, char out[static 65]) {
+#ifndef __APPLE__
+    return app_sha256(path, out);
+#else
+    int fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    if (fd < 0)
+        return false;
+    struct stat   before, after;
+    unsigned char header[65536], block[65536], digest[32];
+    bool          parsed = false, ok = false;
+    if (fstat(fd, &before) || !S_ISREG(before.st_mode) || pread(fd, header, 32, 0) != 32)
+        goto end;
+    uint32_t words[8];
+    memcpy(words, header, sizeof words);
+    if (words[0] != 0xfeedfacf || words[4] > 4096 || words[5] > sizeof header - 32)
+        goto end;
+    size_t length = 32 + (size_t) words[5];
+    if (pread(fd, header, length, 0) != (ssize_t) length)
+        goto end;
+    size_t   offset = 32, signature_command = 0, link = 0;
+    uint32_t signature = 0, signature_size = 0;
+    for (uint32_t i = 0; i < words[4]; i++) {
+        uint32_t command[2];
+        if (offset + sizeof command > length)
+            goto end;
+        memcpy(command, header + offset, sizeof command);
+        if (command[1] < 8 || command[1] > length - offset)
+            goto end;
+        if (command[0] == 0x1d) {
+            if (command[1] != 16 || signature_command)
+                goto end;
+            signature_command = offset;
+            memcpy(&signature, header + offset + 8, 4);
+            memcpy(&signature_size, header + offset + 12, 4);
+        }
+        if (command[0] == 0x19 && command[1] >= 72 &&
+            !memcmp(header + offset + 8, "__LINKEDIT\0\0\0\0\0\0", 16))
+            link = offset;
+        offset += command[1];
+    }
+    if (offset != length || !signature_command || !link || signature < length || !signature_size ||
+        (uint64_t) signature + signature_size != (uint64_t) before.st_size)
+        goto end;
+    memset(header + signature_command + 8, 0, 8);
+    memset(header + link + 32, 0, 8); /* Signature-dependent virtual segment size. */
+    memset(header + link + 48, 0, 8); /* Signature-dependent file segment size. */
+    parsed = true;
+    CC_SHA256_CTX hash;
+    ok = CC_SHA256_Init(&hash) == 1 && CC_SHA256_Update(&hash, header, (CC_LONG) length) == 1;
+    for (uint64_t pos = length; ok && pos < signature;) {
+        size_t  wanted = signature - pos < sizeof block ? (size_t) (signature - pos) : sizeof block;
+        ssize_t n      = pread(fd, block, wanted, (off_t) pos);
+        if (n != (ssize_t) wanted) {
+            ok = false;
+            break;
+        }
+        ok = CC_SHA256_Update(&hash, block, (CC_LONG) n) == 1;
+        pos += (size_t) n;
+    }
+    if (ok)
+        ok = fstat(fd, &after) == 0 && before.st_size == after.st_size &&
+             before.st_mtimespec.tv_sec == after.st_mtimespec.tv_sec &&
+             before.st_mtimespec.tv_nsec == after.st_mtimespec.tv_nsec &&
+             CC_SHA256_Final(digest, &hash) == 1;
+end:
+    close(fd);
+    if (!parsed)
+        return app_sha256(path, out);
+    if (ok)
+        for (size_t i = 0; i < 32; i++)
+            snprintf(out + 2 * i, 3, "%02x", digest[i]);
+    return ok;
+#endif
 }

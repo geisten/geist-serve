@@ -108,7 +108,7 @@ class QualityTests(unittest.TestCase):
             reviews={r['id']:{'pass':True,'critical':False,'reason':'Synthetic unit-test fixture only'} for r in rows}
             with patch.object(evidence,'ROOT',root):
                 run=dict(rows=rows,split='acceptance',model_id='bitnet-2b',model_sha256='4221b252fdd5fd25e15847adfeb5ee88886506ba50b8a34548374492884c2162',
-                         device='pi5',engine_ref='25861c0bd197f1a98f17e49efe0cdc48a0e40713',app_sha256='a'*64,daemon_sha256='b'*64,
+                         device='pi5',engine_ref='e26436906ff6fe7eda296b90fa3a7a9dfa69f418',app_sha256='a'*64,daemon_sha256='b'*64,
                          scorer_sha256=sha(root/'quality/evaluate.py'),source_sha256=source_hash(),policy_sha256=sha(root/'quality/policy.json'),
                          configuration=POLICY['configuration'],corpus_sha256=sha(bundle/'corpus.json'),adverse_sha256=sha(bundle/'adverse.json'),
                          task_versions={t['id']:t['version'] for t in json.loads((root/'tasks/catalog.json').read_text())['tasks']})
@@ -118,9 +118,10 @@ class QualityTests(unittest.TestCase):
                     (bundle/'responses.jsonl').write_text(''.join(json.dumps(row)+'\n' for row in rows))
                     (bundle/'manifest.json').write_text(json.dumps({'human_reviewer':'test fixture','sha256':{n:sha(bundle/n) for n in ('run.json','reviews.json','corpus.json','adverse.json','responses.jsonl')}}))
                 save();self.assertTrue(all(c['quality']=='passed' for c in load_bundle(bundle)[1]))
-                run['engine_ref']='0'*40;save()
-                with self.assertRaisesRegex(ValueError,'identity mismatch'):load_bundle(bundle)
-                run['engine_ref']='25861c0bd197f1a98f17e49efe0cdc48a0e40713'
+                for stale in ['0'*40,'25861c0bd197f1a98f17e49efe0cdc48a0e40713']:
+                    run['engine_ref']=stale;save()
+                    with self.assertRaisesRegex(ValueError,'identity mismatch'):load_bundle(bundle)
+                run['engine_ref']='e26436906ff6fe7eda296b90fa3a7a9dfa69f418'
                 rows[0]['automatic_pass']=False;save()
                 with self.assertRaisesRegex(ValueError,'score disagrees'):load_bundle(bundle)
                 rows[0]['automatic_pass']=True;save()

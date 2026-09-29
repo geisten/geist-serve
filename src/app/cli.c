@@ -443,7 +443,7 @@ static int run(int argc, char **argv) {
     free(model);
     app_put(&b, ",\"messages\":[{\"role\":\"user\",\"content\":");
     app_quote(&b, test || agent ? "Say hello in one sentence." : argv[2]);
-    app_printf(&b, "}],\"max_tokens\":%u", test || agent ? 32 : 256);
+    app_printf(&b, "}],\"max_tokens\":%u", agent ? 32 : test ? 512 : 256);
     if (agent)
         app_put(&b,
                 ",\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"connection_probe\","

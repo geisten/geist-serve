@@ -20,6 +20,7 @@ install -m 755 geist geist-app geistd "$stage/usr/lib/geist/"
 ln -s ../lib/geist/geist "$stage/usr/bin/geist"
 install -m 644 deploy/systemd/geist.service "$stage/usr/lib/systemd/user/"
 install -m 644 web/vendor/marked-LICENSE "$stage/usr/share/doc/geist/marked-LICENSE"
+install -m 644 web/vendor/katex-LICENSE "$stage/usr/share/doc/geist/katex-LICENSE"
 install -m 644 LICENSE "$stage/usr/share/doc/geist/copyright"
 install -m 644 docs/INSTALL.md "$stage/usr/share/doc/geist/README.md"
 cat > "$stage/DEBIAN/control" <<EOF

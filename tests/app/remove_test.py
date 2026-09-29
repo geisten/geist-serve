@@ -72,7 +72,7 @@ if fixture:
             state=app.status()
             assert not state['ready'] and not target.exists()
             entry=next(m for m in state['models'] if m['id']=='smollm2-360m')
-            assert not entry['installed'] and len(state['models'])==6
+            assert not entry['installed'] and len(state['models'])==len(json.loads((ROOT/'models/catalog.json').read_text())['models'])
             assert (home/'selected').read_text()==''
             assert app.request('/app/remove', {'id':'smollm2-360m'})[0] == 200
             print('model removal: idle active model stopped, unsafe paths retain running model, catalog choice retained')

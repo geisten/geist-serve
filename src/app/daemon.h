@@ -3,9 +3,12 @@
 #include <stddef.h>
 #include "../template.h"
 struct app_run_stats {
-    bool   limited;
-    size_t tokens, prompt_tokens, reused;
-    double generation_ns, total_ns;
+    bool        limited, reasoning, no_answer;
+    unsigned    max_tokens;
+    const char *stage; /* bounded operation identity; never prompt/output text */
+    double      first_answer_ns;
+    size_t      tokens, prompt_tokens, reused;
+    double      generation_ns, total_ns, prefill_ns;
 };
 bool app_daemon_ready(const char *path);
 bool app_daemon_ready_backend(const char *path, char backend[static 24]);

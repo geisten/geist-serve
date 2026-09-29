@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class App:
     def __init__(self, home, model=None, binary=None, env=None, server=None, port=0):
         args = [str(binary or ROOT / "geist-app"), "--port", str(port), "--home", str(home),
-                "--daemon", str(server or (ROOT / "geistd" if model else "/usr/bin/false"))]
+                "--daemon", str(server or (os.environ.get("GEIST_EXECUTION_DAEMON", ROOT / "geistd") if model else "/usr/bin/false"))]
         if model:
             args += ["--model", str(model)]
         self.home = Path(home)
@@ -91,7 +91,7 @@ def main():
         app = App(home, binary=binary)
         try:
             state = app.status()
-            assert len(state["models"]) == 6 and state["hardware"]["ram"] > 0
+            assert len(state["models"]) == len(json.loads((ROOT/"models/catalog.json").read_text())["models"]) and state["hardware"]["ram"] > 0
             assert state['runtime'] == 'geistd'
             assert all(m['capabilities'] == {'chat':True, 'vision':False, 'speech_recognition':False} for m in state['models'])
             assert state['hardware']['os'] and state['hardware']['logical_cpus'] > 0
@@ -118,10 +118,11 @@ def main():
             assert "frame-ancestors 'none'" in headers["Content-Security-Policy"]
             assert "Access-Control-Allow-Origin" not in headers
             assert app.token.encode() not in html
-            manifest = json.loads((ROOT/'web/vendor/manifest.json').read_text())
-            for name, sha in manifest['files'].items():
-                assert hashlib.sha256((ROOT/'web/vendor'/name).read_bytes()).hexdigest() == sha
-            for route, source in [('/marked.js', 'vendor/marked.umd.js'), ('/markdown.js', 'markdown.js')]:
+            for manifest_name in ('manifest.json', 'katex-manifest.json'):
+                manifest = json.loads((ROOT/'web/vendor'/manifest_name).read_text())
+                for name, sha in manifest['files'].items():
+                    assert hashlib.sha256((ROOT/'web/vendor'/name).read_bytes()).hexdigest() == sha
+            for route, source in [('/marked.js', 'vendor/marked.umd.js'), ('/katex.js', 'vendor/katex.min.js'), ('/markdown.js', 'markdown.js')]:
                 code, body, asset_headers = app.request(route, auth=False)
                 assert code == 200 and body == (ROOT/'web'/source).read_bytes()
                 assert asset_headers['Content-Type'].startswith('text/javascript')
@@ -182,7 +183,11 @@ def main():
             response.close(); conn.close()
             app.wait(lambda state: not state["busy"], timeout=15)
             assert app.request("/app/generate", {"experimental": True, "prompt": "Say hello."})[0] == 200
-            assert app.request('/app/generate', {'experimental': True, 'prompt':' xy'*3900})[0] == 400
+            code, body, _ = app.request('/app/generate', {'experimental': True, 'prompt':' xy'*3900})
+            events=[json.loads(x) for x in body.splitlines()]
+            assert code==200 and events[-1]['done'], body
+            assert events[-1]['prompt_eval_count'] + events[-1]['max_tokens'] < 4096
+            assert app.request('/app/generate', {'experimental': True, 'prompt':' xy'*5000})[0] == 400
             assert not app.status()['busy']
             assert app.request("/app/stop", {})[0] == 200
             assert not private.exists() and not private.parent.exists()
@@ -199,7 +204,7 @@ def main():
             directory.mkdir()
             import shutil
             shutil.copyfile(model, directory / "smollm2-360m-instruct-q8_0.gguf")
-            app = App(home, binary=binary, server=ROOT / "geistd")
+            app = App(home, binary=binary, server=Path(os.environ.get("GEIST_EXECUTION_DAEMON", ROOT / "geistd")))
             try:
                 assert app.request("/app/select", {"id": "smollm2-360m"})[0] == 202
                 app.wait(lambda state: state["ready"], timeout=60)
@@ -213,7 +218,11 @@ def main():
                 assert card["measured_tokens"] == event["eval_count"]
                 expected = event["eval_count"] / (event["eval_duration"] / 1e9)
                 assert abs(card["measured_tps"] - expected) < .001
-                assert "Measured" in card["performance"]
+                state=app.wait(lambda s:not s['busy'])
+                # Device suitability no longer carries processor-specific speed prose.
+                assert abs(state['execution']['performance']['rate'] - expected) < .001
+                sample=next(x for x in state['performance_history'] if x['processor']==state['execution']['active'])
+                assert sample['tokens']==event['eval_count'] and abs(sample['rate']-expected)<.001
                 child = int(subprocess.check_output(['pgrep','-P',str(app.process.pid)],text=True).strip())
                 import signal
                 os.kill(child, signal.SIGKILL)

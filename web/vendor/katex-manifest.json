@@ -1,0 +1,11 @@
+{
+  "name": "katex",
+  "version": "0.18.9",
+  "upstream": "https://github.com/KaTeX/KaTeX",
+  "tarball": "https://registry.npmjs.org/katex/-/katex-0.18.9.tgz",
+  "integrity": "sha512-8ad9RyoKsb/g8/yLFE+KAlP+DhbCTRUNi/V9XGsxn0R+trJJltNwzcDNo0q/DEkOy5fQUQTAQyCXCYSE+OakTQ==",
+  "files": {
+    "katex.min.js": "155f6c2d673c5912e3b48f45d8830eaad18ae1953915939ceb648ea8b9c3e7e2",
+    "katex-LICENSE": "766ccc1f306c885aa45542a9846bbd0a505b27a0374f146778171c2254ce18e3"
+  }
+}

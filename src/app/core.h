@@ -36,6 +36,10 @@ struct app_model {
     unsigned    working_mib; /* conservative planning estimate at <=4096 context */
     unsigned    recommended_ram_gib;
     unsigned    backends; /* 1: CPU, 2: Metal, 4: Vulkan; device probe is still required */
+    const char *unsupported_format; /* optional catalog format unavailable in this engine */
+    const char *group_id, *group_name,
+            *quantization;        /* display grouping, never artifact identity */
+    const char *reasoning_format; /* optional validated output protocol, not model-name inference */
 };
 extern struct app_model app_models[APP_MODEL_COUNT];
 extern size_t           app_model_count;
@@ -61,6 +65,10 @@ struct app_hardware {
 [[nodiscard]] bool app_hardware_read(struct app_hardware *h, const char *directory);
 
 enum app_fit { APP_RECOMMENDED, APP_CONDITIONAL, APP_UNAVAILABLE };
+#define APP_INTERACTIVE_TPS 8.0
+/* Zero means not measured. A partial CPU/GPU comparison is not a device verdict. */
+double app_device_rate(double cpu_rate, bool gpu_available, double gpu_rate);
+bool   app_rate_below_target(double rate);
 struct app_assessment {
     enum app_fit fit;
     const char  *reason;
@@ -68,10 +76,17 @@ struct app_assessment {
 };
 struct app_assessment
 app_assess(const struct app_hardware *h, const struct app_model *m, bool installed);
+struct app_assessment app_assess_device(const struct app_hardware *h,
+                                        const struct app_model    *m,
+                                        bool                       installed,
+                                        double                     cpu_rate,
+                                        bool                       gpu_available,
+                                        double                     gpu_rate);
 struct app_assessment app_assess_observed(const struct app_hardware *h,
                                           const struct app_model    *m,
                                           bool                       installed,
                                           double                     tokens_per_second);
+[[nodiscard]] bool    app_engine_sha256(const char *path, char out[static 65]);
 [[nodiscard]] bool    app_sha256(const char *path, char out[static 65]);
 [[nodiscard]] bool
 app_sha256_interruptible(const char *path, char out[static 65], bool (*cancel)(void));

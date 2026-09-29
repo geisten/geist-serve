@@ -559,6 +559,12 @@ button.markdown-copy { background:transparent; color:var(--muted); border:0; bor
 .markdown th { background:var(--soft); font-weight:600 }
 .markdown tr:last-child td { border-bottom:0 }
 .literal-html,.markdown-fallback { white-space:pre-wrap }
+.math-inline { display:inline-block; max-width:100%; overflow-x:auto; vertical-align:middle; overflow-wrap:normal }
+.math-display { display:block; max-width:100%; overflow-x:auto; margin:1em 0; padding:.5em .25em }
+.math-display:focus-visible,.math-inline:focus-visible { outline-offset:-3px }
+.markdown math { font-size:1.08em }
+.math-display math { margin-inline:auto }
+.math-source { white-space:pre-wrap; overflow-wrap:anywhere; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.9em }
 .task-check { color:var(--accent) }
 @media(max-height:650px) {
   main { padding-top:22px }
@@ -612,7 +618,8 @@ button.markdown-copy { background:transparent; color:var(--muted); border:0; bor
 .model-ring { --ring-progress:0; color:var(--accent); width:32px; height:32px; display:inline-flex; flex:0 0 auto }
 .model-ring svg { display:block; width:100%; height:100%; overflow:visible; stroke-width:2.5 }
 .ring-track { stroke:var(--border) }
-.ring-fill { stroke:currentColor; stroke-dasharray:var(--ring-progress) 100; transform:rotate(-90deg); transform-origin:18px 18px; stroke-linecap:round }
+.ring-fill { stroke:currentColor; stroke-dasharray:100 100; stroke-dashoffset:calc(100 - var(--ring-progress)); transform:rotate(-90deg); transform-origin:18px 18px; stroke-linecap:round; transition:none }
+.model-ring[data-animate="true"] .ring-fill { transition:stroke-dashoffset var(--ring-duration) linear }
 .model-ring[data-stage="downloaded"] { color:var(--success) }
 .model-ring[data-stage="paused"] { color:var(--muted) }
 .ring-check { display:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round }
@@ -840,8 +847,12 @@ body.manager-page main { max-width:1180px }
 .execution-choice label.is-active { color:var(--ink); border-color:#aacbb5; background:#fff }
 .execution-choice label.is-active .processor-indicator, .execution-choice label.is-loading .processor-indicator { visibility:visible }
 .execution-choice label.is-loading .processor-indicator { border:2px solid #d9e7de; border-top-color:var(--success); border-radius:50%; animation:processor-loading .9s linear infinite }
-.model-ring[data-stage="loading"] .ring-fill { stroke:var(--success); animation:processor-loading 1.2s linear infinite; transform-origin:center }
-@media (prefers-reduced-motion:reduce) { .execution-choice label.is-loading .processor-indicator, .model-ring[data-stage="loading"] .ring-fill { animation:none; border-style:dashed } }
+.model-ring:is([data-stage="loading"], [data-stage="verifying"]) .ring-fill { stroke:var(--success); animation:ring-loading 1.2s linear infinite }
+@keyframes ring-loading { from { transform:rotate(-90deg) } to { transform:rotate(270deg) } }
+@media (prefers-reduced-motion:reduce) {
+ .model-ring .ring-fill { transition:none !important; animation:none !important }
+ .execution-choice label.is-loading .processor-indicator { animation:none; border-style:dashed }
+}
 #execution-notice { margin:0 0 8px; font-size:12px; flex:none }
 .catalog-heading { display:flex; align-items:baseline; gap:10px }
 #catalog-file { max-width:100%; font-size:12px; padding:8px 0 }
@@ -869,3 +880,66 @@ body.manager-page main { max-width:1180px }
 .processor-history [role="row"]>span:first-child { text-align:left }
 .processor-history [role="columnheader"] { font-weight:550 }
 @media(prefers-reduced-motion:reduce) { .status-light.loading { animation:none; border-style:dashed; border-color:var(--success) } }
+
+/* Reply actions remain secondary to the answer and its measurements. */
+.message-actions { align-items:center; gap:8px }
+.message-actions .reply-copy { display:inline-flex; align-items:center; justify-content:center; min-width:32px; min-height:32px; padding:6px }
+.reply-copy svg { width:17px; height:17px }
+.reply-copy[data-copied="true"] { color:var(--success) }
+.execution-warning { display:flex; align-items:flex-start; gap:6px; flex:none; margin:0 0 8px; color:#855707; font-size:12px; line-height:1.5; overflow-wrap:anywhere }
+.execution-warning svg { width:16px; height:16px; margin-top:1px; flex:none }
+
+
+/* A model owns visible quantization rows. Status never depends on hover/color. */
+.model-group { margin:0; padding:12px 0; min-width:0 }
+.model-group + .model-group { border-top:1px solid #e1e5eb }
+.model-group>h3 { margin:0 8px 8px; font-size:14px; line-height:1.45; font-weight:600; overflow-wrap:anywhere }
+.model-variants { display:flex; flex-direction:column; gap:4px; min-width:0 }
+.model-variants .model { display:grid; grid-template-columns:minmax(0,1fr) 44px; align-items:start; padding:4px; margin:0; min-width:0; border-radius:10px }
+.model-variants .model-pick { grid-column:1; grid-row:1; min-height:52px; padding:6px 4px; gap:8px }
+.model-variants .model-ring { width:28px; height:28px; flex:none }
+.model-variants .model-info { flex-direction:row; flex-wrap:wrap; align-items:center; gap:2px 8px }
+.model-variants .model-name { flex-basis:100%; font-size:13px; line-height:1.5; font-weight:500 }
+.variant-size { font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; overflow-wrap:anywhere }
+.variant-active { font-size:11px; color:#225d3c; font-weight:600 }
+.model-variants .download-state { flex-basis:100%; font-size:12px; overflow-wrap:anywhere }
+.model-variants .model-badges { grid-column:1 / -1; grid-row:2; max-width:calc(100% - 36px); margin:0 0 0 36px; padding:3px 4px; min-height:20px }
+.model-variants .model-badges svg { width:14px; height:14px }
+.model-variants .variant-warning { grid-column:1 / -1; margin:2px 4px 2px 40px; font-size:12px; line-height:1.5; color:#80530b; overflow-wrap:anywhere }
+.model-variants .transfer-detail { grid-column:1 / -1; font-size:12px; overflow-wrap:anywhere }
+.model-variants .remove { position:static; grid-column:2; grid-row:1; width:44px; height:44px; min-width:44px; min-height:44px; padding:12px }
+.model-variants .model.unavailable .model-pick { opacity:1; color:var(--muted) }
+.model-variants .model.active { background:#eaf0fd; box-shadow:inset 3px 0 #347653 }
+.model-variants .model.preparing { box-shadow:inset 3px 0 #a0adbf }
+.model-variants .model-pick:focus-visible,.model-variants .remove:focus-visible { outline:2px solid var(--focus); outline-offset:1px }
+@media (min-width:700px) { #models-page { grid-template-columns:minmax(248px,30%) minmax(0,1fr) } }
+@media (max-width:699px) and (min-height:561px) {
+  /* Enough room to compare a two-variant group, including its warning. */
+  #models-page { grid-template-rows:minmax(0,38%) minmax(0,1fr) }
+}
+
+/* Local profile: stable controls, quiet tabular data, one disclosure. */
+.execution-choice .processor-option { gap:2px; min-width:64px }
+.execution-choice .processor-option small { font-size:10px; font-weight:400; white-space:nowrap; font-variant-numeric:tabular-nums }
+.execution-choice label { align-items:flex-start; padding:6px 9px }
+.execution-choice .processor-indicator { margin-top:4px }
+.profile-label { margin-left:auto; font-size:11px }
+.model-performance>summary>.metrics-chevron { margin-left:0 }
+.model-metrics small { font-size:10px }
+.profile-table { width:100%; border-collapse:collapse; font-size:11px; table-layout:fixed; font-variant-numeric:tabular-nums }
+.profile-table caption { text-align:left; font-size:13px; font-weight:600; margin-bottom:10px }
+.profile-table th,.profile-table td { padding:7px 5px; border-bottom:1px solid var(--border); overflow-wrap:anywhere; vertical-align:top }
+.profile-table th { text-align:left; font-weight:500; width:36% }
+.profile-table td,.profile-table thead th:not(:first-child) { text-align:right; width:32% }
+.profile-info { margin:12px 0; font-size:11px; color:var(--muted) }
+.profile-info summary { font-size:11px; padding:4px 0 }
+.profile-info ol { padding-left:18px }
+.profile-info li { padding:4px 0; overflow-wrap:anywhere }
+.profile-actions { display:flex; gap:8px; flex-wrap:wrap }
+.profile-actions button { font-size:11px; padding:6px 8px }
+#profile-group,#profile-confidence,#comparison-status { font-size:10px; line-height:1.5 }
+#history-result { overflow-wrap:anywhere }
+#history-enabled { width:18px; height:18px; accent-color:var(--accent) }
+@media(max-width:390px) { .model-metrics { gap:7px } .execution-choice .processor-option { min-width:48px } .profile-table th,.profile-table td { padding:6px 3px } }
+
+.profile-table thead small { display:block; margin-top:3px; font-size:10px; font-weight:400; color:var(--muted) }

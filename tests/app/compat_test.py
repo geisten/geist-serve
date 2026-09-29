@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory(prefix='geist-compat-') as home:
                       {'response_format':{'type':'json_object'}}, {'tool_choice':'auto'}, {'n':2}]:
             code,body,_=app.request('/v1/chat/completions',base|extra)
             assert code==422 and 'message' in json.loads(body)['error'],body
-        for extra in [{'messages':[]},{'max_tokens':-1},{'max_tokens':1025},{'temperature':3},
+        for extra in [{'messages':[]},{'max_tokens':-1},{'max_tokens':4096},{'temperature':3},
                       {'stream':'true'},{'stream_options':{'include_usage':'yes'}},
                       {'messages':[{'role':'user','content':'hidden\u0000suffix'}]},
                       {'messages':[{'role':'tool','content':'output'}]}]:

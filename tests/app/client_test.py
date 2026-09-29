@@ -32,9 +32,12 @@ def run(reply, *, mode='info', success=False, expected=None, pause=0):
                         header_size, body_size = struct.unpack('<II', recv_exact(conn, 8))
                         assert 0 < header_size <= 65536 and body_size <= 16 << 20
                         request = json.loads(recv_exact(conn, header_size))
-                        assert request['op'] == ('generate' if mode == 'generate' else 'info')
+                        assert request['op'] == ('generate' if mode.startswith('generate') else 'info')
                         if body_size: recv_exact(conn, body_size)
-                        if reply: conn.sendall(reply)
+                        if isinstance(reply,list):
+                            for part in reply:
+                                conn.sendall(part);time.sleep(.08)
+                        elif reply: conn.sendall(reply)
                         if pause: time.sleep(pause)
                     except (BrokenPipeError, ConnectionResetError): pass
             thread = threading.Thread(target=serve, daemon=True); thread.start()
@@ -57,4 +60,6 @@ run(b'', pause=.3)
 run(b'', mode='cancel', pause=.3)
 piece = 'Grüße 🌿\n' + 'x' * 600
 run(frame({'ok':True,'piece':piece,'done':False}) + frame({'ok':True,'done':False,'stop':True,'piece':'<|im_end|>'}) + frame({'ok':True,'done':True,'reason':'stop','generated':2,'duration_ns':1500000}), mode='generate', success=True, expected=piece + '\n2 1500000 stop')
+run([frame({'ok':True,'piece':'x','done':False})]*5+[frame({'ok':True,'done':True,'reason':'stop','generated':5,'duration_ns':400000000})], mode='generate', success=True, expected='xxxxx')
+run([frame({'ok':True,'piece':'x','done':False})]*5, mode='generate-total')
 print('geistd C client: framing, Unicode/long pieces, refusals, disconnect, deadline and cancellation passed')

@@ -22,7 +22,7 @@ with tempfile.TemporaryDirectory(prefix='geist-session-chat-') as home:
                       dict(messages=[{'role':'user','content':'different'}]),
                       dict(messages=[{'role':'user','content':'hidden\u0000suffix'}]),
                       dict(messages=[{'role':'assistant','content':base['prompt']}]),
-                      dict(task='summary'), dict(benchmark=True), dict(max_tokens=1025),
+                      dict(task='summary'), dict(benchmark=True), dict(max_tokens=4096),
                       dict(messages=[{'role':'user','content':'x'},{'role':'assistant','content':''},base['messages'][-1]])]:
             code, body, _ = app.request('/app/generate', base | extra)
             assert code == 400, (extra, code, body)

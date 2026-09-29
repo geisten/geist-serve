@@ -67,13 +67,13 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
     try:
         desktop.activate()
         spin(lambda: desktop.origin is not None)
-        wait_js(desktop.view, "document.querySelectorAll('.model').length === 6")
+        wait_js(desktop.view, "typeof state !== 'undefined' && state?.models.length > 0 && document.querySelectorAll('.model').length === state.models.length")
         wait_js(desktop.view, "tasks.length === 5 && selectedTask?.id === 'freeform'")
         assert evaluate(desktop.view, 'undefined') is None
         assert evaluate(desktop.view, 'false') is False
         assert desktop.window.get_visible()
         assert desktop.view.get_network_session().is_ephemeral()
-        assert evaluate(desktop.view, "document.getElementById('workspace').hidden && !document.getElementById('setup-start') && document.querySelectorAll('.model-pick').length === 6 && !document.getElementById('experimental')")
+        assert evaluate(desktop.view, "document.getElementById('workspace').hidden && !document.getElementById('setup-start') && document.querySelectorAll('.model-pick').length === state.models.length && !document.getElementById('experimental')")
         assert evaluate(desktop.view, "state.models.every(m => !m.preview_accepted)")
         evaluate(desktop.view, "document.getElementById('ui-language').value='system'; document.getElementById('ui-language').dispatchEvent(new Event('change')); true")
         spin(lambda: desktop.preferences.exists() and json.loads(desktop.preferences.read_text())['language'] == 'system')
@@ -117,7 +117,7 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
             assert chat_error is None, chat_error
             evaluate(desktop.view, "document.getElementById('prompt').value='Say hello in one sentence.'; document.getElementById('task-form').requestSubmit(); true")
             wait_js(desktop.view, "document.getElementById('output').textContent.length > 0 && controller === null", timeout=90)
-            assert '—' not in evaluate(desktop.view, "document.getElementById('speed').textContent")
+            assert '—' not in evaluate(desktop.view, "document.querySelector('.reply-metrics').textContent")
             evaluate(desktop.view, "document.querySelector('[data-page=\"connect-page\"]').click(); true")
             # Stream completion may precede the next status poll clearing busy.
             # A click on a disabled button is discarded, so wait for the visible UI.
@@ -137,7 +137,7 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
         assert desktop.stack.get_visible_child_name() == 'status'
         desktop.start()
         spin(lambda: desktop.origin is not None)
-        wait_js(desktop.view, "document.querySelectorAll('.model').length === 6")
+        wait_js(desktop.view, "typeof state !== 'undefined' && state?.models.length > 0 && document.querySelectorAll('.model').length === state.models.length")
         wait_js(desktop.view, "document.documentElement.lang === 'de' && document.getElementById('language-choice').value === 'de'")
         if model:
             wait_js(desktop.view, "state?.ready && !document.getElementById('workspace').hidden && document.getElementById('run').disabled", timeout=60)

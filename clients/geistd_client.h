@@ -25,10 +25,12 @@ struct geistd;
 struct geistd *geistd_connect_unix(const char *path, const char *token);
 struct geistd *geistd_connect_tcp(const char *host, int port, const char *token);
 void           geistd_close(struct geistd *g);
-/* Per-operation monotonic deadline, including streaming; default 120 seconds.
+/* Per-operation monotonic deadline; default 120 seconds.
  * Cancellation is checked at most every 50 ms during socket I/O. The callback
  * and its context are borrowed for the client lifetime; use from one thread. */
 void geistd_limits(struct geistd *g, unsigned timeout_ms, bool (*cancel)(void *), void *ctx);
+/* Opt into a per-frame idle deadline only when the caller supplies a total budget. */
+void geistd_stream_idle(struct geistd *g, bool enabled);
 struct geistd_generation { size_t tokens; double duration_ns; };
 int geistd_generate_ex(struct geistd *g, const char *id, size_t max,
     bool (*emit)(void *, const char *), void *ctx, char reason_out[static 16],
@@ -87,6 +89,7 @@ struct geistd {
     char  err[256];
     int   fd;
     unsigned timeout_ms;
+    bool stream_idle;
     double deadline;
     bool (*cancel)(void *);
     void *cancel_ctx;
@@ -135,9 +138,11 @@ void geistd_close(struct geistd *g) {
 const char *geistd_error(const struct geistd *g) { return g ? g->err : "no client"; }
 
 static int gd_fail(struct geistd *g, const char *msg) {
+    int saved_errno = errno;
     snprintf(g->err, sizeof g->err, "%s", msg);
     if (g->fd >= 0) close(g->fd);
     g->fd = -1;
+    errno = saved_errno;
     return -1;
 }
 
@@ -148,6 +153,7 @@ static double gd_now(void) {
 void geistd_limits(struct geistd *g, unsigned ms, bool (*cancel)(void *), void *ctx) {
     if (g) { g->timeout_ms = ms ? ms : 1; g->cancel = cancel; g->cancel_ctx = ctx; }
 }
+void geistd_stream_idle(struct geistd *g, bool enabled) { if (g) g->stream_idle = enabled; }
 static bool gd_wait(struct geistd *g, short events) {
     for (;;) {
         if (g->cancel && g->cancel(g->cancel_ctx)) { errno = ECANCELED; return false; }
@@ -479,6 +485,8 @@ int geistd_generate_ex(struct geistd *g, const char *id, size_t max, bool (*emit
     if (gd_connect(g) != 0) return -1;
     if (!gd_send(g, h, 0, nullptr)) return gd_fail(g, "send failed");
     for (;;) {
+        /* Generation has an idle deadline per frame. The caller owns any total budget. */
+        if (g->stream_idle) g->deadline = gd_now() + g->timeout_ms;
         if (gd_recv(g) != 0) return -1;
         int ok = gd_find(g, "ok");
         if (ok < 0 || g->hdr[g->tok[ok].start] != 't') return gd_check_ok(g);

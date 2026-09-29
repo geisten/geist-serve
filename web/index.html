@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Geist</title><link rel="stylesheet" href="/app.css">
-<script src="/i18n.js" defer></script><script src="/marked.js" defer></script><script src="/markdown.js" defer></script><script src="/app.js" defer></script>
+<script src="/i18n.js" defer></script><script src="/marked.js" defer></script><script src="/katex.js" defer></script><script src="/markdown.js" defer></script><script src="/app.js" defer></script>
 </head>
 <body class="manager-page">
 <a class="skip" href="#main">Skip to content</a>
@@ -30,37 +30,40 @@
     <div class="execution-row">
       <fieldset id="execution-choice" class="execution-choice" aria-describedby="execution-description"><legend class="sr-only">Execution</legend>
         <label><input type="radio" name="execution" value="auto"><span>Auto</span></label>
-        <label><input type="radio" name="execution" value="cpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option"><span>CPU</span></span><small class="recommended-mark" aria-hidden="true" hidden></small></label>
-        <label><input type="radio" name="execution" value="gpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option"><span>GPU</span><small class="processor-backend" hidden></small></span><small class="recommended-mark" aria-hidden="true" hidden></small></label>
+        <label><input type="radio" name="execution" value="cpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option" id="history-cpu"><span>CPU</span><small id="history-cpu-rate">— tok/s</small></span><small class="recommended-mark" aria-hidden="true" hidden></small></label>
+        <label><input type="radio" name="execution" value="gpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option" id="history-gpu"><span>GPU</span><small class="processor-backend" hidden></small><small id="history-gpu-rate">— tok/s</small></span><small class="recommended-mark" aria-hidden="true" hidden></small></label>
       </fieldset>
       <span id="execution-current" class="sr-only" role="status" aria-live="polite"></span>
       <span id="execution-description" class="sr-only"></span>
     </div>
+    <p id="profile-error" class="hint" role="status" hidden></p>
     <p id="execution-notice" class="hint" role="status" hidden></p>
+    <p id="execution-performance" class="execution-warning" role="status" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 21h20L12 3zM12 9v5m0 3v.01"/></svg><span id="execution-performance-text"></span></p>
     <details id="performance" class="model-performance">
     <summary class="model-metrics" aria-label="Model performance details" aria-describedby="test-speed test-memory test-size" title="Model performance details">
-      <span title="Last completed reply" aria-label="Generation speed"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19a10 10 0 1 1 16 0M12 12l5-5"/><circle cx="12" cy="12" r="1"/></svg><span id="test-speed" class="processor-speeds"><span id="history-cpu">CPU <span id="history-cpu-rate">— tok/s</span></span><span id="history-gpu">GPU <span id="history-gpu-rate">— tok/s</span></span></span></span>
-      <span title="Model process RAM" aria-label="Model process RAM"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 10v4m5-4v4m5-4v4M6 3v4m6-4v4m6-4v4M6 17v4m6-4v4m6-4v4"/></svg><span id="test-memory">— RAM</span></span>
+      <span id="test-speed"><span>First text</span> <span id="profile-first">—</span></span>
+      <span title="Model process RAM" aria-label="Model process RAM"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 10v4m5-4v4m5-4v4M6 3v4m6-4v4m6-4v4M6 17v4m6-4v4m6-4v4"/></svg><span id="test-memory">— RAM</span><small>now</small></span>
       <span title="Download size" aria-label="Download size"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 15h18M16 18h1"/></svg><span id="test-size">—</span></span>
-      <svg class="metrics-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      <span class="profile-label">Profile</span><svg class="metrics-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
     </summary>
         <div class="performance-content" tabindex="0" role="region" aria-label="Model performance details">
+          <p id="profile-group" class="hint"></p>
+          <table class="profile-table"><caption id="processor-history-title">Local performance profile</caption><thead><tr><th scope="col">Measurement</th><th scope="col">CPU<small id="profile-cpu-confidence"></small></th><th scope="col">GPU<small id="profile-gpu-confidence"></small></th></tr></thead><tbody><tr><th scope="row">Typical speed</th><td id="history-cpu-typical">—</td><td id="history-gpu-typical">—</td></tr>
+<tr><th scope="row">Usual range</th><td id="history-cpu-range">—</td><td id="history-gpu-range">—</td></tr>
+<tr><th scope="row">First text</th><td id="history-cpu-first">—</td><td id="history-gpu-first">—</td></tr>
+<tr><th scope="row">Total time</th><td id="history-cpu-total">—</td><td id="history-gpu-total">—</td></tr>
+<tr><th scope="row">Output tokens</th><td id="history-cpu-tokens">—</td><td id="history-gpu-tokens">—</td></tr>
+<tr><th scope="row">Model RAM · after reply</th><td id="history-cpu-ram">—</td><td id="history-gpu-ram">—</td></tr>
+<tr><th scope="row">Sampled peak · 2 s</th><td id="history-cpu-peak">—</td><td id="history-gpu-peak">—</td></tr>
+<tr><th scope="row">Observations</th><td id="history-cpu-count">—</td><td id="history-gpu-count">—</td></tr>
+<tr><th scope="row">Measured</th><td id="history-cpu-time">—</td><td id="history-gpu-time">—</td></tr>
+</tbody></table>
+          <p class="hint" id="profile-confidence"></p>
+          <details class="profile-info"><summary>About these measurements</summary><p>Median of up to 30 comparable replies. Range: middle 50%. Different prompts are observations, not a controlled speed comparison. First text includes hidden preparation. RAM is process RSS; sampled peaks can miss brief spikes. GPU memory and power are not measured.</p>
           <p id="performance-system" class="system-name"></p><p id="performance-os" class="hint"></p>
-          <dl class="performance-grid">
-            <div><dt>Model CPU · now</dt><dd id="performance-cpu">—</dd></div>
-            <div><dt>System RAM</dt><dd id="performance-ram">—</dd></div>
-            <div><dt>Available RAM</dt><dd id="performance-available">—</dd></div>
-          </dl>
-          <p class="performance-note">OS snapshots, refreshed about every two seconds. Model RAM is the resident memory of geistd, including shared pages; it excludes this window. CPU: 100% means all logical CPUs. Available RAM is an OS estimate, not an allocation guarantee. GPU and power use are not measured.</p>
-          <div class="processor-history" role="table" aria-labelledby="processor-history-title"><div id="processor-history-title" class="comparison-title">Last completed reply per processor</div><div role="row"><span role="columnheader"></span><span role="columnheader">CPU</span><span role="columnheader">GPU</span></div>
-            <div role="row"><span role="rowheader">First text</span><span role="cell" id="history-cpu-first">—</span><span role="cell" id="history-gpu-first">—</span></div>
-            <div role="row"><span role="rowheader">Total time</span><span role="cell" id="history-cpu-total">—</span><span role="cell" id="history-gpu-total">—</span></div>
-            <div role="row"><span role="rowheader">Output tokens</span><span role="cell" id="history-cpu-tokens">—</span><span role="cell" id="history-gpu-tokens">—</span></div>
-            <div role="row"><span role="rowheader">Model RAM · after reply</span><span role="cell" id="history-cpu-ram">—</span><span role="cell" id="history-gpu-ram">—</span></div>
-            <div role="row"><span role="rowheader">Measured</span><span role="cell" id="history-cpu-time">—</span><span role="cell" id="history-gpu-time">—</span></div>
-          </div>
-          <p class="performance-note">Last successful measurements, saved locally without chat contents. Different prompts and contexts are not a controlled benchmark. First text and total time are measured by the service; RAM is a process snapshot after the reply, not peak or GPU memory.</p>
-  <details class="settings"><summary>Measurements</summary><div class="metrics"><div><span>Generation speed</span><strong id="speed">—</strong></div><div><span>First text</span><strong id="first-token">—</strong></div><div><span>Total time</span><strong id="elapsed">—</strong></div></div><p id="measurement-note" class="hint">Measurements appear after a run.</p><button id="benchmark" type="button" disabled>Quick speed test</button><div id="benchmark-output" class="message-text" hidden></div></details>
+          <dl class="performance-grid"><div><dt>Model CPU · now</dt><dd id="performance-cpu">—</dd></div><div><dt>System RAM</dt><dd id="performance-ram">—</dd></div><div><dt>Available RAM</dt><dd id="performance-available">—</dd></div></dl></details>
+          <details class="profile-info"><summary>Recent observations</summary><ol id="profile-recent"></ol></details>
+          <div class="profile-actions"><button id="benchmark" class="text-button" type="button" disabled>Measure comparison</button><button id="comparison-stop" type="button" hidden>Cancel comparison</button></div><p id="comparison-status" class="hint" role="status"></p>
         </div>
     </details>
     <div id="transcript" tabindex="0" role="region" aria-label="Conversation">
@@ -71,7 +74,7 @@
       <button id="latest" class="text-button" type="button" hidden>↓ Latest message</button>
       <form id="task-form"><label class="sr-only" for="prompt">Your input</label>
         <textarea id="prompt" rows="1" placeholder="Message Geist…" aria-describedby="composer-hint"></textarea>
-        <div class="actions"><details id="chat-help"><summary aria-label="What can I ask?" title="What can I ask?"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.01"/></svg></summary><div class="help-content"><p>Just describe what you need. No mode to choose.</p><ul><li>Rewrite this email in a friendlier tone: …</li><li>Summarize this text in three points: …</li><li>Suggest three ideas for …</li></ul><p>Answers support Markdown. Copy keeps the original formatting. Web addresses can be copied; external images are not loaded.</p><p>This test stays in this window. Clear test, reloading or quitting clears it. Check answers before using them.</p></div></details><button id="new-chat" class="text-button" type="button" aria-label="Clear test" title="Clear test"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11a8 8 0 1 1 2 7M4 4v7h7"/></svg></button><span class="spacer"></span><button id="stop" class="icon-button" type="button" aria-label="Stop response" title="Stop response" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button><button id="run" class="primary icon-button" type="submit" disabled aria-label="Send message" title="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button></div>
+        <div class="actions"><details id="chat-help"><summary aria-label="What can I ask?" title="What can I ask?"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.01"/></svg></summary><div class="help-content"><p>Just describe what you need. No mode to choose.</p><ul><li>Rewrite this email in a friendlier tone: …</li><li>Summarize this text in three points: …</li><li>Suggest three ideas for …</li></ul><p>Answers support Markdown. Copy keeps the original formatting. Web addresses can be copied; external images are not loaded.</p><p>This conversation stays in this window. Clear chat, reloading or quitting clears it. Check answers before using them.</p></div></details><button id="new-chat" class="text-button" type="button" aria-label="Clear chat" title="Clear chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button><span class="spacer"></span><button id="stop" class="icon-button" type="button" aria-label="Stop response" title="Stop response" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button><button id="run" class="primary icon-button" type="submit" disabled aria-label="Send message" title="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button></div>
       </form>
       <p id="composer-hint" class="hint">↵ Send · ⇧↵ New line</p>
 
@@ -98,6 +101,12 @@
       <label for="catalog-file" class="sr-only">Model catalog JSON file</label><input id="catalog-file" type="file" accept=".json,application/json">
       <p class="hint">Import a newer JSON file from a source you trust. No automatic online updates.</p>
       <p id="catalog-result" class="hint" role="status"></p>
+    </section>
+    <section class="preference-group" aria-labelledby="history-title"><h3 id="history-title">Local measurements</h3>
+      <div class="settings-row"><label for="history-enabled">Collect numeric performance</label><input type="checkbox" id="history-enabled"></div>
+      <div class="settings-row"><label for="history-days">Keep history</label><select id="history-days"><option value="30">30 days</option><option value="90">90 days</option><option value="365">365 days</option></select></div>
+      <p class="hint">No prompts or replies. Stored only on this computer.</p><p id="history-storage" class="hint"></p>
+      <div class="actions"><button id="history-export" type="button">Export JSONL</button><button id="history-clear" type="button">Delete history</button></div><p id="history-result" class="hint" role="status"></p>
     </section>
     <section class="preference-group" aria-labelledby="storage-title"><h3 id="storage-title">Storage</h3><p id="disk-space" class="hint"></p></section>
   </section>

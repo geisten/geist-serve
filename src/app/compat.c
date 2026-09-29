@@ -168,7 +168,7 @@ int app_chat_parse(struct app_arena *arena,
         if (!isfinite(v))
             return 400;
         if (i < 2) {
-            if (v < 1 || v > 1024 || v != (unsigned) v)
+            if (v < 1 || v > 4095 || v != (unsigned) v)
                 return 400;
             chat->max_tokens = (unsigned) v;
         }

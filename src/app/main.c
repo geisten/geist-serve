@@ -4,6 +4,7 @@
  * One joinable model job and at most eight HTTP workers may exist. */
 #include "core.h"
 #include "daemon.h"
+#include "output.h"
 #include "tasks.h"
 #include "compat.h"
 #include "connection.h"
@@ -55,6 +56,9 @@ static const unsigned char script[] = {
 static const unsigned char marked_js[] = {
 #embed "../../web/vendor/marked.umd.js"
 };
+static const unsigned char katex_js[] = {
+#embed "../../web/vendor/katex.min.js"
+};
 static const unsigned char markdown_js[] = {
 #embed "../../web/markdown.js"
 };
@@ -65,6 +69,7 @@ static const unsigned char markdown_js[] = {
 
 #include "version.h"
 #include "resources.h"
+#include "performance.h"
 
 #define WORKER_BYTES (256u * 1024u)
 #define REQUEST_CAP 32768u
@@ -72,30 +77,43 @@ static const unsigned char markdown_js[] = {
 #define WORKER_CAP 8
 #define REQUEST_TIMEOUT_MS 5000
 static volatile sig_atomic_t interrupted;
-static atomic_bool           closing, cancelled;
+static atomic_bool           closing, cancelled, compare_cancelled;
 struct processor_measurement {
     double rate, first, total, tokens, rss, recorded;
 };
 static struct {
-    pthread_mutex_t         mutex;
-    pthread_cond_t          drained;
-    char                    home[APP_PATH_CAP], server[APP_PATH_CAP], models[APP_PATH_CAP];
-    char                    token[65], message[512], active[160], active_id[64];
-    char                    chosen[APP_PATH_CAP], selected[64], answer_language[3];
-    char                    execution_mode[8], backend[24], cpu_backend[24], gpu_backend[24];
-    char                    execution_notice[256];
-    bool                    gpu_available, save_execution, backend_verified;
-    double                  loading_started;
-    bool                    preview_accepted[APP_MODEL_COUNT];
-    unsigned                port, workers;
-    char                    runtime_dir[64], socket_path[100];
-    pid_t                   child;
-    bool                    ready, generating, job_running, job_joinable;
-    pthread_t               job;
-    const struct app_model *job_model;
-    bool                    job_download;
-    uint64_t                received;
-    char                    phase[32];
+    pthread_mutex_t            mutex;
+    pthread_cond_t             drained;
+    char                       home[APP_PATH_CAP], server[APP_PATH_CAP], models[APP_PATH_CAP];
+    char                       token[65], message[512], active[160], active_id[64];
+    char                       chosen[APP_PATH_CAP], selected[64], answer_language[3];
+    char                       execution_mode[8], backend[24], cpu_backend[24], gpu_backend[24];
+    char                       execution_notice[256];
+    char                       request_phase[24], last_error[256], error_stage[24];
+    char                       error_model[64], error_backend[24];
+    int                        error_code;
+    bool                       gpu_available, save_execution, backend_verified;
+    double                     loading_started, loaded_ms;
+    unsigned                   runtime_requests, runtime_threads;
+    char                       profile_series[768];
+    struct perf_record        *observation;
+    struct app_resource_window observation_window;
+    double                     sample_ms, cpu_sum;
+    unsigned                   cpu_samples;
+    bool                       preview_accepted[APP_MODEL_COUNT];
+    unsigned                   port, workers;
+    char                       runtime_dir[64], socket_path[100];
+    pid_t                      child;
+    bool                       ready, generating, job_running, job_joinable;
+    bool                       comparing, compare_joinable;
+    pthread_t                  comparison;
+    char                       compare_phase[24], compare_result[24];
+    unsigned                   compare_step;
+    pthread_t                  job;
+    const struct app_model    *job_model;
+    bool                       job_download, job_activate;
+    uint64_t                   received;
+    char                       phase[32];
     struct {
         double   tps;
         unsigned tokens;
@@ -258,7 +276,7 @@ static ssize_t request_recv(int fd, void *buffer, size_t size, double deadline) 
     return -1;
 }
 
-static void response(int fd, int status, const char *type, const void *body, size_t n) {
+static bool response(int fd, int status, const char *type, const void *body, size_t n) {
     char header[1024];
     int  k = snprintf(
             header,
@@ -272,8 +290,8 @@ static void response(int fd, int status, const char *type, const void *body, siz
             status,
             type,
             n);
-    if (k > 0 && (size_t) k < sizeof header && send_bytes(fd, header, (size_t) k))
-        (void) send_bytes(fd, body, n);
+    return k > 0 && (size_t) k < sizeof header && send_bytes(fd, header, (size_t) k) &&
+           send_bytes(fd, body, n);
 }
 
 static void error_response(int fd, int code, const char *message) {
@@ -504,6 +522,7 @@ static void poll_child(void) {
                      "The engine reported a different processor. Reload the model.");
             return;
         }
+        app.loaded_ms                 = monotonic_ms() - app.loading_started;
         app.ready                     = true;
         app.message[0]                = 0;
         const struct app_model *model = app_model_find(app.active_id);
@@ -615,6 +634,8 @@ static bool start_child_mode(const char *path, const char *id, const char *mode)
     unsigned limit = known && hardware.device == APP_PI5 ? 4 : 2;
     if (cores > limit)
         cores = limit;
+    app.runtime_threads  = cores;
+    app.runtime_requests = 0;
     char threads[40];
     snprintf(threads, sizeof threads, "OMP_NUM_THREADS=%u", cores);
     env[used++] = threads;
@@ -724,8 +745,7 @@ static bool save_preference(const char *name, const char *value) {
     return ok;
 }
 
-/* Numeric observations only, keyed by model SHA, actual backend, app version
- * and hardware/OS. Keep one successful reply per processor, never prompts. */
+/* Legacy last-reply files remain readable for one-time archival migration. */
 static void measurement_key(char key[128], const struct app_model *model, unsigned slot) {
     snprintf(
             key, 128, "performance-%s-%s", model->sha256, slot ? app.gpu_backend : app.cpu_backend);
@@ -740,21 +760,37 @@ static bool valid_measurement(const struct processor_measurement *m) {
 }
 static void restore_measurements(void) {
     memset(app.history, 0, sizeof app.history);
-    if (!app.measurement_identity[0])
-        return;
-    size_t prefix = strlen(app.measurement_identity);
-    for (size_t i = 0; i < app_model_count; ++i) {
-        for (unsigned slot = 0; slot < 2; ++slot) {
+    for (size_t i = 0; i < app_model_count; i++)
+        for (unsigned slot = 0; slot < 2; slot++) {
+            const char        *backend = slot ? app.gpu_backend : app.cpu_backend;
+            struct perf_record r;
+            perf_last(app_models[i].sha256, app.profile_series, backend, &r);
+            if (r.id[0])
+                app.history[i][slot] =
+                        (struct processor_measurement) {.rate  = r.output / (r.generation_ns / 1e9),
+                                                        .first = r.first_ns / 1e9,
+                                                        .total = r.total_ns / 1e9,
+                                                        .tokens   = r.output,
+                                                        .rss      = r.rss > 0 ? r.rss : 0,
+                                                        .recorded = r.timestamp};
+        }
+}
+static void migrate_measurements(void) {
+    for (size_t i = 0; i < app_model_count; i++)
+        for (unsigned slot = 0; slot < 2; slot++) {
             if (slot && !app.gpu_backend[0])
                 continue;
             char key[128], text[1024];
             measurement_key(key, &app_models[i], slot);
-            if (!read_preference(key, text, sizeof text) ||
-                strncmp(text, app.measurement_identity, prefix))
+            if (!read_preference(key, text, sizeof text) || strncmp(text, "v1 ", 3))
+                continue;
+            char *identity = strchr(text, '\n'),
+                 *numbers  = identity ? strchr(identity + 1, '\n') : nullptr;
+            if (!identity || !numbers)
                 continue;
             struct processor_measurement m    = {0};
             int                          used = 0;
-            if (sscanf(text + prefix,
+            if (sscanf(numbers + 1,
                        "%lf %lf %lf %lf %lf %lf%n",
                        &m.rate,
                        &m.first,
@@ -762,44 +798,148 @@ static void restore_measurements(void) {
                        &m.tokens,
                        &m.rss,
                        &m.recorded,
-                       &used) == 6 &&
-                text[prefix + used] == 0 && valid_measurement(&m))
-                app.history[i][slot] = m;
+                       &used) != 6 ||
+                numbers[1 + used] || !valid_measurement(&m))
+                continue;
+            *numbers             = 0;
+            struct perf_record r = {.timestamp     = m.recorded,
+                                    .output        = m.tokens,
+                                    .generation_ns = m.tokens / m.rate * 1e9,
+                                    .first_ns      = m.first * 1e9,
+                                    .total_ns      = m.total * 1e9,
+                                    .rss           = m.rss,
+                                    .peak_rss      = -1,
+                                    .cpu_percent   = -1,
+                                    .load_ns       = -1,
+                                    .prefill_ns    = -1,
+                                    .top_p         = 1};
+            snprintf(r.model, sizeof r.model, "%s", app_models[i].id);
+            snprintf(r.artifact, sizeof r.artifact, "%s", app_models[i].sha256);
+            snprintf(r.backend, sizeof r.backend, "%s", slot ? app.gpu_backend : app.cpu_backend);
+            snprintf(r.quantization, sizeof r.quantization, "%s", app_models[i].quantization);
+            snprintf(r.id, sizeof r.id, "legacy-%s-%s-%.0f", r.artifact, r.backend, m.recorded);
+            snprintf(r.series, sizeof r.series, "legacy;unknown-engine-config;%s", identity + 1);
+            strcpy(r.source, "legacy_last_reply");
+            strcpy(r.outcome, "completed");
+            strcpy(r.finish, "unknown");
+            perf_import(&r);
+        }
+}
+/* These functions capture/update the one active request under app.mutex. Disk
+ * work is confined to performance.c, after this mutex is released. */
+static void observation_sample(bool force) {
+    if (!app.observation || (!force && monotonic_ms() - app.sample_ms < 2000))
+        return;
+    app.sample_ms = monotonic_ms();
+    struct app_process_sample sample;
+    if (app.child <= 0 || !app_process_read(app.child, &sample))
+        return;
+    struct perf_record *r = app.observation;
+    r->rss                = (double) sample.rss;
+    if (r->rss > r->peak_rss)
+        r->peak_rss = r->rss;
+    ++r->samples;
+    struct app_hardware h;
+    if (app_hardware_read(&h, app.models)) {
+        app_resource_update(&app.observation_window, &sample, h.logical_cpus);
+        if (app.observation_window.cpu_known) {
+            app.cpu_sum += app.observation_window.cpu_percent;
+            ++app.cpu_samples;
+            r->cpu_percent = app.cpu_sum / app.cpu_samples;
         }
     }
 }
-static void
-remember_measurement(size_t index, double first, double total, const struct app_run_stats *stats) {
-    if (!app.measurement_identity[0] || !stats->tokens || stats->generation_ns <= 0)
-        return;
-    struct app_process_sample    process;
-    bool                         sampled = app.child > 0 && app_process_read(app.child, &process);
-    struct processor_measurement m       = {.rate     = stats->tokens / (stats->generation_ns / 1e9),
-                                            .first    = first / 1000,
-                                            .total    = total / 1000,
-                                            .tokens   = (double) stats->tokens,
-                                            .rss      = sampled ? (double) process.rss : 0,
-                                            .recorded = (double) time(nullptr)};
-    if (!valid_measurement(&m))
-        return;
-    unsigned slot = strcmp(app.backend, app.cpu_backend) ? 1 : 0;
-    char     key[128], text[1024];
-    measurement_key(key, &app_models[index], slot);
-    snprintf(text,
-             sizeof text,
-             "%s%.17g %.17g %.17g %.17g %.17g %.17g",
-             app.measurement_identity,
-             m.rate,
-             m.first,
-             m.total,
-             m.tokens,
-             m.rss,
-             m.recorded);
-    app.history[index][slot] = m;
-    if (!save_preference(key, text))
-        snprintf(app.execution_notice,
-                 sizeof app.execution_notice,
-                 "Performance could not be saved. Values remain available until quitting.");
+static void observation_begin(
+        struct perf_record *r, const char *source, unsigned max, float temperature, float top_p) {
+    memset(r, 0, sizeof *r);
+    perf_begin(r);
+    const struct app_model *model = app_model_find(app.active_id);
+    snprintf(r->model, sizeof r->model, "%s", app.active_id);
+    /* Uncatalogued files have no verified artifact identity and stay diagnostic. */
+    snprintf(r->artifact,
+             sizeof r->artifact,
+             "%s",
+             model ? model->sha256 : "unknown-custom-artifact");
+    snprintf(r->quantization, sizeof r->quantization, "%s", model ? model->quantization : "");
+    snprintf(r->backend, sizeof r->backend, "%s", app.backend);
+    snprintf(r->series,
+             sizeof r->series,
+             "%s",
+             model ? app.profile_series : "unknown-custom-series");
+    snprintf(r->source, sizeof r->source, "%s", source);
+    r->threads             = app.runtime_threads;
+    r->max_tokens          = max;
+    r->temperature         = temperature;
+    r->top_p               = top_p;
+    r->cold                = app.runtime_requests++ == 0;
+    r->load_ns             = r->cold ? app.loaded_ms * 1e6 : -1;
+    r->contention          = app.job_running && !app.job_activate;
+    app.observation        = r;
+    app.observation_window = (struct app_resource_window) {0};
+    app.cpu_samples        = 0;
+    app.cpu_sum            = 0;
+    observation_sample(true);
+}
+static void observation_end(struct perf_record         *r,
+                            int                         rc,
+                            double                      first,
+                            double                      total,
+                            const struct app_run_stats *stats) {
+    pthread_mutex_lock(&app.mutex);
+    observation_sample(true);
+    app.observation    = nullptr;
+    r->generation_ns   = stats->generation_ns;
+    r->first_ns        = first > 0 ? first * 1e6 : -1;
+    r->first_answer_ns = stats->first_answer_ns;
+    r->reasoning       = stats->reasoning;
+    if (stats->max_tokens)
+        r->max_tokens = stats->max_tokens;
+    r->total_ns   = total * 1e6;
+    r->prefill_ns = stats->prefill_ns;
+    r->input      = stats->prompt_tokens;
+    r->output     = stats->tokens;
+    r->reused     = stats->reused;
+    strcpy(r->outcome,
+           rc == 499                       ? "cancelled"
+           : rc == 498                     ? "disconnected"
+           : rc == 422 && stats->no_answer ? "no_answer"
+           : rc == 400                     ? "error"
+           : rc                            ? "interrupted"
+           : stats->no_answer              ? "no_answer"
+                                           : "completed");
+    strcpy(r->finish, rc ? "unknown" : stats->limited ? "length" : "stop");
+    pthread_mutex_unlock(&app.mutex);
+    perf_submit(r);
+    pthread_mutex_lock(&app.mutex);
+    restore_measurements();
+    /* Prefill is a synchronous engine call. A closed client alone cannot interrupt it.
+     * Reap only our owned child before admitting a new request; preserve its diagnostics. */
+    if (rc && stats->stage && !strcmp(stats->stage, "prefill") && !atomic_load(&closing)) {
+        char path[APP_PATH_CAP], id[64], mode[8], log[APP_PATH_CAP], archive[APP_PATH_CAP];
+        snprintf(path, sizeof path, "%s", app.chosen);
+        snprintf(id, sizeof id, "%s", app.active_id);
+        snprintf(mode, sizeof mode, "%s", app.execution_mode);
+        stop_child();
+        bool saved = false;
+        if (path_join(log, app.home, "server.log") &&
+            path_join(archive, app.home, "request-failure-XXXXXX")) {
+            int fd = mkstemp(archive);
+            if (fd >= 0) {
+                close(fd);
+                saved = rename(log, archive) == 0;
+                if (!saved)
+                    unlink(archive);
+            }
+        }
+        if (saved)
+            (void) start_child_mode(path, id, mode);
+        else
+            snprintf(app.message,
+                     sizeof app.message,
+                     "The model is stopped. Its diagnostics could not be archived.");
+    }
+    app.generating = false;
+    pthread_mutex_unlock(&app.mutex);
 }
 
 static bool save_selection(const char *id) {
@@ -815,7 +955,9 @@ static void model_inventory(struct app_inventory items[static APP_MODEL_COUNT]) 
         bool valid = path_join(path, app.models, app_models[i].file);
         items[i]   = (struct app_inventory) {.installed = valid &&
                                                           regular_size(path) == app_models[i].bytes,
-                                             .tps       = app.measurements[i].tps};
+                                             .tps = app_device_rate(app.history[i][0].rate,
+                                                                    gpu_supported(&app_models[i]),
+                                                                    app.history[i][1].rate)};
         if (valid && snprintf(part, sizeof part, "%s.part", path) < (int) sizeof part)
             items[i].partial = regular_size(part);
     }
@@ -1034,7 +1176,9 @@ static void *model_job(void *unused) {
                  sizeof app.message,
                  "Download or verification cancelled. Partial downloads can be resumed.");
     } else if (ok) {
-        if (start_child(target, m->id))
+        if (!app.job_activate)
+            snprintf(app.message, sizeof app.message, "Download complete.");
+        else if (start_child(target, m->id))
             (void) save_selection(m->id);
     } else
         snprintf(app.message, sizeof app.message, "%s", *why ? why : "Cannot prepare the model.");
@@ -1044,16 +1188,30 @@ static void *model_job(void *unused) {
     return nullptr;
 }
 
-static bool begin_job(const struct app_model *m, bool download) {
+static bool begin_job(const struct app_model *m, bool download, bool activate) {
+    /* Startup also enters here from the saved selection, without an HTTP
+     * assessment. Never hash/download/start a known unsupported format. */
+    if (m->unsupported_format || !m->backends) {
+        snprintf(app.message,
+                 sizeof app.message,
+                 "This model requires PQ2_0 and Hadamard support, unavailable in the bundled "
+                 "engine.");
+        return false;
+    }
     if (app.job_joinable) {
         pthread_join(app.job, nullptr);
         app.job_joinable = false;
     }
     app.job_model    = m;
     app.job_download = download;
+    /* Captured under the mutex. A background download must never replace the
+     * resident daemon, even if it becomes idle or exits before completion. */
+    app.job_activate = activate;
     app.job_running  = true;
-    app.received     = 0;
-    app.message[0]   = 0;
+    if (download && app.observation)
+        app.observation->contention = true;
+    app.received   = 0;
+    app.message[0] = 0;
     strcpy(app.phase, download ? "downloading" : "preparing");
     atomic_store(&cancelled, false);
     if (pthread_create(&app.job, nullptr, model_job, nullptr) != 0) {
@@ -1090,7 +1248,7 @@ static void execution_response(int fd, const char *text) {
     const struct app_model *model = app_model_find(app.active_id);
     int                     code  = 202;
     const char             *error = nullptr;
-    if (!app.ready || app.generating || app.job_running) {
+    if (!app.ready || app.comparing || app.generating || app.job_running) {
         code  = 409;
         error = "Wait until the loaded model is idle before changing execution.";
     } else if (!strcmp(mode, "gpu") && !gpu_supported(model)) {
@@ -1140,7 +1298,7 @@ static void import_catalog(int fd, const char *text) {
     }
     pthread_mutex_lock(&app.mutex);
     int code = 200;
-    if (app.job_running || app.generating || (app.child && !app.ready)) {
+    if (app.comparing || app.job_running || app.generating || (app.child && !app.ready)) {
         code = 409;
         snprintf(why, sizeof why, "Finish the current operation before importing a catalog.");
     } else if (app_catalog_version(candidate) <= app_catalog_revision) {
@@ -1232,6 +1390,17 @@ static void status_response(int fd, struct app_arena *arena) {
     app_quote(&b, app.answer_language);
     const struct app_model *execution_model = app_model_find(app.active_id);
     bool                    gpu             = gpu_supported(execution_model);
+    app_put(&b, ",\"request_phase\":");
+    app_quote(&b, app.generating ? app.request_phase : "idle");
+    app_put(&b, ",\"last_error\":{\"message\":");
+    app_quote(&b, app.last_error);
+    app_put(&b, ",\"stage\":");
+    app_quote(&b, app.error_stage);
+    app_put(&b, ",\"model\":");
+    app_quote(&b, app.error_model);
+    app_put(&b, ",\"backend\":");
+    app_quote(&b, app.error_backend);
+    app_printf(&b, ",\"code\":%d}", app.error_code);
     app_put(&b, ",\"execution\":{\"mode\":");
     app_quote(&b, app.execution_mode[0] ? app.execution_mode : "auto");
     app_put(&b, ",\"active\":");
@@ -1255,6 +1424,27 @@ static void status_response(int fd, struct app_arena *arena) {
                         "measured speed comparison.");
     app_put(&b, ",\"notice\":");
     app_quote(&b, app.execution_notice);
+    double execution_rate = 0;
+    if (app.ready && app.backend_verified && execution_model) {
+        unsigned slot  = !strcmp(app.backend, app.cpu_backend) ? 0 : 1;
+        execution_rate = app.history[execution_model - app_models][slot].rate;
+    }
+    app_printf(&b,
+               ",\"performance\":{\"target_tps\":%.1f,\"below_target\":%s,\"rate\":",
+               APP_INTERACTIVE_TPS,
+               app_rate_below_target(execution_rate) ? "true" : "false");
+    if (isfinite(execution_rate) && execution_rate > 0)
+        app_printf(&b, "%.6f", execution_rate);
+    else
+        app_put(&b, "null");
+    app_put(&b, "}}");
+    app_printf(&b,
+               ",\"comparison\":{\"running\":%s,\"step\":%u,\"phase\":",
+               app.comparing ? "true" : "false",
+               app.compare_step);
+    app_quote(&b, app.compare_phase);
+    app_put(&b, ",\"result\":");
+    app_quote(&b, app.compare_result);
     app_put(&b, "}");
     app_put(&b, ",\"performance_history\":[");
     bool comma = false;
@@ -1328,11 +1518,17 @@ static void status_response(int fd, struct app_arena *arena) {
     app_put(&b, ",\"job_model\":");
     app_quote(&b, app.job_running ? app.job_model->id : "");
     app_printf(&b,
-               ",\"received\":%llu,\"ready\":%s,\"loading\":%s,\"busy\":%s,\"models\":[",
+               ",\"received\":%llu,\"ready\":%s,\"loading\":%s,\"busy\":%s,"
+               "\"inference_busy\":%s,\"background_download\":%s,\"models\":[",
                (unsigned long long) app.received,
                app.ready ? "true" : "false",
                app.child && !app.ready ? "true" : "false",
-               app.job_running || app.generating ? "true" : "false");
+               app.comparing || app.job_running || app.generating ? "true" : "false",
+               app.comparing || app.generating || (app.job_running && app.job_activate) ||
+                               (app.child && !app.ready)
+                       ? "true"
+                       : "false",
+               app.job_running && !app.job_activate ? "true" : "false");
     for (size_t i = 0; i < app_model_count; ++i) {
         const struct app_model *m         = &app_models[i];
         bool                    installed = inventory[i].installed;
@@ -1340,14 +1536,31 @@ static void status_response(int fd, struct app_arena *arena) {
         struct app_hardware     adjusted  = h;
         if (partial <= m->bytes && h.disk_known && UINT64_MAX - adjusted.disk > partial)
             adjusted.disk += partial;
-        struct app_assessment a =
-                app_assess_observed(&adjusted, m, installed, app.measurements[i].tps);
+        /* The running model already owns its resident memory. Do not charge it
+         * twice when displaying its device suitability. Other apps still count. */
+        if (sampled && app.ready && execution_model == m && adjusted.available_known &&
+            adjusted.available < adjusted.ram)
+            adjusted.available += sample.rss < adjusted.ram - adjusted.available
+                                          ? sample.rss
+                                          : adjusted.ram - adjusted.available;
+        struct app_assessment a = app_assess_device(&adjusted,
+                                                    m,
+                                                    installed,
+                                                    app.history[i][0].rate,
+                                                    gpu_supported(m),
+                                                    app.history[i][1].rate);
         if (i)
             app_put(&b, ",");
         app_put(&b, "{\"id\":");
         app_quote(&b, m->id);
         app_put(&b, ",\"name\":");
         app_quote(&b, m->name);
+        app_put(&b, ",\"group_id\":");
+        app_quote(&b, m->group_id);
+        app_put(&b, ",\"group_name\":");
+        app_quote(&b, m->group_name);
+        app_put(&b, ",\"quantization\":");
+        app_quote(&b, m->quantization ? m->quantization : "");
         app_put(&b, ",\"sha256\":");
         app_quote(&b, m->sha256);
         app_printf(&b,
@@ -1373,8 +1586,13 @@ static void status_response(int fd, struct app_arena *arena) {
                    app.measurements[i].tps,
                    app.measurements[i].tokens);
     }
-    app_put(&b, "]}");
+    char artifact[65] = "";
+    if (execution_model)
+        snprintf(artifact, sizeof artifact, "%s", execution_model->sha256);
+    app_put(&b, "],\"performance_profile\":");
     pthread_mutex_unlock(&app.mutex);
+    perf_view(&b, artifact, app.profile_series, app.cpu_backend, app.gpu_backend);
+    app_put(&b, "}");
     if (b.failed)
         error_response(fd, 503, "Status exceeds the response memory budget.");
     else
@@ -1382,33 +1600,49 @@ static void status_response(int fd, struct app_arena *arena) {
 }
 
 struct proxy {
-    int             fd;
-    bool            started;
-    double          start, first;
-    struct app_utf8 utf8;
+    int                   fd;
+    bool                  started, disconnected, expired, preparing;
+    double                start, first, first_answer, heartbeat;
+    struct app_utf8       utf8;
+    struct app_output     output;
+    struct app_run_stats *stats;
+    bool (*send)(void *, const char *);
+    bool (*keepalive)(void *);
+    void *target;
+    char  phase[24];
 };
 static bool proxy_cancel(void *opaque) {
     struct proxy *p = opaque;
     char          one;
     ssize_t       n = recv(p->fd, &one, 1, MSG_PEEK | MSG_DONTWAIT);
-    return atomic_load(&closing) || monotonic_ms() - p->start > 180000 || n == 0 ||
-           (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR);
-}
-static bool proxy_emit(void *opaque, const char *piece) {
-    struct proxy *p = opaque;
-    if (proxy_cancel(p))
-        return false;
-    char decoded[8192];
-    if (!app_utf8_feed(&p->utf8, piece, decoded, sizeof decoded))
-        return false;
-    if (!decoded[0] && piece[0])
+    p->disconnected =
+            n == 0 || (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR);
+    p->expired = monotonic_ms() - p->start > 3600000;
+    if (atomic_load(&closing) || p->expired || p->disconnected)
         return true;
-    if (decoded[0] && !p->first)
-        p->first = monotonic_ms() - p->start;
+    if (p->stats && p->stats->stage && strcmp(p->phase, p->stats->stage)) {
+        snprintf(p->phase, sizeof p->phase, "%s", p->stats->stage);
+        pthread_mutex_lock(&app.mutex);
+        snprintf(app.request_phase, sizeof app.request_phase, "%s", p->phase);
+        pthread_mutex_unlock(&app.mutex);
+    }
+    if (p->keepalive && monotonic_ms() - (p->heartbeat ? p->heartbeat : p->start) >= 10000) {
+        p->heartbeat = monotonic_ms();
+        if (!p->keepalive(p->target)) {
+            p->disconnected = true;
+            return true;
+        }
+    }
+    return false;
+}
+static bool proxy_send(void *opaque, const char *text) {
+    struct proxy *p = opaque;
+    if (text[strspn(text, " \t\r\n")] && !p->first_answer)
+        p->first_answer = monotonic_ms() - p->start;
     if (!p->started) {
         const char *head = "HTTP/1.1 200 OK\r\nContent-Type: application/x-ndjson\r\n"
-                           "Cache-Control: no-store\r\nConnection: "
-                           "close\r\nX-Content-Type-Options: nosniff\r\n\r\n";
+                           "Cache-Control: no-store\r\nConnection: close\r\n"
+                           "X-Content-Type-Options: nosniff\r\n\r\n";
         if (!send_bytes(p->fd, head, strlen(head)))
             return false;
         p->started = true;
@@ -1416,9 +1650,68 @@ static bool proxy_emit(void *opaque, const char *piece) {
     char              data[16384];
     struct app_buffer b = {.data = data, .cap = sizeof data};
     app_put(&b, "{\"response\":");
-    app_quote(&b, decoded);
+    app_quote(&b, text);
     app_put(&b, ",\"done\":false}\n");
     return !b.failed && send_bytes(p->fd, data, b.len);
+}
+static bool proxy_keepalive(void *opaque) {
+    struct proxy *p = opaque;
+    if (!p->started && !proxy_send(p, ""))
+        return false;
+    const char *event = p->first_answer || p->preparing ? "{\"heartbeat\":true}\n"
+                                                        : "{\"phase\":\"preparing\"}\n";
+    p->preparing      = true;
+    return send_bytes(p->fd, event, strlen(event));
+}
+static bool proxy_decode(struct proxy *p, const char *piece) {
+    if (proxy_cancel(p))
+        return false;
+    char decoded[8192];
+    if (!app_utf8_feed(&p->utf8, piece, decoded, sizeof decoded))
+        return false;
+    if (*decoded && !p->first)
+        p->first = monotonic_ms() - p->start;
+    bool ok = app_output_feed(&p->output, decoded, p->send, p->target);
+    if (ok && p->output.reasoning && !p->preparing && p->keepalive) {
+        ok           = p->keepalive(p->target);
+        p->preparing = true;
+    }
+    return ok;
+}
+static bool proxy_emit(void *opaque, const char *piece) {
+    return proxy_decode(opaque, piece);
+}
+static void proxy_init(struct proxy *p) {
+    const struct app_model *model = app_model_find(app.active_id);
+    app_output_init(&p->output, model ? model->reasoning_format : nullptr);
+    app.last_error[0] = app.error_stage[0] = app.error_model[0] = app.error_backend[0] = 0;
+    app.error_code                                                                     = 0;
+    strcpy(app.request_phase, "connect");
+}
+static void
+proxy_finish(struct proxy *p, struct app_run_stats *stats, int *rc, char error[static 256]) {
+    stats->reasoning       = p->output.reasoning;
+    stats->no_answer       = !p->output.visible;
+    stats->first_answer_ns = p->output.visible && p->first_answer > 0 ? p->first_answer * 1e6 : -1;
+    app_output_finish(&p->output);
+    if (p->expired) {
+        *rc = 504;
+        snprintf(error,
+                 256,
+                 "The one-hour request limit was reached. Shorten the conversation or select GPU.");
+    }
+    pthread_mutex_lock(&app.mutex);
+    if (*rc && *rc != 499 && !p->disconnected) {
+        snprintf(app.last_error, sizeof app.last_error, "%s", error);
+        snprintf(app.error_stage,
+                 sizeof app.error_stage,
+                 "%s",
+                 stats->stage ? stats->stage : "output");
+        snprintf(app.error_model, sizeof app.error_model, "%s", app.active_id);
+        snprintf(app.error_backend, sizeof app.error_backend, "%s", app.backend);
+        app.error_code = *rc;
+    }
+    pthread_mutex_unlock(&app.mutex);
 }
 
 static void generate(int fd, struct request *r, struct app_arena *arena) {
@@ -1495,6 +1788,9 @@ static void generate(int fd, struct request *r, struct app_arena *arena) {
             error_response(fd, code, why);
             return;
         }
+        if (json_get(json, 0, "max_tokens") < 0 && json_get(json, 0, "max_completion_tokens") < 0)
+            chat.max_tokens =
+                    0; /* App conversation uses all remaining context in one generation. */
         memmove(chat.messages + 1, chat.messages, chat.count * sizeof *chat.messages);
         chat.messages[0] = (struct chat_msg) {
                 .role    = "system",
@@ -1516,7 +1812,8 @@ static void generate(int fd, struct request *r, struct app_arena *arena) {
              prompt);
     pthread_mutex_lock(&app.mutex);
     poll_child();
-    if (atomic_load(&closing) || !app.ready || app.generating || app.job_running) {
+    if (atomic_load(&closing) || !app.ready || app.comparing || app.generating ||
+        (app.job_running && app.job_activate)) {
         pthread_mutex_unlock(&app.mutex);
         free(prompt);
         error_response(fd, 409, "Wait until the model is ready and idle.");
@@ -1551,69 +1848,98 @@ static void generate(int fd, struct request *r, struct app_arena *arena) {
         if (strcmp(app.active_id, app_models[i].id) == 0)
             model_index = i;
     app.generating = true;
+    struct perf_record observation;
+    observation_begin(&observation,
+                      "app",
+                      conversation ? chat.max_tokens
+                      : benchmark  ? 64
+                                   : task->output_limit,
+                      conversation ? chat.temperature : .2f,
+                      conversation ? chat.top_p : 1);
+    struct app_run_stats stats = {0};
+    struct proxy         proxy = {.fd        = fd,
+                                  .start     = monotonic_ms(),
+                                  .stats     = &stats,
+                                  .send      = proxy_send,
+                                  .keepalive = proxy_keepalive};
+    proxy.target               = &proxy;
+    proxy_init(&proxy);
     pthread_mutex_unlock(&app.mutex);
-    struct proxy         proxy = {.fd = fd, .start = monotonic_ms()};
-    struct app_run_stats stats;
-    char                 error[256];
-    int                  rc = conversation ? app_daemon_chat(app.socket_path,
-                                                             chat.count,
-                                                             chat.messages,
-                                                             chat.max_tokens,
-                                                             chat.temperature,
-                                                             chat.top_p,
-                                                             proxy_emit,
-                                                             proxy_cancel,
-                                                             &proxy,
-                                                             &stats,
-                                                             error)
-                                           : app_daemon_run(app.socket_path,
-                                                            composed,
-                                                            benchmark ? 64 : task->output_limit,
-                                                            proxy_emit,
-                                                            proxy_cancel,
-                                                            &proxy,
-                                                            &stats,
-                                                            error);
+    char error[256];
+    int  rc = conversation ? app_daemon_chat(app.socket_path,
+                                             chat.count,
+                                             chat.messages,
+                                             chat.max_tokens,
+                                             chat.temperature,
+                                             chat.top_p,
+                                             proxy_emit,
+                                             proxy_cancel,
+                                             &proxy,
+                                             &stats,
+                                             error)
+                           : app_daemon_run(app.socket_path,
+                                            composed,
+                                            benchmark ? 64 : task->output_limit,
+                                            proxy_emit,
+                                            proxy_cancel,
+                                            &proxy,
+                                            &stats,
+                                            error);
     free(prompt);
     if (proxy.utf8.used || proxy.utf8.failed) {
         rc = 502;
         snprintf(error, sizeof error, "The model stream ended with invalid text encoding.");
     }
-    if (rc == 0 && !proxy.started && !proxy_emit(&proxy, ""))
+    proxy_finish(&proxy, &stats, &rc, error);
+    if (rc == 0 && !proxy.started && !proxy_send(&proxy, ""))
         rc = 502;
     if (!proxy.started)
         error_response(fd, rc ? rc : 502, error);
     else if (rc) {
-        const char *err = "{\"error\":\"Generation interrupted before completion.\"}\n";
-        (void) send_bytes(fd, err, strlen(err));
+        char              data[1024];
+        struct app_buffer b = {.data = data, .cap = sizeof data};
+        app_put(&b, "{\"error\":");
+        app_quote(&b, error);
+        app_put(&b, "}\n");
+        if (!b.failed)
+            (void) send_bytes(fd, data, b.len);
     } else {
         char final[512];
         int  n = snprintf(final,
                           sizeof final,
                           "{\"done\":true,\"eval_count\":%zu,\"eval_duration\":%.0f,"
                           "\"total_duration\":%.0f,\"prompt_eval_count\":%zu,\"reused\":%zu,"
-                          "\"limited\":%s}\n",
+                          "\"limited\":%s,\"reasoning\":%s,\"no_answer\":%s,\"max_tokens\":%u,"
+                          "\"first_model_text_ns\":%.0f,\"first_answer_ns\":%.0f}\n",
                           stats.tokens,
                           stats.generation_ns,
                           stats.total_ns,
                           stats.prompt_tokens,
                           stats.reused,
-                          stats.limited ? "true" : "false");
+                          stats.limited ? "true" : "false",
+                          stats.reasoning ? "true" : "false",
+                          stats.no_answer ? "true" : "false",
+                          stats.max_tokens,
+                          proxy.first > 0 ? proxy.first * 1e6 : -1,
+                          stats.first_answer_ns);
         bool delivered = send_bytes(fd, final, (size_t) n);
+        if (!delivered)
+            rc = 498;
         if (delivered && model_index >= 0) {
             pthread_mutex_lock(&app.mutex);
-            if (stats.tokens >= 16 && stats.generation_ns > 1e6) {
+            if (!stats.no_answer && stats.tokens >= 16 && stats.generation_ns > 1e6) {
                 app.measurements[model_index].tps    = stats.tokens / (stats.generation_ns / 1e9);
                 app.measurements[model_index].tokens = (unsigned) stats.tokens;
             }
-            remember_measurement(
-                    (size_t) model_index, proxy.first, monotonic_ms() - proxy.start, &stats);
+
             pthread_mutex_unlock(&app.mutex);
         }
     }
-    pthread_mutex_lock(&app.mutex);
-    app.generating = false;
-    pthread_mutex_unlock(&app.mutex);
+    observation_end(&observation,
+                    proxy.disconnected ? 498 : rc,
+                    proxy.first,
+                    monotonic_ms() - proxy.start,
+                    &stats);
 }
 
 /* External clients and the browser share the same owned daemon and busy flag. */
@@ -1643,15 +1969,10 @@ static void completion_prefix(struct app_buffer *b, const struct completion_prox
     app_quote(b, p->model);
 }
 
-static bool completion_emit(void *opaque, const char *piece) {
+static bool completion_send(void *opaque, const char *decoded) {
     struct completion_proxy *p = opaque;
-    if (proxy_cancel(&p->transport))
-        return false;
-    char decoded[8192];
-    if (!app_utf8_feed(&p->transport.utf8, piece, decoded, sizeof decoded))
-        return false;
-    if (!decoded[0] && piece[0])
-        return true;
+    if (decoded[strspn(decoded, " \t\r\n")] && !p->transport.first_answer)
+        p->transport.first_answer = monotonic_ms() - p->transport.start;
     if (!p->stream) {
         app_put(&p->text, decoded);
         return !p->text.failed;
@@ -1672,6 +1993,19 @@ static bool completion_emit(void *opaque, const char *piece) {
     app_quote(&b, decoded);
     app_put(&b, "},\"finish_reason\":null}]}\n\n");
     return !b.failed && send_bytes(p->transport.fd, data, b.len);
+}
+
+static bool completion_keepalive(void *opaque) {
+    struct completion_proxy *p = opaque;
+    if (!p->stream)
+        return true;
+    if (!p->transport.started && !completion_send(p, ""))
+        return false;
+    return send_bytes(p->transport.fd, ": preparing\n\n", 13);
+}
+static bool completion_emit(void *opaque, const char *piece) {
+    struct completion_proxy *p = opaque;
+    return proxy_decode(&p->transport, piece);
 }
 
 static void completions(int fd, const struct request *r, struct app_arena *arena) {
@@ -1698,7 +2032,8 @@ static void completions(int fd, const struct request *r, struct app_arena *arena
              atomic_fetch_add(&sequence, 1));
     pthread_mutex_lock(&app.mutex);
     poll_child();
-    if (atomic_load(&closing) || !app.ready || app.job_running) {
+    if (atomic_load(&closing) || !app.ready || app.comparing ||
+        (app.job_running && app.job_activate)) {
         pthread_mutex_unlock(&app.mutex);
         api_error(fd, 503, "Select and load a model in Geist first.");
         return;
@@ -1717,26 +2052,40 @@ static void completions(int fd, const struct request *r, struct app_arena *arena
     }
     snprintf(p.model, sizeof p.model, "%s", app.active_id);
     app.generating = true;
+    struct perf_record observation;
+    observation_begin(&observation, "api", chat.max_tokens, chat.temperature, chat.top_p);
+    struct app_run_stats stats = {0};
+    p.transport.stats          = &stats;
+    p.transport.send           = completion_send;
+    p.transport.keepalive      = completion_keepalive;
+    p.transport.target         = &p;
+    proxy_init(&p.transport);
     pthread_mutex_unlock(&app.mutex);
-    struct app_run_stats stats;
-    char                 error[256];
-    int                  rc = app_daemon_chat(app.socket_path,
-                                              chat.count,
-                                              chat.messages,
-                                              chat.max_tokens,
-                                              chat.temperature,
-                                              chat.top_p,
-                                              completion_emit,
-                                              proxy_cancel,
-                                              &p,
-                                              &stats,
-                                              error);
+    char error[256];
+    int  rc = app_daemon_chat(app.socket_path,
+                              chat.count,
+                              chat.messages,
+                              chat.max_tokens,
+                              chat.temperature,
+                              chat.top_p,
+                              completion_emit,
+                              proxy_cancel,
+                              &p,
+                              &stats,
+                              error);
     /* completion_proxy begins with proxy, so the cancellation callback borrows it. */
     if (p.transport.utf8.used || p.transport.utf8.failed || p.text.failed) {
         rc = 502;
         snprintf(error, sizeof error, "The model produced invalid or oversized text.");
     }
-    if (!rc && chat.stream && !p.transport.started && !completion_emit(&p, ""))
+    if (!rc && !p.transport.output.visible) {
+        rc = 422;
+        snprintf(error,
+                 sizeof error,
+                 "The model produced no answer. Try again or allow more output tokens.");
+    }
+    proxy_finish(&p.transport, &stats, &rc, error);
+    if (!rc && chat.stream && !p.transport.started && !completion_send(&p, ""))
         rc = 502;
     struct app_buffer b = {.data = body, .cap = 65536};
     if (rc) {
@@ -1784,16 +2133,172 @@ static void completions(int fd, const struct request *r, struct app_arena *arena
                            stats.prompt_tokens + stats.tokens);
             }
             app_put(&b, "data: [DONE]\n\n");
-            if (!b.failed)
-                (void) send_bytes(fd, body, b.len);
-        } else if (b.failed)
+            if (b.failed)
+                rc = 502;
+            else if (!send_bytes(fd, body, b.len))
+                rc = 498;
+        } else if (b.failed) {
+            rc = 502;
             api_error(fd, 502, "Completion exceeds response capacity.");
-        else
-            response(fd, 200, "application/json", body, b.len);
+        } else if (!response(fd, 200, "application/json", body, b.len))
+            rc = 498;
+    }
+    observation_end(&observation,
+                    p.transport.disconnected ? 498 : rc,
+                    p.transport.first,
+                    monotonic_ms() - p.transport.start,
+                    &stats);
+}
+
+/* An explicit, idle-only local comparison. No HTTP worker waits for inference.
+ * A fresh daemon per processor fixes cache warmup policy; measured repetitions
+ * use fresh sessions on that daemon. Actual prefix reuse is recorded. */
+struct compare_output {
+    double          start, first;
+    struct app_utf8 utf8;
+};
+static bool comparison_cancel(void *unused) {
+    (void) unused;
+    return atomic_load(&compare_cancelled) || atomic_load(&closing);
+}
+static bool comparison_emit(void *context, const char *piece) {
+    struct compare_output *o = context;
+    char                   decoded[8192];
+    if (!app_utf8_feed(&o->utf8, piece, decoded, sizeof decoded))
+        return false;
+    if (decoded[0] && !o->first)
+        o->first = monotonic_ms() - o->start;
+    return !comparison_cancel(nullptr);
+}
+static bool comparison_ready(bool restoring) {
+    for (unsigned i = 0; i < 600; i++) {
+        if (atomic_load(&closing) || (!restoring && comparison_cancel(nullptr)))
+            return false;
+        pthread_mutex_lock(&app.mutex);
+        poll_child();
+        bool ready = app.ready, exists = app.child > 0;
+        pthread_mutex_unlock(&app.mutex);
+        if (ready)
+            return true;
+        if (!exists)
+            return false;
+        struct timespec pause = {.tv_nsec = 100000000};
+        nanosleep(&pause, nullptr);
+    }
+    return false;
+}
+static void *comparison_main(void *unused) {
+    (void) unused;
+    char path[APP_PATH_CAP], id[64], previous[8], run[80];
+    bool gpu;
+    pthread_mutex_lock(&app.mutex);
+    snprintf(path, sizeof path, "%s", app.chosen);
+    snprintf(id, sizeof id, "%s", app.active_id);
+    snprintf(previous, sizeof previous, "%s", app.execution_mode);
+    gpu = gpu_supported(app_model_find(id));
+    snprintf(run, sizeof run, "compare-v1-%ld-%.0f", (long) getpid(), monotonic_ms());
+    pthread_mutex_unlock(&app.mutex);
+    bool ok = true;
+    for (unsigned slot = 0; ok && slot < (gpu ? 2u : 1u); slot++) {
+        pthread_mutex_lock(&app.mutex);
+        strcpy(app.compare_phase, "loading");
+        ok = !comparison_cancel(nullptr) && start_child_mode(path, id, slot ? "gpu" : "cpu");
+        /* Comparison must not rewrite the user's saved processor preference. */
+        app.save_execution = false;
+        pthread_mutex_unlock(&app.mutex);
+        ok = ok && comparison_ready(false);
+        pthread_mutex_lock(&app.mutex);
+        ok = ok && !strcmp(app.backend, slot ? app.gpu_backend : app.cpu_backend);
+        pthread_mutex_unlock(&app.mutex);
+        for (unsigned repeat = 0; ok && repeat < 4; repeat++) {
+            if (comparison_cancel(nullptr)) {
+                ok = false;
+                break;
+            }
+            struct perf_record r;
+            pthread_mutex_lock(&app.mutex);
+            app.generating   = true;
+            app.compare_step = slot * 4 + repeat + 1;
+            strcpy(app.compare_phase, repeat ? "measuring" : "warmup");
+            observation_begin(&r, "controlled_test", 128, 0, 1);
+            r.warmup = !repeat;
+            snprintf(r.run, sizeof r.run, "%s", run);
+            pthread_mutex_unlock(&app.mutex);
+            const struct chat_msg prompt = {
+                    .role    = "user",
+                    .content = "Explain how a seed grows into a plant. Describe the stages in six "
+                               "numbered sentences."};
+            struct app_run_stats  stats;
+            char                  error[256];
+            struct compare_output output = {.start = monotonic_ms()};
+            int                   rc     = app_daemon_chat(app.socket_path,
+                                                           1,
+                                                           &prompt,
+                                                           128,
+                                                           0,
+                                                           1,
+                                                           comparison_emit,
+                                                           comparison_cancel,
+                                                           &output,
+                                                           &stats,
+                                                           error);
+            if (output.utf8.failed || output.utf8.used)
+                rc = 502;
+            if (comparison_cancel(nullptr))
+                rc = 499;
+            observation_end(&r, rc, output.first, monotonic_ms() - output.start, &stats);
+            ok = rc == 0 && stats.tokens > 0;
+        }
     }
     pthread_mutex_lock(&app.mutex);
-    app.generating = false;
+    strcpy(app.compare_phase, "restoring");
+    bool restore       = !atomic_load(&closing) && start_child_mode(path, id, previous);
+    app.save_execution = false;
     pthread_mutex_unlock(&app.mutex);
+    restore = restore && comparison_ready(true);
+    pthread_mutex_lock(&app.mutex);
+    strcpy(app.compare_result,
+           !restore                     ? "restore_failed"
+           : comparison_cancel(nullptr) ? "cancelled"
+           : ok                         ? "completed"
+                                        : "failed");
+    app.compare_phase[0] = 0;
+    app.comparing        = false;
+    pthread_mutex_unlock(&app.mutex);
+    return nullptr;
+}
+static void comparison_start(int fd, const char *body, struct app_arena *arena) {
+    struct json *j = app_alloc(arena, 1, sizeof *j, _Alignof(struct json));
+    if (!j || json_parse(j, strlen(body), body) < 0 ||
+        !json_bool(j, json_get(j, 0, "confirm"), false)) {
+        error_response(fd, 400, "Confirm the local processor comparison.");
+        return;
+    }
+    pthread_mutex_lock(&app.mutex);
+    if (!app.ready || app.generating || app.job_running || app.comparing ||
+        !app_model_find(app.active_id)) {
+        pthread_mutex_unlock(&app.mutex);
+        error_response(fd, 409, "Load a model and wait for other work to finish.");
+        return;
+    }
+    if (app.compare_joinable) {
+        pthread_join(app.comparison, nullptr);
+        app.compare_joinable = false;
+    }
+    app.comparing         = true;
+    app.compare_step      = 0;
+    app.compare_result[0] = 0;
+    strcpy(app.compare_phase, "loading");
+    atomic_store(&compare_cancelled, false);
+    bool ok              = pthread_create(&app.comparison, nullptr, comparison_main, nullptr) == 0;
+    app.compare_joinable = ok;
+    if (!ok)
+        app.comparing = false;
+    pthread_mutex_unlock(&app.mutex);
+    if (ok)
+        response(fd, 202, "application/json", "{}", 2);
+    else
+        error_response(fd, 503, "Cannot start comparison.");
 }
 
 static void connections(int fd, bool models) {
@@ -1818,7 +2323,7 @@ static void connections(int fd, bool models) {
         app_quote(&b, app.active_id);
         app_printf(&b,
                    ",\"ready\":%s,\"daemon_pid\":%ld,\"context_tokens\":4096,\"max_output_tokens\":"
-                   "1024,\"chat\":true,\"tools\":false,\"quality\":\"unverified\"}",
+                   "4095,\"chat\":true,\"tools\":false,\"quality\":\"unverified\"}",
                    app.ready ? "true" : "false",
                    (long) app.child);
     }
@@ -1857,6 +2362,10 @@ static void handle(int fd, struct app_arena *arena) {
             response(fd, 200, "text/javascript; charset=utf-8", markdown_js, sizeof markdown_js);
             return;
         }
+        if (strcmp(r.path, "/katex.js") == 0) {
+            response(fd, 200, "text/javascript; charset=utf-8", katex_js, sizeof katex_js);
+            return;
+        }
         if (strcmp(r.path, "/app.js") == 0) {
             response(fd, 200, "text/javascript; charset=utf-8", script, sizeof script);
             return;
@@ -1892,6 +2401,76 @@ static void handle(int fd, struct app_arena *arena) {
     }
     if (strcmp(r.method, "GET") == 0 && strcmp(r.path, "/app/status") == 0) {
         status_response(fd, arena);
+        return;
+    }
+    if (!strcmp(r.path, "/app/performance/compare") && !strcmp(r.method, "POST")) {
+        comparison_start(fd, r.body, arena);
+        return;
+    }
+    if (!strcmp(r.path, "/app/performance/cancel") && !strcmp(r.method, "POST")) {
+        atomic_store(&compare_cancelled, true);
+        response(fd, 200, "application/json", "{}", 2);
+        return;
+    }
+    if (!strcmp(r.path, "/app/performance/export") && !strcmp(r.method, "POST")) {
+        if (perf_save_export()) {
+            char              data[APP_PATH_CAP * 2], path[APP_PATH_CAP];
+            struct app_buffer b = {.data = data, .cap = sizeof data};
+            snprintf(path, sizeof path, "%s/performance/export.jsonl", app.home);
+            app_put(&b, "{\"path\":");
+            app_quote(&b, path);
+            app_put(&b, "}");
+            response(fd, 200, "application/json", data, b.len);
+        } else
+            error_response(fd, 503, "History could not be saved.");
+        return;
+    }
+    if (!strcmp(r.path, "/app/performance/export") && !strcmp(r.method, "GET")) {
+        size_t length = 0;
+        char  *data   = perf_export(&length);
+        if (data) {
+            response(fd, 200, "application/x-ndjson", data, length);
+            free(data);
+        } else
+            error_response(fd, 503, "History export exceeds the memory budget.");
+        return;
+    }
+    if ((!strcmp(r.path, "/app/performance/settings") ||
+         !strcmp(r.path, "/app/performance/clear")) &&
+        !strcmp(r.method, "POST")) {
+        struct json *j = app_alloc(arena, 1, sizeof *j, _Alignof(struct json));
+        if (!j || json_parse(j, strlen(r.body), r.body) < 0) {
+            error_response(fd, 400, "Invalid history settings.");
+            return;
+        }
+        bool ok = false;
+        if (!strcmp(r.path, "/app/performance/clear")) {
+            if (!json_bool(j, json_get(j, 0, "confirm"), false)) {
+                error_response(fd, 400, "Confirm deleting local measurement history.");
+                return;
+            }
+            ok = perf_clear();
+            pthread_mutex_lock(&app.mutex);
+            restore_measurements();
+            pthread_mutex_unlock(&app.mutex);
+        } else {
+            double days    = json_num(j, json_get(j, 0, "days"), 0);
+            int    enabled = json_get(j, 0, "enabled");
+            bool   boolean = enabled >= 0 && j->tok[enabled].type == JSMN_PRIMITIVE &&
+                             ((j->tok[enabled].end - j->tok[enabled].start == 4 &&
+                               !memcmp(r.body + j->tok[enabled].start, "true", 4)) ||
+                              (j->tok[enabled].end - j->tok[enabled].start == 5 &&
+                               !memcmp(r.body + j->tok[enabled].start, "false", 5)));
+            if (!boolean || (days != 30 && days != 90 && days != 365)) {
+                error_response(fd, 400, "Choose 30, 90 or 365 days.");
+                return;
+            }
+            ok = perf_settings(json_bool(j, enabled, false), (unsigned) days);
+        }
+        if (ok)
+            response(fd, 200, "application/json", "{}", 2);
+        else
+            error_response(fd, 503, "History could not be saved.");
         return;
     }
     if (!strcmp(r.path, "/app/catalog")) {
@@ -1932,7 +2511,7 @@ static void handle(int fd, struct app_arena *arena) {
     }
     if (strcmp(r.path, "/app/quit-if-idle") == 0) {
         pthread_mutex_lock(&app.mutex);
-        bool busy = app.generating || app.job_running || (app.child && !app.ready);
+        bool busy = app.comparing || app.generating || app.job_running || (app.child && !app.ready);
         if (!busy)
             atomic_store(&closing, true);
         pthread_mutex_unlock(&app.mutex);
@@ -1949,7 +2528,7 @@ static void handle(int fd, struct app_arena *arena) {
     }
     if (strcmp(r.path, "/app/stop") == 0) {
         pthread_mutex_lock(&app.mutex);
-        if (app.generating || app.job_running) {
+        if (app.comparing || app.generating || app.job_running) {
             pthread_mutex_unlock(&app.mutex);
             error_response(fd, 409, "Stop the current task first.");
             return;
@@ -2006,7 +2585,12 @@ static void handle(int fd, struct app_arena *arena) {
         error_response(fd, 400, "Choose a model from the catalog.");
         return;
     }
-    if (atomic_load(&closing) || app.job_running || app.generating) {
+    /* Consent and another artifact's download do not mutate the resident
+     * runtime. Selection/removal/setup retain their exclusive boundary. */
+    bool background = download && app.child > 0 && strcmp(model->id, app.active_id);
+    if (atomic_load(&closing) || app.comparing || (!preview && app.job_running) ||
+        (app.generating && !preview && !background) ||
+        (download && app.child > 0 && !strcmp(model->id, app.active_id))) {
         pthread_mutex_unlock(&app.mutex);
         error_response(fd, 409, "Another task is active.");
         return;
@@ -2108,11 +2692,12 @@ static void handle(int fd, struct app_arena *arena) {
         error_response(fd,
                        409,
                        !known ? "Cannot read this computer's resources."
-                              : (!download && !installed ? "Download this model first."
-                                                         : assessment.reason));
+                              : (assessment.fit == APP_UNAVAILABLE ? assessment.reason
+                                                                   : "Download this model first."));
         return;
     }
-    bool ok = save_selection(model->id) && begin_job(model, download);
+    bool activate = !download || app.child <= 0;
+    bool ok = (!activate || save_selection(model->id)) && begin_job(model, download, activate);
     pthread_mutex_unlock(&app.mutex);
     if (ok)
         response(fd, 202, "application/json", "{}", 2);
@@ -2300,7 +2885,7 @@ int main(int argc, char **argv) {
             app.home,
             app.port);
     probe_backends();
-    struct app_hardware measurement_hardware;
+    struct app_hardware measurement_hardware = {0};
     if (app_hardware_read(&measurement_hardware, app.models)) {
         int n = snprintf(app.measurement_identity,
                          sizeof app.measurement_identity,
@@ -2314,6 +2899,24 @@ int main(int argc, char **argv) {
         if (n < 0 || (size_t) n >= sizeof app.measurement_identity)
             app.measurement_identity[0] = 0;
     }
+    char     engine_hash[65]   = "unknown";
+    bool     engine_identified = app_engine_sha256(app.server, engine_hash);
+    unsigned profile_threads   = measurement_hardware.cores;
+    unsigned profile_limit     = measurement_hardware.device == APP_PI5 ? 4 : 2;
+    if (profile_threads > profile_limit)
+        profile_threads = profile_limit;
+    snprintf(app.profile_series,
+             sizeof app.profile_series,
+             "v1;engine=%s;host=%s|%s|%s|%llu|%u;ctx=4096;sessions=1;threads=%u;wait=passive;kv="
+             "engine-default;offload=engine-default",
+             engine_identified ? engine_hash : "unknown",
+             measurement_hardware.name,
+             measurement_hardware.arch,
+             measurement_hardware.os,
+             (unsigned long long) measurement_hardware.ram,
+             measurement_hardware.logical_cpus,
+             profile_threads);
+    perf_init(app.home);
     char *catalog_text = malloc(APP_CATALOG_BYTES + 1);
     if (catalog_text && read_preference("catalog.json", catalog_text, APP_CATALOG_BYTES + 1)) {
         char                why[256];
@@ -2332,6 +2935,7 @@ int main(int argc, char **argv) {
     if (strcmp(app.answer_language, "en") && strcmp(app.answer_language, "de"))
         app.answer_language[0] = 0;
     restore_preview_preferences();
+    migrate_measurements();
     restore_measurements();
     (void) read_preference("selected", app.selected, sizeof app.selected);
     if (model) {
@@ -2345,11 +2949,14 @@ int main(int argc, char **argv) {
          * verification of a missing file on reopen, or download without action. */
         if (m && path_join(path, app.models, m->file) && regular_size(path) == m->bytes) {
             pthread_mutex_lock(&app.mutex);
-            (void) begin_job(m, false);
+            (void) begin_job(m, false, true);
             pthread_mutex_unlock(&app.mutex);
         }
     }
     while (!interrupted && !atomic_load(&closing)) {
+        pthread_mutex_lock(&app.mutex);
+        observation_sample(false);
+        pthread_mutex_unlock(&app.mutex);
         struct timeval timeout = {.tv_sec = 1};
         fd_set         set;
         FD_ZERO(&set);
@@ -2394,9 +3001,12 @@ int main(int argc, char **argv) {
     while (app.workers)
         pthread_cond_wait(&app.drained, &app.mutex);
     pthread_mutex_unlock(&app.mutex);
+    if (app.compare_joinable)
+        pthread_join(app.comparison, nullptr);
     if (app.job_joinable)
         pthread_join(app.job, nullptr);
     stop_child();
+    perf_close();
     app_connection_remove(app.home);
     curl_global_cleanup();
     close(lock);

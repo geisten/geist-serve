@@ -1,4 +1,5 @@
 #include "core.h"
+#include <math.h>
 #include <stdalign.h>
 #include <stdarg.h>
 #include <stdckdint.h>
@@ -112,7 +113,10 @@ app_assess(const struct app_hardware *h, const struct app_model *m, bool install
         a.performance = "Pi 5 reference: 17.8 tokens/s; your speed may differ.";
     else if (h->device == APP_APPLE_SILICON)
         a.performance = "Apple Silicon profile; run a local test for actual speed.";
-    if (!h->supported) {
+    if (m->unsupported_format || !m->backends) {
+        a.fit    = APP_UNAVAILABLE;
+        a.reason = "This model requires PQ2_0 and Hadamard support, unavailable in the bundled engine.";
+    } else if (!h->supported) {
         a.fit    = APP_UNAVAILABLE;
         a.reason = "This CPU instruction set or platform is not supported by the bundled engine.";
     } else if (!installed && h->disk_known &&
@@ -132,6 +136,42 @@ app_assess(const struct app_hardware *h, const struct app_model *m, bool install
     } else if (h->device == APP_APPLE_SILICON && h->cores >= 4) {
         a.fit    = APP_RECOMMENDED;
         a.reason = "Fits the Apple Silicon hardware and RAM profile; speed is an estimate.";
+    }
+    return a;
+}
+
+bool app_rate_below_target(double rate) {
+    return isfinite(rate) && rate > 0 && rate < APP_INTERACTIVE_TPS;
+}
+
+double app_device_rate(double cpu_rate, bool gpu_available, double gpu_rate) {
+    bool cpu_known = isfinite(cpu_rate) && cpu_rate > 0;
+    bool gpu_known = isfinite(gpu_rate) && gpu_rate > 0;
+    if (!gpu_available)
+        return cpu_known ? cpu_rate : 0;
+    /* One adequate processor disproves a general speed limit. A slow verdict
+     * requires observations for both supported processors. */
+    if (cpu_known && cpu_rate >= APP_INTERACTIVE_TPS)
+        return gpu_known && gpu_rate > cpu_rate ? gpu_rate : cpu_rate;
+    if (gpu_known && gpu_rate >= APP_INTERACTIVE_TPS)
+        return gpu_rate;
+    return cpu_known && gpu_known ? (cpu_rate > gpu_rate ? cpu_rate : gpu_rate) : 0;
+}
+
+struct app_assessment app_assess_device(const struct app_hardware *h,
+                                       const struct app_model *m, bool installed,
+                                       double cpu_rate, bool gpu_available, double gpu_rate) {
+    struct app_assessment a = app_assess(h, m, installed);
+    /* Unknown speed is not a resource incompatibility. Keep legacy setup and
+     * task-quality policy separate from the catalog's device-compatibility badge. */
+    if (a.fit == APP_CONDITIONAL && !strcmp(a.reason, "Performance on this device is not measured yet.")) {
+        a.fit = APP_RECOMMENDED;
+        a.reason = "No known resource restriction. Speed has not been measured on this device.";
+    }
+    if (a.fit == APP_RECOMMENDED &&
+        app_rate_below_target(app_device_rate(cpu_rate, gpu_available, gpu_rate))) {
+        a.fit = APP_CONDITIONAL;
+        a.reason = "Last replies were below 8 tokens/s on every available processor. Slower tasks remain possible.";
     }
     return a;
 }
@@ -163,6 +203,8 @@ static const char *setup_limit(const struct app_hardware  *h,
                                const struct app_model     *m,
                                const struct app_inventory *inventory,
                                bool                        running) {
+    if (m->unsupported_format || !m->backends)
+        return "This model requires PQ2_0 and Hadamard support, unavailable in the bundled engine.";
     if (!h->supported)
         return "This CPU instruction set or platform is not supported by the bundled engine.";
     if (!h->ram || !h->available_known || !h->disk_known)
@@ -212,7 +254,7 @@ app_recommend(const struct app_hardware *h,
         const struct app_model *m     = choices[i];
         const char             *limit = setup_limit(h, m, &inventory[m - app_models], false);
         if (!limit && ((m != choices[1] && h->cores < 4) ||
-                       (inventory[m - app_models].tps > 0 && inventory[m - app_models].tps < 8)))
+                       app_rate_below_target(inventory[m - app_models].tps)))
             limit = "Local performance is below the interactive setup target.";
         if (!i)
             reason = limit;

@@ -107,10 +107,15 @@ struct app_catalog *app_catalog_parse(const char *text, char error[static 256]) 
                                              "working_mib",
                                              "recommended_ram_gib",
                                              "backends",
+                                             "unsupported_format",
+                                             "group_id",
+                                             "group_name",
+                                             "quantization",
+                                             "reasoning_format",
                                              nullptr};
-    uint64_t                 v;
+    uint64_t                 v, schema;
     if (json_parse(j, strlen(text), text) < 0 || !keys(j, 0, root_keys) ||
-        !number(j, 0, "schema", 1, &v) || !number(j, 0, "revision", 1000000000, &v))
+        !number(j, 0, "schema", 2, &schema) || !number(j, 0, "revision", 1000000000, &v))
         goto bad;
     c->revision = (unsigned) v;
     int list    = json_get(j, 0, "models");
@@ -130,6 +135,27 @@ struct app_catalog *app_catalog_parse(const char *text, char error[static 256]) 
         if (!component(m->id, false) || !strcmp(m->id, "custom") || !m->name ||
             !component(m->file, true) || !m->url || !m->sha256 || strlen(m->sha256) != 64)
             goto bad;
+        if (json_get(j, i, "reasoning_format") >= 0) {
+            m->reasoning_format = string(c, j, i, "reasoning_format", 24);
+            if (!m->reasoning_format ||
+                (strcmp(m->reasoning_format, "none") && strcmp(m->reasoning_format, "think_tags")))
+                goto bad;
+        }
+        if (schema == 2) {
+            m->group_id     = string(c, j, i, "group_id", 63);
+            m->group_name   = string(c, j, i, "group_name", 100);
+            m->quantization = string(c, j, i, "quantization", 32);
+            if (!component(m->group_id, false) || !strcmp(m->group_id, "custom") ||
+                !m->group_name || !component(m->quantization, false))
+                goto bad;
+        } else {
+            /* Legacy catalogs have no trusted grouping metadata. Never guess from names. */
+            if (json_get(j, i, "group_id") >= 0 || json_get(j, i, "group_name") >= 0 ||
+                json_get(j, i, "quantization") >= 0)
+                goto bad;
+            m->group_id   = m->id;
+            m->group_name = m->name;
+        }
         for (const char *p = m->sha256; *p; ++p)
             if (!(*p >= '0' && *p <= '9') && !(*p >= 'a' && *p <= 'f'))
                 goto bad;
@@ -163,11 +189,22 @@ struct app_catalog *app_catalog_parse(const char *text, char error[static 256]) 
                 goto bad;
             m->backends |= bit;
         }
-        if (!(m->backends & 1))
-            goto bad;
-        for (size_t k = 0; k < c->count; ++k)
-            if (!strcmp(m->id, c->models[k].id) || !strcmp(m->file, c->models[k].file))
+        if (json_get(j, i, "unsupported_format") >= 0) {
+            m->unsupported_format = string(c, j, i, "unsupported_format", 32);
+            if (!m->unsupported_format || strcmp(m->unsupported_format, "pq2_0") || m->backends)
                 goto bad;
+        }
+        if (!(m->backends & 1) && !m->unsupported_format)
+            goto bad;
+        for (size_t k = 0; k < c->count; ++k) {
+            const struct app_model *previous = &c->models[k];
+            if (!strcmp(m->id, previous->id) || !strcmp(m->file, previous->file))
+                goto bad;
+            if (!strcmp(m->group_id, previous->group_id) &&
+                (strcmp(m->group_name, previous->group_name) ||
+                 (m->quantization && !strcmp(m->quantization, previous->quantization))))
+                goto bad;
+        }
         ++c->count;
     }
     if (!c->count)

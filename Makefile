@@ -17,7 +17,7 @@
 #> make GEIST_REF=... build against another engine revision, one-off
 
 GEIST_REPO ?= https://github.com/geisten/geistlib.git
-GEIST_REF  ?= 25861c0bd197f1a98f17e49efe0cdc48a0e40713
+GEIST_REF  ?= e26436906ff6fe7eda296b90fa3a7a9dfa69f418
 GEISTLIB   ?= geistlib
 MODE       ?= release
 

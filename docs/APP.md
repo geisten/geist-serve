@@ -1,7 +1,9 @@
 # Geist — Runs here. Stays here.
 
 Manage a local model and connect your terminal and editor to the same service.
-All catalog models appear directly. Click a name or its leading download icon to download and start it.
+All catalog models appear directly, with their quantizations grouped below one name.
+Click a variant or its leading download icon to download that artifact.
+Your first model starts automatically; later downloads keep the current model running.
 No account or separate setup step is required.
 Small models have limited capabilities: check their answers, and use the
 examples to decide whether a model meets your needs.
@@ -13,8 +15,11 @@ Mac release still needs Developer ID signing and notarization.
 ## Start on a Mac
 
 Open the Geist DMG, drag Geist to Applications, and open its desktop window.
-Click a model name or its leading download icon in the complete model list. Geist downloads, verifies and starts
-that model. An installed model starts directly. The same row shows progress and
+Click a quantization row or its leading download icon in the complete model list.
+Geist downloads and verifies that variant. If no model is running, it starts automatically.
+Otherwise the current model stays available for chat and editor connections, even
+during checksum verification. Click the completed variant when you want to switch.
+An installed model starts directly. The same row shows progress and
 lets you pause or resume a download. The main screen stays on **Models**,
 with the catalog on the left and **Quick test** on the right. In narrow windows
 they stack vertically. Each pane scrolls independently. **Connect a program**
@@ -29,6 +34,16 @@ have a separate copy control. Wide code and tables scroll inside their blocks.
 Model-provided HTML is shown literally. Web addresses can be copied; the chat
 does not navigate to them or load remote images. No formatting service is used.
 
+Mathematical expressions use LaTeX notation: `$\rightarrow$` appears as an
+arrow, and fractions, powers, roots, sums and matrices render locally as MathML.
+Use `$…$` or `\(…\)` for inline math and `$$…$$` or `\[…\]` for display math.
+Code blocks and escaped dollar signs remain literal. Dollar notation can be
+ambiguous with currency; `\(…\)` is the unambiguous inline form.
+Wide formulas scroll inside the answer and are keyboard reachable. Unfinished,
+invalid or unsupported expressions remain visible as source. **Copy** preserves
+the original Markdown/LaTeX. This supports mathematical notation, not arbitrary
+LaTeX documents; it needs no network connection, external fonts or TeX installation.
+
 Entering Quick test or clearing the test focuses the composer. Sending and
 stopping return to it; background status updates and completed responses do not
 steal focus. Escape dismisses the help panel and returns to its control. Tab follows the
@@ -41,20 +56,38 @@ while you are reading the latest message. Long drafts scroll without being cut.
 clears the page memory; nothing is saved as chat history. Closing and reopening a
 hidden desktop window can retain that window's memory until the app quits.
 
-A chat response can use up to 1,024 output tokens within the shared 4,096-token
-context. A limited answer is marked and offers **Continue response**, which preserves any next-message draft. Context or
-request limits produce an explicit error; no earlier turns are silently dropped.
+A chat response uses the remaining shared 4,096-token context in a single request.
+There is no fixed 1,024-token cut or manual continuation step. Actual context or
+request limits remain explicit; no earlier turns are silently dropped. Declared
+`<think>` blocks stay outside the visible answer, copy and session history. See
+[answer handling](ANSWER-HANDLING.md) for preparation, deadlines and diagnostics.
 Failed requests keep the draft; stopped partial answers remain in context. Session
 chat requires preview consent: single-task evidence does not certify follow-ups.
 Quick speed tests remain independent of the conversation.
 
 The **Models** screen shows every catalog model alongside the short test, including
-models not yet downloaded. Click a model name or its leading download symbol to
-download and start it; installed models start directly. Deleting a download removes
+models not yet downloaded. Variants show their format, file size and download
+state at once; no menu or disclosure hides them. A complete green ring means
+downloaded, while an Active label identifies the ready variant. Resource warnings
+include a visible reason. Click a variant row or its leading download symbol to
+download it; installed models start directly. Deleting a download removes
 only its local files; the same row remains available to download again. Each local
 row has a delete action. Confirming deletion of an idle active model stops it first;
 active generation and download jobs reject deletion. Custom files outside the catalog
 are not removable through this interface.
+
+Downloads and inference are independent: you can start or resume a different
+model's download during an answer, or send a message while downloading. Pause
+affects only the transfer; Stop affects only the answer. Completion, failure or
+cancellation of a background download never replaces the resident model or its
+saved selection. Only one transfer and one inference request run at a time.
+Processor changes, model activation, deletion and catalog import wait for active
+work to finish. The first download on an empty installation still auto-starts.
+
+The status API retains aggregate `busy` for existing clients, and adds
+`inference_busy` for generation/runtime preparation and `background_download`
+for file work that cannot change the resident runtime. Download progress remains
+in `phase`, `job_model` and `received`.
 
 The single leading symbol changes with download state: arrow before download,
 progress ring during transfer, partial ring with resume after a pause, indeterminate
@@ -93,11 +126,14 @@ menu labels follow the preference. Answer language starts with the interface
 language unless a separate answer preference was saved.
 
 The interface uses white, a light gray catalog and blue action accents. Green
-rings identify completed downloads, independently of the active model. Speed,
-process RAM and model file size appear beneath the active model name; missing
-values remain unknown. Clicking that row or its chevron expands CPU, system memory
-and reply timings beneath the same model. Escape or clicking outside closes the
-details. The composer stays in place, and switching models clears old reply metrics.
+rings identify completed downloads independently of the active model. CPU/GPU
+options show the median of the latest comparable local observations. The metric
+row shows first-text time, live process RAM and file size. **Profile** expands a
+compact comparison table with sample count, range, timings and recent history.
+Escape or clicking outside closes it without moving the composer. App and editor
+requests both grow this private numeric history; no chat contents are saved.
+See [local performance profiles](PERFORMANCE-PROFILES.md) for collection controls,
+retention, migration, export, controlled comparison and measurement limitations.
 Icon controls have localized accessible names and tooltips.
 Download states, constraints and preview consent remain readable text. The trash
 icons in model rows remove the local download after confirmation. A reset icon
@@ -105,7 +141,7 @@ in the composer clears a nonempty test. The active model heading has only a
 green status dot before its name; its accessible name explains the status.
 An amber outer ring marks constrained or unavailable models, accompanied by a
 textual reason; unavailable models cannot start.
-**Settings** also holds service controls. **Connect**
+**Settings** also holds local measurement retention, export and deletion. **Connect**
 sets up Terminal, Continue or OpenCode text chat. On Mac, the menu bar shows the
 active model and service status; **Models**, **Settings** (⌘,) and **Connect a program**
 reopen the corresponding view without reloading or clearing a test draft.
@@ -155,8 +191,9 @@ No direct LAN listener or Internet exposure is needed.
 
 ## Model advice and measurements
 
-The initial catalog reuses six SHA-256 and file-size pins from
-geist-serve-mac. Only this allowlisted catalog can be downloaded in the UI.
+The bundled catalog includes six initial models and three 27B entries, each
+with a SHA-256 and file-size pin. See [catalog sources](../models/SOURCES.md).
+Unsupported formats remain visible but cannot be downloaded or started.
 Original weights have their own licenses; consult each linked model page.
 
 | Model | Download, decimal GB | Planning memory, MiB | Recommended system RAM |

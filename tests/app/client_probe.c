@@ -10,7 +10,8 @@ int main(int argc, char **argv) {
     struct timespec started, finished;
     clock_gettime(CLOCK_MONOTONIC, &started);
     int rc;
-    if (strcmp(argv[2], "generate") == 0) {
+    if (strncmp(argv[2], "generate", 8) == 0) {
+        geistd_stream_idle(g, !strcmp(argv[2], "generate"));
         char reason[16]; struct geistd_generation s;
         rc = geistd_generate_ex(g, "0123456789abcdef", 10, emit, nullptr, reason, &s);
         if (!rc) printf("\n%zu %.0f %s", s.tokens, s.duration_ns, reason);

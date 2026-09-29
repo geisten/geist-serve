@@ -31,7 +31,8 @@ with tempfile.TemporaryDirectory(prefix='geist-verification-') as temporary:
             model = copy.deepcopy(template)
             model.update(id=f'verify-{i}', name=f'Verify {i}', file=f'verify-{i}.gguf',
                          bytes=len(data), sha256=hashlib.sha256(data).hexdigest(),
-                         working_mib=1, recommended_ram_gib=1, backends=['cpu'])
+                         working_mib=1, recommended_ram_gib=1, backends=['cpu'],
+                         group_id='verification-fixture', group_name='Verification fixture', quantization=f'Q{i}')
             (home/'models'/model['file']).write_bytes(data)
             models.append(model)
         catalog['models'] = models

@@ -15,6 +15,29 @@ const formatNumber = (value, digits = 0) => new Intl.NumberFormat(interfaceLangu
   minimumFractionDigits: digits, maximumFractionDigits: digits
 }).format(value);
 const german = {
+  "Preparing answer…": "Antwort wird vorbereitet …",
+  "First answer": "Erste sichtbare Antwort",
+  "Tokens and time include answer preparation.": "Token und Zeit enthalten die Antwortvorbereitung.",
+  "No answer was produced. Try again with a shorter question.": "Es wurde keine Antwort erzeugt. Versuche es mit einer kürzeren Frage erneut.",
+  "The model’s context limit was reached. Start a new chat or ask a shorter question.": "Die Kontextgrenze des Modells ist erreicht. Starte einen neuen Chat oder stelle eine kürzere Frage.",
+  "Stopped before an answer was produced.": "Gestoppt, bevor eine Antwort erzeugt wurde.",
+  "Input processing timed out after 10 minutes. Shorten the conversation or select GPU.": "Die Eingabeverarbeitung hat nach 10 Minuten das Zeitlimit erreicht. Kürze das Gespräch oder wähle GPU.",
+  "The model stopped responding while generating. Try again or select GPU.": "Das Modell reagiert während der Ausgabe nicht mehr. Versuche es erneut oder wähle GPU.",
+  "Could not contact the model service. Reload the model.": "Der Modelldienst ist nicht erreichbar. Lade das Modell erneut.",
+  "Model execution failed while processing the input. Try a shorter conversation or select GPU.": "Bei der Eingabeverarbeitung ist ein Modellfehler aufgetreten. Kürze das Gespräch oder wähle GPU.",
+  "Model execution failed while generating. Reload the model or select another processor.": "Bei der Ausgabe ist ein Modellfehler aufgetreten. Lade das Modell erneut oder wähle einen anderen Prozessor.",
+  "The one-hour request limit was reached. Shorten the conversation or select GPU.": "Das Zeitlimit von einer Stunde ist erreicht. Kürze das Gespräch oder wähle GPU.",
+  "Generation cancelled.": "Ausgabe abgebrochen.",
+  "no_answer": "Keine Antwort",
+
+  'Default': 'Standard', 'Ternary': 'Ternär',
+  'Unsupported format': 'Format nicht unterstützt', 'Unsupported platform': 'Plattform nicht unterstützt',
+  'Not enough disk space': 'Zu wenig Speicherplatz', 'Not enough RAM': 'Zu wenig RAM',
+  'Below recommended RAM': 'Unter RAM-Empfehlung', 'Available RAM is tight': 'Verfügbarer RAM knapp',
+  'Slow on available processors': 'Langsam auf verfügbaren Prozessoren',
+
+  'Formula': 'Formel',
+  'Formula shown as source': 'Formel als Quelltext angezeigt',
   'Performance could not be saved. Values remain available until quitting.': 'Messwerte konnten nicht gespeichert werden. Sie bleiben bis zum Beenden verfügbar.',
   'Switching processor…': 'Prozessor wird gewechselt…',
   'Not measured yet': 'Noch nicht gemessen',
@@ -285,13 +308,13 @@ Object.assign(german, {
   "Enter to send · Shift + Enter for a new line": "Enter zum Senden · Shift + Enter für einen Zeilenumbruch",
   "↓ Latest message": "↓ Neueste Nachricht",
   "Your message is too long. Shorten it before sending; your draft has been kept.": "Deine Nachricht ist zu lang. Kürze sie vor dem Senden; der Entwurf bleibt erhalten.",
-  "This test is full. Use Clear test to start again. The existing text has been kept.": "Dieser Test ist voll. Nutze „Test leeren“ für einen neuen Versuch. Der bisherige Text bleibt erhalten.",
+  "This test is full. Use Clear chat to start again. The existing text has been kept.": "Dieser Test ist voll. Nutze „Chat löschen“ für einen neuen Versuch. Der bisherige Text bleibt erhalten.",
   "Response limit reached. You can ask Geist to continue.": "Antwortlimit erreicht. Du kannst Geist bitten, fortzufahren.",
   "Continue response": "Antwort fortsetzen",
   "Continue from where you stopped.": "Fahre dort fort, wo du aufgehört hast.",
   "Continue from the latest reply, or ask a new question.": "Setze die neueste Antwort fort oder stelle eine neue Frage.",
   "Response complete.": "Antwort vollständig.",
-  "This test does not fit the model’s context. Shorten your draft or use Clear test to start again. No earlier messages have been removed.": "Dieser Test passt nicht mehr in den Kontext des Modells. Kürze deinen Entwurf oder beginne mit „Test leeren“ erneut. Frühere Nachrichten wurden nicht entfernt.",
+  "This test does not fit the model’s context. Shorten your draft or use Clear chat to start again. No earlier messages have been removed.": "Dieser Test passt nicht mehr in den Kontext des Modells. Kürze deinen Entwurf oder beginne mit „Chat löschen“ erneut. Frühere Nachrichten wurden nicht entfernt.",
   "Clear this conversation and draft? They are not saved.": "Gespräch und Entwurf löschen? Sie werden nicht gespeichert.",
   "Test cleared.": "Test geleert.",
   "The loaded model changed. Check the model and send again.": "Das geladene Modell hat sich geändert. Prüfe es und sende erneut."
@@ -309,6 +332,8 @@ Object.assign(german, {
   'Preview · Check answers.': 'Vorschau · Antworten prüfen.',
   'Selecting a model starts its preview. Check answers before using them.': 'Mit der Modellauswahl startest du die Vorschau. Prüfe die Antworten vor der Verwendung.',
   'Download and start': 'Herunterladen und starten',
+  'Download model': 'Modell herunterladen',
+  'Download complete.': 'Download abgeschlossen.',
   'Local model': 'Lokales Modell'
 });
 Object.assign(german, {
@@ -346,3 +371,85 @@ Object.assign(german, {
   "Saved catalog is invalid or older; using the bundled catalog.": "Gespeicherter Katalog ist ungültig oder älter; der mitgelieferte Katalog wird verwendet."
 });
 translateStatic();
+
+Object.assign(german, {
+  'Clear chat': 'Chat löschen',
+  'Chat cleared.': 'Chat gelöscht.',
+  'Copy response': 'Antwort kopieren',
+  'Response copied.': 'Antwort kopiert.',
+  'Below target': 'Unter Richtwert',
+  'Interactive target': 'Richtwert für interaktive Nutzung',
+  'Different prompts are not a controlled benchmark.': 'Unterschiedliche Eingaben sind kein kontrollierter Leistungsvergleich.',
+  'This conversation stays in this window. Clear chat, reloading or quitting clears it. Check answers before using them.': 'Dieses Gespräch bleibt in diesem Fenster. Chat löschen, Neuladen oder Beenden löscht es. Prüfe Antworten vor der Nutzung.',
+  'This model requires PQ2_0 and Hadamard support, unavailable in the bundled engine.': 'Dieses Modell benötigt PQ2_0- und Hadamard-Unterstützung. Die mitgelieferte Engine unterstützt das noch nicht.',
+  'No known resource restriction. Speed has not been measured on this device.': 'Keine bekannte Ressourceneinschränkung. Die Geschwindigkeit wurde auf diesem Gerät noch nicht gemessen.',
+  'Last replies were below 8 tokens/s on every available processor. Slower tasks remain possible.': 'Die letzten Antworten lagen auf allen verfügbaren Prozessoren unter 8 Token/s. Langsamere Aufgaben sind weiterhin möglich.'
+});
+
+Object.assign(german, {
+  "now": "jetzt",
+  "Profile": "Profil",
+  "Local performance profile": "Lokales Leistungsprofil",
+  "Measurement": "Messwert",
+  "Typical speed": "Typische Geschwindigkeit",
+  "Usual range": "Üblicher Bereich",
+  "Sampled peak · 2 s": "Beobachteter Höchstwert · 2 s",
+  "Observations": "Messungen",
+  "About these measurements": "Über diese Messwerte",
+  "Recent observations": "Letzte Messungen",
+  "Measure comparison": "Vergleich messen",
+  "Cancel comparison": "Vergleich abbrechen",
+  "Local measurements": "Lokale Messungen",
+  "Collect numeric performance": "Leistungswerte erfassen",
+  "Keep history": "Verlauf behalten",
+  "30 days": "30 Tage",
+  "90 days": "90 Tage",
+  "365 days": "365 Tage",
+  "No prompts or replies. Stored only on this computer.": "Keine Eingaben oder Antworten. Nur auf diesem Rechner gespeichert.",
+  "Export JSONL": "JSONL exportieren",
+  "Delete history": "Verlauf löschen",
+  "First observations": "Erste Messungen",
+  "Typical": "Typisch",
+  "Latest workload": "Letzte Vergleichsgruppe",
+  "Input": "Eingabe",
+  "Output": "Ausgabe",
+  "Cache reused": "Cache wiederverwendet",
+  "No cache reuse": "Ohne Cache-Wiederverwendung",
+  "First reply after load": "Erste Antwort nach Laden",
+  "Warm": "Warm",
+  "Download overlap": "Während Download",
+  "Controlled comparison": "Kontrollierter Vergleich",
+  "Ordinary use": "Normale Nutzung",
+  "First observations: fewer than 5 replies. No automatic processor changes.": "Erste Messungen: weniger als 5 Antworten. Kein automatischer Prozessorwechsel.",
+  "observations retained": "Messungen gespeichert",
+  "days": "Tage",
+  "Up to 20 MiB / 8192 observations": "Bis 20 MiB / 8192 Messungen",
+  "History could not be saved.": "Verlauf konnte nicht gespeichert werden.",
+  "unsaved observations": "ungespeicherte Messungen",
+  "invalid records skipped": "ungültige Einträge übersprungen",
+  "completed": "Abgeschlossen",
+  "interrupted": "Unterbrochen",
+  "error": "Fehler",
+  "cancelled": "Abgebrochen",
+  "failed": "Fehlgeschlagen",
+  "restore_failed": "Wiederherstellung fehlgeschlagen",
+  "app": "App",
+  "api": "Schnittstelle",
+  "controlled_test": "Kontrollierter Test",
+  "legacy_last_reply": "Älterer Einzelwert",
+  "Warmup": "Aufwärmen",
+  "loading": "Laden",
+  "warmup": "Aufwärmen",
+  "measuring": "Messen",
+  "restoring": "Wiederherstellen",
+  "Saved.": "Gespeichert.",
+  "History deleted.": "Verlauf gelöscht.",
+  "Export saved": "Export gespeichert",
+  "Delete local measurement history? Models and this chat are kept.": "Lokalen Messverlauf löschen? Modelle und dieser Chat bleiben erhalten.",
+  "Run a short CPU/GPU comparison? Each processor loads once, warms up, then answers three times. Your previous processor setting is restored.": "Kurzen CPU/GPU-Vergleich starten? Jeder Prozessor lädt einmal, wärmt auf und antwortet dann dreimal. Deine bisherige Prozessoreinstellung wird wiederhergestellt.",
+  "Median of up to 30 comparable replies. Range: middle 50%. Different prompts are observations, not a controlled speed comparison. First text includes hidden preparation. RAM is process RSS; sampled peaks can miss brief spikes. GPU memory and power are not measured.": "Median aus bis zu 30 vergleichbaren Antworten. Bereich: mittlere 50 %. Unterschiedliche Eingaben sind Beobachtungen, kein kontrollierter Geschwindigkeitsvergleich. Erster Text enthält die ausgeblendete Vorbereitung. RAM ist Prozess-RSS; Stichproben können kurze Spitzen verpassen. GPU-Speicher und Energie werden nicht gemessen."
+});
+
+Object.assign(german, {'disconnected':'Verbindung getrennt'});
+
+Object.assign(german, {'Earlier configuration':'Frühere Konfiguration'});

@@ -1,5 +1,6 @@
 #include "../../src/app/core.h"
 #include <assert.h>
+#include <math.h>
 #include <stdalign.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -75,6 +76,47 @@ int main(void) {
     h.supported = false;
     assert(app_assess(&h, gemma, true).fit == APP_UNAVAILABLE);
 
+    // Whole-device speed must not inherit the most recent (possibly slow) CPU reply.
+    h.supported = true;
+    h.device = APP_APPLE_SILICON;
+    assert(app_assess_device(&h, gemma, true, 3, true, 45).fit == APP_RECOMMENDED);
+    assert(app_assess_device(&h, gemma, true, 3, true, 0).fit == APP_RECOMMENDED);
+    assert(app_assess_device(&h, gemma, true, 0, true, 3).fit == APP_RECOMMENDED);
+    assert(app_assess_device(&h, gemma, true, 3, true, 7.99).fit == APP_CONDITIONAL);
+    assert(app_assess_device(&h, gemma, true, 3, true, 8).fit == APP_RECOMMENDED);
+    assert(app_assess_device(&h, gemma, true, 8, true, 0).fit == APP_RECOMMENDED);
+    assert(app_assess_device(&h, gemma, true, 3, false, 45).fit == APP_CONDITIONAL);
+    assert(app_assess_device(&h, gemma, true, 0, false, 0).fit == APP_RECOMMENDED);
+    assert(!app_rate_below_target(NAN) && !app_rate_below_target(INFINITY));
+    assert(!app_rate_below_target(-1) && !app_rate_below_target(0) && !app_rate_below_target(8));
+    assert(app_device_rate(3, true, NAN) == 0 && app_device_rate(INFINITY, true, 3) == 0);
+    h.device = APP_UNKNOWN;
+    assert(app_assess_device(&h, gemma, true, 0, false, 0).fit == APP_RECOMMENDED);
+    h.available_known = true;
+    h.available = 1;
+    assert(app_assess_device(&h, gemma, true, 30, true, 45).fit == APP_CONDITIONAL);
+    h.available_known = false;
+    h.disk_known = true;
+    h.disk = 1;
+    assert(app_assess_device(&h, gemma, false, 30, true, 45).fit == APP_UNAVAILABLE);
+    const struct app_model *bonsai = app_model_find("bonsai2-27b-pq2");
+    assert(bonsai && !bonsai->unsupported_format && bonsai->backends == 3);
+    h.device = APP_APPLE_SILICON;
+    h.ram = 32 * APP_GIB;
+    h.available_known = true;
+    h.available = 20 * APP_GIB;
+    assert(app_assess_device(&h, bonsai, true, 3, true, 20).fit == APP_RECOMMENDED);
+    h.available--;
+    assert(app_assess_device(&h, bonsai, true, 3, true, 20).fit == APP_CONDITIONAL);
+    h.available = 20 * APP_GIB;
+    h.ram = 16 * APP_GIB;
+    h.available = 14 * APP_GIB;
+    assert(app_assess_device(&h, bonsai, true, 3, true, 20).fit == APP_CONDITIONAL);
+    struct app_model unsupported = *bonsai;
+    unsupported.backends = 0;
+    unsupported.unsupported_format = "pq2_0";
+    assert(app_assess_device(&h, &unsupported, true, 30, true, 45).fit == APP_UNAVAILABLE);
+
     struct app_inventory inventory[APP_MODEL_COUNT] = {};
     h                             = (struct app_hardware) {.supported       = true,
                                                            .ram             = 16 * APP_GIB,
@@ -98,6 +140,12 @@ int main(void) {
     h.cores                           = 4;
     inventory[gemma - app_models].tps = 5;
     assert(!strcmp(app_recommend(&h, inventory, "", "").source, "fallback"));
+    inventory[gemma - app_models].tps = 0;
+    inventory[gemma - app_models].tps = app_device_rate(3, true, 0);
+    assert(app_recommend(&h, inventory, "", "").model == gemma);
+    inventory[gemma - app_models].tps = app_device_rate(3, true, 45);
+    assert(app_recommend(&h, inventory, "", "").model == gemma);
+    assert(!app_recommend(&h, inventory, bonsai->id, "").eligible);
     inventory[gemma - app_models].tps = 0;
     h.device                          = APP_PI5;
     h.ram                             = 4 * APP_GIB;

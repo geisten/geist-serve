@@ -1,6 +1,6 @@
 {
-  "schema": 1,
-  "revision": 1,
+  "schema": 2,
+  "revision": 5,
   "models": [
     {
       "id": "bitnet-2b",
@@ -13,7 +13,10 @@
       "recommended_ram_gib": 4,
       "backends": [
         "cpu"
-      ]
+      ],
+      "group_id": "bitnet-2b",
+      "group_name": "BitNet b1.58 2B",
+      "quantization": "I2_S"
     },
     {
       "id": "smollm2-360m",
@@ -27,7 +30,10 @@
       "backends": [
         "cpu",
         "metal"
-      ]
+      ],
+      "group_id": "smollm2-360m",
+      "group_name": "SmolLM2 360M",
+      "quantization": "Q8_0"
     },
     {
       "id": "qwen3-0.6b",
@@ -41,7 +47,11 @@
       "backends": [
         "cpu",
         "metal"
-      ]
+      ],
+      "group_id": "qwen3-0.6b",
+      "group_name": "Qwen3 0.6B",
+      "quantization": "Q8_0",
+      "reasoning_format": "think_tags"
     },
     {
       "id": "qwen35-0.8b",
@@ -55,7 +65,11 @@
       "backends": [
         "cpu",
         "metal"
-      ]
+      ],
+      "group_id": "qwen35-0.8b",
+      "group_name": "Qwen3.5 0.8B",
+      "quantization": "Q8_0",
+      "reasoning_format": "think_tags"
     },
     {
       "id": "gemma4-e2b",
@@ -69,7 +83,10 @@
       "backends": [
         "cpu",
         "metal"
-      ]
+      ],
+      "group_id": "gemma4-e2b",
+      "group_name": "Gemma 4 E2B",
+      "quantization": "Q4_K_M"
     },
     {
       "id": "gemma4-e4b",
@@ -83,7 +100,64 @@
       "backends": [
         "cpu",
         "metal"
-      ]
+      ],
+      "group_id": "gemma4-e4b",
+      "group_name": "Gemma 4 E4B",
+      "quantization": "Q4_K_M"
+    },
+    {
+      "id": "bonsai2-27b-pq2",
+      "name": "Bonsai 2 27B (ternary)",
+      "file": "Ternary-Bonsai-2-27B-PQ2_0.gguf",
+      "url": "https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf/resolve/b072e1d3b35a0a630cece372c2127528e0994386/Ternary-Bonsai-2-27B-PQ2_0.gguf",
+      "sha256": "3907dc1658db1f78a9826bf8d5bcb8dc65db0d466388937af57f2294fae62ec1",
+      "bytes": 7206168928,
+      "working_mib": 20480,
+      "recommended_ram_gib": 24,
+      "backends": [
+        "cpu",
+        "metal"
+      ],
+      "group_id": "bonsai2-27b",
+      "group_name": "Bonsai 2 27B",
+      "quantization": "PQ2_0",
+      "reasoning_format": "think_tags"
+    },
+    {
+      "id": "qwen38-27b-q4",
+      "name": "Qwen3.8 27B Q4_0",
+      "file": "Qwen3.8-27B-Q4_0.gguf",
+      "url": "https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/4ca720788d1e01f1bff70c033e0d0028fd02e502/Qwen3.8-27B-Q4_0.gguf",
+      "sha256": "ede16c7b36e578ca87a8c70e011e4b4633a32c831c0ce76d0f474582384e671d",
+      "bytes": 16056478688,
+      "working_mib": 20480,
+      "recommended_ram_gib": 32,
+      "backends": [
+        "cpu",
+        "metal"
+      ],
+      "group_id": "qwen38-27b",
+      "group_name": "Qwen3.8 27B",
+      "quantization": "Q4_0",
+      "reasoning_format": "think_tags"
+    },
+    {
+      "id": "qwen38-27b-q8",
+      "name": "Qwen3.8 27B Q8_0",
+      "file": "Qwen3.8-27B-Q8_0.gguf",
+      "url": "https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/4ca720788d1e01f1bff70c033e0d0028fd02e502/Qwen3.8-27B-Q8_0.gguf",
+      "sha256": "a680f44a06920e5d689774823782006aa3acc8db95750323373b24139b67e348",
+      "bytes": 29047086048,
+      "working_mib": 34816,
+      "recommended_ram_gib": 48,
+      "backends": [
+        "cpu",
+        "metal"
+      ],
+      "group_id": "qwen38-27b",
+      "group_name": "Qwen3.8 27B",
+      "quantization": "Q8_0",
+      "reasoning_format": "think_tags"
     }
   ]
 }

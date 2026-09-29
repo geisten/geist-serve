@@ -1,9 +1,13 @@
 'use strict';
+let historySaving = false;
 const $ = id => document.getElementById(id);
 const token = location.hash.slice(1);
+const statusPollInterval = 1800;
 // The capability stays in this page's memory/fragment, never localStorage.
-const cards = new Map();
+const cards = new Map(), modelGroups = new Map();
+let groupSequence = 0;
 let state = null, controller = null, requesting = false, polling = false;
+let downloadRequest = false;
 let lastServerMessage = '', localMessage = false;
 let pendingModel = null, languageInitialized = false, customPreviewAccepted = false;
 let stopped = false, timer;
@@ -58,6 +62,14 @@ $('transcript').addEventListener('scroll', () => {
 });
 $('latest').addEventListener('click', () => { scrollLatest(true); $('prompt').focus({preventScroll: true}); });
 window.addEventListener('resize', () => { resizeComposer(); scrollLatest(); positionPerformance(); });
+const replyCopyIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>';
+const replyCopiedIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>';
+function renderReplyCopy(button) {
+  const label = t(button.dataset.copied === 'true' ? 'Copied' : 'Copy response');
+  button.title = label;
+  button.setAttribute('aria-label', label);
+  button.innerHTML = button.dataset.copied === 'true' ? replyCopiedIcon : replyCopyIcon;
+}
 function addTurn(prompt) {
   $('chat-empty').hidden = true; $('result').hidden = false;
   // Stable ids identify the latest response for automation/accessibility.
@@ -66,13 +78,22 @@ function addTurn(prompt) {
   const userText = document.createElement('div'); userText.className = 'message-text'; userText.textContent = prompt;
   user.setAttribute('aria-label', t('You')); user.append(userText);
   const answer = document.createElement('article'); answer.className = 'chat-message assistant';
-  const label = document.createElement('div'); label.className = 'message-label'; label.textContent = `Geist · ${state.models.find(model => model.id === state.active_id)?.name || state.active}`;
+  const label = document.createElement('div'); label.className = 'message-label'; label.textContent = `Geist · ${modelLabel(state.models.find(model => model.id === state.active_id))}`;
   const output = document.createElement('div'); output.id = 'output'; output.className = 'message-text markdown'; output.markdownSource = '';
-  const status = document.createElement('p'); status.className = 'message-status'; uiText(status, 'Waiting for the first text…');
+  const status = document.createElement('p'); status.className = 'message-status'; uiText(status, 'Preparing answer…');
   const actions = document.createElement('div'); actions.className = 'message-actions';
-  const copy = document.createElement('button'); copy.id = 'copy'; copy.type = 'button'; copy.className = 'text-button'; copy.disabled = true; copy.textContent = t('Copy'); copy.dataset.label = 'Copy';
+  const copy = document.createElement('button'); copy.id = 'copy'; copy.type = 'button'; copy.className = 'text-button reply-copy'; copy.disabled = true;
+  renderReplyCopy(copy);
+  let copiedTimer;
   copy.addEventListener('click', async () => {
-    try { await copyText(output.markdownSource); copy.textContent = t('Copied'); }
+    try {
+      await copyText(output.markdownSource);
+      if (!copy.isConnected) return;
+      copy.dataset.copied = 'true'; renderReplyCopy(copy);
+      uiText($('chat-announcement'), 'Response copied.');
+      clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(() => { copy.dataset.copied = 'false'; if (copy.isConnected) renderReplyCopy(copy); }, 1800);
+    }
     catch { message('Copy is unavailable here. Select the result and copy it manually.'); }
   });
   const metrics = document.createElement('span'); metrics.className = 'reply-metrics';
@@ -94,6 +115,8 @@ function allowed(model, task = selectedTask) {
 const bytes = n => n < 1e9 ? `${formatNumber(n / 1e6)} MB` : `${formatNumber(n / 1e9, 2)} GB`;
 const gib = n => `${formatNumber(n / 2 ** 30, 1)} GiB`;
 
+const variantLabel = model => ({Q4_0:'4 bit · Q4_0', Q8_0:'8 bit · Q8_0', PQ2_0:`${t('Ternary')} · PQ2_0`, I2_S:`${t('Ternary')} · I2_S`}[model?.quantization] || model?.quantization || t('Default'));
+const modelLabel = model => model ? model.quantization ? `${model.group_name || model.name} · ${model.quantization}` : model.name : state?.active || '';
 const knownNumber = value => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 const modelIdentity = () => JSON.stringify([state?.active_id, state?.active, state?.execution?.backend]);
 const workspaceIdentity = () => JSON.stringify([state?.active_id, state?.active, state?.models.find(m => m.id === state.active_id)?.sha256]);
@@ -104,7 +127,7 @@ function renderReplyMetrics(element) {
   const m = element.replyMetrics;
   if (!m) return;
   element.textContent = `${rateText(m.rate)} · ${knownNumber(m.tokens) ? m.tokens : '—'} ${t('tokens')} · ${timeText(m.total)}`;
-  element.title = `${t('First text')}: ${timeText(m.first)}`;
+  element.title = `${t('First text')}: ${timeText(m.first)} · ${t('First answer')}: ${timeText(m.firstAnswer ?? m.first)}${m.reasoning ? ' · ' + t('Tokens and time include answer preparation.') : ''}`;
 }
 function renderPerformance() {
   if (lastReply && lastReply.model !== modelIdentity()) lastReply = null;
@@ -119,22 +142,51 @@ function renderPerformance() {
   $('performance-cpu').textContent = cpu === null ? '—' : `${formatNumber(cpu, 1)} %`;
   $('performance-ram').textContent = h?.known && knownNumber(h.ram) ? gib(h.ram) : '—';
   $('performance-available').textContent = h?.available_known && knownNumber(h.available) ? gib(h.available) : '—';
-  // Service-owned, numeric-only observations survive processor and app restarts.
-  // They describe separate replies, not a controlled CPU/GPU benchmark.
-  const history = state?.performance_history || [];
+  const profile = state?.performance_profile;
+  const compatible = profile && profile.artifact === model?.sha256;
   for (const mode of ['cpu', 'gpu']) {
-    const sample = history.find(item => item.processor === mode);
-    $(`history-${mode}-rate`).textContent = rateText(sample?.rate);
+    const sample = compatible ? profile[mode] : null;
+    for (const id of ['rate','typical']) $(`history-${mode}-${id}`).textContent = rateText(sample?.rate);
+    $(`history-${mode}-range`).textContent = sample?.count > 1 ? `${formatNumber(sample.q25,1)}–${formatNumber(sample.q75,1)} ${t('tok/s')}` : '—';
     $(`history-${mode}-first`).textContent = timeText(sample?.first);
     $(`history-${mode}-total`).textContent = timeText(sample?.total);
-    $(`history-${mode}-tokens`).textContent = knownNumber(sample?.tokens) ? String(sample.tokens) : '—';
-    $(`history-${mode}-ram`).textContent = sample?.rss_bytes > 0 ? gib(sample.rss_bytes) : '—';
+    $(`history-${mode}-tokens`).textContent = knownNumber(sample?.tokens) ? formatNumber(sample.tokens,Number.isInteger(sample.tokens)?0:1) : '—';
+    $(`history-${mode}-ram`).textContent = knownNumber(sample?.rss_bytes) ? gib(sample.rss_bytes) : '—';
+    $(`history-${mode}-peak`).textContent = knownNumber(sample?.sampled_peak_rss) ? gib(sample.sampled_peak_rss) : '—';
+    $(`history-${mode}-count`).textContent = sample ? `${sample.count} · ${t(sample.count < 5 ? 'First observations' : 'Typical')}` : '—';
+    $(`profile-${mode}-confidence`).textContent = sample ? `${sample.count} · ${t(sample.count < 5 ? 'First observations' : 'Typical')}` : t('Not measured yet');
     $(`history-${mode}-time`).textContent = sample?.recorded_at ? new Intl.DateTimeFormat(interfaceLanguage, {dateStyle:'short',timeStyle:'short'}).format(new Date(sample.recorded_at * 1000)) : '—';
-    const label = `${mode.toUpperCase()}: ${sample ? t('Last completed reply') : t('Not measured yet')}`;
-    $(`history-${mode}`).title = label;
-    $(`history-${mode}`).setAttribute('aria-label', `${label} · ${rateText(sample?.rate)}`);
-    $(`history-${mode}`).classList.toggle('current', state?.execution?.active === mode);
+    $(`history-${mode}`).title = `${mode.toUpperCase()}: ${t(sample ? sample.count < 5 ? 'First observations' : 'Typical' : 'Not measured yet')} · ${sample?.count || 0}`;
   }
+  const group = compatible ? profile.group : null;
+  $('profile-first').textContent = timeText(compatible ? profile[state?.execution?.active]?.first : null);
+  $('profile-group').textContent = group ? [t('Latest workload'), `${t('Input')}: ${['≤512','513–2048','>2048'][group.input]}`, `${t('Output')}: ${['<32','32–127','128–511','≥512'][group.output]}`, t('tokens'), t(group.cached ? 'Cache reused' : 'No cache reuse'), t(group.cold ? 'First reply after load' : 'Warm'), group.contention ? t('Download overlap') : '', group.controlled ? t('Controlled comparison') : t('Ordinary use')].filter(Boolean).join(' · ') : t('Not measured yet');
+  $('profile-confidence').textContent = t('First observations: fewer than 5 replies. No automatic processor changes.');
+  // Keep focused disclosure nodes stable during polling; replace only changed text.
+  const recent = compatible ? profile.recent || [] : [];
+  const recentKey = JSON.stringify([interfaceLanguage,recent]);
+  if ($('profile-recent').dataset.key !== recentKey) {
+    $('profile-recent').dataset.key = recentKey;
+    $('profile-recent').replaceChildren(...recent.map(item => {
+      const li = document.createElement('li');
+      const rate = item.output && item.generation_ns > 0 ? item.output / (item.generation_ns / 1e9) : null;
+      li.textContent = [new Intl.DateTimeFormat(interfaceLanguage,{dateStyle:'short',timeStyle:'short'}).format(new Date(item.timestamp*1000)), item.backend, rateText(rate), `${item.input}/${item.output} ${t('tokens')}`, t(item.outcome), t(item.source), item.historical ? t('Earlier configuration') : '', item.warmup ? t('Warmup') : '', item.contention ? t('Download overlap') : ''].filter(Boolean).join(' · ');
+      return li;
+    }));
+  }
+  if (profile && !historySaving) {
+    $('history-enabled').checked = profile.enabled;
+    $('history-days').value = String(profile.days);
+  }
+  $('history-storage').textContent = profile ? `${profile.retained} ${t('observations retained')} · ${profile.days} ${t('days')} · ${t('Up to 20 MiB / 8192 observations')}` : '—';
+  $('profile-error').hidden = !profile?.error && !profile?.invalid;
+  const profileError = profile?.error ? `${t('History could not be saved.')} ${profile.dropped} ${t('unsaved observations')}` : profile?.invalid ? `${profile.invalid} ${t('invalid records skipped')}` : '';
+  if ($('profile-error').textContent !== profileError) $('profile-error').textContent = profileError;
+  const comparison = state?.comparison;
+  $('comparison-stop').hidden = !comparison?.running;
+  const comparisonText = comparison?.running ? `${t(comparison.phase)} · ${comparison.step}/${state?.execution?.gpu_available ? 8 : 4}` : comparison?.result ? t(comparison.result) : '';
+  if ($('comparison-status').textContent !== comparisonText) $('comparison-status').textContent = comparisonText;
+
 }
 
 // A rolling observation from this window, never an advertised network speed.
@@ -173,29 +225,33 @@ function uiText(element, source) {
   element.dataset.uiText = source; element.textContent = t(source);
 }
 function message(text, local = true) { uiText($('notice'), text); localMessage = local; }
+// File transfers and inference have independent lifecycles. Preserve the old
+// conservative boundary when talking to a service without the new status fields.
+function inferenceBusy() { return state?.inference_busy ?? state?.busy; }
+function runtimeRequest() { return requesting && !downloadRequest; }
 function buttonStates() {
   renderPerformance();
   renderExecution();
-  $('test-connection').disabled = !state?.ready || state?.busy || connectionTesting || requesting || !!controller;
+  $('test-connection').disabled = !state?.ready || inferenceBusy() || connectionTesting || runtimeRequest() || !!controller;
   $('copy-connection').disabled = !state?.ready;
   $('connection-endpoint').textContent = t(`${location.origin}/v1`);
   $('connection-model').textContent = t(state?.active_id || 'Choose a model');
-  const ready = selectedTask && !selectedTask.url && state?.ready && !state?.busy && !requesting && !controller && !connectionTesting && allowed(state?.models.find(m => m.id === state.active_id));
+  const ready = selectedTask && !selectedTask.url && state?.ready && !inferenceBusy() && !runtimeRequest() && !controller && !connectionTesting && allowed(state?.models.find(m => m.id === state.active_id));
   $('run').disabled = !ready || !$('prompt').value.trim();
   $('run').hidden = !!controller;
   $('new-chat').disabled = !!controller || !(conversation.length || $('result').children.length || $('prompt').value);
-  $('new-chat').hidden = !(conversation.length || $('result').children.length || $('prompt').value);
-  $('benchmark').disabled = !state?.ready || state?.busy || requesting || !!controller ||
+  $('new-chat').hidden = false;
+  $('benchmark').disabled = !state?.ready || state?.busy || runtimeRequest() || !!controller ||
     !allowed(state?.models.find(m => m.id === state.active_id), tasks.find(t => t.id === 'freeform'));
   if (!controller && document.activeElement === $('stop')) $('prompt').focus({preventScroll: true});
   $('stop').hidden = !controller;
   document.body.classList.toggle('generating', !!controller);
   const loading = executionLoading();
-  const runtimeStatus = t(loading ? 'Switching processor…' : controller ? 'Generating locally…' : state?.ready ? 'Model ready' : 'No model loaded');
+  const runtimeStatus = t(loading ? (pendingExecution !== null ? 'Switching processor…' : 'Loading model') : controller ? 'Generating locally…' : state?.ready ? 'Model ready' : 'No model loaded');
   $('runtime-state').setAttribute('aria-label', runtimeStatus); $('runtime-state').title = runtimeStatus;
   $('runtime-state').classList.toggle('inactive', !state?.ready);
   $('runtime-state').classList.toggle('loading', loading);
-  $('runtime-name').textContent = state?.models.find(model => model.id === state.active_id)?.name || state?.active || '';
+  $('runtime-name').textContent = modelLabel(state?.models.find(model => model.id === state.active_id));
   $('language-choice').disabled = !!controller;
 }
 
@@ -205,19 +261,32 @@ function downloadState(model, current = state) {
   const transferring = current?.job_model === model?.id && !!current?.phase;
   const checking = transferring && current.phase === 'verifying';
   const received = Math.max(0, transferring ? current.received || 0 : model?.partial || 0);
-  const percent = total ? Math.min(100, Math.floor(received / total * 100)) : 0;
+  const progress = total ? Math.min(100, received / total * 100) : 0;
+  const percent = Math.floor(progress);
   if (checking) return {stage:'verifying', percent:null, text:'Checking model…'};
   if ((transferring && current.phase === 'preparing') || (current?.loading && current.active_id === model?.id)) return {stage:'loading', percent:null, text:'Loading model'};
-  if (transferring) return {stage:'downloading', percent, text:`Downloading · ${percent}%`};
+  if (transferring) return {stage:'downloading', progress, percent, text:`Downloading · ${percent}%`};
   if (model?.installed) return {stage:'downloaded', percent:100, text:'Downloaded'};
-  if (received) return {stage:'paused', percent, text:`Paused · ${percent}%`};
+  if (received) return {stage:'paused', progress, percent, text:`Paused · ${percent}%`};
   return {stage:'missing', percent:0, text:'Not downloaded'};
 }
 function renderRing(element, model, current = state) {
   const status = downloadState(model, current);
   if (!element.firstChild) element.innerHTML = ringMarkup; // Fixed, local markup only.
+  const progressValue = status.progress ?? status.percent ?? 72;
+  const previousValue = Number(element.style.getPropertyValue('--ring-progress'));
+  const sameModel = element.dataset.model === model?.id;
+  // Interpolate only towards bytes already received, over one polling interval.
+  // Repeated renders must not interrupt a transition. Pause, reset, model changes
+  // and verified completion snap to their actual state instead of trailing it.
+  if (!sameModel || element.dataset.stage !== status.stage || previousValue !== progressValue) {
+    element.dataset.animate = String(sameModel && element.dataset.stage === 'downloading' &&
+      status.stage === 'downloading' && progressValue > previousValue);
+  }
+  element.dataset.model = model?.id || '';
   element.dataset.stage = status.stage;
-  element.style.setProperty('--ring-progress', status.percent === null ? 72 : status.percent);
+  element.style.setProperty('--ring-duration', `${statusPollInterval}ms`);
+  element.style.setProperty('--ring-progress', progressValue);
   const progress = ['downloading', 'paused', 'verifying', 'loading'].includes(status.stage);
   element.setAttribute('role', progress ? 'progressbar' : 'img');
   element.removeAttribute('aria-hidden');
@@ -259,28 +328,86 @@ function renderModelBadges(element, model) {
   element.title = description;
   element.setAttribute('aria-label', description);
 }
+const shortFitReasons = {
+  'This model requires PQ2_0 and Hadamard support, unavailable in the bundled engine.': 'Unsupported format',
+  'This CPU instruction set or platform is not supported by the bundled engine.': 'Unsupported platform',
+  'Not enough disk space for the download plus 256 MiB reserve.': 'Not enough disk space',
+  'RAM is smaller than the model file, before context and OS memory.': 'Not enough RAM',
+  'Below the RAM recommendation; swapping or allocation failures are possible.': 'Below recommended RAM',
+  'Available RAM is tight now. Close other apps before loading this model.': 'Available RAM is tight',
+  'Last replies were below 8 tokens/s on every available processor. Slower tasks remain possible.': 'Slow on available processors'
+};
+function renderModelGroups(models) {
+  const focused = document.activeElement;
+  const grouped = new Map();
+  for (const model of models) {
+    const id = model.group_id || model.id;
+    if (!grouped.has(id)) grouped.set(id, []);
+    grouped.get(id).push(model);
+  }
+  // Establish initial priority once, then keep groups still as live status changes.
+  const priority = variants => Math.min(...variants.map(m => m.id === state.active_id ? 0 : m.id === state.recommendation?.id ? 1 : m.installed ? 2 : 3));
+  const ordered = modelGroups.size ? [...grouped] : [...grouped].sort((a,b) => priority(a[1]) - priority(b[1]));
+  for (const [id, variants] of ordered) {
+    let group = modelGroups.get(id);
+    if (!group) {
+      group = document.createElement('section'); group.className = 'model-group'; group.dataset.group = id;
+      const heading = document.createElement('h3'); heading.id = `model-group-${++groupSequence}`;
+      const rows = document.createElement('div'); rows.className = 'model-variants'; rows.setAttribute('role', 'list');
+      group.setAttribute('aria-labelledby', heading.id); group.append(heading, rows);
+      modelGroups.set(id, group); $('models').append(group);
+    }
+    group.querySelector('h3').textContent = variants[0].group_name || variants[0].name;
+    const rows = group.querySelector('.model-variants');
+    variants.forEach((model, index) => {
+      modelCard(model);
+      const card = cards.get(model.id);
+      if (rows.children[index] !== card) rows.insertBefore(card, rows.children[index] || null);
+    });
+  }
+  for (const [id, group] of modelGroups) if (!grouped.has(id)) { group.remove(); modelGroups.delete(id); }
+  // A catalog import may regroup an existing row; ordinary polls never move it.
+  if (focused?.isConnected && focused !== document.activeElement && !focused.disabled) focused.focus({preventScroll:true});
+}
 function canPause(model) {
   return state?.job_model === model.id && state.phase === 'downloading' && !state.loading;
+}
+function modelActionDisabled(model) {
+  if (stopped || requesting) return true;
+  if (canPause(model)) return false;
+  if (state.loading || state.phase || model.resource_fit === 2) return true;
+  if (state.ready && state.active_id === model.id && allowed(model)) return true;
+  // A missing, different artifact can download during a resident answer.
+  if (!model.installed && state.ready && state.active_id !== model.id &&
+      typeof state.inference_busy === 'boolean') return false;
+  return !!(state.busy || controller || connectionTesting);
 }
 function modelCard(model) {
   let card = cards.get(model.id);
   if (!card) {
-    card = document.createElement('article'); card.className = 'model'; card.dataset.id = model.id;
+    card = document.createElement('article'); card.className = 'model'; card.dataset.id = model.id; card.setAttribute('role', 'listitem');
     // One button covers the name and download state. Information and removal are siblings.
-    card.innerHTML = '<button class="model-pick" type="button"><span class="model-ring"></span><span class="model-info"><span class="model-name"></span><span class="download-state"></span></span></button><span class="model-badges" role="img" tabindex="0"></span><span class="transfer-detail"></span><button class="remove text-button icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button>';
+    card.innerHTML = '<button class="model-pick" type="button"><span class="model-ring"></span><span class="model-info"><span class="model-name"></span><span class="variant-size"></span><span class="variant-active"></span><span class="download-state"></span></span></button><span class="model-badges" role="img" tabindex="0"></span><span class="variant-warning"></span><span class="transfer-detail"></span><button class="remove text-button icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button>';
     card.querySelector('.model-pick').addEventListener('click', event => { if (event.detail < 2) choose(model.id); });
     card.querySelector('.model-pick').addEventListener('keydown', event => {
       if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
     });
     card.querySelector('.remove').addEventListener('click', () => removeModel(model.id));
-    cards.set(model.id, card); $('models').append(card);
+    cards.set(model.id, card);
   }
-  const active = state.active_id === model.id && (state.ready || state.loading);
+  const active = state.active_id === model.id && state.ready && !state.loading;
   const pending = pendingModel === model.id;
   const preparing = state.job_model === model.id && (!!state.phase || state.loading);
   const paused = canPause(model);
   card.className = `model${active ? ' active' : ''}${preparing || pending ? ' preparing' : ''}${model.resource_fit === 2 ? ' unavailable' : ''}`;
-  card.querySelector('.model-name').textContent = model.name;
+  card.querySelector('.model-name').textContent = variantLabel(model);
+  card.querySelector('.variant-size').textContent = model.bytes ? bytes(model.bytes) : '';
+  card.querySelector('.variant-active').textContent = t('Active');
+  card.querySelector('.variant-active').hidden = !active;
+  const warning = card.querySelector('.variant-warning');
+  warning.hidden = !model.resource_fit;
+  warning.textContent = model.resource_fit ? t(shortFitReasons[model.reason] || model.reason || 'Limited on this computer') : '';
+  warning.title = model.resource_fit ? t(model.reason || 'Limited on this computer') : '';
   const download = renderRing(card.querySelector('.model-ring'), model);
   // The button's complete name exposes status; a duplicate nested progress role
   // is unnecessary to screen readers. Numeric ring attributes remain inspectable.
@@ -294,15 +421,15 @@ function modelCard(model) {
   detail.hidden = !preparing || state.loading;
   detail.textContent = paused ? downloadEstimate(model.id, state.received || 0, model.bytes || 0) : preparing ? t('Checking download…') : '';
   const button = card.querySelector('.model-pick');
-  const action = paused ? 'Pause download' : active && allowed(model) ? 'Active' : model.installed ? 'Start model' : model.partial ? 'Resume download' : 'Download and start';
-  button.title = `${t(action)}: ${model.name}`;
-  button.setAttribute('aria-label', `${t(action)}: ${model.name} · ${t(status)}${model.resource_fit ? ` · ${t(model.reason || 'Limited on this computer')}` : ''}`);
-  button.disabled = requesting || !!controller || connectionTesting || (!paused && (model.resource_fit === 2 || state.busy || state.loading || !!state.phase || (active && allowed(model))));
+  const action = paused ? 'Pause download' : active && allowed(model) ? 'Active' : model.installed ? 'Start model' : model.partial ? 'Resume download' : state.ready ? 'Download model' : 'Download and start';
+  button.title = model.resource_fit === 2 ? `${modelLabel(model)} · ${t(model.reason || 'Unavailable on this computer')}` : `${t(action)}: ${modelLabel(model)}`;
+  button.setAttribute('aria-label', `${t(action)}: ${modelLabel(model)} · ${t(status)}${model.resource_fit ? ` · ${t(model.reason || 'Limited on this computer')}` : ''}`);
+  button.disabled = modelActionDisabled(model);
   const remove = card.querySelector('.remove');
-  remove.title = `${t('Remove download')}: ${model.name}`;
+  remove.title = `${t('Remove download')}: ${modelLabel(model)}`;
   remove.hidden = model.id === 'custom' || (!model.installed && !model.partial);
   remove.disabled = state.busy || state.loading || !!state.phase || requesting || !!controller || connectionTesting;
-  remove.setAttribute('aria-label', `${t('Remove download')}: ${model.name}`);
+  remove.setAttribute('aria-label', `${t('Remove download')}: ${modelLabel(model)}`);
 }
 
 function visibleModels() {
@@ -320,7 +447,7 @@ function render(next) {
   const active = next.models.find(m => m.id === next.active_id);
   const usable = next.ready && allowed(active);
   if (usable) workspaceModel = workspaceIdentity();
-  const retained = workspaceModel === workspaceIdentity() && !!active && allowed(active);
+  const retained = workspaceModel !== null && ((workspaceModel === workspaceIdentity() && !!active && allowed(active)) || working);
   if (modelChanged || (!usable && !retained)) $('performance').open = false;
   const previouslyHidden = $('workspace').hidden;
   $('workspace').hidden = !usable && !retained;
@@ -333,13 +460,8 @@ function render(next) {
   for (const [id, card] of cards) if (!models.some(model => model.id === id)) { card.remove(); cards.delete(id); }
   $('catalog-revision').textContent = next.catalog_revision ? `#${next.catalog_revision}` : '';
   $('catalog-file').disabled = requesting || next.busy || next.loading || !!next.phase || !!controller;
-  // Keep existing nodes and ordering stable while downloading and polling.
-  const ordered = cards.size ? models : [...models].sort((a, b) =>
-    (b.id === next.active_id) - (a.id === next.active_id) ||
-    (b.id === next.recommendation.id) - (a.id === next.recommendation.id) ||
-    Number(b.installed) - Number(a.installed) || a.resource_fit - b.resource_fit);
   if (!working) { transfer.id = ''; transfer.samples = []; }
-  ordered.forEach(modelCard);
+  renderModelGroups(models);
   if (!controller && !requesting && (!localMessage || next.message !== lastServerMessage)) message(working ? '' : next.message || '', false);
   lastServerMessage = next.message;
   buttonStates(); chatLayout();
@@ -355,10 +477,9 @@ async function poll() {
 
 async function choose(id) {
   const model = visibleModels().find(item => item.id === id);
-  if (!model || stopped || requesting || controller || connectionTesting) return;
+  if (!model || modelActionDisabled(model)) return;
   const pause = canPause(model);
-  if (!pause && (state.busy || state.loading || state.phase || model.resource_fit === 2)) return;
-  if (!pause && state.ready && state.active_id === id && allowed(model)) return;
+  downloadRequest = !!state.ready && state.active_id !== id && (pause || !model.installed);
   requesting = true; pendingModel = id; buttonStates(); visibleModels().forEach(modelCard); message('', false);
   try {
     if (pause) {
@@ -379,39 +500,33 @@ async function choose(id) {
     // A periodic poll already in flight may still describe the previous state.
     while (polling) await new Promise(resolve => setTimeout(resolve, 40));
     await poll();
-    requesting = false; pendingModel = null;
+    requesting = false; downloadRequest = false; pendingModel = null;
     if (state) render(state); else buttonStates();
   }
 }
 
-function metric(id, value, unit) {
-  const target = $(id); target.replaceChildren(document.createTextNode(value));
-  const label = document.createElement('small'); label.textContent = t(unit); target.append(label);
-}
 
 async function run(prompt, benchmark = false, preserveDraft = false) {
   prompt = prompt.trim();
   const task = tasks.find(t => t.id === 'freeform');
-  if (!prompt || controller || requesting || connectionTesting || state?.busy || !state?.ready || !task || !allowed(state.models.find(m => m.id === state.active_id), task)) return;
+  if (!prompt || controller || runtimeRequest() || connectionTesting || inferenceBusy() || !state?.ready || !task || !allowed(state.models.find(m => m.id === state.active_id), task)) return;
   if (new TextEncoder().encode(prompt).length > task.input_limit) { message('Your message is too long. Shorten it before sending; your draft has been kept.'); return; }
   const experimental = previewAccepted(state.models.find(m => m.id === state.active_id));
   const messages = [...conversation, {role: 'user', content: prompt}];
   const payload = {prompt, benchmark, language: $('language-choice').value, experimental, task: 'freeform', task_version: task.version,
-    ...(!benchmark ? {model: state.active_id, messages, max_tokens: 1024} : {})};
+    ...(!benchmark ? {model: state.active_id, messages} : {})};
   if (!benchmark && (messages.length > 63 || new TextEncoder().encode(JSON.stringify(payload)).length > 32768)) {
-    message('This test is full. Use Clear test to start again. The existing text has been kept.'); return;
+    message('This test is full. Use Clear chat to start again. The existing text has been kept.'); return;
   }
   const activeController = new AbortController(); controller = activeController;
   const turn = benchmark ? null : addTurn(prompt);
   const requestModel = modelIdentity();
   if (turn) { lastReply = null; replyPending = true; }
-  const target = turn?.output || $('benchmark-output');
+  const target = turn.output;
   target.hidden = false; target.textContent = '';
   if (!benchmark) { if (!preserveDraft) $('prompt').value = ''; $('chat-help').open = false; $('performance').open = false; resizeComposer(); $('prompt').focus(); }
   buttonStates(); visibleModels().forEach(modelCard); message('');
-  for (const [id, unit] of [['speed', 'tokens/s'], ['first-token', 'seconds'], ['elapsed', 'seconds']]) metric(id, '—', unit);
-  uiText($('measurement-note'), benchmark ? 'Short local test running. Results apply to this model and this workload.' : 'Running on your device…');
-  uiText($('chat-announcement'), 'Waiting for the first text…');
+  uiText($('chat-announcement'), 'Preparing answer…');
   const start = performance.now(); let first = null, done = false, reader, completion = null;
   let output = '', pending = '', limited = false, paintTimer = null;
   function paint() { paintTimer = null; if (turn) updateMarkdown(target, output); else target.textContent = output; }
@@ -419,8 +534,9 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
     if (!line.trim()) return;
     const item = JSON.parse(line);
     if (item.error) throw new Error(typeof item.error === 'string' ? item.error : 'The model returned an error.');
+    if (item.phase === 'preparing' && first === null && turn) uiText(turn.status, 'Preparing answer…');
     if (item.response) {
-      if (first === null) { first = (performance.now() - start) / 1000; metric('first-token', first.toFixed(2), 'seconds'); if (turn) turn.status.textContent = ''; }
+      if (first === null) { first = (performance.now() - start) / 1000; if (turn) turn.status.textContent = ''; }
       if (output.length + item.response.length > 131072) throw new Error('Output exceeded the display memory limit.');
       output += item.response;
       if (paintTimer === null) paintTimer = setTimeout(paint, 60);
@@ -445,45 +561,38 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
     if (!done) throw new Error('The connection ended before the model completed its response.');
     const duration = knownNumber(completion?.eval_duration) ? completion.eval_duration / 1e9 : null;
     const tokens = Number.isSafeInteger(completion?.eval_count) && completion.eval_count >= 0 ? completion.eval_count : null;
-    const measured = {model: requestModel, tokens, first, total: (performance.now() - start) / 1000,
+    const measured = {model: requestModel, tokens,
+      first: knownNumber(completion?.first_model_text_ns) ? completion.first_model_text_ns / 1e9 : first,
+      firstAnswer: knownNumber(completion?.first_answer_ns) ? completion.first_answer_ns / 1e9 : first,
+      reasoning: completion?.reasoning === true, total: (performance.now() - start) / 1000,
       rate: duration > 0 && tokens > 0 ? tokens / duration : null};
-    metric('speed', measured.rate === null ? '—' : measured.rate.toFixed(1), 'tokens/s');
-    metric('elapsed', measured.total.toFixed(2), 'seconds');
-    uiText($('measurement-note'), `${tokens ?? 0} generated tokens. Speed uses geistd's generation time, including token streaming; first text and total include the local connection and prompt processing. ${benchmark ? 'A short sample, not a general benchmark.' : ''}`);
     if (turn) { lastReply = measured; turn.metrics.replyMetrics = measured; renderReplyMetrics(turn.metrics); }
-    const status = limited ? 'Response limit reached. You can ask Geist to continue.' : output ? '' : 'The model completed without producing text. Try a different prompt.';
+    const status = !output.trim() ? 'No answer was produced. Try again with a shorter question.'
+      : limited ? 'The model’s context limit was reached. Start a new chat or ask a shorter question.' : '';
     if (turn) {
       uiText(turn.status, status);
-      if (limited) {
-        const more = document.createElement('button'); more.type = 'button'; more.className = 'text-button'; more.textContent = t('Continue response'); more.dataset.label = 'Continue response';
-        more.addEventListener('click', () => {
-          if (controller || state?.busy) return;
-          // A continuation from an older reply would target the wrong context.
-          if (turn.output.id !== 'output') { message('Continue from the latest reply, or ask a new question.'); return; }
-          run(t('Continue from where you stopped.'), false, true);
-        });
-        turn.actions.append(more);
+      if (!output.trim()) {
+        const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'text-button';
+        uiText(retry, 'Retry'); retry.addEventListener('click', () => run(prompt, false, $('prompt').value.trim() !== prompt));
+        turn.actions.append(retry);
       }
     } else message(status);
     uiText($('chat-announcement'), status || 'Response complete.');
   } catch (error) {
     activeController.abort();
-    let status = error.name === 'AbortError' ? 'Stopped. Partial output is kept here.' : error.message;
-    if (status.includes("does not fit this model's context")) status = 'This test does not fit the model’s context. Shorten your draft or use Clear test to start again. No earlier messages have been removed.';
+    let status = error.name === 'AbortError' ? (output.trim() ? 'Stopped. Partial output is kept here.' : 'Stopped before an answer was produced.') : error.message;
+    if (status.includes("does not fit this model's context")) status = 'This test does not fit the model’s context. Shorten your draft or use Clear chat to start again. No earlier messages have been removed.';
     if (turn) uiText(turn.status, status); else message(status);
     uiText($('chat-announcement'), status);
-    uiText($('measurement-note'), 'Run incomplete. No final generation speed is reported.');
-    metric('speed', '—', 'tokens/s');
-    metric('elapsed', ((performance.now() - start) / 1000).toFixed(2), 'seconds');
   } finally {
     clearTimeout(paintTimer); paint();
     if (reader) { try { await reader.cancel(); } catch { /* connection already closed */ } }
     if (turn) {
       // Partial answers are visible and explicitly marked, so follow-ups can
       // refer to them. Failed requests without text never enter model context.
-      if (output) conversation = [...messages, {role: 'assistant', content: output}];
+      if (output.trim()) conversation = [...messages, {role: 'assistant', content: output}];
       else if (!preserveDraft && !$('prompt').value) { $('prompt').value = prompt; resizeComposer(); }
-      turn.copy.disabled = !output;
+      turn.copy.disabled = !output.trim();
       scrollLatest();
     }
     controller = null; replyPending = false; buttonStates(); if (state) visibleModels().forEach(modelCard);
@@ -509,7 +618,7 @@ $('new-chat').addEventListener('click', () => {
   if (controller) return;
   if ((conversation.length || $('result').children.length || $('prompt').value) && !confirm(t('Clear this conversation and draft? They are not saved.'))) return;
   conversation = []; lastReply = null; pendingMarkdown.clear(); $('result').replaceChildren(); $('result').hidden = true; $('chat-empty').hidden = false;
-  $('prompt').value = ''; $('chat-help').open = false; $('performance').open = false; message(''); uiText($('chat-announcement'), 'Test cleared.');
+  $('prompt').value = ''; $('chat-help').open = false; $('performance').open = false; message(''); uiText($('chat-announcement'), 'Chat cleared.');
   resizeComposer(); buttonStates(); followLatest = true; $('latest').hidden = true; $('transcript').scrollTop = 0; $('prompt').focus();
 });
 function chooseTask(id) {
@@ -530,7 +639,32 @@ async function loadTasks() {
   if (state) render(state);
 }
 $('stop').addEventListener('click', () => { controller?.abort(); $('prompt').focus({preventScroll: true}); });
-$('benchmark').addEventListener('click', () => run('Explain in a short paragraph how a seed grows into a plant.', true));
+$('benchmark').addEventListener('click', async () => {
+  if (!confirm(t('Run a short CPU/GPU comparison? Each processor loads once, warms up, then answers three times. Your previous processor setting is restored.'))) return;
+  try { await api('/app/performance/compare',{confirm:true}); await poll(); }
+  catch(error) { message(error.message); }
+});
+$('comparison-stop').addEventListener('click', async () => {
+  try { await api('/app/performance/cancel',{}); await poll(); }
+  catch(error) { message(error.message); }
+});
+for (const id of ['history-enabled','history-days']) $(id).addEventListener('change', async () => {
+  historySaving = true; $('history-enabled').disabled = $('history-days').disabled = true;
+  try { await api('/app/performance/settings',{enabled:$('history-enabled').checked,days:Number($('history-days').value)}); uiText($('history-result'),'Saved.'); }
+  catch(error) { uiText($('history-result'),error.message); }
+  finally { historySaving=false; $('history-enabled').disabled = $('history-days').disabled = false; await poll(); }
+});
+$('history-clear').addEventListener('click', async () => {
+  if (!confirm(t('Delete local measurement history? Models and this chat are kept.'))) return;
+  try { await api('/app/performance/clear',{confirm:true}); uiText($('history-result'),'History deleted.'); await poll(); }
+  catch(error) { uiText($('history-result'),error.message); }
+});
+$('history-export').addEventListener('click', async () => {
+  try {
+    const result = await (await api('/app/performance/export',{})).json();
+    $('history-result').textContent = `${t('Export saved')}: ${result.path}`;
+  } catch(error) { uiText($('history-result'),error.message); }
+});
 document.querySelector('.brand').addEventListener('click', event => { event.preventDefault(); showPage('models-page'); });
 document.querySelector('.skip').addEventListener('click', event => { event.preventDefault(); const main = $('main'); main.tabIndex = -1; main.focus(); });
 window.addEventListener('beforeunload', () => controller?.abort());
@@ -554,7 +688,7 @@ $('copy-connection').addEventListener('click', async () => {
     else if (kind === 'opencode') config = {$schema: 'https://opencode.ai/config.json', provider: {geist: {npm: '@ai-sdk/openai-compatible', name: 'Geist', options: {baseURL: base, apiKey: c.api_key}, models: {[c.model]: {name: 'Geist local text', tool_call: false, limit: {context: 4096, output: 512}}}}}, model: `geist/${c.model}`, default_agent: 'geist-chat', agent: {'geist-chat': {mode: 'primary', description: 'Local text chat without tools', prompt: 'Answer the user briefly. You cannot access files or execute tools.', permission: {'*': 'deny'}}}};
     else {
       const quote = text => `'${text.replaceAll("'", "'\\''")}'`;
-      config = `curl ${quote(`${base}/chat/completions`)} -H ${quote(`Authorization: Bearer ${c.api_key}`)} -H 'Content-Type: application/json' --data ${quote(JSON.stringify({model: c.model, messages: [{role: 'user', content: 'Hello'}], max_tokens: 64}))}`;
+      config = `curl ${quote(`${base}/chat/completions`)} -H ${quote(`Authorization: Bearer ${c.api_key}`)} -H 'Content-Type: application/json' --data ${quote(JSON.stringify({model: c.model, messages: [{role: 'user', content: 'Hello'}], max_tokens: 512}))}`;
     }
     await copyText(typeof config === 'string' ? config : JSON.stringify(config, null, 2));
     uiText($('connection-result'), 'Copied. The configuration contains your private local key.');
@@ -563,14 +697,14 @@ $('copy-connection').addEventListener('click', async () => {
 $('test-connection').addEventListener('click', async () => {
   connectionTesting = true; buttonStates(); uiText($('connection-result'), 'Asking the loaded model through the editor endpoint…');
   try {
-    const result = await (await api('/v1/chat/completions', {model: state.active_id, messages: [{role: 'user', content: 'Say hello in one sentence.'}], max_tokens: 32})).json();
+    const result = await (await api('/v1/chat/completions', {model: state.active_id, messages: [{role: 'user', content: 'Say hello in one sentence.'}], max_tokens: 512})).json();
     if (!result.choices?.[0]?.message?.content || !(result.usage?.completion_tokens > 0)) throw new Error('The model completed without text. Try another model.');
     uiText($('connection-result'), `Connected. The shared model returned ${result.usage.completion_tokens} tokens. Now test the configuration in your chosen client.`);
   } catch (error) { uiText($('connection-result'), error.message); }
   finally { connectionTesting = false; buttonStates(); }
 });
 if (!/^[a-f0-9]{64}$/.test(token)) message('Open Geist using the private link from the app or Pi launcher. The link contains your private local API key.');
-else { loadTasks().catch(error => message(error.message)); poll(); timer = setInterval(poll, 1800); }
+else { loadTasks().catch(error => message(error.message)); poll(); timer = setInterval(poll, statusPollInterval); }
 
 function showPage(id) {
   if (!['models-page', 'connect-page', 'settings-page', 'test-page'].includes(id)) return false;
@@ -604,6 +738,7 @@ $('ui-language').addEventListener('change', async () => {
   document.querySelectorAll('.chat-message.user').forEach(element => element.setAttribute('aria-label', t('You')));
   document.querySelectorAll('.reply-metrics').forEach(renderReplyMetrics);
   document.querySelectorAll('[data-label]').forEach(element => { element.textContent = t(element.dataset.label); });
+  document.querySelectorAll('.reply-copy').forEach(renderReplyCopy);
   if (selectedTask) chooseTask(selectedTask.id);
   updateConnectionHelp();
   if (state) render(state);
@@ -616,7 +751,7 @@ async function removeModel(id) {
   const model = state?.models.find(item => item.id === id);
   if (!model || requesting || controller || state.busy || state.loading || state.phase || connectionTesting) return;
   const warning = state.active_id === id && state.ready ? `${t('The running model will stop. Connected programs will need another model.')}\n\n` : '';
-  if (!confirm(warning + t(`Remove ${model.name} from this computer? You can download it again later.`))) return;
+  if (!confirm(warning + t(`Remove ${modelLabel(model)} from this computer? You can download it again later.`))) return;
   requesting = true; buttonStates(); visibleModels().forEach(modelCard);
   const remove = cards.get(id)?.querySelector('.remove');
   let removed = false;
@@ -689,6 +824,7 @@ function renderExecution() {
     const detail = label.querySelector('.processor-backend');
     if (detail) { detail.textContent = backend; detail.hidden = !backend; }
     const description = [input.value === 'auto' ? 'Auto' : input.value.toUpperCase(), backend,
+      input.value !== 'auto' ? $(`history-${input.value}-rate`).textContent : '',
       running ? t('Active processor') : pending ? t('Switching processor…') : '',
       mark && !mark.hidden ? t('Recommended') : ''].filter(Boolean).join(' · ');
     input.setAttribute('aria-label', description);
@@ -700,6 +836,12 @@ function renderExecution() {
   $('execution-current').title = t('Active processor');
   $('execution-notice').textContent = t(execution?.notice || '');
   $('execution-notice').hidden = !execution?.notice;
+  const measured = execution?.performance;
+  const slow = !!active && measured?.below_target === true && knownNumber(measured.rate) && measured.rate > 0 && knownNumber(measured.target_tps);
+  const warning = $('execution-performance');
+  warning.hidden = !slow;
+  $('execution-performance-text').textContent = slow ? `${active.toUpperCase()} · ${rateText(measured.rate)} · ${t('Below target')}` : '';
+  warning.title = slow ? `${t('Last completed reply')}. ${t('Interactive target')}: ${rateText(measured.target_tps)}. ${t('Different prompts are not a controlled benchmark.')}` : '';
 }
 for (const input of document.querySelectorAll('[name="execution"]')) input.addEventListener('change', async () => {
   if (!input.checked || requesting) return;
