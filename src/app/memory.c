@@ -26,8 +26,10 @@ void app_memory_observe(struct app_memory_record      *m,
     if (!s || !s->sampled_ns || s->sampled_ns > now_ns || s->status > 3 || s->source > 1 ||
         s->sequence < m->last_sequence || s->allocated_bytes > 1000000000000000ull)
         return;
-    m->gpu_age_ms = (double) (now_ns - s->sampled_ns) / 1e6;
-    m->status     = m->gpu_age_ms > 6000 ? 4 : s->status;
+    bool fresh       = m->last_sequence != s->sequence;
+    m->last_sequence = s->sequence;
+    m->gpu_age_ms    = (double) (now_ns - s->sampled_ns) / 1e6;
+    m->status        = m->gpu_age_ms > 6000 ? 4 : s->status;
     if (s->source) {
         m->source  = s->source;
         m->unified = s->unified;
@@ -39,8 +41,7 @@ void app_memory_observe(struct app_memory_record      *m,
     if (m->status != 1)
         return;
     m->gpu_end = (double) s->allocated_bytes;
-    if (m->last_sequence != s->sequence) {
-        m->last_sequence = s->sequence;
+    if (fresh) {
         ++m->gpu_samples;
         if (m->gpu_end > m->gpu_peak)
             m->gpu_peak = m->gpu_end;
