@@ -5,7 +5,7 @@ struct json;
 /* Numeric scopes, never a sum of RSS and device allocation. -1 is unknown. */
 struct app_memory_record {
     char     generation[112];
-    double   sampled_at, gpu_age_ms, gpu_end, gpu_peak;
+    double   sampled_at, gpu_age_ms, gpu_end, gpu_peak, rss_age_ms;
     unsigned gpu_samples, status, source, rss_source;
     bool     unified;
     uint64_t last_sequence; /* transient deduplication, never serialized */

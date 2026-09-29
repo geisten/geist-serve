@@ -133,10 +133,12 @@ function renderReplyMetrics(element) {
   element.title = `${t('First text')}: ${timeText(m.first)} · ${t('First answer')}: ${timeText(m.firstAnswer)}${m.reasoning ? ' · ' + t('Tokens and time include answer preparation.') : ''}`;
 }
 function renderMemory() {
-  const h = state?.hardware, r = state?.resources, memory = state?.memory;
-  const rss = !executionLoading() && state?.ready && r?.scope === 'geistd' && knownNumber(memory?.process_rss_bytes) ? memory.process_rss_bytes : null;
+  const r = state?.resources, memory = state?.memory;
+  const localAge=Math.max(0,performance.now()-stateReceivedAt);
+  const rssFresh=knownNumber(memory?.process_rss_sample_age_ms) && memory.process_rss_sample_age_ms+localAge<=6000;
+  const rss = !executionLoading() && state?.ready && rssFresh && r?.scope === 'geistd' && knownNumber(memory?.process_rss_bytes) ? memory.process_rss_bytes : null;
   $('test-memory').textContent = rss === null ? '—' : gib(rss);
-  const age=(memory?.gpu_sample_age_ms ?? 0)+Math.max(0,performance.now()-stateReceivedAt);
+  const age=(memory?.gpu_sample_age_ms ?? 0)+localAge;
   const stale=age>6000;
   const gpuMemory = !executionLoading() && !stale && memory?.status===1 && knownNumber(memory.gpu_allocated_bytes) ? memory.gpu_allocated_bytes : null;
   const memoryReason = t(stale ? 'Stale measurement' : ({unsupported:'Unsupported',query_failed:'Measurement failed',stale:'Stale measurement'})[memory?.gpu_unavailable_reason] || 'Not measured yet');

@@ -12,7 +12,8 @@ const char *app_rss_source(void) {
 #endif
 }
 void app_memory_reset(struct app_memory_record *m) {
-    *m = (struct app_memory_record) {.gpu_end = -1, .gpu_peak = -1, .gpu_age_ms = -1};
+    *m = (struct app_memory_record) {
+            .gpu_end = -1, .gpu_peak = -1, .gpu_age_ms = -1, .rss_age_ms = -1};
 }
 void app_memory_observe(struct app_memory_record      *m,
                         const struct lifecycle_memory *s,
@@ -22,12 +23,15 @@ void app_memory_observe(struct app_memory_record      *m,
     m->status     = 0;
     m->gpu_age_ms = -1;
     m->sampled_at = timestamp;
-    if (!s || !s->sampled_ns || s->sampled_ns > now_ns)
+    if (!s || !s->sampled_ns || s->sampled_ns > now_ns || s->status > 3 || s->source > 1 ||
+        s->sequence < m->last_sequence || s->allocated_bytes > 1000000000000000ull)
         return;
     m->gpu_age_ms = (double) (now_ns - s->sampled_ns) / 1e6;
     m->status     = m->gpu_age_ms > 6000 ? 4 : s->status;
-    m->source     = s->source;
-    m->unified    = s->unified;
+    if (s->source) {
+        m->source  = s->source;
+        m->unified = s->unified;
+    }
     if (m->status != 1 || m->source != 1)
         return;
     m->gpu_end = (double) s->allocated_bytes;
@@ -45,10 +49,12 @@ static void numeric(struct app_buffer *b, double n) {
         app_printf(b, "%.17g", n);
 }
 bool app_memory_valid(const struct app_memory_record *m) {
-    return m->status <= 4 && m->source <= 1 && m->rss_source <= 2 && m->gpu_samples <= 1000000 &&
+    return strnlen(m->generation, sizeof m->generation) < sizeof m->generation && m->status <= 4 &&
+           m->source <= 1 && m->rss_source <= 2 && m->gpu_samples <= 1000000 &&
            isfinite(m->gpu_end) && m->gpu_end >= -1 && m->gpu_end <= 1e15 &&
            isfinite(m->gpu_peak) && m->gpu_peak >= -1 && m->gpu_peak <= 1e15 &&
            isfinite(m->gpu_age_ms) && m->gpu_age_ms >= -1 && m->gpu_age_ms <= 1e12 &&
+           isfinite(m->rss_age_ms) && m->rss_age_ms >= -1 && m->rss_age_ms <= 1e12 &&
            isfinite(m->sampled_at) && m->sampled_at >= 0 && m->sampled_at <= 1e12 &&
            (m->gpu_samples == 0 || (m->source == 1 && m->gpu_peak >= 0)) &&
            (m->status != 1 ||
@@ -71,6 +77,8 @@ void app_memory_json(struct app_buffer              *b,
     numeric(b, rss);
     app_put(b, ",\"process_rss_sampled_peak_bytes\":");
     numeric(b, peak_rss);
+    app_put(b, ",\"process_rss_sample_age_ms\":");
+    numeric(b, m->rss_age_ms);
     app_put(b, ",\"rss_source\":");
     app_quote(b,
               m->rss_source == 1   ? "macos.proc_pid_rusage.ri_resident_size"
@@ -120,6 +128,7 @@ bool app_memory_parse(struct app_memory_record *m, const struct json *j, int ind
     }
     m->sampled_at    = json_num(j, json_get(j, index, "sampled_at"), 0);
     m->gpu_age_ms    = json_num(j, json_get(j, index, "gpu_sample_age_ms"), -1);
+    m->rss_age_ms    = json_num(j, json_get(j, index, "process_rss_sample_age_ms"), -1);
     m->gpu_end       = json_num(j, json_get(j, index, "gpu_allocated_bytes"), -1);
     m->gpu_peak      = json_num(j, json_get(j, index, "gpu_allocated_sampled_peak_bytes"), -1);
     char *rss_source = json_strdup(j, json_get(j, index, "rss_source"));

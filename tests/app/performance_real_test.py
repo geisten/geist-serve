@@ -40,6 +40,13 @@ with tempfile.TemporaryDirectory(prefix='geist-performance-real-') as temporary:
         code,data,_=app.request('/app/performance/export');assert code==200
         rows=[json.loads(line) for line in data.splitlines()]
         assert all(r['schema']==2 and r['engine']['geistlib']==build['geistlib'] and len(r['engine']['payload_sha256'])==64 for r in rows)
+        for r in rows:
+            memory=r['memory']
+            assert memory['process_rss_bytes']==r['rss'] and memory['total_unique_physical_bytes'] is None
+            assert memory['rss_source']==('macos.proc_pid_rusage.ri_resident_size' if os.uname().sysname=='Darwin' else 'linux.proc_pid_stat.rss')
+            assert memory['status']==(1 if r['backend']=='metal' else 2), memory
+            if r['backend']=='metal':assert memory['gpu_allocated_bytes']>0 and memory['gpu_samples']>0
+            else:assert memory['gpu_allocated_bytes'] is None
         runs=[r for r in rows if r['source']=='controlled_test']
         assert len(runs)==(8 if state['execution']['gpu_available'] else 4)
         assert all(r['outcome']=='completed' and r['output']>0 and r['generation_ns']>0 and r['first_ns']>0 for r in runs)

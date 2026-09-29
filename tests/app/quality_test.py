@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import copy
 import importlib.util
+import re
 import json
 from pathlib import Path
 import sys
@@ -107,8 +108,9 @@ class QualityTests(unittest.TestCase):
                 rows.append(dict(id=c['id'],task=c['task'],language=c['language'],adverse=c['split']=='adverse',output=output,stats={},error=None,**automatic(c,output)))
             reviews={r['id']:{'pass':True,'critical':False,'reason':'Synthetic unit-test fixture only'} for r in rows}
             with patch.object(evidence,'ROOT',root):
+                pin=re.search(r'^GEIST_REF\s*\?=\s*([a-f0-9]{40})$',(root/'Makefile').read_text(),re.M).group(1)
                 run=dict(rows=rows,split='acceptance',model_id='bitnet-2b',model_sha256='4221b252fdd5fd25e15847adfeb5ee88886506ba50b8a34548374492884c2162',
-                         device='pi5',engine_ref='e26436906ff6fe7eda296b90fa3a7a9dfa69f418',app_sha256='a'*64,daemon_sha256='b'*64,
+                         device='pi5',engine_ref=pin,app_sha256='a'*64,daemon_sha256='b'*64,
                          scorer_sha256=sha(root/'quality/evaluate.py'),source_sha256=source_hash(),policy_sha256=sha(root/'quality/policy.json'),
                          configuration=POLICY['configuration'],corpus_sha256=sha(bundle/'corpus.json'),adverse_sha256=sha(bundle/'adverse.json'),
                          task_versions={t['id']:t['version'] for t in json.loads((root/'tasks/catalog.json').read_text())['tasks']})
@@ -121,7 +123,7 @@ class QualityTests(unittest.TestCase):
                 for stale in ['0'*40,'25861c0bd197f1a98f17e49efe0cdc48a0e40713']:
                     run['engine_ref']=stale;save()
                     with self.assertRaisesRegex(ValueError,'identity mismatch'):load_bundle(bundle)
-                run['engine_ref']='e26436906ff6fe7eda296b90fa3a7a9dfa69f418'
+                run['engine_ref']=pin
                 rows[0]['automatic_pass']=False;save()
                 with self.assertRaisesRegex(ValueError,'score disagrees'):load_bundle(bundle)
                 rows[0]['automatic_pass']=True;save()

@@ -18,7 +18,9 @@ geist-app: src/app/main.c $(APP_SOURCE) $(APP_RUNTIME) $(APP_HEADERS) src/app/co
 build/test_app_core: build/app_models.h tests/app/core_test.c $(APP_SOURCE) src/app/core.h
 	@mkdir -p build
 	$(APP_CC) $(APP_CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ tests/app/core_test.c $(APP_SOURCE) src/json.c $(APP_LDLIBS)
-test-app: build/test_app_lifecycle build/test_app_activity build/test_app_engine build/test_app_output build/test_app_engine_identity build/test_app_performance build/test_app_resources build/geist-app-old build/geist-app-new build/geist-app-legacy build/geist-app-test geist-app geist build/test_app_core build/test_app_client build/test_app_tasks
+test-app: build/test_app_memory_journal build/test_app_memory build/test_app_lifecycle build/test_app_activity build/test_app_engine build/test_app_output build/test_app_engine_identity build/test_app_performance build/test_app_resources build/geist-app-old build/geist-app-new build/geist-app-legacy build/geist-app-test geist-app geist build/test_app_core build/test_app_client build/test_app_tasks
+	./build/test_app_memory
+	python3 -c 'import tempfile,subprocess; d=tempfile.TemporaryDirectory(); [subprocess.run(["./build/test_app_memory_journal",d.name,mode],check=True) for mode in ("write","read")]'
 	./build/test_app_lifecycle
 	./build/test_app_activity
 	python3 tests/app/activity_test.py
@@ -98,3 +100,9 @@ build/test_app_activity: tests/app/activity_test.c src/app/activity.c src/app/ac
 
 build/test_app_lifecycle: tests/app/lifecycle_test.c src/lifecycle.c src/lifecycle.h
 	$(APP_CC) $(APP_CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ tests/app/lifecycle_test.c src/lifecycle.c $(APP_LDLIBS)
+
+build/test_app_memory: tests/app/memory_test.c $(APP_SOURCE) src/json.c build/app_models.h
+	$(APP_CC) $(APP_CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ tests/app/memory_test.c $(APP_SOURCE) src/json.c $(APP_LDLIBS)
+
+build/test_app_memory_journal: tests/app/memory_journal_test.c src/app/performance.c src/app/performance.h $(APP_SOURCE) src/json.c build/app_models.h
+	$(APP_CC) $(APP_CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ tests/app/memory_journal_test.c src/app/performance.c $(APP_SOURCE) src/json.c $(APP_LDLIBS)

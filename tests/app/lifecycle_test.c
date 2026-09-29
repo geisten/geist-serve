@@ -26,6 +26,12 @@ int main(void) {
         for (unsigned i = LC_BACKEND; i < LC_PHASES; i++)
             lifecycle_phase(owned, i);
         lifecycle_phase(owned, LC_BACKEND); /* no duplicate overwrite */
+        struct lifecycle_memory memory = {.sampled_ns      = lifecycle_now_ns(),
+                                          .allocated_bytes = UINT64_C(10737418240),
+                                          .status          = 1,
+                                          .source          = 1,
+                                          .unified         = true};
+        lifecycle_memory_write(owned, &memory);
         lifecycle_close(&owned);
         assert(!owned);
         _exit(0);
@@ -39,6 +45,15 @@ int main(void) {
                (i == LC_BACKEND || sample.phase_ns[i] >= sample.phase_ns[i - 1]));
     assert(!lifecycle_read(shared, 43, &sample));
     assert(!sample.sequence);
+    struct lifecycle_memory memory;
+    assert(lifecycle_memory_read(shared, 42, &memory));
+    assert(memory.process == (uint64_t) child && memory.generation == 42 && memory.sequence == 2);
+    assert(memory.allocated_bytes == UINT64_C(10737418240) && memory.unified && memory.source == 1);
+    assert(!lifecycle_memory_read(shared, 43, &memory) && !memory.sequence);
+    assert(!lifecycle_memory_read(nullptr, 42, &memory));
+    memory = (struct lifecycle_memory) {.sampled_ns = lifecycle_now_ns(), .status = 4};
+    lifecycle_memory_write(shared, &memory);
+    assert(!lifecycle_memory_read(shared, 42, &memory));
     close(fd);
     lifecycle_close(&shared);
     lifecycle_close(&shared);
