@@ -96,6 +96,7 @@ static struct {
     double                     loading_started, loaded_ms;
     unsigned                   runtime_requests, runtime_threads;
     char                       profile_series[768];
+    struct app_engine          engine;
     struct perf_record        *observation;
     struct app_resource_window observation_window;
     double                     sample_ms, cpu_sum;
@@ -512,8 +513,14 @@ static void poll_child(void) {
     }
     if (app.ready)
         return;
-    char reported[24];
-    if (app_daemon_ready_backend(app.socket_path, reported)) {
+    char              reported[24];
+    struct app_engine identity;
+    if (app_daemon_identity(app.socket_path, reported, &identity)) {
+        snprintf(identity.payload_sha256,
+                 sizeof identity.payload_sha256,
+                 "%s",
+                 app.engine.payload_sha256);
+        app.engine           = identity;
         app.backend_verified = !strcmp(reported, app.backend);
         if (reported[0] && !app.backend_verified) {
             stop_child();
@@ -577,6 +584,8 @@ static bool start_child_mode(const char *path, const char *id, const char *mode)
         return false;
     }
     stop_child();
+    app.engine = (struct app_engine) {0};
+    (void) app_engine_sha256(app.server, app.engine.payload_sha256);
     struct app_hardware hardware;
     bool                known = app_hardware_read(&hardware, app.home);
     if (!known || !hardware.supported) {
@@ -853,6 +862,7 @@ static void observation_begin(
         struct perf_record *r, const char *source, unsigned max, float temperature, float top_p) {
     memset(r, 0, sizeof *r);
     perf_begin(r);
+    r->engine                     = app.engine;
     const struct app_model *model = app_model_find(app.active_id);
     snprintf(r->model, sizeof r->model, "%s", app.active_id);
     /* Uncatalogued files have no verified artifact identity and stay diagnostic. */
@@ -1390,6 +1400,8 @@ static void status_response(int fd, struct app_arena *arena) {
     app_quote(&b, app.answer_language);
     const struct app_model *execution_model = app_model_find(app.active_id);
     bool                    gpu             = gpu_supported(execution_model);
+    app_put(&b, ",\"engine\":");
+    app_engine_json(&b, &app.engine);
     app_put(&b, ",\"request_phase\":");
     app_quote(&b, app.generating ? app.request_phase : "idle");
     app_put(&b, ",\"last_error\":{\"message\":");

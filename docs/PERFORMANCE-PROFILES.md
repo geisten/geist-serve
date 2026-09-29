@@ -163,3 +163,24 @@ legacy values stay unknown. `reasoning` indicates a recognized hidden block.
 Generated tokens and generation time include preparation. `no_answer` observations
 are retained diagnostically and do not contribute to successful-answer aggregates.
 No reasoning text is saved in this schema or exports.
+
+## Actual engine provenance (observation schema 2)
+
+`geistd --build-info` reports the linked library's version, the resolved source
+revision/state and the SHA-256 of its static archive. `info.engine` reports the
+same identity after loading. The build partitions object directories by source
+content and verifies unchanged inputs before linking; header/link version mismatch
+fails closed. Release packages include `ENGINE.json` and require clean provenance.
+Source archives without Git remain unknown, never a guessed clean revision.
+
+The app freezes this identity and its signature-independent executable payload
+hash at request admission. Schema-2 records and compatible aggregates contain
+`engine.geistlib.{version,revision,source_state}` and `engine.payload_sha256`.
+Unavailable identity fields are null with `unavailable_reason: not_reported`.
+The bounded parser rejects malformed provenance. Older daemons still operate
+with explicitly unknown identity. Different revisions never share an aggregate,
+even if semantic versions match. The payload remains an independent safeguard.
+
+Schema-1 rows are read and exported as schema 1, without retroactive metadata.
+Mixed journals, rotation, retention and derived-cache reconstruction preserve
+this distinction. Provenance contains neither checkout paths nor user content.

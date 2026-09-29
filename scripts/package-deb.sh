@@ -22,6 +22,7 @@ install -m 644 deploy/systemd/geist.service "$stage/usr/lib/systemd/user/"
 install -m 644 web/vendor/marked-LICENSE "$stage/usr/share/doc/geist/marked-LICENSE"
 install -m 644 web/vendor/katex-LICENSE "$stage/usr/share/doc/geist/katex-LICENSE"
 install -m 644 LICENSE "$stage/usr/share/doc/geist/copyright"
+python3 scripts/engine-provenance.py package ./geistd --require-clean --output "$stage/usr/share/doc/geist/ENGINE.json"
 install -m 644 docs/INSTALL.md "$stage/usr/share/doc/geist/README.md"
 cat > "$stage/DEBIAN/control" <<EOF
 Package: geist

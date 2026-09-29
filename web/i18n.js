@@ -15,6 +15,7 @@ const formatNumber = (value, digits = 0) => new Intl.NumberFormat(interfaceLangu
   minimumFractionDigits: digits, maximumFractionDigits: digits
 }).format(value);
 const german = {
+  'Unknown': 'Unbekannt', 'Modified build': 'Geänderter Build',
   "Preparing answer…": "Antwort wird vorbereitet …",
   "First answer": "Erste sichtbare Antwort",
   "Tokens and time include answer preparation.": "Token und Zeit enthalten die Antwortvorbereitung.",

@@ -47,9 +47,10 @@ endif
 
 empty :=
 space := $(empty) $(empty)
-ENGINE_FLAVOR := $(GEMM_PROVIDER)-$(subst $(space),-,$(strip $(BACKENDS)))
-ENGINE_BUILD := build/$(TARGET)/$(MODE)-$(ENGINE_FLAVOR)
-ENGINE_LIB := lib/$(TARGET)/$(MODE)-$(ENGINE_FLAVOR)
+ENGINE_FLAVOR := omp$(GEIST_STATIC_OMP)-$(GEMM_PROVIDER)-$(subst $(space),-,$(strip $(BACKENDS)))
+ENGINE_SOURCE_ID := $(if $(ENGINE),$(shell python3 scripts/engine-provenance.py identity $(GEISTLIB)),none)
+ENGINE_BUILD := build/$(TARGET)/$(MODE)-$(ENGINE_FLAVOR)-$(ENGINE_SOURCE_ID)
+ENGINE_LIB := lib/$(TARGET)/$(MODE)-$(ENGINE_FLAVOR)-$(ENGINE_SOURCE_ID)
 LIB := $(GEISTLIB)/$(ENGINE_LIB)/libgeist.a
 
 # EXTRA_* are geistlib's own escape hatches; the Linux release binary links
@@ -73,9 +74,10 @@ geist-serve: src/serve.c $(SHARED) $(HDRS) $(LIB)
 
 # geistd: libgeist over a socket for agents (resident sessions, logits).
 GEISTD_OUTPUT ?= geistd
-$(GEISTD_OUTPUT): src/geistd.c $(SHARED) $(HDRS) $(LIB)
+$(GEISTD_OUTPUT): src/geistd.c $(SHARED) $(HDRS) $(LIB) scripts/engine-provenance.py
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -o $@ src/geistd.c $(SHARED) $(LIB) $(LDFLAGS) $(LDLIBS)
+	python3 scripts/engine-provenance.py capture $(GEISTLIB) --archive $(LIB) --expected $(ENGINE_SOURCE_ID) --output build/engine-build.h
+	$(CC) $(CFLAGS) -Ibuild -o $@ src/geistd.c $(SHARED) $(LIB) $(LDFLAGS) $(LDLIBS)
 
 # Model-free unit test of the chat renderers; no engine needed.
 build/test_template: tests/test_template.c src/template.c src/template.h

@@ -158,6 +158,8 @@ function renderPerformance() {
     $(`history-${mode}-time`).textContent = sample?.recorded_at ? new Intl.DateTimeFormat(interfaceLanguage, {dateStyle:'short',timeStyle:'short'}).format(new Date(sample.recorded_at * 1000)) : '—';
     $(`history-${mode}`).title = `${mode.toUpperCase()}: ${t(sample ? sample.count < 5 ? 'First observations' : 'Typical' : 'Not measured yet')} · ${sample?.count || 0}`;
   }
+  const engine = compatible ? profile[state?.execution?.active]?.engine?.geistlib : null;
+  $('profile-engine').textContent = `geistlib ${engine?.version || t('Unknown')} · ${engine?.revision?.slice(0,12) || t('Unknown')}${engine?.source_state === 'modified' ? ' · ' + t('Modified build') : ''}`;
   const group = compatible ? profile.group : null;
   $('profile-first').textContent = timeText(compatible ? profile[state?.execution?.active]?.first : null);
   $('profile-group').textContent = group ? [t('Latest workload'), `${t('Input')}: ${['≤512','513–2048','>2048'][group.input]}`, `${t('Output')}: ${['<32','32–127','128–511','≥512'][group.output]}`, t('tokens'), t(group.cached ? 'Cache reused' : 'No cache reuse'), t(group.cold ? 'First reply after load' : 'Warm'), group.contention ? t('Download overlap') : '', group.controlled ? t('Controlled comparison') : t('Ordinary use')].filter(Boolean).join(' · ') : t('Not measured yet');

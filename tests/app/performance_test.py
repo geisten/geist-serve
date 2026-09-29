@@ -34,7 +34,8 @@ def main():
         for m in catalog['models']:m['backends']=['cpu','metal']
         model=catalog['models'][0];shutil.copyfile(source,home/'models'/model['file'])
         (home/'catalog.json').write_text(json.dumps(catalog));(home/'selected').write_text(model['id'])
-        gate=home/'gate';env={**os.environ,'GEIST_PEER_GATE':str(gate)}
+        gate=home/'gate';identity={'geistlib':{'version':'0.11.0','revision':'a'*40,'source_state':'clean'}}
+        env={**os.environ,'GEIST_PEER_GATE':str(gate),'GEIST_PEER_ENGINE':json.dumps(identity)}
         def start(binary=BINARY):
             app=App(home,binary=binary,server=wrapper,env=env);app.wait(lambda s:s['ready'] and not s['busy']);return app
         app=start()
@@ -47,6 +48,7 @@ def main():
             rows=exported(app);assert len({r['id'] for r in rows})==6
             assert {r['source'] for r in rows}=={'app','api'}
             assert all(r['first_ns']>0 and r['total_ns']>=r['first_ns'] for r in rows)
+            assert all(r['schema']==2 and r['engine']['geistlib']==identity['geistlib'] and len(r['engine']['payload_sha256'])==64 for r in rows)
             assert rows[0]['cold'] and all(not r['cold'] for r in rows[1:])
             assert all(r['rss']>0 and r['peak_rss']>=r['rss'] for r in rows)
             assert 'Say hello' not in json.dumps(rows) and 'Fixture response' not in json.dumps(rows)
@@ -102,6 +104,8 @@ def main():
         golden=[]
         for i,rate in enumerate([10,20,30,40,10000]):
             r={**base,'id':f'gold-{i}','output':64,'generation_ns':64/rate*1e9};golden.append(r)
+        legacy_row={**golden[0],'id':'schema-1','schema':1};legacy_row.pop('engine');golden.insert(0,legacy_row)
+        other=copy.deepcopy(golden[-1]);other['id']='other-engine';other['engine']['geistlib']['revision']='b'*40;golden.insert(1,other)
         golden.insert(1,{**golden[0],'id':'gpu-other-workload','backend':'metal','output':2})
         golden.insert(2,{**golden[0],'id':'failed','outcome':'error','generation_ns':1})
         journal.write_text(''.join(json.dumps(r)+'\n' for r in golden)+'{"schema":')
@@ -114,10 +118,15 @@ def main():
             p=profile(app);assert p['invalid']==1 and p['cpu']['count']==5,p
             assert (p['cpu']['rate'],p['cpu']['q25'],p['cpu']['q75'])==(30,20,40),p
             assert p['gpu'] is None,'Must not borrow another workload to fill GPU'
-            request(app);app.wait(lambda s:s['performance_profile']['persisted']>=8)
+            request(app);app.wait(lambda s:s['performance_profile']['persisted']>=10)
         finally:app.close()
         app=start()
-        try:assert len(exported(app))==8 and profile(app)['invalid']==1
+        try:
+            restored=exported(app)
+            assert len(restored)==10 and profile(app)['invalid']==1
+            assert next(r for r in restored if r['id']=='schema-1')['schema']==1
+            assert 'engine' not in next(r for r in restored if r['id']=='schema-1')
+            assert next(r for r in restored if r['id']=='other-engine')['engine']['geistlib']['revision']=='b'*40
         finally:app.close()
         # Legacy import survives restart, stays archived, and deletion never reimports.
         legacy=home/f'performance-{base["artifact"]}-{base["backend"]}'
