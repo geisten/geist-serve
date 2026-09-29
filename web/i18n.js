@@ -59,7 +59,6 @@ const german = {
   "Connect your program.": "Verbinde dein Programm.",
   "Downloaded": "Heruntergeladen",
   "Not downloaded": "Nicht heruntergeladen",
-  "Checking download…": "Download wird geprüft…",
 
   "Model RAM · now": "Modell-RAM · aktuell",
   "Model CPU · now": "Modell-CPU · aktuell",
@@ -332,6 +331,8 @@ Object.assign(german, {
   "CPU is suggested for this small model. This is a hardware default, not a measured speed comparison.": "CPU wird für dieses kleine Modell empfohlen. Die Empfehlung beruht auf der Hardware, nicht auf einem gemessenen Geschwindigkeitsvergleich.",
   "Choose Auto, CPU or GPU.": "Wähle Auto, CPU oder GPU.",
   "Wait until the loaded model is idle before changing execution.": "Warte vor dem Wechsel, bis das geladene Modell nicht mehr beschäftigt ist.",
+  "Checking model…": "Modell wird geprüft…",
+  "Cannot finish verification. The model file changed.": "Prüfung nicht abgeschlossen. Die Modelldatei wurde verändert.",
   "Cannot save execution preference.": "Die Ausführungseinstellung konnte nicht gespeichert werden.",
   "Cannot change execution. Restoring CPU.": "Ausführung konnte nicht gewechselt werden. CPU wird wiederhergestellt.",
   "GPU stopped or failed to load. Restored CPU; diagnostics are kept in the app data folder.": "GPU beendet oder Start fehlgeschlagen. CPU wiederhergestellt; die Diagnose bleibt im App-Datenordner erhalten.",

@@ -831,7 +831,17 @@ body.manager-page main { max-width:1180px }
 .execution-choice label:has(input:disabled) { opacity:.55; cursor:default }
 .execution-choice label:hover:not(:has(input:disabled)) { color:var(--ink) }
 .recommended-mark { color:#27623c; font-size:9px; font-weight:550 }
-.execution-current { color:var(--muted); font-size:11px }
+.processor-indicator::before { content:'✓' }
+.execution-choice label.is-loading .processor-indicator::before { content:'' }
+.recommended-mark::before { content:'★' }
+.processor-option { display:flex; flex-direction:column; align-items:flex-start; gap:1px; line-height:1.2 }
+.processor-backend { font-size:10px; font-weight:400; color:var(--muted) }
+.processor-indicator { width:12px; height:12px; flex:none; visibility:hidden; color:var(--success); font-size:12px; line-height:12px }
+.execution-choice label.is-active { color:var(--ink); border-color:#aacbb5; background:#fff }
+.execution-choice label.is-active .processor-indicator, .execution-choice label.is-loading .processor-indicator { visibility:visible }
+.execution-choice label.is-loading .processor-indicator { border:2px solid #d9e7de; border-top-color:var(--success); border-radius:50%; animation:processor-loading .9s linear infinite }
+.model-ring[data-stage="loading"] .ring-fill { stroke:var(--success); animation:processor-loading 1.2s linear infinite; transform-origin:center }
+@media (prefers-reduced-motion:reduce) { .execution-choice label.is-loading .processor-indicator, .model-ring[data-stage="loading"] .ring-fill { animation:none; border-style:dashed } }
 #execution-notice { margin:0 0 8px; font-size:12px; flex:none }
 .catalog-heading { display:flex; align-items:baseline; gap:10px }
 #catalog-file { max-width:100%; font-size:12px; padding:8px 0 }

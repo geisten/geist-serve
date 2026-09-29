@@ -47,6 +47,9 @@ window.chatChecksStage = 'locale';
     assert(ring.dataset.stage === 'paused' && ring.getAttribute('aria-valuenow') === '25', 'paused download retains progress');
     renderRing(ring, downloadModel, {phase:'verifying', job_model:downloadModel.id, received:downloadModel.bytes});
     assert(ring.dataset.stage === 'verifying' && !ring.hasAttribute('aria-valuenow'), '100 percent transfer does not imply a verified completed download');
+    assert(!ring.getAttribute('aria-label').includes('Download'), 'existing-file verification does not imply a new download');
+    renderRing(ring, downloadModel, {phase:'preparing', job_model:downloadModel.id});
+    assert(ring.dataset.stage === 'loading' && !ring.hasAttribute('aria-valuenow'), 'cached model preparation is loading, not download progress');
     renderRing(ring, {...downloadModel, installed:true}, {phase:'',job_model:''});
     assert(ring.dataset.stage === 'downloaded' && ring.style.getPropertyValue('--ring-progress') === '100' && !ring.hasAttribute('aria-valuenow'), 'complete download closes the ring independent of active model');
     renderRing(ring, downloadModel, {phase:'',job_model:''});
@@ -185,7 +188,7 @@ window.chatChecksStage = 'locale';
     const beforeExecutionAPI = api;
     const executionIdle = async () => { for (let i=0;i<100 && (requesting || polling);i++) await tick(); assert(!requesting,'execution action settles'); };
     try {
-      executionFixture.execution = {mode:'auto',active:'cpu',backend:'cpu_neon',recommended:'gpu',gpu_available:true,basis:'hardware',notice:'',reason:'GPU is suggested for this larger model. This is a hardware default, not a measured speed comparison.'};
+      executionFixture.execution = {mode:'auto',active:'cpu',backend:'cpu_neon',gpu_backend:'metal',recommended:'gpu',gpu_available:true,basis:'hardware',notice:'',reason:'GPU is suggested for this larger model. This is a hardware default, not a measured speed comparison.'};
       api = async (path, body, signal) => {
         if (path === '/app/status') return new Response(JSON.stringify(executionFixture));
         if (path === '/app/execution') {
@@ -211,9 +214,13 @@ window.chatChecksStage = 'locale';
       $('performance').open=true;await tick();
       const cpu = document.querySelector('[name="execution"][value="cpu"]'), gpu=document.querySelector('[name="execution"][value="gpu"]');
       assert(document.querySelector('[name="execution"]:checked').value==='auto' && !gpu.closest('label').querySelector('.recommended-mark').hidden, 'recommendation and selected mode remain distinct');
+      assert(cpu.closest('label').classList.contains('is-active') && !gpu.closest('label').classList.contains('is-active'), 'Auto exposes the actual processor inside its option');
+      assert(cpu.getAttribute('aria-label').includes(t('Active processor')) && gpu.closest('label').querySelector('.processor-backend').textContent==='Metal', 'active processor is accessible and GPU backend is an option sublabel');
+      assert($('execution-current').classList.contains('sr-only'), 'no duplicate visible processor label outside the choices');
       assert($('execution-choice').closest('#workspace') && !$('settings-page').contains($('execution-choice')), 'processor choice lives with active model only');
       gpu.click(); await executionIdle();
       assert(executionCalls.length===1 && executionCalls[0].mode==='gpu' && gpu.checked, 'GPU click targets real execution endpoint');
+      assert(gpu.closest('label').classList.contains('is-loading') && !document.querySelector('.execution-choice .is-active'), 'pending choice spins without claiming an active backend');
       assert(!$('workspace').hidden && $('test-unavailable').hidden && $('runtime-state').classList.contains('loading'), 'asynchronous reload keeps the workspace and shows a status ring');
       assert(getComputedStyle($('runtime-state')).animationName === (matchMedia('(prefers-reduced-motion:reduce)').matches ? 'none' : 'processor-loading'), 'loading animation respects reduced motion');
       assert($('result')===retainedTranscript && $('result').innerHTML===retainedContent && $('performance').open, 'reload preserves transcript nodes and expanded metrics');
@@ -222,6 +229,11 @@ window.chatChecksStage = 'locale';
       input('Edited during reload');
       executionFixture.ready=true;executionFixture.loading=false;executionFixture.execution.active='gpu';executionFixture.execution.backend='metal';render(executionFixture);
       assert(!$('runtime-state').classList.contains('loading') && $('execution-current').textContent==='GPU · Metal', 'ready status removes spinner and reports actual backend');
+      assert(gpu.closest('label').classList.contains('is-active') && !gpu.closest('label').classList.contains('is-loading'), 'completed GPU option gets the active check');
+      for (const [backend, display] of [['vulkan','Vulkan'],['cuda','CUDA'],['metal','Metal']]) {
+        executionFixture.execution.backend=backend;executionFixture.execution.gpu_backend=backend;render(executionFixture);
+        assert(gpu.closest('label').querySelector('.processor-backend').textContent===display, 'backend metadata appears within GPU choice');
+      }
       assert($('prompt').value==='Edited during reload', 'draft changes during reload survive');
       input('Keep draft across processors');
       assert($('prompt').value==='Keep draft across processors', 'backend switch preserves draft');

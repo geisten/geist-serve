@@ -13,6 +13,7 @@
 #include <curl/curl.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <math.h>
 #include <netinet/in.h>
 #include <poll.h>
@@ -698,7 +699,7 @@ static bool read_preference(const char *name, char *out, size_t cap) {
                      st.st_nlink == 1 && st.st_size > 0 && (uint64_t) st.st_size < cap;
     ssize_t     n  = ok ? read(fd, out, cap - 1) : -1;
     close(fd);
-    if (n <= 0 || n != st.st_size) {
+    if (n <= 0 || n != st.st_size || memchr(out, 0, (size_t) n)) {
         out[0] = 0;
         return false;
     }
@@ -934,6 +935,38 @@ static bool job_cancelled(void) {
     return atomic_load(&cancelled) || atomic_load(&closing);
 }
 
+/* A private receipt avoids rereading unchanged multi-GB files on each selection.
+ * Bind it to the expected digest AND the file identity, including nanosecond
+ * ctime: restoring mtime after an edit must not preserve the receipt. This is
+ * a local cache, not an attestation against code running as the same user. */
+static bool model_stamp(const char *path, const struct app_model *m, char out[static 512]) {
+    struct stat s;
+    if (lstat(path, &s) != 0 || !S_ISREG(s.st_mode) || s.st_size < 0 ||
+        (uint64_t) s.st_size != m->bytes)
+        return false;
+#ifdef __APPLE__
+    struct timespec modified = s.st_mtimespec, changed = s.st_ctimespec;
+#else
+    struct timespec modified = s.st_mtim, changed = s.st_ctim;
+#endif
+    int n = snprintf(out,
+                     512,
+                     "v1 %s %ju %ju %ju %ju %ju %ju %ju %jd %ld %jd %ld",
+                     m->sha256,
+                     (uintmax_t) s.st_dev,
+                     (uintmax_t) s.st_ino,
+                     (uintmax_t) s.st_size,
+                     (uintmax_t) s.st_mode,
+                     (uintmax_t) s.st_uid,
+                     (uintmax_t) s.st_gid,
+                     (uintmax_t) s.st_nlink,
+                     (intmax_t) modified.tv_sec,
+                     modified.tv_nsec,
+                     (intmax_t) changed.tv_sec,
+                     changed.tv_nsec);
+    return n > 0 && n < 512;
+}
+
 static void *model_job(void *unused) {
     (void) unused;
     const struct app_model *m                    = app.job_model;
@@ -944,18 +977,29 @@ static void *model_job(void *unused) {
     if (ok && app.job_download)
         ok = download_model(m, part, why, sizeof why);
     const char *verify = app.job_download ? part : target;
+    char        key[80], before[512] = "", after[512] = "", receipt[512] = "";
+    snprintf(key, sizeof key, "verified-%s", m->sha256);
+    bool stamped = ok && model_stamp(verify, m, before);
+    bool cached  = !app.job_download && stamped && read_preference(key, receipt, sizeof receipt) &&
+                   !strcmp(before, receipt);
     if (ok && !atomic_load(&cancelled) && !atomic_load(&closing)) {
-        pthread_mutex_lock(&app.mutex);
-        strcpy(app.phase, "verifying");
-        pthread_mutex_unlock(&app.mutex);
-        bool size_ok = regular_size(verify) == m->bytes;
-        bool hash_ok = size_ok && app_sha256_interruptible(verify, hash, job_cancelled);
-        ok           = hash_ok && strcmp(hash, m->sha256) == 0;
+        if (!cached) {
+            pthread_mutex_lock(&app.mutex);
+            strcpy(app.phase, "verifying");
+            pthread_mutex_unlock(&app.mutex);
+#ifdef APP_TESTING
+            fprintf(stderr, "model verification: hashing %s\n", m->id);
+#endif
+        }
+        bool size_ok = stamped;
+        bool hash_ok = cached || (size_ok && app_sha256_interruptible(verify, hash, job_cancelled));
+        bool stable  = model_stamp(verify, m, after) && !strcmp(before, after);
+        ok           = hash_ok && stable && (cached || strcmp(hash, m->sha256) == 0);
         if (!ok) {
             snprintf(why,
                      sizeof why,
                      "Checksum or size mismatch. The model was not started; download it again.");
-            if (!job_cancelled() && (!size_ok || hash_ok))
+            if (!job_cancelled() && (!size_ok || (hash_ok && stable)))
                 unlink(verify);
             else if (!job_cancelled())
                 snprintf(
@@ -963,10 +1007,26 @@ static void *model_job(void *unused) {
                         sizeof why,
                         "Cannot read the model for verification. Check disk and file permissions.");
         }
-        if (ok && app.job_download && rename(part, target) != 0) {
-            ok = false;
-            snprintf(why, sizeof why, "Cannot finish download: %s", strerror(errno));
+        if (ok && app.job_download) {
+            /* Keep the verified inode open across rename. Capture its new ctime
+             * only if the destination still describes that exact file. */
+            int         verified_fd = open(part, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC);
+            struct stat held, placed;
+            ok = verified_fd >= 0 && model_stamp(part, m, after) && !strcmp(before, after);
+            if (ok && rename(part, target) != 0) {
+                ok = false;
+                snprintf(why, sizeof why, "Cannot finish download: %s", strerror(errno));
+            }
+            ok = ok && fstat(verified_fd, &held) == 0 && lstat(target, &placed) == 0 &&
+                 held.st_dev == placed.st_dev && held.st_ino == placed.st_ino &&
+                 model_stamp(target, m, after);
+            if (verified_fd >= 0)
+                close(verified_fd);
+            if (!ok && !*why)
+                snprintf(why, sizeof why, "Cannot finish verification. The model file changed.");
         }
+        if (ok && !cached && !job_cancelled())
+            (void) save_preference(key, after);
     }
     pthread_mutex_lock(&app.mutex);
     if (atomic_load(&cancelled) || atomic_load(&closing)) {
@@ -994,7 +1054,7 @@ static bool begin_job(const struct app_model *m, bool download) {
     app.job_running  = true;
     app.received     = 0;
     app.message[0]   = 0;
-    strcpy(app.phase, download ? "downloading" : "verifying");
+    strcpy(app.phase, download ? "downloading" : "preparing");
     atomic_store(&cancelled, false);
     if (pthread_create(&app.job, nullptr, model_job, nullptr) != 0) {
         app.job_running = false;

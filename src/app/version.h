@@ -1,4 +1,4 @@
 #pragma once
 #ifndef APP_VERSION
-#define APP_VERSION "0.5.16"
+#define APP_VERSION "0.5.17"
 #endif

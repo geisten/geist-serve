@@ -81,6 +81,12 @@ try:
                     digest.update(chunk)
             assert digest.hexdigest() == expected
             assert (Path(home) / 'selected').read_text() == 'smollm2-360m'
+            receipt = Path(home)/('verified-'+expected)
+            assert receipt.exists() and receipt.stat().st_mode & 0o777 == 0o600
+            before = os.pread(app.log.fileno(), 100000, 0).count(b'model verification: hashing ')
+            assert app.request('/app/select', {'id':'smollm2-360m'})[0] == 202
+            app.wait(lambda s: not s['busy'], timeout=90)
+            assert os.pread(app.log.fileno(), 100000, 0).count(b'model verification: hashing ') == before
             print('download: cancellation, concurrent-action rejection, resume across launch, SHA and atomic placement passed')
         finally:
             app.close()

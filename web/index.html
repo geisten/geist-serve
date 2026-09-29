@@ -30,10 +30,10 @@
     <div class="execution-row">
       <fieldset id="execution-choice" class="execution-choice" aria-describedby="execution-description"><legend class="sr-only">Execution</legend>
         <label><input type="radio" name="execution" value="auto"><span>Auto</span></label>
-        <label><input type="radio" name="execution" value="cpu"><span>CPU</span><small class="recommended-mark" hidden>Recommended</small></label>
-        <label><input type="radio" name="execution" value="gpu"><span>GPU</span><small class="recommended-mark" hidden>Recommended</small></label>
+        <label><input type="radio" name="execution" value="cpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option"><span>CPU</span></span><small class="recommended-mark" aria-hidden="true" hidden></small></label>
+        <label><input type="radio" name="execution" value="gpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option"><span>GPU</span><small class="processor-backend" hidden></small></span><small class="recommended-mark" aria-hidden="true" hidden></small></label>
       </fieldset>
-      <span id="execution-current" class="execution-current" role="status" aria-live="polite"></span>
+      <span id="execution-current" class="sr-only" role="status" aria-live="polite"></span>
       <span id="execution-description" class="sr-only"></span>
     </div>
     <p id="execution-notice" class="hint" role="status" hidden></p>

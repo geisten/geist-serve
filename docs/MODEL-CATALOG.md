@@ -43,6 +43,23 @@ the effective catalog; `POST /app/catalog` imports its raw JSON.
 
 ## CPU and GPU
 
+### Reusing verified model files
+
+Each newly downloaded or previously unverified catalog file receives a full
+SHA-256 check. The service then saves a private, atomic verification receipt
+bound to the catalog digest, file device/inode, size, owner, permissions, link
+count and nanosecond modification/change timestamps. Switching back to an
+unchanged model, including after a service restart, checks that receipt instead
+of rereading the full model. Replacing or changing a file, an invalid receipt,
+or a new catalog digest requires full verification again. Same-size edits with
+restored mtime invalidate through ctime. Symlinks are never accepted.
+
+This receipt is a local cache, not proof against a process with the same user
+privileges. Failure to save it only costs another full check. Model loading into
+CPU/GPU memory still takes time. The UI distinguishes loading from checking a
+model and downloading new bytes; existing files are never labeled as a download
+merely because they need verification.
+
 The active-model header offers **Auto · CPU · GPU**. Auto currently suggests
 Metal for supported catalog models of at least 1 GiB; smaller models and the
 ternary BitNet package use CPU. This is an explicit hardware heuristic, not a
@@ -56,6 +73,13 @@ include Metal. Current Linux packages remain CPU-only; a Vulkan engine build and
 hardware validation are prerequisites before exposing a working Linux GPU
 option. Adding `vulkan` to JSON alone does not enable it. Custom GGUF files without
 catalog capability metadata use CPU.
+
+The active processor has a check within its option, while the selected radio
+records the policy (including Auto). A star marks the hardware recommendation;
+it is not a measured-speed award. Reloading replaces the active check with a
+spinner until the backend is ready. GPU backend names, such as Metal, appear as
+option sublabels. Screen-reader labels and a polite status announce the same
+information without duplicating visible text beside the control.
 
 Switching an idle model restarts the same owned `geistd` with an explicit
 `GEIST_BACKEND`. It neither downloads nor hashes the model again. The daemon

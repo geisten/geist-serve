@@ -18,7 +18,7 @@ geist-app: src/app/main.c $(APP_SOURCE) $(APP_RUNTIME) $(APP_HEADERS) src/app/co
 build/test_app_core: build/app_models.h tests/app/core_test.c $(APP_SOURCE) src/app/core.h
 	@mkdir -p build
 	$(APP_CC) $(APP_CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ tests/app/core_test.c $(APP_SOURCE) src/json.c $(APP_LDLIBS)
-test-app: build/test_app_resources build/geist-app-old build/geist-app-new build/geist-app-legacy geist-app geist build/test_app_core build/test_app_client build/test_app_tasks
+test-app: build/test_app_resources build/geist-app-old build/geist-app-new build/geist-app-legacy build/geist-app-test geist-app geist build/test_app_core build/test_app_client build/test_app_tasks
 	./build/test_app_resources
 	./build/test_app_core
 	./build/test_app_tasks
@@ -28,6 +28,7 @@ test-app: build/test_app_resources build/geist-app-old build/geist-app-new build
 	python3 tests/app/deadline_test.py
 	python3 tests/app/http_test.py
 	python3 tests/app/catalog_test.py
+	python3 tests/app/verification_test.py
 	python3 tests/app/execution_test.py
 	python3 tests/app/remove_test.py
 	python3 tests/app/setup_test.py

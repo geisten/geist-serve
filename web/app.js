@@ -206,7 +206,8 @@ function downloadState(model, current = state) {
   const checking = transferring && current.phase === 'verifying';
   const received = Math.max(0, transferring ? current.received || 0 : model?.partial || 0);
   const percent = total ? Math.min(100, Math.floor(received / total * 100)) : 0;
-  if (checking) return {stage:'verifying', percent:null, text:'Checking download…'};
+  if (checking) return {stage:'verifying', percent:null, text:'Checking model…'};
+  if ((transferring && current.phase === 'preparing') || (current?.loading && current.active_id === model?.id)) return {stage:'loading', percent:null, text:'Loading model'};
   if (transferring) return {stage:'downloading', percent, text:`Downloading · ${percent}%`};
   if (model?.installed) return {stage:'downloaded', percent:100, text:'Downloaded'};
   if (received) return {stage:'paused', percent, text:`Paused · ${percent}%`};
@@ -217,7 +218,7 @@ function renderRing(element, model, current = state) {
   if (!element.firstChild) element.innerHTML = ringMarkup; // Fixed, local markup only.
   element.dataset.stage = status.stage;
   element.style.setProperty('--ring-progress', status.percent === null ? 72 : status.percent);
-  const progress = ['downloading', 'paused', 'verifying'].includes(status.stage);
+  const progress = ['downloading', 'paused', 'verifying', 'loading'].includes(status.stage);
   element.setAttribute('role', progress ? 'progressbar' : 'img');
   element.removeAttribute('aria-hidden');
   element.setAttribute('aria-label', `${model?.name || ''}: ${t(status.text)}`);
@@ -666,16 +667,35 @@ document.addEventListener('pointerdown', event => {
 // Native radio semantics preserve keyboard navigation and checked state.
 function renderExecution() {
   const execution = state?.execution;
+  const loading = executionLoading();
+  const choice = pendingExecution || execution?.mode || 'auto';
+  const active = !loading && state?.ready ? execution?.active : '';
+  const target = choice === 'auto' ? execution?.recommended : choice;
+  const backendName = value => ({metal:'Metal',vulkan:'Vulkan',cuda:'CUDA',hip:'ROCm',sycl:'SYCL'})[value] || value || '';
   const disabled = !state?.ready || state.busy || state.loading || requesting || !!controller || connectionTesting;
   for (const input of document.querySelectorAll('[name="execution"]')) {
-    input.checked = input.value === (pendingExecution || execution?.mode || 'auto');
+    input.checked = input.value === choice;
     input.disabled = disabled || (input.value === 'gpu' && !execution?.gpu_available);
     const label = input.closest('label'), mark = label.querySelector('.recommended-mark');
-    if (mark) mark.hidden = input.value !== execution?.recommended;
-    label.title = t(input.value === 'auto' ? 'Uses the recommended processor. Changing execution reloads the model without downloading it again.' : execution?.reason || 'Load a model first.');
+    const running = input.value === active;
+    const pending = loading && input.value === target;
+    label.classList.toggle('is-active', running);
+    label.classList.toggle('is-loading', pending);
+    if (mark) {
+      mark.hidden = input.value !== execution?.recommended;
+      mark.title = t('Recommended');
+    }
+    const backend = input.value === 'gpu' ? backendName(execution?.gpu_backend || (execution?.active === 'gpu' ? execution?.backend : '')) : '';
+    const detail = label.querySelector('.processor-backend');
+    if (detail) { detail.textContent = backend; detail.hidden = !backend; }
+    const description = [input.value === 'auto' ? 'Auto' : input.value.toUpperCase(), backend,
+      running ? t('Active processor') : pending ? t('Switching processor…') : '',
+      mark && !mark.hidden ? t('Recommended') : ''].filter(Boolean).join(' · ');
+    input.setAttribute('aria-label', description);
+    label.title = `${description}. ${t(input.value === 'auto' ? 'Uses the recommended processor. Changing execution reloads the model without downloading it again.' : execution?.reason || 'Load a model first.')}`;
   }
   $('execution-description').textContent = t(execution?.reason || 'Load a model first.');
-  const status = executionLoading() ? t('Switching processor…') : execution?.active ? `${execution.active.toUpperCase()}${execution.active === 'gpu' && execution.backend === 'metal' ? ' · Metal' : ''}` : t('No model loaded');
+  const status = loading ? t('Switching processor…') : active ? `${active.toUpperCase()}${active === 'gpu' ? ` · ${backendName(execution.backend)}` : ''}` : t('No model loaded');
   if ($('execution-current').textContent !== status) $('execution-current').textContent = status;
   $('execution-current').title = t('Active processor');
   $('execution-notice').textContent = t(execution?.notice || '');
