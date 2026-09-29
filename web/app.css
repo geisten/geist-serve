@@ -976,3 +976,19 @@ body.manager-page main { max-width:1180px }
 @media(max-width:540px) { #open-measurements>span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap } #open-measurements { width:44px; justify-content:center } }
 
 .measurement-sheet button { min-height:44px }
+
+.activity-slot { height:44px; min-height:44px }
+#activity-lane { display:flex; align-items:center; gap:8px; min-height:44px }
+#open-activity { display:flex; align-items:center; gap:7px; min-width:0; min-height:44px; padding:3px 4px; text-align:left; font-size:11px; font-weight:400 }
+#activity-time { color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap }
+#activity-stop { margin-left:auto; min-width:44px; min-height:44px; padding:3px; font-size:11px }
+#runtime-state.working { background:transparent; border:2px solid #dce4ef; border-top-color:var(--accent); animation:processor-loading .9s linear infinite }
+.activity-summary { display:grid; grid-template-columns:auto minmax(0,1fr); gap:6px 14px; font-size:12px }
+.activity-summary dt { color:var(--muted) }
+.activity-summary dd { margin:0; overflow-wrap:anywhere; font-variant-numeric:tabular-nums }
+#activity-phases { font-size:12px; font-variant-numeric:tabular-nums }
+@media(prefers-reduced-motion:reduce) { #runtime-state.working { animation:none; border-style:dashed } }
+@media(max-width:699px) and (max-height:520px) { .runtime-panel { max-height:min(24vh,calc(100% - 196px)) } }
+
+.activity-copy { display:flex; flex-direction:column; gap:2px; min-width:0 }
+#activity-cpu-hint { font-size:10px; line-height:1.2 }

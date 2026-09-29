@@ -455,3 +455,20 @@ Object.assign(german, {
 Object.assign(german, {'disconnected':'Verbindung getrennt'});
 
 Object.assign(german, {'Earlier configuration':'Frühere Konfiguration'});
+
+Object.assign(german, {
+  'Activity':'Aktivität','Stop':'Stopp','Phases':'Phasen','Sending…':'Wird gesendet…',
+  'A running service does not prove that the model is making progress. No input progress counter is available.':'Ein laufender Dienst belegt keinen Modellfortschritt. Für die Eingabeverarbeitung ist kein Fortschrittszähler verfügbar.',
+  'Validating local artifact':'Lokale Datei prüfen','Checking model':'Modell prüfen','Downloading model':'Modell herunterladen',
+  'Stopping':'Wird gestoppt','Starting runtime':'Laufzeit starten','Loading model':'Modell laden','Ready':'Bereit',
+  'Connecting':'Verbindung herstellen','Opening session':'Sitzung öffnen','Reading input':'Eingabe einlesen',
+  'Processing input':'Eingabe verarbeiten','Generating':'Antwort erzeugen','Preparing answer':'Antwort vorbereiten','Answering':'Antwort ausgeben',
+  'Waiting for service':'Warte auf den Dienst','Failed':'Fehlgeschlagen','Stopped':'Gestoppt','Working':'In Arbeit',
+  'Status unavailable':'Status nicht verfügbar','Status is stale. Reconnect to see current activity.':'Status veraltet. Erneut verbinden, um die aktuelle Aktivität zu sehen.',
+  'The operation failed. Retry the model or choose another processor.':'Der Vorgang ist fehlgeschlagen. Modell erneut starten oder anderen Prozessor wählen.',
+  'Large models can take time on CPU.':'Große Modelle können auf der CPU Zeit benötigen.',
+  'No progress report available':'Keine Fortschrittsmeldung verfügbar','Operation':'Vorgang','Stage':'Phase','Phase elapsed':'Phasendauer',
+  'Total elapsed':'Gesamtdauer','Last progress report':'Letzte Fortschrittsmeldung vor','Runtime':'Laufzeit','Process alive':'Prozess läuft',
+  'Not running':'Gestoppt','Processor':'Prozessor','Error code':'Fehlercode'
+});
+translateStatic();

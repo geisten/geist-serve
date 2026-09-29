@@ -208,6 +208,14 @@ def scenario(source, daemon, fake=False):
                     response.close(); conn.close()
                     state=app.wait(lambda s:not s['inference_busy'])
                     assert state['phase']=='downloading' and state['background_download']
+                    # Aborting a synchronous request now reaps/reloads only the
+                    # owned runtime. The unrelated transfer must remain intact.
+                    old_pid=pid
+                    pid=json.loads(app.request('/app/connections')[1])['daemon_pid']
+                    assert pid>0 and pid!=old_pid
+                    try: os.kill(old_pid,0)
+                    except ProcessLookupError: pass
+                    else: raise AssertionError('cancelled owned runtime survives')
                     peer_gate.unlink(); gate.set(); app.wait(lambda s:not s['phase']); stable()
                     # Network failure then corrupt completion leave A usable and B retryable.
                     for mode in ('disconnect','corrupt'):

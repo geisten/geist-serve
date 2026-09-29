@@ -65,7 +65,9 @@ with tempfile.TemporaryDirectory(prefix='geist-compat-') as home:
             response.readline()
             assert app.request('/v1/chat/completions',base)[0]==429
             response.close();conn.close()
-            app.wait(lambda s:not s['busy'],timeout=15)
+            # Cancelling synchronous work can reap/reload the owned runtime.
+            # Worker completion alone is not readiness for the next editor.
+            app.wait(lambda s:not s['busy'] and s['ready'],timeout=30)
             assert app.request('/v1/chat/completions',base)[0]==200
             assert app.request('/v1/chat/completions',base|{'messages':[{'role':'user','content':' xy'*7000}]})[0]==400
             assert not app.status()['busy']

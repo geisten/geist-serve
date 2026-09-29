@@ -69,6 +69,7 @@ static const unsigned char markdown_js[] = {
 
 #include "version.h"
 #include "resources.h"
+#include "activity.h"
 #include "performance.h"
 
 #define WORKER_BYTES (256u * 1024u)
@@ -77,7 +78,7 @@ static const unsigned char markdown_js[] = {
 #define WORKER_CAP 8
 #define REQUEST_TIMEOUT_MS 5000
 static volatile sig_atomic_t interrupted;
-static atomic_bool           closing, cancelled, compare_cancelled;
+static atomic_bool closing, cancelled, compare_cancelled, request_cancelled, load_cancelled;
 struct processor_measurement {
     double rate, first, total, tokens, rss, recorded;
 };
@@ -97,6 +98,11 @@ static struct {
     unsigned                   runtime_requests, runtime_threads;
     char                       profile_series[768];
     struct app_engine          engine;
+    struct activity            load_activity, request_activity, download_activity;
+    uint64_t                   operation_id, generation;
+    char                       instance[80];
+    bool                       stopping;
+    double                     child_probe_ms;
     struct perf_record        *observation;
     struct app_resource_window observation_window;
     double                     sample_ms, cpu_sum;
@@ -339,6 +345,20 @@ static bool loopback_host(const char *host) {
     return value > 0 && value <= 65535;
 }
 
+/* All activity mutations use app.mutex. A service heartbeat is never progress. */
+static void activity_change(struct activity *a, enum activity_stage stage) {
+    (void) activity_step(a, a->id, a->generation, stage, monotonic_ms());
+}
+static void begin_activity(struct activity    *a,
+                           enum activity_stage stage,
+                           uint64_t            generation,
+                           const char         *model) {
+    activity_begin(a, ++app.operation_id, generation, stage, monotonic_ms());
+    snprintf(a->model, sizeof a->model, "%s", model ? model : "custom");
+    snprintf(a->backend, sizeof a->backend, "%s", app.backend);
+    a->engine = app.engine;
+}
+
 static int read_request(int fd, struct app_arena *arena, struct request *r) {
     double deadline = monotonic_ms() + REQUEST_TIMEOUT_MS;
     char  *head     = app_alloc(arena, HEADER_CAP + 1, 1, 1);
@@ -467,8 +487,14 @@ static int listener(unsigned *port) {
 /* Called with app.mutex held. The child is ours: never attach to or stop
  * Ollama or another user's process. Reap before inspecting health. */
 static void poll_child(void) {
-    if (!app.child)
+    if (!app.child || app.stopping)
         return;
+    if (atomic_load(&load_cancelled) && !app.ready) {
+        activity_change(&app.load_activity, ACT_STOPPING);
+        stop_child();
+        (void) activity_end(&app.load_activity, "cancelled", 499, monotonic_ms());
+        return;
+    }
     int   status;
     pid_t result    = waitpid(app.child, &status, WNOHANG);
     bool  timed_out = !app.ready && monotonic_ms() - app.loading_started > 120000;
@@ -477,6 +503,12 @@ static void poll_child(void) {
             stop_child();
         app.child = 0;
         app.ready = false;
+        /* A replacement's verification may already have failed or be active.
+         * Reaping the previous generation must not overwrite that newer
+         * outcome, restart the old GPU choice or erase its diagnostic. */
+        if (app.load_activity.generation > app.generation)
+            return;
+        (void) activity_end(&app.load_activity, "failed", timed_out ? 504 : 502, monotonic_ms());
         if (strcmp(app.backend, app.cpu_backend)) {
             char path[APP_PATH_CAP], id[64], log[APP_PATH_CAP], archive[APP_PATH_CAP];
             snprintf(path, sizeof path, "%s", app.chosen);
@@ -513,6 +545,9 @@ static void poll_child(void) {
     }
     if (app.ready)
         return;
+    if (monotonic_ms() - app.child_probe_ms < 250)
+        return;
+    app.child_probe_ms = monotonic_ms();
     char              reported[24];
     struct app_engine identity;
     if (app_daemon_identity(app.socket_path, reported, &identity)) {
@@ -524,13 +559,17 @@ static void poll_child(void) {
         app.backend_verified = !strcmp(reported, app.backend);
         if (reported[0] && !app.backend_verified) {
             stop_child();
+            (void) activity_end(&app.load_activity, "failed", 502, monotonic_ms());
             snprintf(app.message,
                      sizeof app.message,
                      "The engine reported a different processor. Reload the model.");
             return;
         }
-        app.loaded_ms                 = monotonic_ms() - app.loading_started;
-        app.ready                     = true;
+        app.loaded_ms            = monotonic_ms() - app.loading_started;
+        app.ready                = true;
+        app.load_activity.engine = app.engine;
+        activity_change(&app.load_activity, ACT_READY);
+        (void) activity_end(&app.load_activity, "completed", 0, monotonic_ms());
         app.message[0]                = 0;
         const struct app_model *model = app_model_find(app.active_id);
         if (app.save_execution && model) {
@@ -546,6 +585,10 @@ static void poll_child(void) {
 }
 
 static void stop_child(void) {
+    /* Readiness is revoked before releasing the mutex. Other workers can report
+     * cached status, but cannot replace, reuse or reap this owned process. */
+    app.ready    = false;
+    app.stopping = true;
     if (!app.child)
         goto cleanup;
     kill(app.child, SIGTERM);
@@ -557,7 +600,9 @@ static void stop_child(void) {
             break;
         }
         struct timespec pause = {.tv_nsec = 25000000};
+        pthread_mutex_unlock(&app.mutex);
         nanosleep(&pause, nullptr);
+        pthread_mutex_lock(&app.mutex);
     }
     if (app.child) {
         kill(app.child, SIGKILL);
@@ -566,7 +611,8 @@ static void stop_child(void) {
     }
     app.child = 0;
 cleanup:
-    app.ready = false;
+    app.stopping = false;
+    app.ready    = false;
     if (app.socket_path[0])
         unlink(app.socket_path);
     if (app.runtime_dir[0])
@@ -574,7 +620,7 @@ cleanup:
     app.socket_path[0] = app.runtime_dir[0] = 0;
 }
 
-static bool start_child_mode(const char *path, const char *id, const char *mode) {
+static bool start_child_mode_impl(const char *path, const char *id, const char *mode) {
     const struct app_model *model = app_model_find(id);
     bool gpu = !strcmp(mode, "gpu") || (!strcmp(mode, "auto") && recommend_gpu(model));
     if (gpu && !gpu_supported(model)) {
@@ -583,7 +629,17 @@ static bool start_child_mode(const char *path, const char *id, const char *mode)
                  "GPU is not supported by this model and packaged engine.");
         return false;
     }
+    if (!app.load_activity.id || app.load_activity.outcome[0])
+        begin_activity(&app.load_activity, ACT_STARTING, app.generation + 1, id);
+    snprintf(app.load_activity.backend,
+             sizeof app.load_activity.backend,
+             "%s",
+             gpu ? app.gpu_backend : app.cpu_backend);
+    atomic_store(&load_cancelled, false);
+    if (app.child)
+        activity_change(&app.load_activity, ACT_STOPPING);
     stop_child();
+    activity_change(&app.load_activity, ACT_STARTING);
     app.engine = (struct app_engine) {0};
     (void) app_engine_sha256(app.server, app.engine.payload_sha256);
     struct app_hardware hardware;
@@ -682,6 +738,10 @@ static bool start_child_mode(const char *path, const char *id, const char *mode)
     snprintf(app.active_id, sizeof app.active_id, "%s", id ? id : "custom");
     snprintf(app.execution_mode, sizeof app.execution_mode, "%s", mode);
     snprintf(app.backend, sizeof app.backend, "%s", gpu ? app.gpu_backend : app.cpu_backend);
+    ++app.generation;
+    app.load_activity.generation = app.generation;
+    app.load_activity.engine     = app.engine;
+    activity_change(&app.load_activity, ACT_LOADING);
     app.loading_started  = monotonic_ms();
     app.backend_verified = false;
     app.save_execution   = true;
@@ -693,6 +753,15 @@ static bool start_child_mode(const char *path, const char *id, const char *mode)
         *ext = 0;
     snprintf(app.message, sizeof app.message, "Loading the model into memory…");
     return true;
+}
+
+static bool start_child_mode(const char *path, const char *id, const char *mode) {
+    bool ok = start_child_mode_impl(path, id, mode);
+    if (!ok) {
+        stop_child();
+        (void) activity_end(&app.load_activity, "failed", 502, monotonic_ms());
+    }
+    return ok;
 }
 
 static bool start_child(const char *path, const char *id) {
@@ -858,6 +927,19 @@ static void observation_sample(bool force) {
         }
     }
 }
+/* Cached lifecycle status stays independent of HTTP admission and UI polling. */
+static void *monitor_main(void *unused) {
+    (void) unused;
+    while (!atomic_load(&closing)) {
+        pthread_mutex_lock(&app.mutex);
+        poll_child();
+        observation_sample(false);
+        pthread_mutex_unlock(&app.mutex);
+        struct timespec pause = {.tv_nsec = 100000000};
+        nanosleep(&pause, nullptr);
+    }
+    return nullptr;
+}
 static void observation_begin(
         struct perf_record *r, const char *source, unsigned max, float temperature, float top_p) {
     memset(r, 0, sizeof *r);
@@ -877,13 +959,15 @@ static void observation_begin(
              "%s",
              model ? app.profile_series : "unknown-custom-series");
     snprintf(r->source, sizeof r->source, "%s", source);
-    r->threads             = app.runtime_threads;
-    r->max_tokens          = max;
-    r->temperature         = temperature;
-    r->top_p               = top_p;
-    r->cold                = app.runtime_requests++ == 0;
-    r->load_ns             = r->cold ? app.loaded_ms * 1e6 : -1;
-    r->contention          = app.job_running && !app.job_activate;
+    r->threads     = app.runtime_threads;
+    r->max_tokens  = max;
+    r->temperature = temperature;
+    r->top_p       = top_p;
+    r->cold        = app.runtime_requests++ == 0;
+    r->load_ns     = r->cold ? app.loaded_ms * 1e6 : -1;
+    r->contention  = app.job_running && !app.job_activate;
+    begin_activity(&app.request_activity, ACT_CONNECT, app.generation, app.active_id);
+    atomic_store(&request_cancelled, false);
     app.observation        = r;
     app.observation_window = (struct app_resource_window) {0};
     app.cpu_samples        = 0;
@@ -897,6 +981,8 @@ static void observation_end(struct perf_record         *r,
                             const struct app_run_stats *stats) {
     pthread_mutex_lock(&app.mutex);
     observation_sample(true);
+    if (rc == 498 && atomic_load(&request_cancelled))
+        rc = 499;
     app.observation    = nullptr;
     r->generation_ns   = stats->generation_ns;
     r->first_ns        = first > 0 ? first * 1e6 : -1;
@@ -918,17 +1004,24 @@ static void observation_end(struct perf_record         *r,
            : stats->no_answer              ? "no_answer"
                                            : "completed");
     strcpy(r->finish, rc ? "unknown" : stats->limited ? "length" : "stop");
+    (void) activity_end(&app.request_activity,
+                        rc == 499 ? "cancelled"
+                        : rc      ? "failed"
+                                  : "completed",
+                        rc,
+                        monotonic_ms());
     pthread_mutex_unlock(&app.mutex);
     perf_submit(r);
     pthread_mutex_lock(&app.mutex);
     restore_measurements();
     /* Prefill is a synchronous engine call. A closed client alone cannot interrupt it.
      * Reap only our owned child before admitting a new request; preserve its diagnostics. */
-    if (rc && stats->stage && !strcmp(stats->stage, "prefill") && !atomic_load(&closing)) {
+    if ((rc == 499 || rc == 498 || rc == 502 || rc == 504) && !atomic_load(&closing)) {
         char path[APP_PATH_CAP], id[64], mode[8], log[APP_PATH_CAP], archive[APP_PATH_CAP];
         snprintf(path, sizeof path, "%s", app.chosen);
         snprintf(id, sizeof id, "%s", app.active_id);
         snprintf(mode, sizeof mode, "%s", app.execution_mode);
+        begin_activity(&app.load_activity, ACT_STOPPING, app.generation + 1, id);
         stop_child();
         bool saved = false;
         if (path_join(log, app.home, "server.log") &&
@@ -943,10 +1036,12 @@ static void observation_end(struct perf_record         *r,
         }
         if (saved)
             (void) start_child_mode(path, id, mode);
-        else
+        else {
+            (void) activity_end(&app.load_activity, "failed", 502, monotonic_ms());
             snprintf(app.message,
                      sizeof app.message,
                      "The model is stopped. Its diagnostics could not be archived.");
+        }
     }
     app.generating = false;
     pthread_mutex_unlock(&app.mutex);
@@ -988,6 +1083,9 @@ static size_t download_write(char *p, size_t size, size_t n, void *opaque) {
     s->bytes += written;
     pthread_mutex_lock(&app.mutex);
     app.received = s->bytes;
+    activity_progress(app.job_activate ? &app.load_activity : &app.download_activity,
+                      s->bytes,
+                      monotonic_ms());
     pthread_mutex_unlock(&app.mutex);
     return written;
 }
@@ -1138,6 +1236,8 @@ static void *model_job(void *unused) {
         if (!cached) {
             pthread_mutex_lock(&app.mutex);
             strcpy(app.phase, "verifying");
+            activity_change(app.job_activate ? &app.load_activity : &app.download_activity,
+                            ACT_HASH);
             pthread_mutex_unlock(&app.mutex);
 #ifdef APP_TESTING
             fprintf(stderr, "model verification: hashing %s\n", m->id);
@@ -1192,6 +1292,13 @@ static void *model_job(void *unused) {
             (void) save_selection(m->id);
     } else
         snprintf(app.message, sizeof app.message, "%s", *why ? why : "Cannot prepare the model.");
+    struct activity *job_activity = app.job_activate ? &app.load_activity : &app.download_activity;
+    if (atomic_load(&cancelled) || atomic_load(&closing))
+        (void) activity_end(job_activity, "cancelled", 499, monotonic_ms());
+    else if (!ok || (app.job_activate && !app.child))
+        (void) activity_end(job_activity, "failed", 502, monotonic_ms());
+    else if (!app.job_activate)
+        (void) activity_end(job_activity, "completed", 0, monotonic_ms());
     app.job_running = false;
     app.phase[0]    = 0;
     pthread_mutex_unlock(&app.mutex);
@@ -1212,6 +1319,12 @@ static bool begin_job(const struct app_model *m, bool download, bool activate) {
         pthread_join(app.job, nullptr);
         app.job_joinable = false;
     }
+    begin_activity(activate ? &app.load_activity : &app.download_activity,
+                   download ? ACT_DOWNLOAD : ACT_RECEIPT,
+                   activate ? app.generation + 1 : app.generation,
+                   m->id);
+    if (activate)
+        atomic_store(&load_cancelled, false);
     app.job_model    = m;
     app.job_download = download;
     /* Captured under the mutex. A background download must never replace the
@@ -1227,6 +1340,10 @@ static bool begin_job(const struct app_model *m, bool download, bool activate) {
     if (pthread_create(&app.job, nullptr, model_job, nullptr) != 0) {
         app.job_running = false;
         app.phase[0]    = 0;
+        (void) activity_end(activate ? &app.load_activity : &app.download_activity,
+                            "failed",
+                            503,
+                            monotonic_ms());
         strcpy(app.message, "Cannot start model worker.");
         return false;
     }
@@ -1254,7 +1371,6 @@ static void execution_response(int fd, const char *text) {
         return;
     }
     pthread_mutex_lock(&app.mutex);
-    poll_child();
     const struct app_model *model = app_model_find(app.active_id);
     int                     code  = 202;
     const char             *error = nullptr;
@@ -1378,7 +1494,6 @@ static void status_response(int fd, struct app_arena *arena) {
     struct app_hardware h;
     bool                known = app_hardware_read(&h, app.models);
     pthread_mutex_lock(&app.mutex);
-    poll_child();
     struct app_inventory inventory[APP_MODEL_COUNT];
     model_inventory(inventory);
     struct app_recommendation recommendation =
@@ -1402,6 +1517,21 @@ static void status_response(int fd, struct app_arena *arena) {
     bool                    gpu             = gpu_supported(execution_model);
     app_put(&b, ",\"engine\":");
     app_engine_json(&b, &app.engine);
+    app_put(&b, ",\"activity\":{\"instance\":");
+    app_quote(&b, app.instance);
+    app_put(&b, ",\"load\":");
+    activity_json(&b,
+                  &app.load_activity,
+                  monotonic_ms(),
+                  app.child && app.load_activity.generation == app.generation);
+    app_put(&b, ",\"request\":");
+    activity_json(&b,
+                  &app.request_activity,
+                  monotonic_ms(),
+                  app.child && app.request_activity.generation == app.generation);
+    app_put(&b, ",\"download\":");
+    activity_json(&b, &app.download_activity, monotonic_ms(), false);
+    app_printf(&b, "},\"process_generation\":%llu", (unsigned long long) app.generation);
     app_put(&b, ",\"request_phase\":");
     app_quote(&b, app.generating ? app.request_phase : "idle");
     app_put(&b, ",\"last_error\":{\"message\":");
@@ -1620,8 +1750,9 @@ struct proxy {
     struct app_run_stats *stats;
     bool (*send)(void *, const char *);
     bool (*keepalive)(void *);
-    void *target;
-    char  phase[24];
+    void    *target;
+    char     phase[24];
+    uint64_t operation, generation, pieces;
 };
 static bool proxy_cancel(void *opaque) {
     struct proxy *p = opaque;
@@ -1630,12 +1761,17 @@ static bool proxy_cancel(void *opaque) {
     p->disconnected =
             n == 0 || (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR);
     p->expired = monotonic_ms() - p->start > 3600000;
-    if (atomic_load(&closing) || p->expired || p->disconnected)
+    if (atomic_load(&closing) || atomic_load(&request_cancelled) || p->expired || p->disconnected)
         return true;
     if (p->stats && p->stats->stage && strcmp(p->phase, p->stats->stage)) {
         snprintf(p->phase, sizeof p->phase, "%s", p->stats->stage);
         pthread_mutex_lock(&app.mutex);
         snprintf(app.request_phase, sizeof app.request_phase, "%s", p->phase);
+        (void) activity_step(&app.request_activity,
+                             p->operation,
+                             p->generation,
+                             activity_request_stage(p->phase),
+                             monotonic_ms());
         pthread_mutex_unlock(&app.mutex);
     }
     if (p->keepalive && monotonic_ms() - (p->heartbeat ? p->heartbeat : p->start) >= 10000) {
@@ -1670,9 +1806,9 @@ static bool proxy_keepalive(void *opaque) {
     struct proxy *p = opaque;
     if (!p->started && !proxy_send(p, ""))
         return false;
-    const char *event = p->first_answer || p->preparing ? "{\"heartbeat\":true}\n"
-                                                        : "{\"phase\":\"preparing\"}\n";
-    p->preparing      = true;
+    const char *event = p->output.state == OUTPUT_REASONING && !p->first_answer
+                                ? "{\"phase\":\"preparing\"}\n"
+                                : "{\"heartbeat\":true}\n";
     return send_bytes(p->fd, event, strlen(event));
 }
 static bool proxy_decode(struct proxy *p, const char *piece) {
@@ -1684,6 +1820,18 @@ static bool proxy_decode(struct proxy *p, const char *piece) {
     if (*decoded && !p->first)
         p->first = monotonic_ms() - p->start;
     bool ok = app_output_feed(&p->output, decoded, p->send, p->target);
+    if (*decoded) {
+        pthread_mutex_lock(&app.mutex);
+        if (app.request_activity.id == p->operation &&
+            app.request_activity.generation == p->generation) {
+            activity_progress(&app.request_activity, ++p->pieces, monotonic_ms());
+            if (p->output.visible)
+                activity_change(&app.request_activity, ACT_ANSWER);
+            else if (p->output.state == OUTPUT_REASONING)
+                activity_change(&app.request_activity, ACT_PREPARING);
+        }
+        pthread_mutex_unlock(&app.mutex);
+    }
     if (ok && p->output.reasoning && !p->preparing && p->keepalive) {
         ok           = p->keepalive(p->target);
         p->preparing = true;
@@ -1694,6 +1842,8 @@ static bool proxy_emit(void *opaque, const char *piece) {
     return proxy_decode(opaque, piece);
 }
 static void proxy_init(struct proxy *p) {
+    p->operation                  = app.request_activity.id;
+    p->generation                 = app.request_activity.generation;
     const struct app_model *model = app_model_find(app.active_id);
     app_output_init(&p->output, model ? model->reasoning_format : nullptr);
     app.last_error[0] = app.error_stage[0] = app.error_model[0] = app.error_backend[0] = 0;
@@ -1823,7 +1973,6 @@ static void generate(int fd, struct request *r, struct app_arena *arena) {
              task->instruction,
              prompt);
     pthread_mutex_lock(&app.mutex);
-    poll_child();
     if (atomic_load(&closing) || !app.ready || app.comparing || app.generating ||
         (app.job_running && app.job_activate)) {
         pthread_mutex_unlock(&app.mutex);
@@ -2043,7 +2192,6 @@ static void completions(int fd, const struct request *r, struct app_arena *arena
              (long) getpid(),
              atomic_fetch_add(&sequence, 1));
     pthread_mutex_lock(&app.mutex);
-    poll_child();
     if (atomic_load(&closing) || !app.ready || app.comparing ||
         (app.job_running && app.job_activate)) {
         pthread_mutex_unlock(&app.mutex);
@@ -2166,11 +2314,22 @@ static void completions(int fd, const struct request *r, struct app_arena *arena
  * A fresh daemon per processor fixes cache warmup policy; measured repetitions
  * use fresh sessions on that daemon. Actual prefix reuse is recorded. */
 struct compare_output {
-    double          start, first;
-    struct app_utf8 utf8;
+    double                start, first;
+    struct app_utf8       utf8;
+    struct app_run_stats *stats;
+    uint64_t              operation, generation;
 };
-static bool comparison_cancel(void *unused) {
-    (void) unused;
+static bool comparison_cancel(void *context) {
+    struct compare_output *o = context;
+    if (o && o->stats && o->stats->stage) {
+        pthread_mutex_lock(&app.mutex);
+        (void) activity_step(&app.request_activity,
+                             o->operation,
+                             o->generation,
+                             activity_request_stage(o->stats->stage),
+                             monotonic_ms());
+        pthread_mutex_unlock(&app.mutex);
+    }
     return atomic_load(&compare_cancelled) || atomic_load(&closing);
 }
 static bool comparison_emit(void *context, const char *piece) {
@@ -2187,7 +2346,6 @@ static bool comparison_ready(bool restoring) {
         if (atomic_load(&closing) || (!restoring && comparison_cancel(nullptr)))
             return false;
         pthread_mutex_lock(&app.mutex);
-        poll_child();
         bool ready = app.ready, exists = app.child > 0;
         pthread_mutex_unlock(&app.mutex);
         if (ready)
@@ -2242,7 +2400,10 @@ static void *comparison_main(void *unused) {
                                "numbered sentences."};
             struct app_run_stats  stats;
             char                  error[256];
-            struct compare_output output = {.start = monotonic_ms()};
+            struct compare_output output = {.start      = monotonic_ms(),
+                                            .stats      = &stats,
+                                            .operation  = app.request_activity.id,
+                                            .generation = app.generation};
             int                   rc     = app_daemon_chat(app.socket_path,
                                                            1,
                                                            &prompt,
@@ -2317,7 +2478,6 @@ static void connections(int fd, bool models) {
     char              body[4096];
     struct app_buffer b = {.data = body, .cap = sizeof body};
     pthread_mutex_lock(&app.mutex);
-    poll_child();
     if (models) {
         app_put(&b, "{\"object\":\"list\",\"data\":[");
         if (app.ready) {
@@ -2516,6 +2676,38 @@ static void handle(int fd, struct app_arena *arena) {
         generate(fd, &r, arena);
         return;
     }
+    if (!strcmp(r.path, "/app/activity/cancel")) {
+        struct json *j          = app_alloc(arena, 1, sizeof *j, _Alignof(struct json));
+        bool         parsed     = j && json_parse(j, strlen(r.body), r.body) >= 0;
+        double       id         = parsed ? json_num(j, json_get(j, 0, "id"), 0) : 0;
+        double       generation = parsed ? json_num(j, json_get(j, 0, "generation"), -1) : -1;
+        char        *instance   = parsed ? json_strdup(j, json_get(j, 0, "instance")) : nullptr;
+        pthread_mutex_lock(&app.mutex);
+        struct activity *a = app.generating ? &app.request_activity : &app.load_activity;
+        bool valid = instance && !strcmp(instance, app.instance) &&
+                     generation == (double) a->generation && id > 0 && id == (double) a->id &&
+                     !a->outcome[0] &&
+                     (app.generating || app.job_running || (app.child && !app.ready));
+        if (valid) {
+            activity_change(a, ACT_STOPPING);
+            if (app.generating) {
+                atomic_store(&request_cancelled, true);
+                if (app.comparing)
+                    atomic_store(&compare_cancelled, true);
+            } else {
+                atomic_store(&load_cancelled, true);
+                if (app.job_activate)
+                    atomic_store(&cancelled, true);
+            }
+        }
+        pthread_mutex_unlock(&app.mutex);
+        free(instance);
+        if (valid)
+            response(fd, 202, "application/json", "{}", 2);
+        else
+            error_response(fd, 409, "This operation is no longer active.");
+        return;
+    }
     if (strcmp(r.path, "/app/cancel") == 0) {
         atomic_store(&cancelled, true);
         response(fd, 200, "application/json", "{}", 2);
@@ -2540,7 +2732,7 @@ static void handle(int fd, struct app_arena *arena) {
     }
     if (strcmp(r.path, "/app/stop") == 0) {
         pthread_mutex_lock(&app.mutex);
-        if (app.comparing || app.generating || app.job_running) {
+        if (app.stopping || app.comparing || app.generating || app.job_running) {
             pthread_mutex_unlock(&app.mutex);
             error_response(fd, 409, "Stop the current task first.");
             return;
@@ -2600,7 +2792,7 @@ static void handle(int fd, struct app_arena *arena) {
     /* Consent and another artifact's download do not mutate the resident
      * runtime. Selection/removal/setup retain their exclusive boundary. */
     bool background = download && app.child > 0 && strcmp(model->id, app.active_id);
-    if (atomic_load(&closing) || app.comparing || (!preview && app.job_running) ||
+    if (atomic_load(&closing) || app.stopping || app.comparing || (!preview && app.job_running) ||
         (app.generating && !preview && !background) ||
         (download && app.child > 0 && !strcmp(model->id, app.active_id))) {
         pthread_mutex_unlock(&app.mutex);
@@ -2752,6 +2944,14 @@ static void usage(void) {
 }
 
 int main(int argc, char **argv) {
+    struct timespec instance_time;
+    clock_gettime(CLOCK_REALTIME, &instance_time);
+    snprintf(app.instance,
+             sizeof app.instance,
+             "%ld-%lld-%ld",
+             (long) getpid(),
+             (long long) instance_time.tv_sec,
+             instance_time.tv_nsec);
     /* The native shell can terminate this private group if graceful shutdown fails. */
     if (setpgid(0, 0) != 0 && getpgrp() != getpid()) {
         perror("geist-app: process group");
@@ -2965,11 +3165,14 @@ int main(int argc, char **argv) {
             pthread_mutex_unlock(&app.mutex);
         }
     }
+    pthread_t monitor;
+    bool      monitoring = pthread_create(&monitor, nullptr, monitor_main, nullptr) == 0;
+    if (!monitoring) {
+        fprintf(stderr, "Cannot start process monitor.\n");
+        atomic_store(&closing, true);
+    }
     while (!interrupted && !atomic_load(&closing)) {
-        pthread_mutex_lock(&app.mutex);
-        observation_sample(false);
-        pthread_mutex_unlock(&app.mutex);
-        struct timeval timeout = {.tv_sec = 1};
+        struct timeval timeout = {.tv_usec = 100000};
         fd_set         set;
         FD_ZERO(&set);
         FD_SET(fd, &set);
@@ -3009,6 +3212,8 @@ int main(int argc, char **argv) {
     atomic_store(&closing, true);
     atomic_store(&cancelled, true);
     close(fd);
+    if (monitoring)
+        pthread_join(monitor, nullptr);
     pthread_mutex_lock(&app.mutex);
     while (app.workers)
         pthread_cond_wait(&app.drained, &app.mutex);
@@ -3017,7 +3222,9 @@ int main(int argc, char **argv) {
         pthread_join(app.comparison, nullptr);
     if (app.job_joinable)
         pthread_join(app.job, nullptr);
+    pthread_mutex_lock(&app.mutex);
     stop_child();
+    pthread_mutex_unlock(&app.mutex);
     perf_close();
     app_connection_remove(app.home);
     curl_global_cleanup();

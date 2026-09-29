@@ -44,6 +44,7 @@
     </div>
     </div>
     <div class="activity-slot">
+    <div id="activity-lane"><button id="open-activity" class="text-button" type="button" aria-haspopup="dialog" title="Activity"><span class="activity-copy"><span id="activity-label" role="status" aria-live="polite"></span><span id="activity-cpu-hint" class="hint" role="status" hidden></span></span><span id="activity-time" aria-hidden="true"></span></button><button id="activity-stop" class="text-button" type="button" hidden>Stop</button></div>
     <p id="profile-error" class="hint" role="status" hidden></p>
     <p id="execution-notice" class="hint" role="status" hidden></p>
     <p id="execution-performance" class="execution-warning" role="status" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 21h20L12 3zM12 9v5m0 3v.01"/></svg><span id="execution-performance-text"></span></p>
@@ -115,4 +116,11 @@
           <section class="profile-info"><h3>Recent observations</h3><ol id="profile-recent"></ol></section>
           <div class="profile-actions"><button id="benchmark" class="text-button" type="button" disabled>Measure comparison</button><button id="comparison-stop" type="button" hidden>Cancel comparison</button></div><p id="comparison-status" class="hint" role="status"></p>
         </div>
-</dialog></body></html>
+</dialog>
+<dialog id="activity-dialog" class="measurement-sheet" aria-labelledby="activity-title">
+<div class="sheet-heading"><h2 id="activity-title">Activity</h2><button id="close-activity" type="button" aria-label="Close" title="Close" autofocus><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
+<div class="performance-content" tabindex="0" role="region" aria-label="Activity">
+<p id="activity-hint"></p><dl id="activity-summary" class="activity-summary"></dl>
+<h3>Phases</h3><ol id="activity-phases"></ol>
+<p id="activity-engine" class="hint"></p><p class="hint">A running service does not prove that the model is making progress. No input progress counter is available.</p>
+</div></dialog></body></html>

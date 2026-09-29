@@ -183,7 +183,7 @@ def main():
             assert response.status == 200
             assert response.readline()
             response.close(); conn.close()
-            app.wait(lambda state: not state["busy"], timeout=15)
+            app.wait(lambda state: not state["busy"] and state["ready"], timeout=30)
             assert app.request("/app/generate", {"experimental": True, "prompt": "Say hello."})[0] == 200
             code, body, _ = app.request('/app/generate', {'experimental': True, 'prompt':' xy'*3900})
             events=[json.loads(x) for x in body.splitlines()]

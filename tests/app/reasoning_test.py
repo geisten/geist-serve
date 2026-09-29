@@ -59,6 +59,9 @@ with tempfile.TemporaryDirectory(prefix='geist-reasoning-') as temporary:
         # Keepalive arrives before input processing completes, without exposing hidden text.
         config(prefill_pause=11)
         e=events();assert any(x.get('phase')=='preparing' for x in e)
+        assert next(i for i,x in enumerate(e) if x.get('heartbeat')) < next(i for i,x in enumerate(e) if x.get('phase')=='preparing'), 'prefill heartbeat does not guess preparation'
+        config(prefill_pause=11,text='Plain answer')
+        e=events();assert any(x.get('heartbeat') for x in e) and not any(x.get('phase')=='preparing' for x in e)
         time.sleep(.1)
     finally:app.close()
     rows=[json.loads(x) for x in (home/'performance/observations.jsonl').read_text().splitlines()]
