@@ -14,20 +14,26 @@ async function checkDownloadRingMotion(assert) {
   const fill = () => ring.querySelector('.ring-fill');
   const value = () => {
     const style = getComputedStyle(fill());
-    // WebKit scales computed SVG lengths with page zoom. Use their ratio.
-    return 100 * (1 - parseFloat(style.strokeDashoffset) / parseFloat(style.strokeDasharray));
+    // WebKit versions differ in whether CSS zoom scales computed dasharray and
+    // dashoffset together. Calibrate the same property in the same SVG context.
+    const probe = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    probe.style.strokeDashoffset = '100';
+    ring.querySelector('svg').append(probe);
+    const full = parseFloat(getComputedStyle(probe).strokeDashoffset);
+    const offset = parseFloat(style.strokeDashoffset); probe.remove();
+    return 100 * (1 - offset / full);
   };
   const near = (a, b) => Math.abs(a - b) < .02;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const report = {reducedMotion:reduced, frames:[], playback:'wall-clock'};
   const advance = async milliseconds => {
-    if (document.visibilityState === 'visible') { await wait(milliseconds); return; }
-    // WebKit suspends timelines in occluded/headless native test windows. Seek
+    // A headless WebKit can report visible while its timeline is suspended. Seek
     // its actual CSS animations instead; this still checks rendered interpolation,
     // but is explicitly not evidence of wall-clock frame pacing on this host.
     report.playback = 'native-interpolation-with-controlled-time';
     for (const animation of fill().getAnimations()) {
       const time = Number(animation.currentTime || 0) + milliseconds;
+      animation.pause();
       if (time >= animation.effect.getComputedTiming().endTime) animation.finish();
       else animation.currentTime = time;
     }

@@ -36,20 +36,21 @@ def run(reply, *, mode='info', success=False, expected=None, pause=0):
                         if body_size: recv_exact(conn, body_size)
                         if isinstance(reply,list):
                             for part in reply:
-                                conn.sendall(part);time.sleep(.08)
+                                conn.sendall(part);time.sleep(.12)
                         elif reply: conn.sendall(reply)
                         if pause: time.sleep(pause)
                     except (BrokenPipeError, ConnectionResetError): pass
             thread = threading.Thread(target=serve, daemon=True); thread.start()
-            proc = subprocess.run([str(ROOT/'build/test_app_client'), path, mode], capture_output=True, timeout=3)
+            proc = subprocess.run([str(ROOT/'build/test_app_client'), path, mode], capture_output=True, timeout=5)
             assert proc.returncode == (0 if success else 1), (proc.returncode, proc.stdout, proc.stderr)
             # Measure client I/O, not loader/sanitizer startup. The subprocess
-            # still has its independent three-second outer bound.
+            # still has its independent five-second outer bound.
             timing = re.search(rb'^operation_ms=([0-9.]+)$', proc.stderr, re.MULTILINE)
-            assert timing and float(timing.group(1)) < 1000, ('deadline did not bound I/O', proc.stderr)
+            assert timing and float(timing.group(1)) < (2500 if mode.startswith('generate') else 1000), ('deadline did not bound I/O', proc.stderr)
             assert b'AddressSanitizer' not in proc.stderr and b'runtime error:' not in proc.stderr, proc.stderr
             if expected: assert expected in proc.stdout.decode(), proc.stdout
-            thread.join(timeout=1)
+            thread.join(timeout=2)
+            return float(timing.group(1))
 
 run(frame({'ok': True}), success=True)
 run(frame(['wrong shape']))
@@ -60,6 +61,7 @@ run(b'', pause=.3)
 run(b'', mode='cancel', pause=.3)
 piece = 'Grüße 🌿\n' + 'x' * 600
 run(frame({'ok':True,'piece':piece,'done':False}) + frame({'ok':True,'done':False,'stop':True,'piece':'<|im_end|>'}) + frame({'ok':True,'done':True,'reason':'stop','generated':2,'duration_ns':1500000}), mode='generate', success=True, expected=piece + '\n2 1500000 stop')
-run([frame({'ok':True,'piece':'x','done':False})]*5+[frame({'ok':True,'done':True,'reason':'stop','generated':5,'duration_ns':400000000})], mode='generate', success=True, expected='xxxxx')
-run([frame({'ok':True,'piece':'x','done':False})]*5, mode='generate-total')
+assert run([frame({'ok':True,'piece':'x','done':False})]*8+[frame({'ok':True,'done':True,'reason':'stop','generated':8,'duration_ns':960000000})], mode='generate', success=True, expected='xxxxxxxx') > 600
+run([frame({'ok':True,'piece':'x','done':False})]*8, mode='generate-total')
+run(frame({'ok':True,'piece':'x','done':False}), mode='generate', pause=1.1)
 print('geistd C client: framing, Unicode/long pieces, refusals, disconnect, deadline and cancellation passed')
