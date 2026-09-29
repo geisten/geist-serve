@@ -975,6 +975,7 @@ int main(int argc, char **argv) {
     if (geist_model_load(model, d.be, &d.m) != GEIST_OK) {
         fprintf(stderr, "model: %s\n", d.m ? geist_model_errmsg(d.m) : "load failed");
         resource_sampler_stop(&d.resources);
+        geist_model_destroy(d.m);
         geist_backend_destroy(d.be);
         lifecycle_close(&lifecycle);
         return 1;

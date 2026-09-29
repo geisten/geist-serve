@@ -32,7 +32,11 @@ void app_memory_observe(struct app_memory_record      *m,
         m->source  = s->source;
         m->unified = s->unified;
     }
-    if (m->status != 1 || m->source != 1)
+    if (m->status == 1 && s->source != 1) {
+        m->status = 3;
+        return;
+    }
+    if (m->status != 1)
         return;
     m->gpu_end = (double) s->allocated_bytes;
     if (m->last_sequence != s->sequence) {
