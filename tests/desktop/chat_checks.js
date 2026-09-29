@@ -175,6 +175,13 @@ async function checkActivityUX(assert, tick) {
     $('activity-stop').click();for(let i=0;i<30&&cancellingActivity;i++)await tick();
     assert(cancels.length===1&&cancels[0]===102&&currentActivity().outcome==='cancelled','Stop addresses current owned load exactly once');
     assert($('prompt').value==='Unsent multiline\ndraft' && $('prompt').selectionStart===2,'activity and cancellation preserve draft selection');
+    // These are presentation fixtures, not CUDA/Vulkan inference certification.
+    let nextOperation=103;
+    for (const [backend,label] of [['metal','Metal'],['cuda','CUDA'],['vulkan','Vulkan'],['',t('Unknown')]]) {
+      update(operation(nextOperation++,'prefill',{generation:10,backend}));
+      assert($('activity-time').textContent.startsWith(label+' · '), `${backend || 'unreported'} activity renders without losing service state`);
+      assert($('activity-cpu-hint').hidden && !$('activity-stop').disabled, 'GPU or unreported backend keeps activity cancellable without a CPU hint');
+    }
     const animation=getComputedStyle($('runtime-state')).animationName;
     if(matchMedia('(prefers-reduced-motion:reduce)').matches)assert(animation==='none','reduced motion has static status');
   } finally {

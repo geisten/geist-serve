@@ -121,6 +121,7 @@ const gib = n => `${formatNumber(n / 2 ** 30, 1)} GiB`;
 const variantLabel = model => ({Q4_0:'4 bit · Q4_0', Q8_0:'8 bit · Q8_0', PQ2_0:`${t('Ternary')} · PQ2_0`, I2_S:`${t('Ternary')} · I2_S`}[model?.quantization] || model?.quantization || t('Default'));
 const modelLabel = model => model ? model.quantization ? `${model.group_name || model.name} · ${model.quantization}` : model.name : state?.active || '';
 const knownNumber = value => typeof value === 'number' && Number.isFinite(value) && value >= 0;
+const backendName = value => ({metal:'Metal',vulkan:'Vulkan',cuda:'CUDA',hip:'ROCm',sycl:'SYCL'})[value] || value || '';
 const modelIdentity = () => JSON.stringify([state?.active_id, state?.active, state?.execution?.backend]);
 const workspaceIdentity = () => JSON.stringify([state?.active_id, state?.active, state?.models.find(m => m.id === state.active_id)?.sha256]);
 const executionLoading = () => pendingExecution !== null || !!state?.loading;
@@ -858,7 +859,6 @@ function renderExecution() {
   const choice = pendingExecution || execution?.mode || 'auto';
   const active = !loading && state?.ready ? execution?.active : '';
   const target = choice === 'auto' ? execution?.recommended : choice;
-  const backendName = value => ({metal:'Metal',vulkan:'Vulkan',cuda:'CUDA',hip:'ROCm',sycl:'SYCL'})[value] || value || '';
   const disabled = !state?.ready || state.busy || state.loading || requesting || !!controller || connectionTesting;
   for (const input of document.querySelectorAll('[name="execution"]')) {
     input.checked = input.value === choice;
@@ -957,7 +957,7 @@ function renderActivity() {
   const phase=pending?'Waiting for service':!a?'Ready':a.outcome==='failed'?'Failed':a.outcome==='cancelled'?'Stopped':a.outcome?'Ready':activityLabels[a.stage] || 'Working';
   const label=stale?'Status unavailable':phase;
   if ($('activity-label').dataset.uiText!==label) uiText($('activity-label'),label);
-  $('activity-time').textContent=running&&!stale ? `${a.backend?.startsWith('cpu')?'CPU':backendName(a.backend)} · ${formatNumber(elapsed,0)} s` : '';
+  $('activity-time').textContent=running&&!stale ? `${a.backend?.startsWith('cpu')?'CPU':backendName(a.backend)||t('Unknown')} · ${formatNumber(elapsed,0)} s` : '';
   $('activity-stop').hidden=!running&&!pending;
   $('activity-stop').disabled=cancellingActivity||(!a&&!controller)||a?.stage==='stopping'||stale;
   $('runtime-state').classList.toggle('working',running||pending);
