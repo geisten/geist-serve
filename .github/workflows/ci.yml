@@ -9,7 +9,7 @@ on:
     inputs:
       package_version:
         type: string
-        default: '0.5.28'
+        default: '0.5.29'
 
 permissions:
   contents: read
@@ -106,9 +106,11 @@ jobs:
         run: |
           if [ "${{ runner.os }}" = Linux ]; then export APP_CC=gcc-14; fi
           make -f App.mk app build/geist-app-test build/test_app_performance build/test_app_engine_identity build/test_app_output
-          make -f App.mk build/test_app_activity
+          make -f App.mk build/test_app_activity build/test_app_lifecycle
+          ./build/test_app_lifecycle
           ./build/test_app_activity
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/activity_test.py
+          GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/lifecycle_fault_test.py
           ./build/test_app_output
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/reasoning_test.py
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/deadline_test.py
@@ -128,6 +130,6 @@ jobs:
   installers:
     uses: ./.github/workflows/installers.yml
     with:
-      package_version: ${{ inputs.package_version || '0.5.28' }}
+      package_version: ${{ inputs.package_version || '0.5.29' }}
     permissions:
       contents: read

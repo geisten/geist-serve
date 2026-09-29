@@ -16,7 +16,8 @@ else
     source_id=$(python3 scripts/engine-provenance.py identity geistlib)
     make -s -j2 -C geistlib lib TARGET=linux GEMM_PROVIDER=native MODE=release
     python3 scripts/engine-provenance.py capture geistlib --archive geistlib/lib/linux/release/libgeist.a --expected "$source_id" --output build/engine-build.h
-    cc -std=c23 -O2 -D_GNU_SOURCE -Ibuild -Igeistlib/include -o geistd src/geistd.c src/template.c src/json.c src/net.c geistlib/lib/linux/release/libgeist.a -fopenmp -lm -static
+    # Intentional word splitting: the repository manifest contains source paths.
+    cc -std=c23 -O2 -D_GNU_SOURCE -Ibuild -Igeistlib/include -o geistd $(cat scripts/daemon-sources.list) geistlib/lib/linux/release/libgeist.a -fopenmp -lm -static
 fi
 make -f App.mk app APP_CC=gcc APP_LDLIBS="$(pkg-config --static --libs libcurl openssl) -lpthread -static"
 apk info -v > build/app-build-packages.txt

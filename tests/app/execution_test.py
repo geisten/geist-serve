@@ -32,6 +32,11 @@ with tempfile.TemporaryDirectory(prefix='geist-execution-') as temporary:
         assert app.request('/app/select',{'id':'smollm2-360m'})[0]==202
         state=app.wait(lambda s:s['ready'],timeout=90)
         assert state['execution']['active']=='cpu' and state['execution']['recommended']=='cpu'
+        same=json.loads(app.request('/app/connections')[1])['daemon_pid'];generation=state['process_generation']
+        assert app.request('/app/select',{'id':'smollm2-360m'})[0]==200
+        assert app.request('/app/execution',{'mode':'auto'})[0]==200
+        assert json.loads(app.request('/app/connections')[1])['daemon_pid']==same
+        assert app.status()['ready'] and app.status()['process_generation']==generation
         assert app.request('/app/execution',{'mode':'cpu'})[0]==200
         modes=['cpu','gpu','cpu'] if state['execution']['gpu_available'] else ['cpu']
         if len(modes)==1: assert app.request('/app/execution',{'mode':'gpu'})[0]==409

@@ -48,6 +48,7 @@ with tempfile.TemporaryDirectory(prefix='geist-verification-') as temporary:
         select(app, second)
         select(app, first)
         assert hashes(app) == 2, 'switching back to unchanged data must not hash it again'
+        assert app.status()['lifecycle']['receipt']=='hit' and app.status()['lifecycle']['verified_bytes']==0
         print('verification: A → B → A hashes each file once', flush=True)
     finally:
         app.close()

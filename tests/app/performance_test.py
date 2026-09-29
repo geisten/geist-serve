@@ -22,7 +22,11 @@ def profile(app): return app.status()['performance_profile']
 def exported(app):
     code,body,_=app.request('/app/performance/export');assert code==200
     return [json.loads(line) for line in body.splitlines()]
-def request(app,api=False): chat(app,api)
+def request(app,api=False):
+    # A non-streaming API body can arrive before request accounting has
+    # relinquished the shared runtime. Wait for the documented idle state.
+    app.wait(lambda s:s['ready'] and not s['inference_busy'])
+    chat(app,api)
 def main():
     with tempfile.TemporaryDirectory(prefix='geist-profile-') as temporary:
         root=Path(temporary)

@@ -70,6 +70,7 @@ static const unsigned char markdown_js[] = {
 #include "version.h"
 #include "resources.h"
 #include "activity.h"
+#include "../lifecycle.h"
 #include "performance.h"
 
 #define WORKER_BYTES (256u * 1024u)
@@ -103,6 +104,13 @@ static struct {
     char                       instance[80];
     bool                       stopping;
     double                     child_probe_ms;
+    struct lifecycle_shared   *lifecycle;
+    struct lifecycle_snapshot  lifecycle_snapshot;
+    unsigned                   lifecycle_phase;
+    pid_t                      previous_pid;
+    double                     reaped_ms, spawned_ms;
+    bool                       receipt_checked, receipt_hit;
+    uint64_t                   verified_bytes;
     struct perf_record        *observation;
     struct app_resource_window observation_window;
     double                     sample_ms, cpu_sum;
@@ -484,23 +492,74 @@ static int listener(unsigned *port) {
     return fd;
 }
 
+static void runtime_paths_close(void) {
+    lifecycle_close(&app.lifecycle);
+    if (app.socket_path[0])
+        unlink(app.socket_path);
+    if (app.runtime_dir[0])
+        rmdir(app.runtime_dir);
+    app.socket_path[0] = app.runtime_dir[0] = 0;
+}
+
+static bool archive_load_failure(void) {
+    char source[APP_PATH_CAP], archive[APP_PATH_CAP];
+    if (!path_join(source, app.home, "server.log") ||
+        !path_join(archive, app.home, "load-failure-XXXXXX"))
+        return false;
+    int fd = mkstemp(archive);
+    if (fd < 0)
+        return false;
+    close(fd);
+    if (!rename(source, archive))
+        return true;
+    unlink(archive);
+    return false;
+}
+
 /* Called with app.mutex held. The child is ours: never attach to or stop
  * Ollama or another user's process. Reap before inspecting health. */
+static void lifecycle_sample(void) {
+    struct lifecycle_snapshot sample;
+    if (!lifecycle_read(app.lifecycle, app.generation, &sample) ||
+        sample.process != (uint64_t) app.child)
+        return;
+    app.lifecycle_snapshot                    = sample;
+    static const enum activity_stage stages[] = {
+            ACT_NONE, ACT_BACKEND, ACT_MODEL, ACT_METADATA, ACT_WARMUP, ACT_READY};
+    for (unsigned i = app.lifecycle_phase + 1; i < LC_READY; i++) {
+        if (!sample.phase_ns[i])
+            break;
+        double when = (double) sample.phase_ns[i] / 1e6;
+        if (when < app.load_activity.event_at)
+            when = app.load_activity.event_at;
+        (void) activity_step(
+                &app.load_activity, app.load_activity.id, app.generation, stages[i], when);
+        app.lifecycle_phase = i;
+    }
+}
+
 static void poll_child(void) {
     if (!app.child || app.stopping)
         return;
     if (atomic_load(&load_cancelled) && !app.ready) {
         activity_change(&app.load_activity, ACT_STOPPING);
         stop_child();
+        (void) archive_load_failure();
         (void) activity_end(&app.load_activity, "cancelled", 499, monotonic_ms());
         return;
     }
+    lifecycle_sample();
     int   status;
     pid_t result    = waitpid(app.child, &status, WNOHANG);
     bool  timed_out = !app.ready && monotonic_ms() - app.loading_started > 120000;
     if (result == app.child || (result < 0 && errno == ECHILD) || timed_out) {
         if (timed_out)
             stop_child();
+        else {
+            app.previous_pid = app.child;
+            app.reaped_ms    = monotonic_ms();
+            runtime_paths_close();
+        }
         app.child = 0;
         app.ready = false;
         /* A replacement's verification may already have failed or be active.
@@ -538,9 +597,12 @@ static void poll_child(void) {
             if (start_child_mode(path, id, "cpu"))
                 return;
         }
+        bool archived = !app.generating && archive_load_failure();
         snprintf(app.message,
                  sizeof app.message,
-                 "The model process stopped. See server.log in the app data folder.");
+                 archived ? "The model process stopped. Its diagnostics were preserved. Retry the "
+                            "model."
+                          : "The model process stopped. See server.log in the app data folder.");
         return;
     }
     if (app.ready)
@@ -551,6 +613,9 @@ static void poll_child(void) {
     char              reported[24];
     struct app_engine identity;
     if (app_daemon_identity(app.socket_path, reported, &identity)) {
+        /* The engine can complete several phases during the bounded info
+         * handshake. Capture them before publishing readiness. */
+        lifecycle_sample();
         snprintf(identity.payload_sha256,
                  sizeof identity.payload_sha256,
                  "%s",
@@ -591,12 +656,14 @@ static void stop_child(void) {
     app.stopping = true;
     if (!app.child)
         goto cleanup;
+    app.previous_pid = app.child;
     kill(app.child, SIGTERM);
     for (unsigned i = 0; i < 20; ++i) {
         int   status;
         pid_t result = waitpid(app.child, &status, WNOHANG);
         if (result == app.child || (result < 0 && errno == ECHILD)) {
-            app.child = 0;
+            app.child     = 0;
+            app.reaped_ms = monotonic_ms();
             break;
         }
         struct timespec pause = {.tv_nsec = 25000000};
@@ -609,15 +676,14 @@ static void stop_child(void) {
         while (waitpid(app.child, nullptr, 0) < 0 && errno == EINTR) {
         }
     }
-    app.child = 0;
+    app.child     = 0;
+    app.reaped_ms = monotonic_ms();
 cleanup:
-    app.stopping = false;
-    app.ready    = false;
-    if (app.socket_path[0])
-        unlink(app.socket_path);
-    if (app.runtime_dir[0])
-        rmdir(app.runtime_dir);
-    app.socket_path[0] = app.runtime_dir[0] = 0;
+    runtime_paths_close();
+    app.lifecycle_snapshot = (struct lifecycle_snapshot) {0};
+    app.lifecycle_phase    = 0;
+    app.stopping           = false;
+    app.ready              = false;
 }
 
 static bool start_child_mode_impl(const char *path, const char *id, const char *mode) {
@@ -682,8 +748,15 @@ static bool start_child_mode_impl(const char *path, const char *id, const char *
     size_t count = 0;
     while (environ[count])
         ++count;
-    char **env = calloc(count + 5, sizeof *env);
+    char **env = calloc(count + 6, sizeof *env);
     if (!env) {
+        close(fd);
+        close(log);
+        return false;
+    }
+    int lifecycle_fd = lifecycle_create(app.runtime_dir, app.generation + 1, &app.lifecycle);
+    if (lifecycle_fd < 0) {
+        free(env);
         close(fd);
         close(log);
         return false;
@@ -693,6 +766,7 @@ static bool start_child_mode_impl(const char *path, const char *id, const char *
         if (strncmp(environ[i], "LISTEN_FDS=", 11) && strncmp(environ[i], "LISTEN_PID=", 11) &&
             strncmp(environ[i], "OMP_NUM_THREADS=", 16) &&
             strncmp(environ[i], "OMP_WAIT_POLICY=", 16) &&
+            strncmp(environ[i], "GEIST_LIFECYCLE_FD=", 19) &&
             strncmp(environ[i], "GEIST_BACKEND=", 14))
             env[used++] = environ[i];
     unsigned cores = known ? hardware.cores : 1;
@@ -706,6 +780,7 @@ static bool start_child_mode_impl(const char *path, const char *id, const char *
     env[used++] = threads;
     env[used++] = "OMP_WAIT_POLICY=passive";
     env[used++] = "LISTEN_FDS=1";
+    env[used++] = "GEIST_LIFECYCLE_FD=4";
     char backend_env[48];
     snprintf(backend_env,
              sizeof backend_env,
@@ -721,12 +796,17 @@ static bool start_child_mode_impl(const char *path, const char *id, const char *
         if (!rc)
             rc = posix_spawn_file_actions_adddup2(&actions, fd, 3);
         if (!rc)
-            rc = posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
+            rc = posix_spawn_file_actions_adddup2(&actions, lifecycle_fd, 4);
         if (!rc)
-            rc = posix_spawn(&app.child, app.server, &actions, nullptr, args, env);
+            rc = posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
+        if (!rc) {
+            app.spawned_ms = monotonic_ms();
+            rc             = posix_spawn(&app.child, app.server, &actions, nullptr, args, env);
+        }
         posix_spawn_file_actions_destroy(&actions);
     }
     free(env);
+    close(lifecycle_fd);
     close(fd);
     close(log);
     if (rc) {
@@ -759,6 +839,7 @@ static bool start_child_mode(const char *path, const char *id, const char *mode)
     bool ok = start_child_mode_impl(path, id, mode);
     if (!ok) {
         stop_child();
+        (void) archive_load_failure();
         (void) activity_end(&app.load_activity, "failed", 502, monotonic_ms());
     }
     return ok;
@@ -1232,6 +1313,13 @@ static void *model_job(void *unused) {
     bool stamped = ok && model_stamp(verify, m, before);
     bool cached  = !app.job_download && stamped && read_preference(key, receipt, sizeof receipt) &&
                    !strcmp(before, receipt);
+    pthread_mutex_lock(&app.mutex);
+    if (app.job_activate) {
+        app.receipt_checked = true;
+        app.receipt_hit     = cached;
+        app.verified_bytes  = 0;
+    }
+    pthread_mutex_unlock(&app.mutex);
     if (ok && !atomic_load(&cancelled) && !atomic_load(&closing)) {
         if (!cached) {
             pthread_mutex_lock(&app.mutex);
@@ -1245,8 +1333,12 @@ static void *model_job(void *unused) {
         }
         bool size_ok = stamped;
         bool hash_ok = cached || (size_ok && app_sha256_interruptible(verify, hash, job_cancelled));
-        bool stable  = model_stamp(verify, m, after) && !strcmp(before, after);
-        ok           = hash_ok && stable && (cached || strcmp(hash, m->sha256) == 0);
+        pthread_mutex_lock(&app.mutex);
+        if (app.job_activate && !cached && hash_ok)
+            app.verified_bytes = m->bytes;
+        pthread_mutex_unlock(&app.mutex);
+        bool stable = model_stamp(verify, m, after) && !strcmp(before, after);
+        ok          = hash_ok && stable && (cached || strcmp(hash, m->sha256) == 0);
         if (!ok) {
             snprintf(why,
                      sizeof why,
@@ -1318,6 +1410,11 @@ static bool begin_job(const struct app_model *m, bool download, bool activate) {
     if (app.job_joinable) {
         pthread_join(app.job, nullptr);
         app.job_joinable = false;
+    }
+    if (activate) {
+        app.receipt_checked = false;
+        app.receipt_hit     = false;
+        app.verified_bytes  = 0;
     }
     begin_activity(activate ? &app.load_activity : &app.download_activity,
                    download ? ACT_DOWNLOAD : ACT_RECEIPT,
@@ -1532,6 +1629,41 @@ static void status_response(int fd, struct app_arena *arena) {
     app_put(&b, ",\"download\":");
     activity_json(&b, &app.download_activity, monotonic_ms(), false);
     app_printf(&b, "},\"process_generation\":%llu", (unsigned long long) app.generation);
+    app_put(&b, ",\"lifecycle\":{");
+    app_printf(&b,
+               "\"generation\":%llu,\"pid\":%ld,\"previous_pid\":%ld,\"spawned_ms\":%.3f,\"reaped_"
+               "ms\":%.3f,\"receipt\":",
+               (unsigned long long) app.generation,
+               (long) app.child,
+               (long) app.previous_pid,
+               app.spawned_ms,
+               app.reaped_ms);
+    app_quote(&b, app.receipt_checked ? (app.receipt_hit ? "hit" : "miss") : "not_checked");
+    app_printf(&b,
+               ",\"verified_bytes\":%llu,\"engine_phases\":[",
+               (unsigned long long) app.verified_bytes);
+    bool phase_comma = false;
+    for (unsigned i = LC_BACKEND; i < LC_PHASES; i++) {
+        uint64_t start = app.lifecycle_snapshot.phase_ns[i];
+        if (!start)
+            continue;
+        if (phase_comma)
+            app_put(&b, ",");
+        phase_comma  = true;
+        uint64_t end = i == LC_READY ? start : lifecycle_now_ns();
+        for (unsigned j = i + 1; j < LC_PHASES; j++)
+            if (app.lifecycle_snapshot.phase_ns[j]) {
+                end = app.lifecycle_snapshot.phase_ns[j];
+                break;
+            }
+        app_put(&b, "{\"stage\":");
+        app_quote(&b, lifecycle_name(i));
+        app_printf(&b,
+                   ",\"started_ms\":%.3f,\"duration_ms\":%.3f}",
+                   (double) start / 1e6,
+                   (double) (end - start) / 1e6);
+    }
+    app_put(&b, "]}");
     app_put(&b, ",\"request_phase\":");
     app_quote(&b, app.generating ? app.request_phase : "idle");
     app_put(&b, ",\"last_error\":{\"message\":");
@@ -2865,6 +2997,20 @@ static void handle(int fd, struct app_arena *arena) {
         else
             error_response(fd, 409, "Cannot remove this download safely.");
         return;
+    }
+    /* A live identical model needs no replacement process. Still validate the
+     * trusted receipt stamp: replacing or modifying its file invalidates this
+     * no-op just as it invalidates the normal cached loading path. */
+    if (!download && installed && app.ready && !strcmp(app.active_id, model->id) &&
+        !strcmp(app.chosen, path)) {
+        char key[80], stamp[512], receipt[512];
+        snprintf(key, sizeof key, "verified-%s", model->sha256);
+        if (model_stamp(path, model, stamp) && read_preference(key, receipt, sizeof receipt) &&
+            !strcmp(stamp, receipt)) {
+            pthread_mutex_unlock(&app.mutex);
+            response(fd, 200, "application/json", "{}", 2);
+            return;
+        }
     }
     struct app_hardware h;
     bool                known = app_hardware_read(&h, app.models);
