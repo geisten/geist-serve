@@ -18,6 +18,7 @@
 
 #include "json.h"
 #include "net.h"
+#include "lifecycle.h"
 #include "template.h"
 
 #include <errno.h>
@@ -958,14 +959,18 @@ int main(int argc, char **argv) {
             return 1;
     }
 
+    struct lifecycle_shared *lifecycle = lifecycle_inherit();
+    lifecycle_phase(lifecycle, LC_BACKEND);
     if (geist_backend_create(backend, nullptr, nullptr, &d.be) != GEIST_OK) {
         fprintf(stderr, "backend: %s\n", d.be ? geist_backend_errmsg(d.be) : "create failed");
         return 1;
     }
+    lifecycle_phase(lifecycle, LC_MODEL);
     if (geist_model_load(model, d.be, &d.m) != GEIST_OK) {
         fprintf(stderr, "model: %s\n", d.m ? geist_model_errmsg(d.m) : "load failed");
         return 1;
     }
+    lifecycle_phase(lifecycle, LC_METADATA);
     char path_copy[1024];
     snprintf(path_copy, sizeof path_copy, "%s", model);
     snprintf(d.name, sizeof d.name, "%s", basename(path_copy));
@@ -990,6 +995,7 @@ int main(int argc, char **argv) {
         if (id != GEIST_TOKEN_NONE)
             d.eot[d.n_eot++] = id;
     }
+    lifecycle_phase(lifecycle, LC_WARMUP);
     /* Vocabulary size: one forward pass over BOS in a throwaway session. */
     {
         struct geist_session_opts o   = {.max_seq_len = 16};
@@ -1015,6 +1021,7 @@ int main(int argc, char **argv) {
             d.idle_s,
             d.need_hello ? ", token required" : "");
 
+    lifecycle_phase(lifecycle, LC_READY);
     net_install_signals();
     if (stdio) {
         serve_conn(&d, STDIN_FILENO, STDOUT_FILENO);
@@ -1046,6 +1053,7 @@ int main(int argc, char **argv) {
         if (d.sess[i].live)
             sess_free(&d.sess[i]);
     gguf_meta_free(&d.meta);
+    lifecycle_close(&lifecycle);
     geist_model_destroy(d.m);
     geist_backend_destroy(d.be);
     return 0;

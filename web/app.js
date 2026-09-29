@@ -906,7 +906,7 @@ $('catalog-file').addEventListener('change', async () => {
 
 
 // Polling restores the current snapshot; it never starts or replays work.
-const activityLabels={receipt:'Validating local artifact',hash:'Checking model',download:'Downloading model',stopping:'Stopping',starting:'Starting runtime',loading:'Loading model',ready:'Ready',connect:'Connecting',open:'Opening session',tokenize:'Reading input',prefill:'Processing input',generate:'Generating',preparing:'Preparing answer',answer:'Answering'};
+const activityLabels={receipt:'Validating local artifact',hash:'Checking model',download:'Downloading model',stopping:'Stopping',starting:'Starting runtime',loading:'Loading model',backend:'Initializing processor',model:'Loading weights',metadata:'Reading model metadata',warmup:'Warming up runtime',ready:'Ready',connect:'Connecting',open:'Opening session',tokenize:'Reading input',prefill:'Processing input',generate:'Generating',preparing:'Preparing answer',answer:'Answering'};
 function acceptActivity(snapshot) {
   if (!snapshot?.instance) { activitySnapshot=null; activitySequences.clear(); return; }
   if (activityInstance!==snapshot.instance) { activitySequences.clear(); activityInstance=snapshot.instance; requestAfter=0; }

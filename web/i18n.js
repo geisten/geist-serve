@@ -472,3 +472,5 @@ Object.assign(german, {
   'Not running':'Gestoppt','Processor':'Prozessor','Error code':'Fehlercode'
 });
 translateStatic();
+
+Object.assign(german, {'Initializing processor':'Prozessor wird initialisiert','Loading weights':'Gewichte werden geladen','Reading model metadata':'Modelldaten werden gelesen','Warming up runtime':'Laufzeit wird vorbereitet'});
