@@ -75,7 +75,7 @@ with tempfile.TemporaryDirectory(prefix='geist-execution-') as temporary:
         assert app.request('/app/execution',{'mode':'auto'})[0]==409
         catalog=json.loads(app.request('/app/catalog')[1]);catalog['revision']+=1
         assert app.request('/app/catalog',catalog)[0]==409
-        response.close();conn.close();app.wait(lambda s:not s['busy'])
+        response.close();conn.close();app.wait(lambda s:not s['busy'] and s['ready'],timeout=30)
         changed=copy.deepcopy(catalog);changed['models']=[m for m in changed['models'] if m['id']!='smollm2-360m']
         assert app.request('/app/catalog',changed)[0]==409
         assert app.request('/app/catalog',catalog)[0]==200
