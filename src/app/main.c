@@ -580,6 +580,9 @@ static void poll_child(void) {
     char              reported[24];
     struct app_engine identity;
     if (app_daemon_identity(app.socket_path, reported, &identity)) {
+        /* The engine can complete several phases during the bounded info
+         * handshake. Capture them before publishing readiness. */
+        lifecycle_sample();
         snprintf(identity.payload_sha256,
                  sizeof identity.payload_sha256,
                  "%s",
