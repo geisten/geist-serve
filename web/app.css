@@ -625,7 +625,6 @@ button.markdown-copy { background:transparent; color:var(--muted); border:0; bor
 .ring-check { display:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round }
 .model-ring[data-stage="downloaded"] .ring-check { display:block }
 .model-ring[data-stage="missing"] .ring-fill { display:none }
-.performance-content { position:static; max-height:50vh; overflow:auto; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:20px; margin-top:10px; font-size:13px }
 .performance-content:focus-visible { outline-offset:-3px }
 .model-home>.settings { padding:16px 0 }
 .model-home>.settings>summary { font-size:13px; font-weight:500; color:var(--muted) }
@@ -668,7 +667,6 @@ body.manager-page footer { display:none }
 .model-sidebar>.settings>summary { font-size:12px; font-weight:500 }
 .model-sidebar .settings-row { display:block }
 .model-sidebar .settings-row select { width:100%; margin-top:8px; font-size:12px }
-.performance-content { max-height:45vh; padding:14px }
 .performance-grid { gap:12px }
 .performance-grid dd { font-size:16px }
 #test-page,#workspace { display:flex; flex-direction:column; min-width:0; min-height:0; flex:1 }
@@ -779,22 +777,7 @@ body.manager-page main { max-width:1180px }
 #test-unavailable h2 { font-size:22px; font-weight:500; color:var(--muted); margin:0; letter-spacing:-.5px }
 @media(max-width:699px) { .catalog-note { margin-bottom:6px } .model { padding:4px } }
 
-/* One performance surface: the active model's metric row expands in place. */
-.model-performance { position:relative; flex:none; min-width:0; margin:0 0 8px }
-.model-performance>summary { list-style:none; border-radius:8px; min-height:24px; padding:2px 6px; margin:0; font-weight:400; cursor:pointer }
-.model-performance>summary::-webkit-details-marker { display:none }
-.model-performance>summary:hover { background:var(--soft) }
-.model-performance>summary:focus-visible { outline:2px solid var(--focus); outline-offset:2px }
-.model-performance>summary>.metrics-chevron { width:14px; height:14px; margin-left:auto; flex:none; transition:transform .15s }
-.model-performance[open]>summary { margin:0 }
-.model-performance[open]>summary>.metrics-chevron { transform:rotate(180deg) }
-.model-performance .performance-content { position:absolute; z-index:20; top:100%; left:0; right:0; max-height:min(360px,var(--performance-space,45vh)); margin-top:4px; overflow:auto; overscroll-behavior:contain; padding:16px; border-radius:12px; box-shadow:0 8px 24px #20232916 }
-.model-performance .performance-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px }
-.model-performance .performance-grid dd { color:var(--ink); font-size:14px }
-@media(max-width:699px) {
-  .model-performance { margin-bottom:4px }
-  .model-performance>summary { min-height:20px; padding:1px 4px }
-}
+
 
 /* Direct model actions and a separate preferences page. */
 .model { position:relative; padding-right:30px }
@@ -923,8 +906,6 @@ body.manager-page main { max-width:1180px }
 .execution-choice .processor-option small { font-size:10px; font-weight:400; white-space:nowrap; font-variant-numeric:tabular-nums }
 .execution-choice label { align-items:flex-start; padding:6px 9px }
 .execution-choice .processor-indicator { margin-top:4px }
-.profile-label { margin-left:auto; font-size:11px }
-.model-performance>summary>.metrics-chevron { margin-left:0 }
 .model-metrics small { font-size:10px }
 .profile-table { width:100%; border-collapse:collapse; font-size:11px; table-layout:fixed; font-variant-numeric:tabular-nums }
 .profile-table caption { text-align:left; font-size:13px; font-weight:600; margin-bottom:10px }
@@ -943,3 +924,55 @@ body.manager-page main { max-width:1180px }
 @media(max-width:390px) { .model-metrics { gap:7px } .execution-choice .processor-option { min-width:48px } .profile-table th,.profile-table td { padding:6px 3px } }
 
 .profile-table thead small { display:block; margin-top:3px; font-size:10px; font-weight:400; color:var(--muted) }
+
+/* Fixed summary and one intentional, independently scrolling measurement sheet. */
+.measurement-sheet { width:min(660px,calc(100vw - 32px)); max-width:none; max-height:calc(100dvh - 32px); padding:0; border:1px solid var(--border); border-radius:18px; background:#fff; color:var(--ink); box-shadow:0 20px 70px #20232930; overflow:hidden }
+.measurement-sheet[open] { display:flex; flex-direction:column }
+.measurement-sheet::backdrop { background:#17213145 }
+.sheet-heading { display:flex; align-items:center; justify-content:space-between; flex:none; gap:12px; padding:12px 18px; border-bottom:1px solid var(--border) }
+.sheet-heading h2 { margin:0; font-size:17px }
+.sheet-heading button { width:44px; height:44px; padding:0; font-size:25px; background:transparent; border:0 }
+.measurement-sheet .performance-content { min-height:0; overflow:auto; overscroll-behavior:contain; padding:18px; font-size:13px }
+.measurement-sheet .profile-info h3 { font-size:12px; margin:16px 0 8px }
+.measurement-sheet .performance-content:focus-visible { outline-offset:-3px }
+#open-measurements { display:inline-flex; align-items:center; gap:5px; min-height:44px; padding:4px 6px; font-size:11px; margin-left:auto }
+.execution-choice label { min-height:44px }
+.execution-choice .processor-option small { white-space:normal; line-height:1.25; min-height:1.25em }
+.model-metrics { min-height:44px; align-items:center }
+.activity-slot { flex:none; height:36px; overflow:auto; font-size:11px }
+.activity-slot p { margin:0!important }
+@media (max-width:540px) {
+ .measurement-sheet { width:100vw; height:100dvh; max-height:100dvh; margin:0; border:0; border-radius:0 }
+ .sheet-heading { padding:8px 12px }
+ .measurement-sheet .performance-content { padding:12px }
+}
+@media(max-height:560px) {
+ .activity-slot { height:28px }
+ .execution-choice label { min-height:44px }
+}
+
+.sheet-heading button svg { width:20px; height:20px }
+.runtime-panel { flex:none; min-height:0; overflow:auto; scrollbar-gutter:stable; max-height:44%; overscroll-behavior:contain }
+.runtime-panel:focus-visible { outline-offset:-2px }
+@media(max-width:699px) and (max-height:520px) {
+ #models-page { grid-template-rows:60px minmax(0,1fr); gap:6px }
+ .runtime-panel { max-height:min(24vh,calc(100% - 180px)) }
+}
+
+.execution-choice .processor-option { display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:7px; row-gap:2px; min-width:78px }
+.processor-option>span:first-child { grid-column:1; grid-row:1 }
+.processor-option .processor-backend { grid-column:2; grid-row:1 }
+.processor-option [id$="-rate"] { grid-column:1 / -1; grid-row:2 }
+.processor-option [id^="summary-"][id$="-first"] { grid-column:1; grid-row:3 }
+.processor-option [id^="summary-"][id$="-count"] { grid-column:2; grid-row:3; text-align:right }
+@media(max-width:699px) and (min-height:521px) {
+ #models-page { grid-template-rows:minmax(64px,min(20vh,120px)) minmax(0,1fr) }
+}
+.model-metrics { display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-rows:22px 22px; gap:0 8px; height:44px }
+.model-metrics>span:first-child { grid-column:1; grid-row:1 }
+.model-metrics>span:nth-child(2) { grid-column:1; grid-row:2 }
+#open-measurements { grid-column:2; grid-row:1 / 3; margin:0 }
+#profile-engine { overflow-wrap:anywhere }
+@media(max-width:540px) { #open-measurements>span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap } #open-measurements { width:44px; justify-content:center } }
+
+.measurement-sheet button { min-height:44px }

@@ -4,7 +4,7 @@ on:
     inputs:
       package_version:
         type: string
-        default: '0.5.26'
+        default: '0.5.27'
   workflow_dispatch:
 permissions:
   contents: read
@@ -12,7 +12,7 @@ jobs:
   ubuntu:
     timeout-minutes: 45
     env:
-      VERSION: ${{ inputs.package_version || '0.5.26' }}
+      VERSION: ${{ inputs.package_version || '0.5.27' }}
     strategy:
       fail-fast: false
       matrix:

@@ -15,6 +15,7 @@ const formatNumber = (value, digits = 0) => new Intl.NumberFormat(interfaceLangu
   minimumFractionDigits: digits, maximumFractionDigits: digits
 }).format(value);
 const german = {
+  'Model measurements': 'Modellmesswerte', 'Measurements': 'Messwerte', 'Close': 'Schließen', 'Historical': 'Historisch', 'Observed': 'Beobachtet', 'Known values': 'Bekannte Werte', 'Collection enabled': 'Messung aktiv', 'Collection disabled': 'Messung deaktiviert', 'Process RSS': 'Prozess-RSS', 'Process RSS · after reply': 'Prozess-RSS · nach Antwort', 'RSS sampled peak · 2 s': 'RSS-Stichprobenmaximum · 2 s', 'Current memory': 'Aktueller Speicher', 'File': 'Datei',
   'Unknown': 'Unbekannt', 'Modified build': 'Geänderter Build',
   "Preparing answer…": "Antwort wird vorbereitet …",
   "First answer": "Erste sichtbare Antwort",
@@ -273,7 +274,7 @@ Object.assign(german, {
   'Getting ready…': 'Wird vorbereitet…', 'What would you like to try?': 'Was möchtest du ausprobieren?',
   'Rewrite': 'Umformulieren', 'Summarize': 'Zusammenfassen', 'Ideas': 'Ideen',
   'Each request starts fresh. ⌘ / Ctrl + Enter to send.': 'Jede Anfrage beginnt neu. Senden mit ⌘ / Strg + Enter.',
-  'Make yourself at home.': 'So passt es zu dir.', 'This computer': 'Dieser Rechner', 'Measurements': 'Messwerte',
+  'Make yourself at home.': 'So passt es zu dir.', 'This computer': 'Dieser Rechner', 'Model measurements': 'Modellmesswerte', 'Measurements': 'Messwerte',
   'Service': 'Dienst', 'Selected for setup': 'Für die Einrichtung gewählt', 'Available': 'Verfügbar', 'Details': 'Details',
   'Choose': 'Auswählen', 'Already on this computer': 'Bereits auf diesem Rechner', 'Download': 'Download',
   'No suitable model available right now.': 'Zurzeit ist kein geeignetes Modell verfügbar.',

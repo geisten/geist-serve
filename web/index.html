@@ -26,46 +26,28 @@
 <section id="test-page" aria-labelledby="task-title">
   <div id="test-unavailable"><h2 id="model-prompt">Choose a model to begin.</h2></div>
   <div id="workspace" hidden>
+    <div class="runtime-panel" tabindex="0" role="region" aria-label="Model measurements">
     <div class="chat-heading"><div><h2 id="task-title" class="sr-only">Quick test</h2><h2 id="runtime-model" class="runtime-model"><span id="runtime-state" class="status-light" role="img" aria-label="Model ready" title="Model ready"></span><span id="runtime-name"></span></h2></div></div>
     <div class="execution-row">
       <fieldset id="execution-choice" class="execution-choice" aria-describedby="execution-description"><legend class="sr-only">Execution</legend>
         <label><input type="radio" name="execution" value="auto"><span>Auto</span></label>
-        <label><input type="radio" name="execution" value="cpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option" id="history-cpu"><span>CPU</span><small id="history-cpu-rate">— tok/s</small></span><small class="recommended-mark" aria-hidden="true" hidden></small></label>
-        <label><input type="radio" name="execution" value="gpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option" id="history-gpu"><span>GPU</span><small class="processor-backend" hidden></small><small id="history-gpu-rate">— tok/s</small></span><small class="recommended-mark" aria-hidden="true" hidden></small></label>
+        <label><input type="radio" name="execution" value="cpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option" id="history-cpu"><span>CPU</span><small id="history-cpu-rate">— tok/s</small><small id="summary-cpu-first">—</small><small id="summary-cpu-count">—</small></span><small class="recommended-mark" aria-hidden="true" hidden></small></label>
+        <label><input type="radio" name="execution" value="gpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option" id="history-gpu"><span>GPU</span><small class="processor-backend" hidden></small><small id="history-gpu-rate">— tok/s</small><small id="summary-gpu-first">—</small><small id="summary-gpu-count">—</small></span><small class="recommended-mark" aria-hidden="true" hidden></small></label>
       </fieldset>
       <span id="execution-current" class="sr-only" role="status" aria-live="polite"></span>
       <span id="execution-description" class="sr-only"></span>
     </div>
+    <div class="model-metrics" aria-label="Current memory">
+      <span><span>Process RSS</span> <span id="test-memory">—</span></span>
+      <span><span>File</span> <span id="test-size">—</span></span>
+      <button id="open-measurements" type="button" class="text-button" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3v17h17M8 15v-4m5 4V6m5 9V9"/></svg><span>Measurements</span></button>
+    </div>
+    </div>
+    <div class="activity-slot">
     <p id="profile-error" class="hint" role="status" hidden></p>
     <p id="execution-notice" class="hint" role="status" hidden></p>
     <p id="execution-performance" class="execution-warning" role="status" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 21h20L12 3zM12 9v5m0 3v.01"/></svg><span id="execution-performance-text"></span></p>
-    <details id="performance" class="model-performance">
-    <summary class="model-metrics" aria-label="Model performance details" aria-describedby="test-speed test-memory test-size" title="Model performance details">
-      <span id="test-speed"><span>First text</span> <span id="profile-first">—</span></span>
-      <span title="Model process RAM" aria-label="Model process RAM"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 10v4m5-4v4m5-4v4M6 3v4m6-4v4m6-4v4M6 17v4m6-4v4m6-4v4"/></svg><span id="test-memory">— RAM</span><small>now</small></span>
-      <span title="Download size" aria-label="Download size"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 15h18M16 18h1"/></svg><span id="test-size">—</span></span>
-      <span class="profile-label">Profile</span><svg class="metrics-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-    </summary>
-        <div class="performance-content" tabindex="0" role="region" aria-label="Model performance details">
-          <p id="profile-group" class="hint"></p><p id="profile-engine" class="hint"></p>
-          <table class="profile-table"><caption id="processor-history-title">Local performance profile</caption><thead><tr><th scope="col">Measurement</th><th scope="col">CPU<small id="profile-cpu-confidence"></small></th><th scope="col">GPU<small id="profile-gpu-confidence"></small></th></tr></thead><tbody><tr><th scope="row">Typical speed</th><td id="history-cpu-typical">—</td><td id="history-gpu-typical">—</td></tr>
-<tr><th scope="row">Usual range</th><td id="history-cpu-range">—</td><td id="history-gpu-range">—</td></tr>
-<tr><th scope="row">First text</th><td id="history-cpu-first">—</td><td id="history-gpu-first">—</td></tr>
-<tr><th scope="row">Total time</th><td id="history-cpu-total">—</td><td id="history-gpu-total">—</td></tr>
-<tr><th scope="row">Output tokens</th><td id="history-cpu-tokens">—</td><td id="history-gpu-tokens">—</td></tr>
-<tr><th scope="row">Model RAM · after reply</th><td id="history-cpu-ram">—</td><td id="history-gpu-ram">—</td></tr>
-<tr><th scope="row">Sampled peak · 2 s</th><td id="history-cpu-peak">—</td><td id="history-gpu-peak">—</td></tr>
-<tr><th scope="row">Observations</th><td id="history-cpu-count">—</td><td id="history-gpu-count">—</td></tr>
-<tr><th scope="row">Measured</th><td id="history-cpu-time">—</td><td id="history-gpu-time">—</td></tr>
-</tbody></table>
-          <p class="hint" id="profile-confidence"></p>
-          <details class="profile-info"><summary>About these measurements</summary><p>Median of up to 30 comparable replies. Range: middle 50%. Different prompts are observations, not a controlled speed comparison. First text includes hidden preparation. RAM is process RSS; sampled peaks can miss brief spikes. GPU memory and power are not measured.</p>
-          <p id="performance-system" class="system-name"></p><p id="performance-os" class="hint"></p>
-          <dl class="performance-grid"><div><dt>Model CPU · now</dt><dd id="performance-cpu">—</dd></div><div><dt>System RAM</dt><dd id="performance-ram">—</dd></div><div><dt>Available RAM</dt><dd id="performance-available">—</dd></div></dl></details>
-          <details class="profile-info"><summary>Recent observations</summary><ol id="profile-recent"></ol></details>
-          <div class="profile-actions"><button id="benchmark" class="text-button" type="button" disabled>Measure comparison</button><button id="comparison-stop" type="button" hidden>Cancel comparison</button></div><p id="comparison-status" class="hint" role="status"></p>
-        </div>
-    </details>
+    </div>
     <div id="transcript" tabindex="0" role="region" aria-label="Conversation">
       <div id="chat-empty"><h3>Test a message.</h3></div>
       <div id="result" hidden></div>
@@ -111,4 +93,26 @@
     <section class="preference-group" aria-labelledby="storage-title"><h3 id="storage-title">Storage</h3><p id="disk-space" class="hint"></p></section>
   </section>
 <footer>Models stay on this computer. Prompts and results are not saved as chat history.</footer>
-</main></body></html>
+</main><dialog id="performance" class="measurement-sheet" aria-labelledby="measurements-title">
+<div class="sheet-heading"><h2 id="measurements-title">Measurements</h2><button id="close-measurements" type="button" aria-label="Close" title="Close" autofocus><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
+        <div class="performance-content" tabindex="0" role="region" aria-label="Measurements">
+          <p id="profile-collection" class="hint"></p><p id="profile-group" class="hint"></p><p id="profile-engine" class="hint"></p>
+          <table class="profile-table"><caption id="processor-history-title">Local performance profile</caption><thead><tr><th scope="col">Measurement</th><th scope="col">CPU<small id="profile-cpu-confidence"></small></th><th scope="col">GPU<small id="profile-gpu-confidence"></small></th></tr></thead><tbody><tr><th scope="row">Typical speed</th><td id="history-cpu-typical">—</td><td id="history-gpu-typical">—</td></tr>
+<tr><th scope="row">Usual range</th><td id="history-cpu-range">—</td><td id="history-gpu-range">—</td></tr>
+<tr><th scope="row">First answer</th><td id="history-cpu-answer">—</td><td id="history-gpu-answer">—</td></tr>
+<tr><th scope="row">First text</th><td id="history-cpu-first">—</td><td id="history-gpu-first">—</td></tr>
+<tr><th scope="row">Total time</th><td id="history-cpu-total">—</td><td id="history-gpu-total">—</td></tr>
+<tr><th scope="row">Output tokens</th><td id="history-cpu-tokens">—</td><td id="history-gpu-tokens">—</td></tr>
+<tr><th scope="row">Process RSS · after reply</th><td id="history-cpu-ram">—</td><td id="history-gpu-ram">—</td></tr>
+<tr><th scope="row">RSS sampled peak · 2 s</th><td id="history-cpu-peak">—</td><td id="history-gpu-peak">—</td></tr>
+<tr><th scope="row">Observations</th><td id="history-cpu-count">—</td><td id="history-gpu-count">—</td></tr>
+<tr><th scope="row">Measured</th><td id="history-cpu-time">—</td><td id="history-gpu-time">—</td></tr>
+</tbody></table>
+          <p class="hint" id="profile-confidence"></p>
+          <section class="profile-info"><h3>About these measurements</h3><p>Median of up to 30 comparable replies. Range: middle 50%. Different prompts are observations, not a controlled speed comparison. First text includes hidden preparation. RAM is process RSS; sampled peaks can miss brief spikes. GPU memory and power are not measured.</p>
+          <p id="performance-system" class="system-name"></p><p id="performance-os" class="hint"></p>
+          <dl class="performance-grid"><div><dt>Model CPU · now</dt><dd id="performance-cpu">—</dd></div><div><dt>System RAM</dt><dd id="performance-ram">—</dd></div><div><dt>Available RAM</dt><dd id="performance-available">—</dd></div></dl></section>
+          <section class="profile-info"><h3>Recent observations</h3><ol id="profile-recent"></ol></section>
+          <div class="profile-actions"><button id="benchmark" class="text-button" type="button" disabled>Measure comparison</button><button id="comparison-stop" type="button" hidden>Cancel comparison</button></div><p id="comparison-status" class="hint" role="status"></p>
+        </div>
+</dialog></body></html>

@@ -103,7 +103,7 @@ def main():
         base=next(r for r in rows if r['source']=='app' and not r['cold'])
         golden=[]
         for i,rate in enumerate([10,20,30,40,10000]):
-            r={**base,'id':f'gold-{i}','output':64,'generation_ns':64/rate*1e9};golden.append(r)
+            r={**base,'total_ns':10e9,'first_answer_ns':None if i<2 else i*1e9,'id':f'gold-{i}','output':64,'generation_ns':64/rate*1e9};golden.append(r)
         legacy_row={**golden[0],'id':'schema-1','schema':1};legacy_row.pop('engine');golden.insert(0,legacy_row)
         other=copy.deepcopy(golden[-1]);other['id']='other-engine';other['engine']['geistlib']['revision']='b'*40;golden.insert(1,other)
         golden.insert(1,{**golden[0],'id':'gpu-other-workload','backend':'metal','output':2})
@@ -117,6 +117,7 @@ def main():
             assert not staging.exists()
             p=profile(app);assert p['invalid']==1 and p['cpu']['count']==5,p
             assert (p['cpu']['rate'],p['cpu']['q25'],p['cpu']['q75'])==(30,20,40),p
+            assert p['cpu']['first_answer']==3 and p['cpu']['first_answer_count']==3,p
             assert p['gpu'] is None,'Must not borrow another workload to fill GPU'
             request(app);app.wait(lambda s:s['performance_profile']['persisted']>=10)
         finally:app.close()

@@ -15,7 +15,10 @@ def hashes(app):
 
 def select(app, model):
     assert app.request('/app/select', {'id': model['id']})[0] == 202
-    return app.wait(lambda s: not s['busy'] and not s['phase'])
+    # This integrity-only fixture launches /usr/bin/false. Wait for that owned
+    # process to be reaped before mutating the next artifact; worker completion
+    # alone does not mean the model lifecycle has reached its terminal state.
+    return app.wait(lambda s: not s['busy'] and not s['phase'] and not s['loading'])
 
 
 with tempfile.TemporaryDirectory(prefix='geist-verification-') as temporary:
@@ -50,7 +53,7 @@ with tempfile.TemporaryDirectory(prefix='geist-verification-') as temporary:
         app.close()
     app = App(home, binary=ROOT/'build/geist-app-test')
     try:
-        app.wait(lambda s: not s['busy'] and not s['phase'])
+        app.wait(lambda s: not s['busy'] and not s['phase'] and not s['loading'])
         assert hashes(app) == 0, 'unchanged files reuse receipts across process restart'
         target = home/'models'/first['file']
         # A new inode containing identical bytes requires a fresh full checksum.
