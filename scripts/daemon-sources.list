@@ -1,0 +1,5 @@
+src/geistd.c
+src/lifecycle.c
+src/template.c
+src/json.c
+src/net.c
