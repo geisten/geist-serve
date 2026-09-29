@@ -793,9 +793,9 @@ $$
 
     const measuredReply = lastReply;
     const savedState = state;
-    state = {...savedState, resources:{scope:'geistd', rss_bytes:2**30, cpu_percent:0}}; renderPerformance();
+    state = {...savedState, memory:{process_rss_bytes:2**30,status:2,gpu_unavailable_reason:'unsupported'}, resources:{scope:'geistd', rss_bytes:2**30, cpu_percent:0}}; renderPerformance();
     assert($('test-memory').textContent === '1.0 GiB' && $('performance-cpu').textContent === '0.0 %', 'real zero CPU differs from unknown');
-    state = {...savedState, resources:{scope:'geistd', rss_bytes:null, cpu_percent:null}}; renderPerformance();
+    state = {...savedState, memory:{process_rss_bytes:null,status:0}, resources:{scope:'geistd', rss_bytes:null, cpu_percent:null}}; renderPerformance();
     assert($('test-memory').textContent === '—' && $('performance-cpu').textContent === '—', 'unknown resource counters are not zero');
     state = {...savedState, hardware:{...savedState.hardware, known:false, ram:0}}; renderPerformance();
     assert($('performance-ram').textContent === '—', 'failed system memory read is unknown, not zero');

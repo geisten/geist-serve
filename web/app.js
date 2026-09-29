@@ -6,6 +6,7 @@ const statusPollInterval = 1800;
 // The capability stays in this page's memory/fragment, never localStorage.
 const cards = new Map(), modelGroups = new Map();
 let groupSequence = 0;
+let stateReceivedAt = performance.now();
 let state = null, controller = null, requesting = false, polling = false;
 let downloadRequest = false;
 let lastServerMessage = '', localMessage = false;
@@ -131,19 +132,25 @@ function renderReplyMetrics(element) {
   element.textContent = `${rateText(m.rate)} · ${knownNumber(m.tokens) ? m.tokens : '—'} ${t('tokens')} · ${timeText(m.total)}`;
   element.title = `${t('First text')}: ${timeText(m.first)} · ${t('First answer')}: ${timeText(m.firstAnswer)}${m.reasoning ? ' · ' + t('Tokens and time include answer preparation.') : ''}`;
 }
-function renderPerformance() {
-  if (lastReply && lastReply.model !== modelIdentity()) lastReply = null;
+function renderMemory() {
   const h = state?.hardware, r = state?.resources, memory = state?.memory;
   const rss = !executionLoading() && state?.ready && r?.scope === 'geistd' && knownNumber(memory?.process_rss_bytes) ? memory.process_rss_bytes : null;
-  const cpu = !executionLoading() && state?.ready && r?.scope === 'geistd' && knownNumber(r.cpu_percent) ? r.cpu_percent : null;
   $('test-memory').textContent = rss === null ? '—' : gib(rss);
-  const gpuMemory = !executionLoading() && memory?.status===1 && knownNumber(memory.gpu_allocated_bytes) ? memory.gpu_allocated_bytes : null;
-  const memoryReason = t(({unsupported:'Unsupported',query_failed:'Measurement failed',stale:'Stale measurement'})[memory?.gpu_unavailable_reason] || 'Not measured yet');
+  const age=(memory?.gpu_sample_age_ms ?? 0)+Math.max(0,performance.now()-stateReceivedAt);
+  const stale=age>6000;
+  const gpuMemory = !executionLoading() && !stale && memory?.status===1 && knownNumber(memory.gpu_allocated_bytes) ? memory.gpu_allocated_bytes : null;
+  const memoryReason = t(stale ? 'Stale measurement' : ({unsupported:'Unsupported',query_failed:'Measurement failed',stale:'Stale measurement'})[memory?.gpu_unavailable_reason] || 'Not measured yet');
   $('test-gpu-memory').textContent = gpuMemory===null ? '—' : gib(gpuMemory);
-  $('test-gpu-memory').title = gpuMemory===null ? memoryReason : `${memory.gpu_source} · ${formatNumber(memory.gpu_sample_age_ms/1000,1)} s`;
+  $('test-gpu-memory').title = gpuMemory===null ? memoryReason : `${memory.gpu_source} · ${formatNumber(age/1000,1)} s`;
   $('test-gpu-memory').setAttribute('aria-label',`${t('Metal allocated')}: ${gpuMemory===null ? memoryReason : gib(gpuMemory)}`);
   $('memory-live').textContent = `${t('Process RSS')}: ${rss===null?'—':gib(rss)} · ${t('Metal allocated')}: ${gpuMemory===null?memoryReason:gib(gpuMemory)}`;
-  $('memory-source').textContent = [memory?.rss_source, memory?.gpu_source, memory?.gpu_source && knownNumber(memory?.gpu_sample_age_ms) ? `${t('Sample age')}: ${formatNumber(memory.gpu_sample_age_ms/1000,1)} s` : null, memory?.unified_memory ? t('Shared memory; values overlap.') : null].filter(Boolean).join(' · ');
+  $('memory-source').textContent = [memory?.rss_source, memory?.gpu_source, memory?.gpu_source && knownNumber(memory?.gpu_sample_age_ms) ? `${t('Sample age')}: ${formatNumber(age/1000,1)} s` : null, memory?.unified_memory ? t('Shared memory; values overlap.') : null].filter(Boolean).join(' · ');
+}
+function renderPerformance() {
+  if (lastReply && lastReply.model !== modelIdentity()) lastReply = null;
+  const h=state?.hardware, r=state?.resources;
+  const cpu=!executionLoading() && state?.ready && r?.scope==='geistd' && knownNumber(r.cpu_percent) ? r.cpu_percent : null;
+  renderMemory();
   const model = state?.models.find(item => item.id === state.active_id);
   $('test-size').textContent = model && knownNumber(model.bytes) ? bytes(model.bytes) : '—';
   $('performance-system').textContent = h?.name || t('Not available');
@@ -461,6 +468,7 @@ function visibleModels() {
 function render(next) {
   const modelChanged = state && (state.active_id !== next.active_id || state.active !== next.active);
   state = next;
+  stateReceivedAt=performance.now();
   acceptActivity(next.activity);
   if (!languageInitialized) {
     $('language-choice').value = next.answer_language || interfaceLanguage;
@@ -972,4 +980,4 @@ $('activity-stop').addEventListener('click',async()=>{
   catch(error){message(error.message);}
   finally {cancellingActivity=false;renderActivity();}
 });
-setInterval(renderActivity,1000);
+setInterval(()=>{renderActivity();renderMemory();},1000);
