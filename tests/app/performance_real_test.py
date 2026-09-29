@@ -17,7 +17,7 @@ with tempfile.TemporaryDirectory(prefix='geist-performance-real-') as temporary:
     home=Path(temporary);(home/'models').mkdir()
     shutil.copyfile(model,home/'models/smollm2-360m-instruct-q8_0.gguf')
     (home/'selected').write_text('smollm2-360m')
-    app=App(home,binary=Path(os.environ.get('GEIST_APP_TEST_BINARY',ROOT/'build/geist-app-test')),server=Path(os.environ.get('GEIST_EXECUTION_DAEMON',ROOT/'build/geistd-execution')))
+    app=App(home,binary=Path(os.environ.get('GEIST_APP_TEST_BINARY',ROOT/'build/geist-app-test')),server=Path(os.environ.get('GEIST_EXECUTION_DAEMON',ROOT/'build/geistd-execution')).resolve())
     try:
         state=app.wait(lambda s:s['ready'] and not s['busy'],timeout=90)
         daemon=Path(os.environ.get('GEIST_EXECUTION_DAEMON',ROOT/'build/geistd-execution'))
@@ -52,7 +52,7 @@ with tempfile.TemporaryDirectory(prefix='geist-performance-real-') as temporary:
             (target/'real-observations.jsonl').write_bytes(data)
             (target/'real-profile.json').write_text(json.dumps(state['performance_profile'],indent=2)+'\n')
     finally:app.close()
-    app=App(home,binary=ROOT/'geist-app',server=Path(os.environ.get('GEIST_EXECUTION_DAEMON',ROOT/'build/geistd-execution')))
+    app=App(home,binary=ROOT/'geist-app',server=Path(os.environ.get('GEIST_EXECUTION_DAEMON',ROOT/'build/geistd-execution')).resolve())
     try:
         state=app.wait(lambda s:s['ready'] and not s['busy'],timeout=90)
         code,data,_=app.request('/app/performance/export');restored=[json.loads(line) for line in data.splitlines()]
