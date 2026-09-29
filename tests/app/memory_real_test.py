@@ -34,6 +34,9 @@ try:
             else:shutil.copyfile(path,home/'models'/m['file'])
             (home/f"backend-{m['sha256']}").write_text('cpu')
         for trial,enabled in enumerate([True,False,False,True,True,False]):
+            # A prior large-model selection must not autostart while the next
+            # paired small-model trial is trying to select its own fixture.
+            (home/'selected').write_text(entries[0]['id'])
             env={**os.environ,'GEIST_RESOURCE_SAMPLING':'1' if enabled else '0'}
             app=App(home,binary=app_bin,server=daemon,env=env);label='idle'
             def sample():
@@ -65,7 +68,8 @@ try:
                 return events[-1]
             try:
                 start=sample()
-                if any(m['bytes']>2**30 for m in entries):assert start['hardware']['available_known'] and start['hardware']['available']>=16*2**30
+                if trial==0 and any(m['bytes']>2**30 for m in entries):assert start['hardware']['available_known'] and start['hardware']['available']>=16*2**30
+                wait(lambda s:s['ready'] and not s['busy'])
                 # Expensive Bonsai switch/prefill evidence once; paired small trials six times.
                 for m in entries if trial==0 else entries[:1]:
                     label=m['id']+':select';assert app.request('/app/select',{'id':m['id']})[0] in (200,202)
