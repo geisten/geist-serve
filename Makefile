@@ -74,10 +74,11 @@ geist-serve: src/serve.c $(SHARED) $(HDRS) $(LIB)
 
 # geistd: libgeist over a socket for agents (resident sessions, logits).
 GEISTD_OUTPUT ?= geistd
-$(GEISTD_OUTPUT): src/geistd.c src/resource_sampler.c src/resource_sampler.h src/lifecycle.c src/lifecycle.h $(SHARED) $(HDRS) $(LIB) scripts/engine-provenance.py
+DAEMON_SOURCES := $(shell cat scripts/daemon-sources.list)
+$(GEISTD_OUTPUT): $(DAEMON_SOURCES) scripts/daemon-sources.list src/lifecycle.h src/resource_sampler.h $(HDRS) $(LIB) scripts/engine-provenance.py
 	@mkdir -p $(@D)
 	python3 scripts/engine-provenance.py capture $(GEISTLIB) --archive $(LIB) --expected $(ENGINE_SOURCE_ID) --output build/engine-build.h
-	$(CC) $(CFLAGS) -Ibuild -o $@ src/geistd.c src/resource_sampler.c src/lifecycle.c $(SHARED) $(LIB) $(LDFLAGS) $(LDLIBS)
+	$(CC) $(CFLAGS) -Ibuild -o $@ $(DAEMON_SOURCES) $(LIB) $(LDFLAGS) $(LDLIBS)
 
 # Model-free unit test of the chat renderers; no engine needed.
 build/test_template: tests/test_template.c src/template.c src/template.h
