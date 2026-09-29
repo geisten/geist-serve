@@ -3,9 +3,11 @@
 import json,os,socket,struct,sys,time,signal
 from pathlib import Path
 if '--backends' in sys.argv:
-    print(json.dumps({'cpu':{'name':'cpu_neon'},'gpu':{'name':'metal','available':False}}));sys.exit()
+    print(json.dumps({'cpu':{'name':'cpu_neon'},'gpu':{'name':'metal','available':os.environ.get('GEIST_FIXTURE_GPU')=='1'}}));sys.exit()
 root=Path(sys.argv[1]).parent.parent
 startup=json.loads((root/'fixture.json').read_text())
+print('fixture startup '+os.environ.get('GEIST_BACKEND','unknown'),flush=True)
+if startup.get('crash_load') or (startup.get('crash_gpu') and os.environ.get('GEIST_BACKEND')=='metal'):sys.exit(17)
 if startup.get('ignore_term'):signal.signal(signal.SIGTERM,signal.SIG_IGN)
 (root/'fixture-pid').write_text(str(os.getpid()))
 if startup.get('load_pause'):

@@ -492,6 +492,30 @@ static int listener(unsigned *port) {
     return fd;
 }
 
+static void runtime_paths_close(void) {
+    lifecycle_close(&app.lifecycle);
+    if (app.socket_path[0])
+        unlink(app.socket_path);
+    if (app.runtime_dir[0])
+        rmdir(app.runtime_dir);
+    app.socket_path[0] = app.runtime_dir[0] = 0;
+}
+
+static bool archive_load_failure(void) {
+    char source[APP_PATH_CAP], archive[APP_PATH_CAP];
+    if (!path_join(source, app.home, "server.log") ||
+        !path_join(archive, app.home, "load-failure-XXXXXX"))
+        return false;
+    int fd = mkstemp(archive);
+    if (fd < 0)
+        return false;
+    close(fd);
+    if (!rename(source, archive))
+        return true;
+    unlink(archive);
+    return false;
+}
+
 /* Called with app.mutex held. The child is ours: never attach to or stop
  * Ollama or another user's process. Reap before inspecting health. */
 static void lifecycle_sample(void) {
@@ -520,6 +544,7 @@ static void poll_child(void) {
     if (atomic_load(&load_cancelled) && !app.ready) {
         activity_change(&app.load_activity, ACT_STOPPING);
         stop_child();
+        (void) archive_load_failure();
         (void) activity_end(&app.load_activity, "cancelled", 499, monotonic_ms());
         return;
     }
@@ -530,6 +555,11 @@ static void poll_child(void) {
     if (result == app.child || (result < 0 && errno == ECHILD) || timed_out) {
         if (timed_out)
             stop_child();
+        else {
+            app.previous_pid = app.child;
+            app.reaped_ms    = monotonic_ms();
+            runtime_paths_close();
+        }
         app.child = 0;
         app.ready = false;
         /* A replacement's verification may already have failed or be active.
@@ -567,9 +597,12 @@ static void poll_child(void) {
             if (start_child_mode(path, id, "cpu"))
                 return;
         }
+        bool archived = !app.generating && archive_load_failure();
         snprintf(app.message,
                  sizeof app.message,
-                 "The model process stopped. See server.log in the app data folder.");
+                 archived ? "The model process stopped. Its diagnostics were preserved. Retry the "
+                            "model."
+                          : "The model process stopped. See server.log in the app data folder.");
         return;
     }
     if (app.ready)
@@ -646,16 +679,11 @@ static void stop_child(void) {
     app.child     = 0;
     app.reaped_ms = monotonic_ms();
 cleanup:
-    lifecycle_close(&app.lifecycle);
+    runtime_paths_close();
     app.lifecycle_snapshot = (struct lifecycle_snapshot) {0};
     app.lifecycle_phase    = 0;
     app.stopping           = false;
     app.ready              = false;
-    if (app.socket_path[0])
-        unlink(app.socket_path);
-    if (app.runtime_dir[0])
-        rmdir(app.runtime_dir);
-    app.socket_path[0] = app.runtime_dir[0] = 0;
 }
 
 static bool start_child_mode_impl(const char *path, const char *id, const char *mode) {
@@ -811,6 +839,7 @@ static bool start_child_mode(const char *path, const char *id, const char *mode)
     bool ok = start_child_mode_impl(path, id, mode);
     if (!ok) {
         stop_child();
+        (void) archive_load_failure();
         (void) activity_end(&app.load_activity, "failed", 502, monotonic_ms());
     }
     return ok;
@@ -2968,6 +2997,20 @@ static void handle(int fd, struct app_arena *arena) {
         else
             error_response(fd, 409, "Cannot remove this download safely.");
         return;
+    }
+    /* A live identical model needs no replacement process. Still validate the
+     * trusted receipt stamp: replacing or modifying its file invalidates this
+     * no-op just as it invalidates the normal cached loading path. */
+    if (!download && installed && app.ready && !strcmp(app.active_id, model->id) &&
+        !strcmp(app.chosen, path)) {
+        char key[80], stamp[512], receipt[512];
+        snprintf(key, sizeof key, "verified-%s", model->sha256);
+        if (model_stamp(path, model, stamp) && read_preference(key, receipt, sizeof receipt) &&
+            !strcmp(stamp, receipt)) {
+            pthread_mutex_unlock(&app.mutex);
+            response(fd, 200, "application/json", "{}", 2);
+            return;
+        }
     }
     struct app_hardware h;
     bool                known = app_hardware_read(&h, app.models);

@@ -22,6 +22,7 @@ test-app: build/test_app_lifecycle build/test_app_activity build/test_app_engine
 	./build/test_app_lifecycle
 	./build/test_app_activity
 	python3 tests/app/activity_test.py
+	python3 tests/app/lifecycle_fault_test.py
 	./build/test_app_engine
 	python3 tests/app/engine_provenance_test.py
 	./build/test_app_output
