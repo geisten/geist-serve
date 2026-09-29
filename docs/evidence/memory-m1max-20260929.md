@@ -16,8 +16,8 @@ These scopes overlap and must not be added. This reproduces the RSS/allocation d
 
 ## Long prefill and lifetime
 
-- CPU: 2023 status observations during prefill; maximum backend-sample age 2.084 seconds. CPU reports unsupported GPU allocation while continuing RSS sampling.
-- GPU: 72 status observations during prefill; maximum backend-sample age 2.024 seconds. CPU reports unsupported GPU allocation while continuing RSS sampling.
+- CPU: 2023 status observations during prefill; maximum backend-sample age 2.084 seconds.
+- GPU: 72 status observations during prefill; maximum backend-sample age 2.024 seconds.
 
 The 1,223-token prompts completed on CPU and Metal. All 26 recorded owned child PIDs were gone after stop/restart trials; old generation values were rejected. Collection and request history worked without a WebView. Exact restoration of system-free RAM is not asserted.
 
@@ -29,13 +29,10 @@ Same cached SmolLM2 artifact, deterministic prompt, 29 generated tokens, fresh C
 | --- | --- | ---: | ---: | ---: |
 | CPU | off | 6 | 380.538 ms | 371.627–388.100 ms |
 | CPU | on | 6 | 391.278 ms | 380.870–411.415 ms |
-
-Observed CPU median difference: +2.82%.
-
 | GPU | off | 3 | 511.388 ms | 495.367–529.221 ms |
 | GPU | on | 3 | 502.909 ms | 488.275–506.119 ms |
 
-Observed GPU median difference: -1.66%.
+Observed CPU median difference: +2.82%. Observed GPU median difference: -1.66%.
 
 These short trials do not isolate a causal overhead or establish negligible overhead. The implementation adds no GPU flush, inference-mutex wait or per-token persistence; longer repeated trials would be needed for a narrow overhead bound.
 
