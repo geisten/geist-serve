@@ -133,10 +133,17 @@ function renderReplyMetrics(element) {
 }
 function renderPerformance() {
   if (lastReply && lastReply.model !== modelIdentity()) lastReply = null;
-  const h = state?.hardware, r = state?.resources;
-  const rss = !executionLoading() && state?.ready && r?.scope === 'geistd' && knownNumber(r.rss_bytes) ? r.rss_bytes : null;
+  const h = state?.hardware, r = state?.resources, memory = state?.memory;
+  const rss = !executionLoading() && state?.ready && r?.scope === 'geistd' && knownNumber(memory?.process_rss_bytes) ? memory.process_rss_bytes : null;
   const cpu = !executionLoading() && state?.ready && r?.scope === 'geistd' && knownNumber(r.cpu_percent) ? r.cpu_percent : null;
   $('test-memory').textContent = rss === null ? '—' : gib(rss);
+  const gpuMemory = !executionLoading() && memory?.status===1 && knownNumber(memory.gpu_allocated_bytes) ? memory.gpu_allocated_bytes : null;
+  const memoryReason = t(({unsupported:'Unsupported',query_failed:'Measurement failed',stale:'Stale measurement'})[memory?.gpu_unavailable_reason] || 'Not measured yet');
+  $('test-gpu-memory').textContent = gpuMemory===null ? '—' : gib(gpuMemory);
+  $('test-gpu-memory').title = gpuMemory===null ? memoryReason : `${memory.gpu_source} · ${formatNumber(memory.gpu_sample_age_ms/1000,1)} s`;
+  $('test-gpu-memory').setAttribute('aria-label',`${t('Metal allocated')}: ${gpuMemory===null ? memoryReason : gib(gpuMemory)}`);
+  $('memory-live').textContent = `${t('Process RSS')}: ${rss===null?'—':gib(rss)} · ${t('Metal allocated')}: ${gpuMemory===null?memoryReason:gib(gpuMemory)}`;
+  $('memory-source').textContent = [memory?.rss_source, memory?.gpu_source, memory?.gpu_source && knownNumber(memory?.gpu_sample_age_ms) ? `${t('Sample age')}: ${formatNumber(memory.gpu_sample_age_ms/1000,1)} s` : null, memory?.unified_memory ? t('Shared memory; values overlap.') : null].filter(Boolean).join(' · ');
   const model = state?.models.find(item => item.id === state.active_id);
   $('test-size').textContent = model && knownNumber(model.bytes) ? bytes(model.bytes) : '—';
   $('performance-system').textContent = h?.name || t('Not available');
@@ -163,6 +170,8 @@ function renderPerformance() {
     $(`history-${mode}-tokens`).textContent = knownNumber(sample?.tokens) ? formatNumber(sample.tokens,Number.isInteger(sample.tokens)?0:1) : '—';
     $(`history-${mode}-ram`).textContent = knownNumber(sample?.rss_bytes) ? gib(sample.rss_bytes) : '—';
     $(`history-${mode}-peak`).textContent = knownNumber(sample?.sampled_peak_rss) ? gib(sample.sampled_peak_rss) : '—';
+    $(`history-${mode}-gpu-memory`).textContent = knownNumber(sample?.gpu_allocated_bytes) ? `${gib(sample.gpu_allocated_bytes)} · n=${sample.gpu_known_count}` : '—';
+    $(`history-${mode}-gpu-peak`).textContent = knownNumber(sample?.gpu_sampled_peak) ? gib(sample.gpu_sampled_peak) : '—';
     $(`history-${mode}-count`).textContent = sample ? `${sample.count} · ${t(sample.count < 5 ? 'First observations' : 'Typical')}` : '—';
     $(`profile-${mode}-confidence`).textContent = sample ? `${sample.count} · ${t(sample.count < 5 ? 'First observations' : 'Typical')}` : t('Not measured yet');
     $(`history-${mode}-time`).textContent = sample?.recorded_at ? new Intl.DateTimeFormat(interfaceLanguage, {dateStyle:'short',timeStyle:'short'}).format(new Date(sample.recorded_at * 1000)) : '—';

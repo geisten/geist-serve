@@ -39,6 +39,7 @@
     </div>
     <div class="model-metrics" aria-label="Current memory">
       <span><span>Process RSS</span> <span id="test-memory">—</span></span>
+      <span title="Device allocation; do not add to RSS"><span>Metal allocated</span> <span id="test-gpu-memory">—</span></span>
       <span><span>File</span> <span id="test-size">—</span></span>
       <button id="open-measurements" type="button" class="text-button" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3v17h17M8 15v-4m5 4V6m5 9V9"/></svg><span>Measurements</span></button>
     </div>
@@ -106,13 +107,16 @@
 <tr><th scope="row">Output tokens</th><td id="history-cpu-tokens">—</td><td id="history-gpu-tokens">—</td></tr>
 <tr><th scope="row">Process RSS · after reply</th><td id="history-cpu-ram">—</td><td id="history-gpu-ram">—</td></tr>
 <tr><th scope="row">RSS sampled peak · 2 s</th><td id="history-cpu-peak">—</td><td id="history-gpu-peak">—</td></tr>
-<tr><th scope="row">Observations</th><td id="history-cpu-count">—</td><td id="history-gpu-count">—</td></tr>
+<tr><th scope="row">Metal allocated · after reply</th><td id="history-cpu-gpu-memory">—</td><td id="history-gpu-gpu-memory">—</td></tr>
+              <tr><th scope="row">Metal sampled peak · 2 s</th><td id="history-cpu-gpu-peak">—</td><td id="history-gpu-gpu-peak">—</td></tr>
+              <tr><th scope="row">Observations</th><td id="history-cpu-count">—</td><td id="history-gpu-count">—</td></tr>
 <tr><th scope="row">Measured</th><td id="history-cpu-time">—</td><td id="history-gpu-time">—</td></tr>
 </tbody></table>
           <p class="hint" id="profile-confidence"></p>
-          <section class="profile-info"><h3>About these measurements</h3><p>Median of up to 30 comparable replies. Range: middle 50%. Different prompts are observations, not a controlled speed comparison. First text includes hidden preparation. RAM is process RSS; sampled peaks can miss brief spikes. GPU memory and power are not measured.</p>
+          <section class="profile-info"><h3>About these measurements</h3><p>Median of up to 30 comparable replies. Range: middle 50%. Different prompts are observations, not a controlled speed comparison. First text includes hidden preparation. RAM is process RSS; sampled peaks can miss brief spikes. Metal shows device allocation, not unique physical memory. Do not add it to RSS. Power is not measured.</p>
           <p id="performance-system" class="system-name"></p><p id="performance-os" class="hint"></p>
           <dl class="performance-grid"><div><dt>Model CPU · now</dt><dd id="performance-cpu">—</dd></div><div><dt>System RAM</dt><dd id="performance-ram">—</dd></div><div><dt>Available RAM</dt><dd id="performance-available">—</dd></div></dl></section>
+          <section class="profile-info"><h3>Current memory</h3><p id="memory-live"></p><p id="memory-source"></p></section>
           <section class="profile-info"><h3>Recent observations</h3><ol id="profile-recent"></ol></section>
           <div class="profile-actions"><button id="benchmark" class="text-button" type="button" disabled>Measure comparison</button><button id="comparison-stop" type="button" hidden>Cancel comparison</button></div><p id="comparison-status" class="hint" role="status"></p>
         </div>

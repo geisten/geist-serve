@@ -19,3 +19,15 @@ bool        lifecycle_read(const struct lifecycle_shared *state,
                            struct lifecycle_snapshot     *out);
 uint64_t    lifecycle_now_ns(void);
 const char *lifecycle_name(enum lifecycle_phase phase);
+
+/* Independent writer sequence: phase and resource sampling may run concurrently.
+ * status: 0 missing, 1 measured, 2 unsupported, 3 query failure. */
+struct lifecycle_memory {
+    uint64_t generation, process, sequence, sampled_ns, allocated_bytes;
+    unsigned status, source;
+    bool     unified;
+};
+void lifecycle_memory_write(struct lifecycle_shared *state, const struct lifecycle_memory *sample);
+bool lifecycle_memory_read(const struct lifecycle_shared *state,
+                           uint64_t                       generation,
+                           struct lifecycle_memory       *sample);

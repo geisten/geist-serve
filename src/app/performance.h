@@ -1,12 +1,14 @@
 #pragma once
 #include "core.h"
 #include "engine.h"
+#include "memory.h"
 #include <stdint.h>
 /* Typed numeric observations. No request/reply strings enter this interface. */
 #define PERF_RECORDS 8192u
 #define PERF_QUEUE 64u
 struct perf_record {
     unsigned          schema;
+    struct app_memory_record memory;
     struct app_engine engine;
     char              id[160], model[65], artifact[65], quantization[32];
     char              series[768], backend[24], source[24], outcome[24], finish[16];

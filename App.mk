@@ -6,9 +6,9 @@ APP_LDLIBS ?= -lcurl -lpthread
 ifeq ($(shell uname -s),Linux)
 APP_LDLIBS += -lcrypto -lm
 endif
-APP_SOURCE := src/app/engine.c src/app/catalog.c src/app/core.c src/app/platform.c src/app/resources.c
+APP_SOURCE := src/app/memory.c src/app/engine.c src/app/catalog.c src/app/core.c src/app/platform.c src/app/resources.c
 APP_RUNTIME := src/lifecycle.c src/app/activity.c src/app/output.c src/app/performance.c src/app/daemon.c src/template.c src/app/tasks.c src/app/compat.c src/app/connection.c
-APP_HEADERS := src/lifecycle.h src/app/activity.h src/app/engine.h src/app/output.h src/app/performance.h build/app_models.h src/app/resources.h src/app/version.h src/app/tasks.h build/app_tasks.h src/app/daemon.h src/app/compat.h src/app/connection.h clients/geistd_client.h src/jsmn.h src/template.h src/json.h
+APP_HEADERS := src/app/memory.h src/lifecycle.h src/app/activity.h src/app/engine.h src/app/output.h src/app/performance.h build/app_models.h src/app/resources.h src/app/version.h src/app/tasks.h build/app_tasks.h src/app/daemon.h src/app/compat.h src/app/connection.h clients/geistd_client.h src/jsmn.h src/template.h src/json.h
 .PHONY: app test-app
 app: geist-app geist
 geist: build/app_models.h src/app/catalog.c src/app/version.h src/app/cli.c src/app/connection.c src/app/connection.h src/app/core.c src/app/core.h src/json.c src/json.h
