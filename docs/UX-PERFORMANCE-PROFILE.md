@@ -1,4 +1,38 @@
-# Local performance profile — concept
+# Local measurements — current interaction
+
+Issue #37 supersedes the earlier expandable Profile concept below.
+
+The primary flow is: choose a model and processor, send a short test, read the
+observed speed and first-visible-answer latency directly inside the CPU/GPU
+options. Missing measurements stay unknown. Both options use the same compatible
+workload/engine group; ordinary observations do not imply a controlled comparison.
+The visible sample count is distinct from the known-first-answer count.
+
+Measurements opens a native HTML modal dialog, centered on desktop and full-screen
+on small viewports. It has a fixed Close heading and one scrolling content region
+with a semantic comparison table, workload, geistlib identity, memory definitions,
+system counters and recent observations. The background is inert; work continues.
+Escape/Close returns focus without rebuilding the transcript or changing the draft,
+selection, scroll anchor or per-answer footers. Opening it never starts a benchmark.
+The separately confirmed comparison action remains explicit. Collection, export and
+deletion remain in Settings.
+
+Current memory is labelled Process RSS, never total model RAM. Unsupported GPU
+allocation remains unknown pending #40. First answer aggregates only actual known
+first_answer_ns; first raw text is a separate row. Legacy unknowns stay unknown.
+Errors and processor notices use a reserved, scrollable lane so status refreshes
+do not change the chat geometry. Phase activity follows in #38.
+
+Validation: shared native WebKit fixtures check ten open/close cycles with 50
+messages, an unsent multiline draft and a selection; <=1 CSS px geometry change,
+focus return, stable scroll anchor and immutable answer footers. Fixtures cover
+missing and partial first-answer samples, DE/EN, slow CPU/fast GPU and switching.
+Mac tests exercise the packaged assets and real CPU/Metal; Ubuntu uses WebKitGTK.
+
+---
+
+## Earlier design record (superseded presentation)
+
 
 Status: implemented in local candidate 0.5.23, 29 September 2026.
 See [implementation and verification](PERFORMANCE-PROFILES.md) for final defaults,

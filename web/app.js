@@ -41,7 +41,7 @@ document.addEventListener('focusout', () => setTimeout(flushMarkdown, 0));
 function chatLayout() {
   document.body.classList.toggle('manager-page', !$('models-page').hidden);
   document.body.classList.toggle('has-model', !$('workspace').hidden);
-  resizeComposer(); positionPerformance();
+  resizeComposer();
 }
 function resizeComposer() {
   const input = $('prompt');
@@ -61,7 +61,7 @@ $('transcript').addEventListener('scroll', () => {
   $('latest').hidden = followLatest;
 });
 $('latest').addEventListener('click', () => { scrollLatest(true); $('prompt').focus({preventScroll: true}); });
-window.addEventListener('resize', () => { resizeComposer(); scrollLatest(); positionPerformance(); });
+window.addEventListener('resize', () => { resizeComposer(); scrollLatest(); });
 const replyCopyIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>';
 const replyCopiedIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>';
 function renderReplyCopy(button) {
@@ -127,14 +127,14 @@ function renderReplyMetrics(element) {
   const m = element.replyMetrics;
   if (!m) return;
   element.textContent = `${rateText(m.rate)} · ${knownNumber(m.tokens) ? m.tokens : '—'} ${t('tokens')} · ${timeText(m.total)}`;
-  element.title = `${t('First text')}: ${timeText(m.first)} · ${t('First answer')}: ${timeText(m.firstAnswer ?? m.first)}${m.reasoning ? ' · ' + t('Tokens and time include answer preparation.') : ''}`;
+  element.title = `${t('First text')}: ${timeText(m.first)} · ${t('First answer')}: ${timeText(m.firstAnswer)}${m.reasoning ? ' · ' + t('Tokens and time include answer preparation.') : ''}`;
 }
 function renderPerformance() {
   if (lastReply && lastReply.model !== modelIdentity()) lastReply = null;
   const h = state?.hardware, r = state?.resources;
-  const rss = r?.scope === 'geistd' && knownNumber(r.rss_bytes) ? r.rss_bytes : null;
-  const cpu = r?.scope === 'geistd' && knownNumber(r.cpu_percent) ? r.cpu_percent : null;
-  $('test-memory').textContent = `${rss === null ? '—' : gib(rss)} RAM`;
+  const rss = !executionLoading() && state?.ready && r?.scope === 'geistd' && knownNumber(r.rss_bytes) ? r.rss_bytes : null;
+  const cpu = !executionLoading() && state?.ready && r?.scope === 'geistd' && knownNumber(r.cpu_percent) ? r.cpu_percent : null;
+  $('test-memory').textContent = rss === null ? '—' : gib(rss);
   const model = state?.models.find(item => item.id === state.active_id);
   $('test-size').textContent = model && knownNumber(model.bytes) ? bytes(model.bytes) : '—';
   $('performance-system').textContent = h?.name || t('Not available');
@@ -148,6 +148,14 @@ function renderPerformance() {
     const sample = compatible ? profile[mode] : null;
     for (const id of ['rate','typical']) $(`history-${mode}-${id}`).textContent = rateText(sample?.rate);
     $(`history-${mode}-range`).textContent = sample?.count > 1 ? `${formatNumber(sample.q25,1)}–${formatNumber(sample.q75,1)} ${t('tok/s')}` : '—';
+    $(`summary-${mode}-first`).textContent = `◷ ${timeText(sample?.first_answer)}`;
+    const availability = mode==='gpu' && !state?.execution?.gpu_available ? 'Not available' : profile?.recent?.some(r=>r.historical && (mode==='gpu' ? r.backend==='metal' : r.backend?.startsWith('cpu'))) ? 'Historical' : 'Not measured yet';
+    $(`summary-${mode}-count`).textContent = sample ? `n=${sample.count}` : 'n=—';
+    $(`summary-${mode}-count`).title = t(sample ? sample.count<5 ? 'First observations' : 'Observed' : availability);
+    $(`summary-${mode}-count`).setAttribute('aria-label', `${$(`summary-${mode}-count`).title} · ${sample?.count || 0}`);
+    $(`summary-${mode}-first`).setAttribute('aria-label', `${t('First answer')}: ${timeText(sample?.first_answer)}`);
+    $(`summary-${mode}-first`).title = `${t('Known values')}: ${sample?.first_answer_count || 0}`;
+    $(`history-${mode}-answer`).textContent = `${timeText(sample?.first_answer)} · n=${sample?.first_answer_count || 0}`;
     $(`history-${mode}-first`).textContent = timeText(sample?.first);
     $(`history-${mode}-total`).textContent = timeText(sample?.total);
     $(`history-${mode}-tokens`).textContent = knownNumber(sample?.tokens) ? formatNumber(sample.tokens,Number.isInteger(sample.tokens)?0:1) : '—';
@@ -161,7 +169,7 @@ function renderPerformance() {
   const engine = compatible ? profile[state?.execution?.active]?.engine?.geistlib : null;
   $('profile-engine').textContent = `geistlib ${engine?.version || t('Unknown')} · ${engine?.revision?.slice(0,12) || t('Unknown')}${engine?.source_state === 'modified' ? ' · ' + t('Modified build') : ''}`;
   const group = compatible ? profile.group : null;
-  $('profile-first').textContent = timeText(compatible ? profile[state?.execution?.active]?.first : null);
+  $('profile-collection').textContent = t(profile?.enabled ? 'Collection enabled' : 'Collection disabled');
   $('profile-group').textContent = group ? [t('Latest workload'), `${t('Input')}: ${['≤512','513–2048','>2048'][group.input]}`, `${t('Output')}: ${['<32','32–127','128–511','≥512'][group.output]}`, t('tokens'), t(group.cached ? 'Cache reused' : 'No cache reuse'), t(group.cold ? 'First reply after load' : 'Warm'), group.contention ? t('Download overlap') : '', group.controlled ? t('Controlled comparison') : t('Ordinary use')].filter(Boolean).join(' · ') : t('Not measured yet');
   $('profile-confidence').textContent = t('First observations: fewer than 5 replies. No automatic processor changes.');
   // Keep focused disclosure nodes stable during polling; replace only changed text.
@@ -450,7 +458,7 @@ function render(next) {
   const usable = next.ready && allowed(active);
   if (usable) workspaceModel = workspaceIdentity();
   const retained = workspaceModel !== null && ((workspaceModel === workspaceIdentity() && !!active && allowed(active)) || working);
-  if (modelChanged || (!usable && !retained)) $('performance').open = false;
+  if (modelChanged || (!usable && !retained)) closeMeasurements();
   const previouslyHidden = $('workspace').hidden;
   $('workspace').hidden = !usable && !retained;
   $('test-unavailable').hidden = !$('workspace').hidden;
@@ -526,7 +534,7 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
   if (turn) { lastReply = null; replyPending = true; }
   const target = turn.output;
   target.hidden = false; target.textContent = '';
-  if (!benchmark) { if (!preserveDraft) $('prompt').value = ''; $('chat-help').open = false; $('performance').open = false; resizeComposer(); $('prompt').focus(); }
+  if (!benchmark) { if (!preserveDraft) $('prompt').value = ''; $('chat-help').open = false; closeMeasurements(); resizeComposer(); $('prompt').focus(); }
   buttonStates(); visibleModels().forEach(modelCard); message('');
   uiText($('chat-announcement'), 'Preparing answer…');
   const start = performance.now(); let first = null, done = false, reader, completion = null;
@@ -620,7 +628,7 @@ $('new-chat').addEventListener('click', () => {
   if (controller) return;
   if ((conversation.length || $('result').children.length || $('prompt').value) && !confirm(t('Clear this conversation and draft? They are not saved.'))) return;
   conversation = []; lastReply = null; pendingMarkdown.clear(); $('result').replaceChildren(); $('result').hidden = true; $('chat-empty').hidden = false;
-  $('prompt').value = ''; $('chat-help').open = false; $('performance').open = false; message(''); uiText($('chat-announcement'), 'Chat cleared.');
+  $('prompt').value = ''; $('chat-help').open = false; closeMeasurements(); message(''); uiText($('chat-announcement'), 'Chat cleared.');
   resizeComposer(); buttonStates(); followLatest = true; $('latest').hidden = true; $('transcript').scrollTop = 0; $('prompt').focus();
 });
 function chooseTask(id) {
@@ -717,7 +725,7 @@ function showPage(id) {
     if (button.dataset.page === id) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
-  $('chat-help').open = false; $('performance').open = false;
+  $('chat-help').open = false; closeMeasurements();
   chatLayout();
   if (quickTest && !$('workspace').hidden) $('prompt').focus({preventScroll: true});
   else { const heading = $(id).querySelector('h1, h2'); heading.tabIndex = -1; heading.focus({preventScroll:true}); }
@@ -773,32 +781,44 @@ async function removeModel(id) {
   }
 }
 
-function positionPerformance() {
-  if (!$('performance').open) return;
-  // Bound the expanded model information to the viewport, even at text zoom.
-  // It overlays the transcript without moving the composer or existing messages.
-  const bottom = $('performance').querySelector('summary').getBoundingClientRect().bottom;
-  $('performance').style.setProperty('--performance-space', `${Math.max(0, innerHeight - bottom - 18)}px`);
+// Native dialog supplies top-layer modality and an inert background.
+let measurementReturn = null, measurementDraft = null;
+function openMeasurements() {
+  if ($('performance').open) return;
+  measurementReturn = document.activeElement;
+  measurementDraft = {value:$('prompt').value, selection:[$('prompt').selectionStart, $('prompt').selectionEnd, $('prompt').selectionDirection]};
+  $('chat-help').open = false;
+  $('performance').showModal();
+  $('close-measurements').focus({preventScroll:true});
 }
-
-// Only one disclosure is open. Escape returns focus; polling never moves it.
-for (const id of ['chat-help', 'performance']) {
-  $(id).addEventListener('toggle', () => {
-    if ($(id).open) {
-      $(id === 'chat-help' ? 'performance' : 'chat-help').open = false;
-      if (id === 'performance') positionPerformance();
-    }
-  });
+function closeMeasurements() {
+  if ($('performance').open) $('performance').close();
 }
+$('open-measurements').addEventListener('click', openMeasurements);
+$('close-measurements').addEventListener('click', closeMeasurements);
+$('performance').addEventListener('close', () => {
+  if (measurementDraft && $('prompt').value===measurementDraft.value) $('prompt').setSelectionRange(...measurementDraft.selection);
+  if (measurementReturn?.isConnected && (document.activeElement===document.body || document.activeElement===measurementReturn || $('performance').contains(document.activeElement))) measurementReturn.focus({preventScroll:true});
+  measurementReturn = null; measurementDraft = null;
+});
 document.addEventListener('keydown', event => {
+  if (event.key === 'Tab' && $('performance').open) {
+    const controls = [...$('performance').querySelectorAll('button,[tabindex="0"]')]
+      .filter(node => !node.disabled && node.getClientRects().length && !node.closest('[hidden]'));
+    const first = controls[0], last = controls.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    return;
+  }
   if (event.key !== 'Escape') return;
-  for (const id of ['chat-help', 'performance']) if ($(id).open) {
-    event.preventDefault(); $(id).open = false;
-    $(id).querySelector('summary').focus({preventScroll: true});
+  if ($('performance').open) { event.preventDefault(); closeMeasurements(); }
+  else if ($('chat-help').open) {
+    event.preventDefault(); $('chat-help').open = false;
+    $('chat-help').querySelector('summary').focus({preventScroll:true});
   }
 });
 document.addEventListener('pointerdown', event => {
-  for (const id of ['chat-help', 'performance']) if (!$(id).contains(event.target)) $(id).open = false;
+  if (!$('chat-help').contains(event.target)) $('chat-help').open = false;
 });
 
 // Native radio semantics preserve keyboard navigation and checked state.
@@ -826,7 +846,7 @@ function renderExecution() {
     const detail = label.querySelector('.processor-backend');
     if (detail) { detail.textContent = backend; detail.hidden = !backend; }
     const description = [input.value === 'auto' ? 'Auto' : input.value.toUpperCase(), backend,
-      input.value !== 'auto' ? $(`history-${input.value}-rate`).textContent : '',
+      input.value !== 'auto' ? `${$(`history-${input.value}-rate`).textContent} · ${$(`summary-${input.value}-first`).getAttribute('aria-label')} · ${$(`summary-${input.value}-count`).textContent}` : '',
       running ? t('Active processor') : pending ? t('Switching processor…') : '',
       mark && !mark.hidden ? t('Recommended') : ''].filter(Boolean).join(' · ');
     input.setAttribute('aria-label', description);

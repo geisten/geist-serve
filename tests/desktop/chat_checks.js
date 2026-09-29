@@ -127,7 +127,11 @@ async function checkDownloadRingMotion(assert) {
 (async () => {
   const originalAPI = api, originalConfirm = window.confirm;
   const assert = (ok, detail) => { if (!ok) throw new Error(detail); };
-  const tick = () => new Promise(resolve => setTimeout(resolve, 90));
+  // Native acceptance can supply its 100 ms host poll as the fixture scheduler.
+  // Background WebViews coalesce JS timers; transport/geometry assertions do not
+  // measure wall-clock latency. Real inference below uses the actual service.
+  const tick = () => new Promise(resolve => window.geistTestClock
+    ? (window.geistTestTicks ||= []).push(resolve) : setTimeout(resolve, 90));
   const idle = async () => { for (let i=0; i<200 && controller; i++) await tick(); assert(!controller, 'request completed'); };
   const key = options => { const event = new KeyboardEvent('keydown', {key:'Enter', bubbles:true, cancelable:true, ...options}); $('prompt').dispatchEvent(event); return event.defaultPrevented; };
   const input = text => { $('prompt').value = text; $('prompt').dispatchEvent(new Event('input')); };
@@ -147,11 +151,10 @@ async function checkDownloadRingMotion(assert) {
     assert($('new-chat').querySelector('svg') && !$('new-chat').textContent.trim(), 'clear test uses a labelled trash icon');
     assert($('new-chat').getAttribute('aria-label') === t('Clear chat'), 'trash accessible label follows locale');
     assert(!$('new-chat').hidden, 'clear chat remains discoverable even when disabled');
-    assert($('test-speed').closest('.model-metrics') && $('test-size').closest('.model-metrics'), 'speed and model size live in the model header');
-    assert($('performance').closest('#workspace') && !document.querySelector('.model-sidebar #performance'), 'all live model performance belongs below the active model');
+    assert($('summary-cpu-first').closest('.execution-choice') && $('test-size').closest('.model-metrics'), 'measurements stay under their processor/model');
+    assert($('performance').tagName==='DIALOG' && !$('performance').closest('#workspace'), 'measurements use a separate modal, not a chat disclosure');
     assert(!$('chat-speed') && !$('chat-memory') && !$('performance-rss') && !$('performance-speed'), 'no duplicate performance summaries or live counters');
-    assert($('performance').querySelector('summary').contains($('test-speed')) && $('performance').querySelector('summary').contains($('test-memory')), 'the metrics themselves open their details');
-    assert($('performance').querySelector('summary').getAttribute('aria-describedby') === 'test-speed test-memory test-size', 'screen readers receive the same current values without duplicate counters');
+    assert($('open-measurements').getAttribute('aria-haspopup')==='dialog', 'measurement inspection is an explicit accessible action');
     assert(new Set([...document.querySelectorAll('[id]')].map(el => el.id)).size === document.querySelectorAll('[id]').length, 'unique IDs preserve control bindings');
     api = async (path, body, signal) => {
       if (path !== '/app/generate') return originalAPI(path, body, signal);
@@ -420,7 +423,7 @@ async function checkDownloadRingMotion(assert) {
       const oldOutput=$('output'), oldRow=cards.get(bm.id);
       assert(controller && !$('stop').hidden && !backgroundPick().disabled && $('runtime-name').textContent===activeLabel,'streaming, Stop and pause work together without changing the loaded header');
       assert($('prompt').value==='My next draft' && document.activeElement===$('prompt') && !$('workspace').hidden,'download progress preserves draft, focus and the visible chat');
-      assert($('stop').getBoundingClientRect().bottom<=innerHeight && document.documentElement.scrollWidth<=innerWidth,'parallel activity keeps Stop in the viewport without horizontal clipping');
+      assert($('stop').getBoundingClientRect().bottom<=innerHeight && document.documentElement.scrollWidth<=innerWidth,`parallel activity keeps Stop in the viewport without horizontal clipping: ${JSON.stringify({stop:$('stop').getBoundingClientRect().toJSON(),height:innerHeight,workspace:$('workspace').getBoundingClientRect().toJSON(),panel:document.querySelector('.runtime-panel').getBoundingClientRect().toJSON()})}`);
       // Optional host checkpoint for an actual WKWebView screenshot, fixture-labelled.
       window.backgroundUXReady=true;
       for(let i=0;window.captureBackgroundUX&&i<200;i++)await tick();
@@ -488,7 +491,7 @@ async function checkDownloadRingMotion(assert) {
         return beforeExecutionAPI(path,body,signal);
       };
       executionFixture.performance_history=[{processor:'cpu',rate:32,first:.5,total:2,tokens:64,rss_bytes:2**30,recorded_at:1700000000},{processor:'gpu',rate:64,first:.2,total:1,tokens:64,rss_bytes:2**31,recorded_at:1700000100}];
-      executionFixture.performance_profile={...executionFixture.performance_profile, artifact:executionFixture.models.find(m=>m.id===executionFixture.active_id)?.sha256,group:{input:0,output:1,cached:false,cold:false,contention:false,controlled:false},cpu:{...executionFixture.performance_history[0],count:5,q25:30,q75:34},gpu:{...executionFixture.performance_history[1],count:7,q25:60,q75:68},recent:[]};
+      executionFixture.performance_profile={...executionFixture.performance_profile, artifact:executionFixture.models.find(m=>m.id===executionFixture.active_id)?.sha256,group:{input:0,output:1,cached:false,cold:false,contention:false,controlled:false},cpu:{...executionFixture.performance_history[0],first_answer:.7,first_answer_count:4,count:5,q25:30,q75:34},gpu:{...executionFixture.performance_history[1],first_answer:.3,first_answer_count:7,count:7,q25:60,q75:68},recent:[]};
       executionFixture.execution.performance={target_tps:8,below_target:true,rate:3};
       const fixtureModel=executionFixture.models.find(m=>m.id===executionFixture.active_id);
       if (fixtureModel) fixtureModel.resource_fit=0;
@@ -502,7 +505,7 @@ async function checkDownloadRingMotion(assert) {
       interfaceLanguage=warningLanguage;renderExecution();
       if (fixtureModel) assert(cards.get(fixtureModel.id).querySelector('.model-fit').dataset.fit==='0', 'adequate GPU keeps the whole-device badge suitable despite slow CPU');
       const retainedTranscript=$('result'), retainedContent=$('result').innerHTML;
-      $('performance').open=true;await tick();
+      openMeasurements();await tick();
       const cpu = document.querySelector('[name="execution"][value="cpu"]'), gpu=document.querySelector('[name="execution"][value="gpu"]');
       assert(document.querySelector('[name="execution"]:checked').value==='auto' && !gpu.closest('label').querySelector('.recommended-mark').hidden, 'recommendation and selected mode remain distinct');
       assert(cpu.closest('label').classList.contains('is-active') && !gpu.closest('label').classList.contains('is-active'), 'Auto exposes the actual processor inside its option');
@@ -517,6 +520,7 @@ async function checkDownloadRingMotion(assert) {
       assert(getComputedStyle($('runtime-state')).animationName === (matchMedia('(prefers-reduced-motion:reduce)').matches ? 'none' : 'processor-loading'), 'loading animation respects reduced motion');
       assert($('result')===retainedTranscript && $('result').innerHTML===retainedContent && $('performance').open, 'reload preserves transcript nodes and expanded metrics');
       assert($('history-cpu-rate').textContent===rateText(32) && $('history-gpu-rate').textContent===rateText(64), 'CPU/GPU measurements remain visible together during reload');
+      assert($('test-memory').textContent==='—', 'reload clears live RSS while preserving historical samples');
       assert($('run').disabled && cpu.disabled && gpu.disabled && !$('prompt').disabled, 'reload locks send and switching but permits drafting');
       input('Edited during reload');
       executionFixture.ready=true;executionFixture.loading=false;executionFixture.execution.active='gpu';executionFixture.execution.backend='metal';
@@ -666,7 +670,7 @@ $$
     const long = 'Very long draft line with umlauts äöü\n'.repeat(200) + 'x'.repeat(1800);
     input(long); assert($('prompt').value === long, 'long pasted text preserved');
     assert($('prompt').scrollHeight > $('prompt').clientHeight, 'long draft scrollable');
-    assert($('run').getBoundingClientRect().bottom <= innerHeight, `send visible with long draft: ${JSON.stringify({run:$('run').getBoundingClientRect().toJSON(),height:innerHeight,workspace:$('workspace').getBoundingClientRect().toJSON(),metrics:$('performance').getBoundingClientRect().toJSON()})}`);
+    assert($('run').getBoundingClientRect().bottom <= innerHeight, `send visible with long draft: ${JSON.stringify({run:$('run').getBoundingClientRect().toJSON(),height:innerHeight,workspace:$('workspace').getBoundingClientRect().toJSON(),metrics:$('open-measurements').getBoundingClientRect().toJSON()})}`);
     assert(document.documentElement.scrollWidth <= innerWidth, 'draft does not overflow horizontally');
     input('Remember lighthouse.');
     assert(!key({shiftKey:true}) && !key({isComposing:true}) && !key({keyCode:229}), 'newline and IME not intercepted');
@@ -723,19 +727,19 @@ $$
     assert(rateText(32.5) === '32.5 tok/s' && $('new-chat').title === 'Clear chat', 'switching back restores English');
     window.chatChecksStage = 'metrics';
     assert($('history-cpu-rate').closest('.execution-choice') && $('history-gpu-rate').closest('.execution-choice'), 'typical speed belongs to each processor choice');
-    assert(document.querySelector('.profile-table caption') && document.querySelectorAll('.profile-table th[scope="row"]').length===9, 'profile uses a semantic comparison table');
+    assert(document.querySelector('.profile-table caption') && document.querySelectorAll('.profile-table th[scope="row"]').length===10, 'profile uses a semantic comparison table');
     assert(!$('measurement-note') && !$('speed'), 'old nested measurements removed');
     assert($('history-enabled').closest('#settings-page') && $('history-export').closest('#settings-page'), 'collection and export belong to settings');
 
     const measuredReply = lastReply;
     const savedState = state;
     state = {...savedState, resources:{scope:'geistd', rss_bytes:2**30, cpu_percent:0}}; renderPerformance();
-    assert($('test-memory').textContent === '1.0 GiB RAM' && $('performance-cpu').textContent === '0.0 %', 'real zero CPU differs from unknown');
+    assert($('test-memory').textContent === '1.0 GiB' && $('performance-cpu').textContent === '0.0 %', 'real zero CPU differs from unknown');
     state = {...savedState, resources:{scope:'geistd', rss_bytes:null, cpu_percent:null}}; renderPerformance();
-    assert($('test-memory').textContent === '— RAM' && $('performance-cpu').textContent === '—', 'unknown resource counters are not zero');
+    assert($('test-memory').textContent === '—' && $('performance-cpu').textContent === '—', 'unknown resource counters are not zero');
     state = {...savedState, hardware:{...savedState.hardware, known:false, ram:0}}; renderPerformance();
     assert($('performance-ram').textContent === '—', 'failed system memory read is unknown, not zero');
-    $('performance').open = true; await tick();
+    openMeasurements(); await tick();
     render({...savedState, active:'another model', performance_history:[],performance_profile:null});
     assert(lastReply === null && $('history-cpu-tokens').textContent === '—' && !$('performance').open, 'model change closes old details and invalidates last reply metrics');
     render(savedState); lastReply = measuredReply; renderPerformance();
@@ -791,24 +795,34 @@ $$
     assert(!$('chat-help').open, 'outside click dismisses help');
     showPage('models-page');
     window.chatChecksStage = 'model-details';
-    const composerBefore = $('task-form').getBoundingClientRect();
-    const summary = $('performance').querySelector('summary');
-    summary.click(); await tick();
-    window.chatChecksStage='details-focus';
-    const panel = document.querySelector('.performance-content');
-    panel.focus(); window.chatChecksStage='details-scroll'; panel.scrollTop=panel.scrollHeight;
-    const bounds = panel.getBoundingClientRect(), modelBounds = $('runtime-model').getBoundingClientRect();
-    assert(panel.scrollTop > 0 && panel.scrollHeight > panel.clientHeight, 'model details scroll within their bounded panel');
-    assert(bounds.top >= modelBounds.bottom && bounds.left >= 0 && bounds.right <= innerWidth && bounds.bottom <= innerHeight, `expanded details remain beneath the model and inside the window: ${JSON.stringify({bounds:bounds.toJSON(),model:modelBounds.toJSON(),width:innerWidth,height:innerHeight})}`);
-    assert(Math.abs($('task-form').getBoundingClientRect().top - composerBefore.top) < 1, 'expanding metrics never moves the composer');
-    window.chatChecksStage='details-refresh'; render(state); await tick();
-    assert($('performance').open && document.activeElement === panel, 'live status refresh preserves the expanded panel and keyboard focus');
-    assert(document.documentElement.scrollWidth <= innerWidth, 'model details do not clip horizontally');
-    document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true, cancelable:true}));
-    assert(!$('performance').open && document.activeElement === summary, 'Escape returns focus to the same metric row');
-    window.chatChecksStage='details-reopen'; summary.click(); await tick();
-    $('prompt').dispatchEvent(new Event('pointerdown', {bubbles:true}));
-    assert(!$('performance').open, 'clicking the composer dismisses model details');
+    closeMeasurements(); await tick();
+    const draft=$('prompt'); draft.value='A multiline\ndraft with selection';resizeComposer();draft.focus();draft.setSelectionRange(2,12);
+    const filler=Array.from({length:50},(_,i)=>{const p=document.createElement('p');p.textContent=`Retained message ${i}`;return p;});
+    $('result').append(...filler);$('result').hidden=false;chatLayout();
+    $('transcript').scrollTop=80;followLatest=false;
+    const sheetTranscript=$('transcript'), composerBefore=$('task-form').getBoundingClientRect();
+    const transcriptBefore=sheetTranscript.getBoundingClientRect(), scrollBefore=sheetTranscript.scrollTop;
+    const summary=$('open-measurements'), footers=[...document.querySelectorAll('.reply-metrics')].map(n=>n.textContent);
+    for(let iteration=0;iteration<10;iteration++) {
+      window.chatChecksStage=`measurements-${iteration}-open`;
+      summary.focus();summary.click();
+      assert($('performance').open && document.activeElement===$('close-measurements'), 'sheet gives focus to its visible Close action');
+      const panel=document.querySelector('.performance-content');panel.focus();panel.scrollTop=panel.scrollHeight;
+      const bounds=$('performance').getBoundingClientRect();
+      assert(panel.scrollTop>0 && panel.scrollHeight>panel.clientHeight, 'sheet content has an independent scroll region');
+      assert(bounds.left>=-1 && bounds.right<=innerWidth+1 && bounds.top>=-1 && bounds.bottom<=innerHeight+1, 'sheet stays inside viewport');
+      render(state);
+      assert(document.activeElement===panel && $('performance').open, 'polling retains sheet and focus');
+      assert(Math.abs($('task-form').getBoundingClientRect().top-composerBefore.top)<=1 && Math.abs(sheetTranscript.getBoundingClientRect().top-transcriptBefore.top)<=1, 'sheet and polling never move composer/transcript');
+      window.chatChecksStage=`measurements-${iteration}-close`;
+      const closed=new Promise(resolve=>$('performance').addEventListener('close',resolve,{once:true}));
+      document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));await closed;
+      assert(!$('performance').open && document.activeElement===summary, 'Escape returns focus to its invoker');
+      assert(draft.value==='A multiline\ndraft with selection' && draft.selectionStart===2 && draft.selectionEnd===12, 'draft and selection survive inspection');
+      assert(sheetTranscript.scrollTop===scrollBefore && !followLatest, 'inspection preserves the reader scroll anchor');
+      assert(JSON.stringify([...document.querySelectorAll('.reply-metrics')].map(n=>n.textContent))===JSON.stringify(footers), 'answer footers are immutable');
+    }
+    filler.forEach(n=>n.remove());draft.value='';resizeComposer();
     showPage('test-page');
     $('prompt').focus();
     const computed = getComputedStyle(document.body);

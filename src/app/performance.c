@@ -581,6 +581,12 @@ static void aggregate(struct app_buffer *b, const struct perf_record *rs, size_t
     app_put(b, ",\"q75\":");
     number(b, percentile(values, n, .75));
     AGG("first", rs[i].first_ns / 1e9);
+    AGG("first_answer", rs[i].first_answer_ns / 1e9);
+    size_t answer_count = 0;
+    for (size_t i = 0; i < n; i++)
+        if (rs[i].first_answer_ns >= 0)
+            ++answer_count;
+    app_printf(b, ",\"first_answer_count\":%zu", answer_count);
     AGG("total", rs[i].total_ns / 1e9);
     AGG("tokens", (double) rs[i].output);
     AGG("rss_bytes", rs[i].rss);
