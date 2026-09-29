@@ -47,7 +47,8 @@ The `memory` object in `/app/status` and schema-2 observations contains:
 
 `status` is 0 missing, 1 measured, 2 unsupported, 3 query failed, 4 stale.
 `source` is 0 unknown or 1 Metal. Human-readable `gpu_unavailable_reason`
-distinguishes missing, unsupported, query failure and stale. A measured zero is
+distinguishes missing, unsupported, query failure and stale. `rss_unavailable_reason`
+supplies the same missing/query-failed/stale distinction for process RSS. A measured zero is
 numeric zero, never the unavailable marker. Samples older than 6000 ms are stale;
 the UI also expires its own cached values if status polling stops. A historical
 sampled peak can remain known when the final query fails; it is not the current

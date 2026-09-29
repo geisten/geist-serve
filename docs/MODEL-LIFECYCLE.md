@@ -60,8 +60,8 @@ Exit/reap before new spawn and disappearance of owned sockets are release oracle
 Exact free-RAM restoration is not: reclaimable pages, driver accounting and other
 applications may change system availability. Ten small-model and three Bonsai
 CPU/Metal cycles retain numeric memory trends under predeclared noise budgets.
-RSS remains process RSS, not a CPU+GPU total; supported Metal telemetry is tracked
-in #40 and adds a separately scoped counter.
+RSS remains process RSS, not a CPU+GPU total; [supported Metal telemetry](MEMORY-TELEMETRY.md)
+adds a separately scoped allocation counter.
 
 Failed CPU starts, crashes and cancelled loads preserve logs in distinct
 `load-failure-*` files before another attempt truncates `server.log`. GPU failures
