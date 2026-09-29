@@ -802,6 +802,11 @@ $$
     state={...savedState,memory:{process_rss_bytes:.3*2**30,process_rss_sample_age_ms:0,status:1,gpu_allocated_bytes:10*2**30,gpu_sample_age_ms:0,gpu_source:'metal.MTLDevice.currentAllocatedSize',unified_memory:true},resources:{scope:'geistd',cpu_percent:0}};
     renderPerformance();
     assert($('test-memory').textContent==='0.3 GiB' && $('test-gpu-memory').textContent==='10.0 GiB', 'small RSS and large synthetic Metal allocation have separate scopes');
+    const metricsBounds=document.querySelector('.model-metrics').getBoundingClientRect();
+    for(const id of ['test-memory','test-gpu-memory','test-size']) {
+      const bounds=$(id).parentElement.getBoundingClientRect();
+      assert(bounds.top>=metricsBounds.top && bounds.bottom<=metricsBounds.bottom+1, `${id} fits inside the three-row summary without clipping`);
+    }
     assert($('memory-live').textContent.includes('Process RSS') && $('memory-source').textContent.includes('values overlap'), 'scopes and shared-memory overlap are visible');
     state.memory.gpu_allocated_bytes=0;renderMemory();
     assert($('test-gpu-memory').textContent==='0.0 GiB', 'known zero Metal differs from unavailable');
