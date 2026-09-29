@@ -3,7 +3,7 @@
 GEIST_ACTIVITY_MODELS lists catalog IDs; GEIST_ACTIVITY_MODEL_DIR supplies GGUFs.
 GEIST_ACTIVITY_EVIDENCE must name a new directory. Does not touch an installed app.
 """
-import concurrent.futures, http.client, json, os, shutil, subprocess, tempfile, time
+import concurrent.futures, hashlib, http.client, json, os, shutil, subprocess, tempfile, time
 from pathlib import Path
 from http_test import App, ROOT
 ids=os.environ.get('GEIST_ACTIVITY_MODELS','').split(',')
@@ -14,6 +14,15 @@ evidence.mkdir(parents=True,exist_ok=False)
 catalog=json.loads((ROOT/'models/catalog.json').read_text())
 server=Path(os.environ.get('GEIST_EXECUTION_DAEMON',ROOT/'build/geistd-execution')).resolve()
 binary=Path(os.environ.get('GEIST_APP_TEST_BINARY',ROOT/'geist-app')).resolve()
+# Freeze executables for a sustained trial even if another edit rebuilds the checkout.
+original_binary,original_server=binary,server
+binary=evidence/'geist-app';server=evidence/'geistd'
+shutil.copy2(original_binary,binary);shutil.copy2(original_server,server)
+def sha(path):
+    with path.open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
+(evidence/'build.json').write_text(json.dumps({'app_sha256':sha(binary),'daemon_sha256':sha(server),
+    'daemon':json.loads(subprocess.check_output([str(server),'--build-info'])),
+    'source_head':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()},indent=2)+'\n')
 results=[]
 for model_id in ids:
     entry=next(m for m in catalog['models'] if m['id']==model_id)
