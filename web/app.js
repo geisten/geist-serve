@@ -137,7 +137,10 @@ function renderMemory() {
   const localAge=Math.max(0,performance.now()-stateReceivedAt);
   const rssFresh=knownNumber(memory?.process_rss_sample_age_ms) && memory.process_rss_sample_age_ms+localAge<=6000;
   const rss = !executionLoading() && state?.ready && rssFresh && r?.scope === 'geistd' && knownNumber(memory?.process_rss_bytes) ? memory.process_rss_bytes : null;
+  const rssReason=t(!rssFresh && knownNumber(memory?.process_rss_sample_age_ms) ? 'Stale measurement' : ({query_failed:'Measurement failed',stale:'Stale measurement'})[memory?.rss_unavailable_reason] || 'Not measured yet');
   $('test-memory').textContent = rss === null ? '—' : gib(rss);
+  $('test-memory').title=rss===null ? rssReason : memory.rss_source || t('Process RSS');
+  $('test-memory').setAttribute('aria-label',`${t('Process RSS')}: ${rss===null?rssReason:gib(rss)}`);
   const age=(memory?.gpu_sample_age_ms ?? 0)+localAge;
   const stale=age>6000;
   const gpuMemory = !executionLoading() && !stale && memory?.status===1 && knownNumber(memory.gpu_allocated_bytes) ? memory.gpu_allocated_bytes : null;
@@ -145,7 +148,7 @@ function renderMemory() {
   $('test-gpu-memory').textContent = gpuMemory===null ? '—' : gib(gpuMemory);
   $('test-gpu-memory').title = gpuMemory===null ? memoryReason : `${memory.gpu_source} · ${formatNumber(age/1000,1)} s`;
   $('test-gpu-memory').setAttribute('aria-label',`${t('Metal allocated')}: ${gpuMemory===null ? memoryReason : gib(gpuMemory)}`);
-  $('memory-live').textContent = `${t('Process RSS')}: ${rss===null?'—':gib(rss)} · ${t('Metal allocated')}: ${gpuMemory===null?memoryReason:gib(gpuMemory)}`;
+  $('memory-live').textContent = `${t('Process RSS')}: ${rss===null?rssReason:gib(rss)} · ${t('Metal allocated')}: ${gpuMemory===null?memoryReason:gib(gpuMemory)}`;
   $('memory-source').textContent = [memory?.rss_source, memory?.gpu_source, memory?.gpu_source && knownNumber(memory?.gpu_sample_age_ms) ? `${t('Sample age')}: ${formatNumber(age/1000,1)} s` : null, memory?.unified_memory ? t('Shared memory; values overlap.') : null].filter(Boolean).join(' · ');
 }
 function renderPerformance() {

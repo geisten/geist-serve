@@ -83,6 +83,14 @@ void app_memory_json(struct app_buffer              *b,
     numeric(b, peak_rss);
     app_put(b, ",\"process_rss_sample_age_ms\":");
     numeric(b, m->rss_age_ms);
+    app_put(b, ",\"rss_unavailable_reason\":");
+    if (rss >= 0)
+        app_put(b, "null");
+    else
+        app_quote(b,
+                  m->rss_age_ms > 6000 ? "stale"
+                  : m->rss_age_ms >= 0 ? "query_failed"
+                                       : "not_collected");
     app_put(b, ",\"rss_source\":");
     app_quote(b,
               m->rss_source == 1   ? "macos.proc_pid_rusage.ri_resident_size"

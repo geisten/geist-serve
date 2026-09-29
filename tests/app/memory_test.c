@@ -66,6 +66,16 @@ int main(void) {
     assert(app_memory_parse(&parsed, j, 0));
     assert(parsed.gpu_end == m.gpu_end && parsed.gpu_peak == m.gpu_peak && parsed.rss_source == 1);
     assert(!strcmp(parsed.generation, m.generation));
+    for (unsigned i = 0; i < 3; i++) {
+        m.rss_age_ms = (double[]) {-1, 0, 6001}[i];
+        b            = (struct app_buffer) {.data = data, .cap = sizeof data};
+        app_memory_json(&b, &m, -1, 400000000., 2);
+        assert(!b.failed && json_parse(j, b.len, data) >= 0);
+        char *reason = json_strdup(j, json_get(j, 0, "rss_unavailable_reason"));
+        assert(reason &&
+               !strcmp(reason, (const char *[]) {"not_collected", "query_failed", "stale"}[i]));
+        free(reason);
+    }
     assert(app_memory_parse(&parsed, j, -1) && parsed.gpu_end == -1 && !parsed.source);
     m.gpu_end = INFINITY;
     assert(!app_memory_valid(&m));

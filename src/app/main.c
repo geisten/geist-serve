@@ -1029,7 +1029,7 @@ static void observation_sample(bool force) {
     memory_observe(&r->memory);
     struct app_process_sample sample;
     r->rss               = -1;
-    r->memory.rss_age_ms = -1;
+    r->memory.rss_age_ms = app.child > 0 ? 0 : -1;
     if (app.child <= 0 || !app_process_read(app.child, &sample))
         return;
     r->rss               = (double) sample.rss;
@@ -1832,7 +1832,9 @@ static void status_response(int fd, struct app_arena *arena) {
                                              monotonic_ms() - app.memory_process_ms <= 6000
                                      ? (double) app.memory_process.rss
                                      : -1;
-    live_memory.rss_age_ms = live_rss >= 0 ? monotonic_ms() - app.memory_process_ms : -1;
+    live_memory.rss_age_ms = app.child > 0 && app.memory_generation == app.generation
+                                     ? monotonic_ms() - app.memory_process_ms
+                                     : -1;
     app_put(&b, "\"memory\":");
     app_memory_json(&b, &live_memory, live_rss, -1, live_rss >= 0 ? 1 : 0);
     app_put(&b, ",");
