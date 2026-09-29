@@ -19,6 +19,7 @@
 #include "json.h"
 #include "net.h"
 #include "lifecycle.h"
+#include "resource_sampler.h"
 #include "template.h"
 
 #include <errno.h>
@@ -56,6 +57,7 @@ struct sess {
 };
 
 struct daemon {
+    struct resource_sampler resources;
     struct geist_backend *be;
     struct geist_model   *m;
     char                  name[128];
@@ -654,6 +656,7 @@ static bool op_generate(struct daemon *d, struct conn *c, struct sess *x, const 
     clock_gettime(CLOCK_MONOTONIC, &end);
     double    elapsed_ns = (end.tv_sec - start.tv_sec) * 1e9 + end.tv_nsec - start.tv_nsec;
     struct sb h          = {};
+    resource_sampler_capture(&d->resources);
     sb_printf(&h,
               "{\"ok\":true,\"done\":true,\"reason\":\"%s\",\"generated\":%zu,\"n\":%zu,\"duration_"
               "ns\":%.0f}",
@@ -803,7 +806,9 @@ static void serve_conn(struct daemon *d, int fd, int out) {
                 reply_error(&c, "malformed frame; closing");
             return;
         }
+        resource_sampler_capture(&d->resources);
         bool ok = handle(d, &c, hdr, strlen(hdr), bl, body);
+        resource_sampler_capture(&d->resources);
         free(hdr);
         free(body);
         if (!ok || c.broken)
@@ -965,9 +970,14 @@ int main(int argc, char **argv) {
         fprintf(stderr, "backend: %s\n", d.be ? geist_backend_errmsg(d.be) : "create failed");
         return 1;
     }
+    resource_sampler_start(&d.resources, d.be, lifecycle);
     lifecycle_phase(lifecycle, LC_MODEL);
     if (geist_model_load(model, d.be, &d.m) != GEIST_OK) {
         fprintf(stderr, "model: %s\n", d.m ? geist_model_errmsg(d.m) : "load failed");
+        resource_sampler_stop(&d.resources);
+        geist_model_destroy(d.m);
+        geist_backend_destroy(d.be);
+        lifecycle_close(&lifecycle);
         return 1;
     }
     lifecycle_phase(lifecycle, LC_METADATA);
@@ -1053,6 +1063,7 @@ int main(int argc, char **argv) {
         if (d.sess[i].live)
             sess_free(&d.sess[i]);
     gguf_meta_free(&d.meta);
+    resource_sampler_stop(&d.resources);
     lifecycle_close(&lifecycle);
     geist_model_destroy(d.m);
     geist_backend_destroy(d.be);

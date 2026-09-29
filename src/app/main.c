@@ -114,6 +114,9 @@ static struct {
     struct perf_record        *observation;
     struct app_resource_window observation_window;
     double                     sample_ms, cpu_sum;
+    struct app_process_sample  memory_process;
+    double                     memory_process_ms;
+    uint64_t                   memory_generation;
     unsigned                   cpu_samples;
     bool                       preview_accepted[APP_MODEL_COUNT];
     unsigned                   port, workers;
@@ -986,15 +989,51 @@ static void migrate_measurements(void) {
 }
 /* These functions capture/update the one active request under app.mutex. Disk
  * work is confined to performance.c, after this mutex is released. */
+static void memory_generation(char *out, size_t capacity) {
+    snprintf(out, capacity, "%s:%llu", app.instance, (unsigned long long) app.generation);
+}
+static void memory_observe(struct app_memory_record *record) {
+#ifdef __APPLE__
+    record->rss_source = 1;
+#else
+    record->rss_source = 2;
+#endif
+    struct lifecycle_memory sample;
+    char                    generation[112];
+    memory_generation(generation, sizeof generation);
+    bool valid = app.child > 0 && !app.stopping && !strcmp(generation, record->generation) &&
+                 lifecycle_memory_read(app.lifecycle, app.generation, &sample) &&
+                 sample.process == (uint64_t) app.child;
+    app_memory_observe(
+            record, valid ? &sample : nullptr, lifecycle_now_ns(), (double) time(nullptr));
+}
+static void memory_process_sample(void) {
+    double now = monotonic_ms();
+    if (app.child <= 0 || app.stopping) {
+        app.memory_process    = (struct app_process_sample) {0};
+        app.memory_generation = 0;
+        return;
+    }
+    if (app.memory_generation == app.generation && now - app.memory_process_ms < 2000)
+        return;
+    app.memory_generation = app.generation;
+    app.memory_process_ms = now;
+    if (!app_process_read(app.child, &app.memory_process))
+        app.memory_process = (struct app_process_sample) {0};
+}
 static void observation_sample(bool force) {
     if (!app.observation || (!force && monotonic_ms() - app.sample_ms < 2000))
         return;
-    app.sample_ms = monotonic_ms();
+    app.sample_ms         = monotonic_ms();
+    struct perf_record *r = app.observation;
+    memory_observe(&r->memory);
     struct app_process_sample sample;
+    r->rss               = -1;
+    r->memory.rss_age_ms = app.child > 0 ? 0 : -1;
     if (app.child <= 0 || !app_process_read(app.child, &sample))
         return;
-    struct perf_record *r = app.observation;
-    r->rss                = (double) sample.rss;
+    r->rss               = (double) sample.rss;
+    r->memory.rss_age_ms = 0;
     if (r->rss > r->peak_rss)
         r->peak_rss = r->rss;
     ++r->samples;
@@ -1014,6 +1053,7 @@ static void *monitor_main(void *unused) {
     while (!atomic_load(&closing)) {
         pthread_mutex_lock(&app.mutex);
         poll_child();
+        memory_process_sample();
         observation_sample(false);
         pthread_mutex_unlock(&app.mutex);
         struct timespec pause = {.tv_nsec = 100000000};
@@ -1025,7 +1065,8 @@ static void observation_begin(
         struct perf_record *r, const char *source, unsigned max, float temperature, float top_p) {
     memset(r, 0, sizeof *r);
     perf_begin(r);
-    r->engine                     = app.engine;
+    r->engine = app.engine;
+    memory_generation(r->memory.generation, sizeof r->memory.generation);
     const struct app_model *model = app_model_find(app.active_id);
     snprintf(r->model, sizeof r->model, "%s", app.active_id);
     /* Uncatalogued files have no verified artifact identity and stay diagnostic. */
@@ -1781,6 +1822,22 @@ static void status_response(int fd, struct app_arena *arena) {
     else
         app_put(&b, "null");
     app_printf(&b, ",\"cpu_interval_ms\":%.0f},", resource_window.interval_ms);
+    struct app_memory_record live_memory;
+    app_memory_reset(&live_memory);
+    if (app.child > 0 && !app.stopping)
+        memory_generation(live_memory.generation, sizeof live_memory.generation);
+    memory_observe(&live_memory);
+    double live_rss        = app.child > 0 && app.memory_generation == app.generation &&
+                                             app.memory_process.pid == app.child &&
+                                             monotonic_ms() - app.memory_process_ms <= 6000
+                                     ? (double) app.memory_process.rss
+                                     : -1;
+    live_memory.rss_age_ms = app.child > 0 && app.memory_generation == app.generation
+                                     ? monotonic_ms() - app.memory_process_ms
+                                     : -1;
+    app_put(&b, "\"memory\":");
+    app_memory_json(&b, &live_memory, live_rss, -1, live_rss >= 0 ? 1 : 0);
+    app_put(&b, ",");
     app_put(&b, "\"runtime\":\"geistd\",\"active\":");
     app_quote(&b, app.active);
     app_put(&b, ",\"active_id\":");
@@ -1810,13 +1867,8 @@ static void status_response(int fd, struct app_arena *arena) {
         struct app_hardware     adjusted  = h;
         if (partial <= m->bytes && h.disk_known && UINT64_MAX - adjusted.disk > partial)
             adjusted.disk += partial;
-        /* The running model already owns its resident memory. Do not charge it
-         * twice when displaying its device suitability. Other apps still count. */
-        if (sampled && app.ready && execution_model == m && adjusted.available_known &&
-            adjusted.available < adjusted.ram)
-            adjusted.available += sample.rss < adjusted.ram - adjusted.available
-                                          ? sample.rss
-                                          : adjusted.ram - adjusted.available;
+        /* Neither process RSS nor Metal allocation guarantees reclaimable
+         * capacity on shared memory. Assess against current availability. */
         struct app_assessment a = app_assess_device(&adjusted,
                                                     m,
                                                     installed,

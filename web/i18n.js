@@ -15,6 +15,12 @@ const formatNumber = (value, digits = 0) => new Intl.NumberFormat(interfaceLangu
   minimumFractionDigits: digits, maximumFractionDigits: digits
 }).format(value);
 const german = {
+  'Metal allocated': 'Metal-Belegung', 'Metal allocated · after reply': 'Metal-Belegung · nach Antwort',
+  'Metal sampled peak · 2 s': 'Metal-Stichprobenmaximum · 2 s', 'Sample age': 'Alter der Messung',
+  'Shared memory; values overlap.': 'Gemeinsamer Speicher; Werte überschneiden sich.',
+  'Unsupported': 'Nicht unterstützt', 'Measurement failed': 'Messung fehlgeschlagen', 'Stale measurement': 'Messung veraltet',
+  'Device allocation; do not add to RSS': 'Gerätebelegung; nicht zum RSS addieren',
+
   'Model measurements': 'Modellmesswerte', 'Measurements': 'Messwerte', 'Close': 'Schließen', 'Historical': 'Historisch', 'Observed': 'Beobachtet', 'Known values': 'Bekannte Werte', 'Collection enabled': 'Messung aktiv', 'Collection disabled': 'Messung deaktiviert', 'Process RSS': 'Prozess-RSS', 'Process RSS · after reply': 'Prozess-RSS · nach Antwort', 'RSS sampled peak · 2 s': 'RSS-Stichprobenmaximum · 2 s', 'Current memory': 'Aktueller Speicher', 'File': 'Datei',
   'Unknown': 'Unbekannt', 'Modified build': 'Geänderter Build',
   "Preparing answer…": "Antwort wird vorbereitet …",
@@ -449,7 +455,7 @@ Object.assign(german, {
   "Export saved": "Export gespeichert",
   "Delete local measurement history? Models and this chat are kept.": "Lokalen Messverlauf löschen? Modelle und dieser Chat bleiben erhalten.",
   "Run a short CPU/GPU comparison? Each processor loads once, warms up, then answers three times. Your previous processor setting is restored.": "Kurzen CPU/GPU-Vergleich starten? Jeder Prozessor lädt einmal, wärmt auf und antwortet dann dreimal. Deine bisherige Prozessoreinstellung wird wiederhergestellt.",
-  "Median of up to 30 comparable replies. Range: middle 50%. Different prompts are observations, not a controlled speed comparison. First text includes hidden preparation. RAM is process RSS; sampled peaks can miss brief spikes. GPU memory and power are not measured.": "Median aus bis zu 30 vergleichbaren Antworten. Bereich: mittlere 50 %. Unterschiedliche Eingaben sind Beobachtungen, kein kontrollierter Geschwindigkeitsvergleich. Erster Text enthält die ausgeblendete Vorbereitung. RAM ist Prozess-RSS; Stichproben können kurze Spitzen verpassen. GPU-Speicher und Energie werden nicht gemessen."
+  "Median of up to 30 comparable replies. Range: middle 50%. Different prompts are observations, not a controlled speed comparison. First text includes hidden preparation. RAM is process RSS; sampled peaks can miss brief spikes. Metal shows device allocation, not unique physical memory. Do not add it to RSS. Power is not measured.": "Median aus bis zu 30 vergleichbaren Antworten. Bereich: mittlere 50 %. Unterschiedliche Eingaben sind Beobachtungen, kein kontrollierter Geschwindigkeitsvergleich. Erster Text enthält die ausgeblendete Vorbereitung. RAM ist Prozess-RSS; Stichproben können kurze Spitzen verpassen. Metal zeigt Gerätebelegung, keinen eindeutigen physischen Speicher. Nicht zum RSS addieren. Energie wird nicht gemessen."
 });
 
 Object.assign(german, {'disconnected':'Verbindung getrennt'});

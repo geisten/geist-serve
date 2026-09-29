@@ -10,11 +10,13 @@
 #include <time.h>
 #include <unistd.h>
 
-#define LC_MAGIC 0x474c4301u
+#define LC_MAGIC 0x474c4302u
 _Static_assert(ATOMIC_LLONG_LOCK_FREE == 2, "Lifecycle requires lock-free 64-bit atomics");
 struct lifecycle_shared {
     uint32_t      magic, size;
     atomic_ullong generation, sequence, process, started_ns, phase_ns[LC_PHASES];
+    atomic_ullong memory_sequence, memory_time, memory_bytes, memory_status, memory_source,
+            memory_unified;
 };
 uint64_t lifecycle_now_ns(void) {
     struct timespec now;
@@ -63,6 +65,12 @@ int lifecycle_create(const char *directory, uint64_t generation, struct lifecycl
     atomic_init(&state->started_ns, 0);
     for (unsigned i = 0; i < LC_PHASES; i++)
         atomic_init(&state->phase_ns[i], 0);
+    atomic_init(&state->memory_sequence, 0);
+    atomic_init(&state->memory_time, 0);
+    atomic_init(&state->memory_bytes, 0);
+    atomic_init(&state->memory_status, 0);
+    atomic_init(&state->memory_source, 0);
+    atomic_init(&state->memory_unified, 0);
     *out = state;
     return fd;
 }
@@ -113,6 +121,43 @@ bool lifecycle_read(const struct lifecycle_shared *state,
         if (sample.sequence == atomic_load(&state->sequence) && sample.process &&
             sample.started_ns) {
             *out = sample;
+            return true;
+        }
+    }
+    return false;
+}
+
+void lifecycle_memory_write(struct lifecycle_shared *state, const struct lifecycle_memory *sample) {
+    if (!state || !sample)
+        return;
+    atomic_fetch_add(&state->memory_sequence, 1);
+    atomic_store(&state->memory_time, sample->sampled_ns);
+    atomic_store(&state->memory_bytes, sample->allocated_bytes);
+    atomic_store(&state->memory_status, sample->status);
+    atomic_store(&state->memory_source, sample->source);
+    atomic_store(&state->memory_unified, sample->unified);
+    atomic_fetch_add(&state->memory_sequence, 1);
+}
+bool lifecycle_memory_read(const struct lifecycle_shared *state,
+                           uint64_t                       generation,
+                           struct lifecycle_memory       *out) {
+    *out = (struct lifecycle_memory) {0};
+    if (!state)
+        return false;
+    for (unsigned attempt = 0; attempt < 3; attempt++) {
+        struct lifecycle_memory s = {.generation = atomic_load(&state->generation),
+                                     .process    = atomic_load(&state->process),
+                                     .sequence   = atomic_load(&state->memory_sequence)};
+        if (s.generation != generation || (s.sequence & 1) || !s.sequence || !s.process)
+            continue;
+        s.sampled_ns      = atomic_load(&state->memory_time);
+        s.allocated_bytes = atomic_load(&state->memory_bytes);
+        s.status          = (unsigned) atomic_load(&state->memory_status);
+        s.source          = (unsigned) atomic_load(&state->memory_source);
+        s.unified         = atomic_load(&state->memory_unified) != 0;
+        if (s.sequence == atomic_load(&state->memory_sequence) && s.sampled_ns && s.status <= 3 &&
+            s.source <= 1) {
+            *out = s;
             return true;
         }
     }

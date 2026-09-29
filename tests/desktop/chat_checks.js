@@ -175,6 +175,13 @@ async function checkActivityUX(assert, tick) {
     $('activity-stop').click();for(let i=0;i<30&&cancellingActivity;i++)await tick();
     assert(cancels.length===1&&cancels[0]===102&&currentActivity().outcome==='cancelled','Stop addresses current owned load exactly once');
     assert($('prompt').value==='Unsent multiline\ndraft' && $('prompt').selectionStart===2,'activity and cancellation preserve draft selection');
+    // These are presentation fixtures, not CUDA/Vulkan inference certification.
+    let nextOperation=103;
+    for (const [backend,label] of [['metal','Metal'],['cuda','CUDA'],['vulkan','Vulkan'],['',t('Unknown')]]) {
+      update(operation(nextOperation++,'prefill',{generation:10,backend}));
+      assert($('activity-time').textContent.startsWith(label+' · '), `${backend || 'unreported'} activity renders without losing service state`);
+      assert($('activity-cpu-hint').hidden && !$('activity-stop').disabled, 'GPU or unreported backend keeps activity cancellable without a CPU hint');
+    }
     const animation=getComputedStyle($('runtime-state')).animationName;
     if(matchMedia('(prefers-reduced-motion:reduce)').matches)assert(animation==='none','reduced motion has static status');
   } finally {
@@ -787,16 +794,33 @@ $$
     assert(rateText(32.5) === '32.5 tok/s' && $('new-chat').title === 'Clear chat', 'switching back restores English');
     window.chatChecksStage = 'metrics';
     assert($('history-cpu-rate').closest('.execution-choice') && $('history-gpu-rate').closest('.execution-choice'), 'typical speed belongs to each processor choice');
-    assert(document.querySelector('.profile-table caption') && document.querySelectorAll('.profile-table th[scope="row"]').length===10, 'profile uses a semantic comparison table');
+    assert(document.querySelector('.profile-table caption') && document.querySelectorAll('.profile-table th[scope="row"]').length===12, 'profile uses a semantic comparison table');
     assert(!$('measurement-note') && !$('speed'), 'old nested measurements removed');
     assert($('history-enabled').closest('#settings-page') && $('history-export').closest('#settings-page'), 'collection and export belong to settings');
 
     const measuredReply = lastReply;
     const savedState = state;
-    state = {...savedState, resources:{scope:'geistd', rss_bytes:2**30, cpu_percent:0}}; renderPerformance();
+    state = {...savedState, memory:{process_rss_bytes:2**30,process_rss_sample_age_ms:0,status:2,gpu_unavailable_reason:'unsupported'}, resources:{scope:'geistd', rss_bytes:2**30, cpu_percent:0}}; renderPerformance();
     assert($('test-memory').textContent === '1.0 GiB' && $('performance-cpu').textContent === '0.0 %', 'real zero CPU differs from unknown');
-    state = {...savedState, resources:{scope:'geistd', rss_bytes:null, cpu_percent:null}}; renderPerformance();
+    state = {...savedState, memory:{process_rss_bytes:null,status:0}, resources:{scope:'geistd', rss_bytes:null, cpu_percent:null}}; renderPerformance();
     assert($('test-memory').textContent === '—' && $('performance-cpu').textContent === '—', 'unknown resource counters are not zero');
+    const beforeMemoryLayout=$('transcript').getBoundingClientRect().toJSON();
+    stateReceivedAt=performance.now();
+    state={...savedState,memory:{process_rss_bytes:.3*2**30,process_rss_sample_age_ms:0,status:1,gpu_allocated_bytes:10*2**30,gpu_sample_age_ms:0,gpu_source:'metal.MTLDevice.currentAllocatedSize',unified_memory:true},resources:{scope:'geistd',cpu_percent:0}};
+    renderPerformance();
+    assert($('test-memory').textContent==='0.3 GiB' && $('test-gpu-memory').textContent==='10.0 GiB', 'small RSS and large synthetic Metal allocation have separate scopes');
+    const metricsBounds=document.querySelector('.model-metrics').getBoundingClientRect();
+    for(const id of ['test-memory','test-gpu-memory','test-size']) {
+      const bounds=$(id).parentElement.getBoundingClientRect();
+      assert(bounds.top>=metricsBounds.top && bounds.bottom<=metricsBounds.bottom+1, `${id} fits inside the three-row summary without clipping`);
+    }
+    assert($('memory-live').textContent.includes('Process RSS') && $('memory-source').textContent.includes('values overlap'), 'scopes and shared-memory overlap are visible');
+    state.memory.gpu_allocated_bytes=0;renderMemory();
+    assert($('test-gpu-memory').textContent==='0.0 GiB', 'known zero Metal differs from unavailable');
+    stateReceivedAt-=6100;renderMemory();
+    assert($('test-gpu-memory').textContent==='—' && $('test-memory').textContent==='—' && $('test-gpu-memory').title==='Stale measurement','cached counters expire without a status response');
+    assert(JSON.stringify($('transcript').getBoundingClientRect().toJSON())===JSON.stringify(beforeMemoryLayout),'memory updates do not move transcript');
+    stateReceivedAt=performance.now();
     state = {...savedState, hardware:{...savedState.hardware, known:false, ram:0}}; renderPerformance();
     assert($('performance-ram').textContent === '—', 'failed system memory read is unknown, not zero');
     openMeasurements(); await tick();

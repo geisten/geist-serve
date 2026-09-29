@@ -174,6 +174,12 @@ Mac CPU time is converted from Mach ticks with the system timebase; Linux uses
 checks units on both platforms. Available RAM remains a conservative OS estimate.
 GPU utilization and energy are not measured.
 
+The `memory` object adds independent, timestamped process-RSS and Metal-allocation
+snapshots from the owning runtime, including during long load/prefill. The UI uses
+these scoped values and expires samples after six seconds. Shared-memory values
+must not be summed. See [the memory contract](MEMORY-TELEMETRY.md) for sources,
+unsupported/error states and journal fields.
+
 Reply speed uses the backend’s generated-token count and generation duration,
 including streaming. First text and total use the interface’s monotonic clock,
 including prompt processing and the local connection. No chunk/character-based

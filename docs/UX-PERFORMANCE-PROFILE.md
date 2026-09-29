@@ -17,11 +17,13 @@ selection, scroll anchor or per-answer footers. Opening it never starts a benchm
 The separately confirmed comparison action remains explicit. Collection, export and
 deletion remain in Settings.
 
-Current memory is labelled Process RSS, never total model RAM. Unsupported GPU
-allocation remains unknown pending #40. First answer aggregates only actual known
+Current memory distinguishes Process RSS from allocated Metal resources, never
+a total model-RAM figure. Missing, failed and stale values remain unavailable;
+unsupported GPU providers stay unknown. See [memory telemetry](MEMORY-TELEMETRY.md).
+First answer aggregates only actual known
 first_answer_ns; first raw text is a separate row. Legacy unknowns stay unknown.
 Errors and processor notices use a reserved, scrollable lane so status refreshes
-do not change the chat geometry. Phase activity follows in #38.
+do not change the chat geometry. Phase activity and cancellation use the same lane.
 
 Validation: shared native WebKit fixtures check ten open/close cycles with 50
 messages, an unsent multiline draft and a selection; <=1 CSS px geometry change,

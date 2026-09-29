@@ -17,7 +17,7 @@
 #> make GEIST_REF=... build against another engine revision, one-off
 
 GEIST_REPO ?= https://github.com/geisten/geistlib.git
-GEIST_REF  ?= e26436906ff6fe7eda296b90fa3a7a9dfa69f418
+GEIST_REF  ?= 33db79d7764b4f6177d944e8ae4fd9f7fadea9be
 GEISTLIB   ?= geistlib
 MODE       ?= release
 
@@ -75,7 +75,7 @@ geist-serve: src/serve.c $(SHARED) $(HDRS) $(LIB)
 # geistd: libgeist over a socket for agents (resident sessions, logits).
 GEISTD_OUTPUT ?= geistd
 DAEMON_SOURCES := $(shell cat scripts/daemon-sources.list)
-$(GEISTD_OUTPUT): $(DAEMON_SOURCES) scripts/daemon-sources.list src/lifecycle.h $(HDRS) $(LIB) scripts/engine-provenance.py
+$(GEISTD_OUTPUT): $(DAEMON_SOURCES) scripts/daemon-sources.list src/lifecycle.h src/resource_sampler.h $(HDRS) $(LIB) scripts/engine-provenance.py
 	@mkdir -p $(@D)
 	python3 scripts/engine-provenance.py capture $(GEISTLIB) --archive $(LIB) --expected $(ENGINE_SOURCE_ID) --output build/engine-build.h
 	$(CC) $(CFLAGS) -Ibuild -o $@ $(DAEMON_SOURCES) $(LIB) $(LDFLAGS) $(LDLIBS)

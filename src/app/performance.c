@@ -55,9 +55,10 @@ static bool valid(const struct perf_record *r) {
            r->load_ns <= 3.6e12 && isfinite(r->rss) && r->rss >= -1 && r->rss <= 1e15 &&
            isfinite(r->peak_rss) && r->peak_rss >= -1 && r->peak_rss <= 1e15 &&
            isfinite(r->cpu_percent) && r->cpu_percent >= -1 && r->cpu_percent <= 100.01 &&
-           r->input <= 1000000 && r->output <= 1000000 && r->reused <= r->input &&
-           isfinite(r->temperature) && r->temperature >= 0 && r->temperature <= 10 &&
-           isfinite(r->top_p) && r->top_p >= 0 && r->top_p <= 1 && r->samples <= 3601;
+           app_memory_valid(&r->memory) && r->input <= 1000000 && r->output <= 1000000 &&
+           r->reused <= r->input && isfinite(r->temperature) && r->temperature >= 0 &&
+           r->temperature <= 10 && isfinite(r->top_p) && r->top_p >= 0 && r->top_p <= 1 &&
+           r->samples <= 3601;
 }
 static bool eligible(const struct perf_record *r) {
     return !strcmp(r->outcome, "completed") && strcmp(r->source, "legacy_last_reply") &&
@@ -118,7 +119,7 @@ static void record_json(struct app_buffer *b, const struct perf_record *r) {
                ",\"input\":%llu,\"output\":%llu,\"reused\":%llu,\"max_tokens\":%u,"
                "\"threads\":%u,\"samples\":%u,\"sample_interval_ms\":2000,"
                "\"cold\":%s,\"contention\":%s,\"warmup\":%s,\"gpu_memory\":null,"
-               "\"unavailable_reason\":\"not_exposed_by_runtime\"}\n",
+               "\"unavailable_reason\":\"legacy_field_use_memory_scopes\"",
                (unsigned long long) r->input,
                (unsigned long long) r->output,
                (unsigned long long) r->reused,
@@ -128,6 +129,9 @@ static void record_json(struct app_buffer *b, const struct perf_record *r) {
                r->cold ? "true" : "false",
                r->contention ? "true" : "false",
                r->warmup ? "true" : "false");
+    app_put(b, ",\"memory\":");
+    app_memory_json(b, &r->memory, r->rss, r->peak_rss, r->samples);
+    app_put(b, "}\n");
 }
 static bool parse(const char *line, struct perf_record *r) {
     struct json *j  = calloc(1, sizeof *j);
@@ -194,7 +198,7 @@ static bool parse(const char *line, struct perf_record *r) {
     r->cold       = json_bool(j, json_get(j, 0, "cold"), false);
     r->contention = json_bool(j, json_get(j, 0, "contention"), false);
     r->warmup     = json_bool(j, json_get(j, 0, "warmup"), false);
-    ok            = valid(r);
+    ok            = app_memory_parse(&r->memory, j, json_get(j, 0, "memory")) && valid(r);
 end:
     free(j);
     return ok;
@@ -499,6 +503,7 @@ void perf_begin(struct perf_record *r) {
     pthread_mutex_unlock(&p.mutex);
     r->timestamp = (double) time(nullptr);
     r->rss = r->peak_rss = r->cpu_percent = -1;
+    app_memory_reset(&r->memory);
     r->first_answer_ns = r->first_ns = r->prefill_ns = r->load_ns = -1;
 }
 void perf_submit(const struct perf_record *r) {
@@ -591,6 +596,13 @@ static void aggregate(struct app_buffer *b, const struct perf_record *rs, size_t
     AGG("tokens", (double) rs[i].output);
     AGG("rss_bytes", rs[i].rss);
     AGG("sampled_peak_rss", rs[i].peak_rss);
+    AGG("gpu_allocated_bytes", rs[i].memory.status == 1 ? rs[i].memory.gpu_end : -1);
+    AGG("gpu_sampled_peak", rs[i].memory.gpu_samples ? rs[i].memory.gpu_peak : -1);
+    unsigned gpu_count = 0;
+    for (size_t i = 0; i < n; i++)
+        if (rs[i].memory.status == 1)
+            ++gpu_count;
+    app_printf(b, ",\"gpu_known_count\":%u", gpu_count);
 #undef AGG
     app_printf(b, ",\"recorded_at\":%.0f}", rs[0].timestamp);
 }

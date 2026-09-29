@@ -66,7 +66,11 @@ Service-side resource sampling runs independently of browser polling, about ever
 2 seconds plus request boundaries. Records contain an after-response RSS snapshot,
 observed peak RSS, sample count and available CPU samples. A sampled peak can miss
 brief spikes. RSS does not represent total GPU memory or a guaranteed requirement.
-Unsupported values are null. No energy or GPU-memory estimate is presented.
+The owning Metal backend supplies separately scoped allocated resource bytes,
+request-end values and sampled peaks through the independent cached status path.
+Both scopes retain source, generation and age; they are never added together.
+Unsupported, failed and stale values are null; known zero remains zero. No energy
+or unique-physical-memory estimate is presented. See [memory telemetry](MEMORY-TELEMETRY.md).
 
 ## Explicit controlled comparison
 
