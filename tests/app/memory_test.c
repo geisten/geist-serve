@@ -33,6 +33,11 @@ int main(void) {
     s.source   = 0;
     app_memory_observe(&m, &s, 2000000000, 1790000001);
     assert(m.status == 3 && m.gpu_end == -1 && m.gpu_peak == 10737418240.);
+    assert(app_memory_valid(&m)); /* failed query retains a scoped historical peak */
+    s.status = 1;
+    s.source = 0;
+    app_memory_observe(&m, &s, 2000000000, 1790000001);
+    assert(m.status == 3 && m.gpu_end == -1); /* old source cannot legitimize a bad new sample */
     app_memory_reset(&m);
     s.status = 2;
     app_memory_observe(&m, &s, 2000000000, 1790000001);
