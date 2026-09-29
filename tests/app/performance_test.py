@@ -1,0 +1,186 @@
+#!/usr/bin/env python3
+"""Numeric history contract, storage recovery and idle-only comparison.
+The deterministic protocol peer validates accounting, not model quality/speed.
+"""
+import concurrent.futures
+import copy
+import json
+import os
+from pathlib import Path
+import shlex
+import shutil
+import sys
+import tempfile
+import time
+import subprocess
+from http_test import App, ROOT
+from background_download_test import peer, model_catalog, chat, Transfer
+
+BINARY=Path(os.environ.get('GEIST_APP_TEST_BINARY',ROOT/'build/geist-app-test'))
+
+def profile(app): return app.status()['performance_profile']
+def exported(app):
+    code,body,_=app.request('/app/performance/export');assert code==200
+    return [json.loads(line) for line in body.splitlines()]
+def request(app,api=False): chat(app,api)
+def main():
+    with tempfile.TemporaryDirectory(prefix='geist-profile-') as temporary:
+        root=Path(temporary)
+        queue_home=root/'queue';queue_home.mkdir()
+        subprocess.run([str(ROOT/'build/test_app_performance'),str(queue_home)],env={**os.environ,'GEIST_TEST_PERFORMANCE_SLOW':'1'},check=True)
+        source=root/'fixture.gguf';source.write_bytes(b'x'*1048576)
+        wrapper=root/'peer';wrapper.write_text('#!/bin/sh\nexec '+shlex.quote(sys.executable)+' '+shlex.quote(str(Path(__file__).resolve()))+' --peer "$@"\n');wrapper.chmod(0o700)
+        home=root/'data';home.mkdir();(home/'models').mkdir();catalog=model_catalog(source)
+        for m in catalog['models']:m['backends']=['cpu','metal']
+        model=catalog['models'][0];shutil.copyfile(source,home/'models'/model['file'])
+        (home/'catalog.json').write_text(json.dumps(catalog));(home/'selected').write_text(model['id'])
+        gate=home/'gate';env={**os.environ,'GEIST_PEER_GATE':str(gate)}
+        def start(binary=BINARY):
+            app=App(home,binary=binary,server=wrapper,env=env);app.wait(lambda s:s['ready'] and not s['busy']);return app
+        app=start()
+        try:
+            assert profile(app)['cpu'] is None and profile(app)['retained']==0
+            for i in range(6):request(app,i%2==1)
+            app.wait(lambda s:s['performance_profile']['persisted']>=6)
+            p=profile(app);assert p['retained']==6 and p['cpu']['count']==5,p
+            assert p['cpu']['rate']==20 and p['gpu'] is None,p
+            rows=exported(app);assert len({r['id'] for r in rows})==6
+            assert {r['source'] for r in rows}=={'app','api'}
+            assert all(r['first_ns']>0 and r['total_ns']>=r['first_ns'] for r in rows)
+            assert rows[0]['cold'] and all(not r['cold'] for r in rows[1:])
+            assert all(r['rss']>0 and r['peak_rss']>=r['rss'] for r in rows)
+            assert 'Say hello' not in json.dumps(rows) and 'Fixture response' not in json.dumps(rows)
+            assert app.request('/app/performance/export',{},auth=False)[0]==403
+            code,body,_=app.request('/app/performance/export',{});assert code==200
+            export=Path(json.loads(body)['path']);assert export.exists() and export.stat().st_mode&0o777==0o600
+            for days in [0,1,90.5,999]:assert app.request('/app/performance/settings',{'enabled':True,'days':days})[0]==400
+            for invalid in [None,'true',1,[]]:assert app.request('/app/performance/settings',{'enabled':invalid,'days':90})[0]==400
+            assert app.request('/app/performance/settings',{'enabled':False,'days':30})[0]==200
+            request(app);assert len(exported(app))==6
+            assert app.request('/app/performance/settings',{'enabled':True,'days':90})[0]==200
+            gate.touch()
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future=pool.submit(request,app,True);app.wait(lambda s:s['inference_busy'])
+                assert app.request('/app/performance/compare',{'confirm':True})[0]==409
+                # Sampling without a UI/status request for more than one interval.
+                time.sleep(2.3);gate.unlink();future.result()
+            app.wait(lambda s:s['performance_profile']['persisted']>=7)
+            assert exported(app)[-1]['samples']>=3
+            before=app.status()['execution']['mode']
+            assert app.request('/app/performance/compare',{})[0]==400
+            assert app.request('/app/performance/compare',{'confirm':True})[0]==202
+            state=app.wait(lambda s:not s['comparison']['running'],timeout=30)
+            assert state['comparison']['result']=='completed' and state['execution']['mode']==before,state['comparison']
+            measured=[r for r in exported(app) if r['source']=='controlled_test']
+            assert len(measured)==8 and sum(r['warmup'] for r in measured)==2
+            assert len({r['run'] for r in measured})==1 and len({r['backend'] for r in measured})==2
+            assert profile(app)['cpu']['count']==3 and profile(app)['gpu']['count']==3
+            gate.touch();assert app.request('/app/performance/compare',{'confirm':True})[0]==202
+            app.wait(lambda s:s['comparison']['phase']=='warmup')
+            assert app.request('/app/execution',{'mode':'gpu'})[0]==409
+            assert app.request('/app/performance/cancel',{})[0]==200
+            state=app.wait(lambda s:not s['comparison']['running'],timeout=30);gate.unlink()
+            assert state['ready'] and state['comparison']['result']=='cancelled' and state['execution']['mode']==before
+            assert exported(app)[-1]['outcome']=='cancelled'
+        finally:gate.unlink(missing_ok=True);app.close()
+        # UI-only app version change retains the same engine/configuration series.
+        if (ROOT/'build/geist-app-new').exists():
+            app=start(ROOT/'build/geist-app-new')
+            try:assert profile(app)['retained']>=15 and profile(app)['cpu']['rate']==20
+            finally:app.close()
+        original=wrapper.read_text();wrapper.write_text(original+'\n# changed engine build fixture\n')
+        app=start()
+        try:
+            p=profile(app);assert p['retained']>=15 and p['cpu'] is None and p['gpu'] is None
+            assert all(r['historical'] for r in p['recent'])
+        finally:app.close()
+        wrapper.write_text(original)
+        journal=home/'performance/observations.jsonl'
+        rows=[json.loads(line) for line in journal.read_text().splitlines()]
+        # Golden dataset: groups, exact interpolated quartiles, failures and outliers.
+        base=next(r for r in rows if r['source']=='app' and not r['cold'])
+        golden=[]
+        for i,rate in enumerate([10,20,30,40,10000]):
+            r={**base,'id':f'gold-{i}','output':64,'generation_ns':64/rate*1e9};golden.append(r)
+        golden.insert(1,{**golden[0],'id':'gpu-other-workload','backend':'metal','output':2})
+        golden.insert(2,{**golden[0],'id':'failed','outcome':'error','generation_ns':1})
+        journal.write_text(''.join(json.dumps(r)+'\n' for r in golden)+'{"schema":')
+        (home/'performance/observations.1.jsonl').unlink(missing_ok=True)
+        (home/'performance/profiles.json').write_text('broken cache')
+        staging=home/'performance/.profiles.json.tmp';staging.write_text('interrupted replacement');staging.chmod(0o600)
+        app=start()
+        try:
+            assert not staging.exists()
+            p=profile(app);assert p['invalid']==1 and p['cpu']['count']==5,p
+            assert (p['cpu']['rate'],p['cpu']['q25'],p['cpu']['q75'])==(30,20,40),p
+            assert p['gpu'] is None,'Must not borrow another workload to fill GPU'
+            request(app);app.wait(lambda s:s['performance_profile']['persisted']>=8)
+        finally:app.close()
+        app=start()
+        try:assert len(exported(app))==8 and profile(app)['invalid']==1
+        finally:app.close()
+        # Legacy import survives restart, stays archived, and deletion never reimports.
+        legacy=home/f'performance-{base["artifact"]}-{base["backend"]}'
+        legacy.write_text(f'v1 0.5.1\nHistorical computer|arm64|macOS|64|10\n20 0.1 1 20 123 {int(time.time())}')
+        legacy.chmod(0o600)
+        app=start()
+        try:assert len([r for r in exported(app) if r['source']=='legacy_last_reply'])==1
+        finally:app.close()
+        app=start()
+        try:
+            assert len([r for r in exported(app) if r['source']=='legacy_last_reply'])==1
+            assert app.request('/app/performance/clear',{})[0]==400
+            assert app.request('/app/performance/clear',{'confirm':True})[0]==200
+            assert not exported(app) and app.status()['ready'] and (home/'models'/model['file']).exists()
+        finally:app.close()
+        app=start()
+        try:assert not exported(app)
+        finally:app.close()
+        # No-follow / inability to save does not prevent generation.
+        victim=root/'untouched';victim.write_text('Do not modify')
+        journal.unlink(missing_ok=True);journal.symlink_to(victim)
+        app=start()
+        try:
+            request(app);app.wait(lambda s:s['performance_profile']['error'])
+            assert profile(app)['retained']==1 and victim.read_text()=='Do not modify'
+        finally:app.close()
+        journal.unlink()
+        full_env={**env,'GEIST_TEST_PERFORMANCE_FULL':'1'}
+        app=App(home,binary=BINARY,server=wrapper,env=full_env)
+        try:
+            app.wait(lambda s:s['ready']);request(app)
+            app.wait(lambda s:s['performance_profile']['dropped']>0)
+            assert profile(app)['retained']==1 and app.status()['ready']
+        finally:app.close()
+        journal.unlink(missing_ok=True)
+        storage=home/'performance';storage.chmod(0o500)
+        app=start()
+        try:
+            request(app);app.wait(lambda s:s['performance_profile']['dropped']>0)
+            assert app.status()['ready']
+        finally:app.close();storage.chmod(0o700)
+        # Bound both disk segments and recover after a real rotation.
+        line=(json.dumps({**base,'id':'rotation-base'})+'\n').encode()
+        size=10*1024*1024-100
+        journal.write_bytes(line*(size//len(line))+b' '*(size%len(line)));journal.chmod(0o600)
+        app=start()
+        try:
+            request(app);app.wait(lambda s:s['performance_profile']['persisted']>=2)
+        finally:app.close()
+        assert journal.stat().st_size<8192
+        assert (home/'performance/observations.1.jsonl').stat().st_size<=10*1024*1024
+        app=start()
+        try:assert len(exported(app))==2
+        finally:app.close()
+        (home/'performance/observations.1.jsonl').unlink()
+        # Retention removes expired numeric data from both disk and export.
+        journal.write_text(json.dumps({**base,'id':'expired','timestamp':time.time()-366*86400})+'\n');journal.chmod(0o600)
+        app=start()
+        try:assert not exported(app) and 'expired' not in journal.read_text()
+        finally:app.close()
+    print('performance: shared app/API accounting, no-content export, persistence, groups/median/quartiles, opt-out, retention, migration, delete, torn tail, symlink failure, independent sampling and comparison/cancel passed')
+if __name__=='__main__':
+    if '--peer' in sys.argv:
+        if '--backends' in sys.argv:print(json.dumps({'gpu':{'name':'metal','available':True}}))
+        else:peer()
+    else:main()

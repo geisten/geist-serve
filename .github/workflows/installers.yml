@@ -1,0 +1,87 @@
+name: installer candidates
+on:
+  workflow_call:
+    inputs:
+      package_version:
+        type: string
+        default: '0.5.25'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ubuntu:
+    timeout-minutes: 45
+    env:
+      VERSION: ${{ inputs.package_version || '0.5.25' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Build pinned daemon and fetch verified test model
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-14 libcurl4-openssl-dev libssl-dev
+          make CC=gcc-14 TARGET=linux geistd fetch-model
+      - name: Build static installer payload
+        run: |
+          mkdir -p build/package
+          docker run --rm -e VERSION \
+            --mount "type=bind,source=$PWD,target=/source,readonly" \
+            --mount "type=bind,source=$PWD/build/package,target=/out" \
+            alpine:3.23@sha256:85fe1e81d6758c208f3e1eed4338a1997e19d4be002d4dd32d3100c9a8c010a0 \
+            sh /source/scripts/build-linux-candidate.sh '${{ matrix.arch }}'
+      - name: Installed package, real inference and lifecycle
+        run: |
+          set -o pipefail
+          sudo env GEIST_INSTALLER_TEST=1 GEIST_REQUIRE_SYSTEMD=1 \
+            GEIST_TEST_MODEL="$PWD/geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf" \
+            sh tests/install/ubuntu.sh "build/package/geist_${VERSION}_${{ matrix.arch }}.deb" "$PWD" \
+            2>&1 | tee build/package/acceptance.log
+      - name: Build optional desktop package and install system WebView
+        run: |
+          sudo apt-get install -y -qq python3-gi gir1.2-gtk-4.0 gir1.2-webkit-6.0 xvfb xauth dbus-x11 fonts-dejavu-core apparmor-utils at-spi2-core
+          VERSION="$VERSION" sh scripts/package-desktop-deb.sh
+          cp build/geist-desktop_*.deb* build/package/
+          sudo apt-get install -y "$PWD/build/package/geist_${VERSION}_${{ matrix.arch }}.deb" "$PWD/build/geist-desktop_${VERSION}_all.deb"
+          desktop-file-validate /usr/share/applications/geist.desktop
+          sudo aa-status | grep -F geist-desktop
+          cp /usr/lib/geist/geist /usr/lib/geist/geist-app /usr/lib/geist/geistd .
+      - name: Actual GTK and WebKit desktop interaction
+        run: |
+          set -o pipefail
+          timeout 300s env GEIST_TEST_MODEL="$PWD/geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf" GDK_BACKEND=x11 GSK_RENDERER=cairo LIBGL_ALWAYS_SOFTWARE=1 \
+            xvfb-run -a -s '-screen 0 1280x900x24' dbus-run-session -- \
+            sh -c 'python3 tests/desktop/installed_entry_test.py && exec aa-exec -p geist-desktop -- /usr/bin/python3 tests/desktop/linux_ui_test.py' 2>&1 | tee build/package/desktop-acceptance.log
+      - name: Desktop profile upgrade, rollback and removal
+        run: |
+          set -o pipefail
+          sudo env GEIST_INSTALLER_TEST=1 sh tests/install/desktop.sh "build/geist-desktop_${VERSION}_all.deb" \
+            2>&1 | tee build/package/desktop-package-acceptance.log
+      - name: Record source identity
+        run: |
+          git rev-parse HEAD > build/package/source-commit.txt
+          git -C geistlib rev-parse HEAD > build/package/engine-commit.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ubuntu-${{ matrix.arch }}-candidate
+          if-no-files-found: error
+          path: |
+            build/package/*.deb
+            build/package/*.deb.sha256
+            build/package/*-commit.txt
+            build/package/app-build-packages.txt
+            build/package/*acceptance.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: failure()
+        with:
+          name: ubuntu-${{ matrix.arch }}-diagnostics
+          path: build/package/*acceptance.log

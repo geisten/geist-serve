@@ -1,0 +1,23 @@
+[Unit]
+Description=Geist local model service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/geist/geist-app
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+UMask=0077
+StandardOutput=null
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+Environment=XDG_DATA_HOME=%h/.local/share
+ReadWritePaths=%h/.local/share/geist
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+
+[Install]
+WantedBy=default.target

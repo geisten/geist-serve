@@ -1,0 +1,5047 @@
+{
+  "schema": 1,
+  "version": "1.0.0",
+  "sampling": "10 authored scenario families per task, parameterized; not independent traffic samples",
+  "cases": [
+    {
+      "id": "screening-rewrite-en-00-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "en",
+      "family": 0,
+      "prompt": "The workshop starts at 12:00 in room K120. Bring gloves; tools are provided.",
+      "required": [
+        "12",
+        "K120"
+      ]
+    },
+    {
+      "id": "screening-rewrite-en-01-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "en",
+      "family": 1,
+      "prompt": "Please move my appointment to 13:00. I cannot attend in the morning. My booking is K121.",
+      "required": [
+        "13",
+        "K121"
+      ]
+    },
+    {
+      "id": "screening-rewrite-en-02-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "en",
+      "family": 2,
+      "prompt": "The order K122 contains 14 notebooks, not pens. Please confirm this quantity.",
+      "required": [
+        "14",
+        "K122"
+      ]
+    },
+    {
+      "id": "screening-rewrite-en-03-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "en",
+      "family": 3,
+      "prompt": "We have reserved 12 seats for group K123. No payment has been made yet.",
+      "required": [
+        "12",
+        "K123"
+      ]
+    },
+    {
+      "id": "screening-rewrite-en-04-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "en",
+      "family": 4,
+      "prompt": "Train K124 is delayed by 13 minutes. The reason has not been announced.",
+      "required": [
+        "13",
+        "K124"
+      ]
+    },
+    {
+      "id": "screening-rewrite-en-05-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "en",
+      "family": 5,
+      "prompt": "The library lends 14 books per person. The new rule starts on 12 October; notice K125 explains it.",
+      "required": [
+        "14",
+        "K125"
+      ]
+    },
+    {
+      "id": "screening-rewrite-en-06-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "en",
+      "family": 6,
+      "prompt": "Project K126 needs 12 additional hours. This is an estimate, not a confirmed delivery date.",
+      "required": [
+        "12",
+        "K126"
+      ]
+    },
+    {
+      "id": "screening-rewrite-en-07-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "en",
+      "family": 7,
+      "prompt": "The room temperature is 13 degrees. Sensor K127 was checked today, but the heater was not inspected.",
+      "required": [
+        "13",
+        "K127"
+      ]
+    },
+    {
+      "id": "screening-rewrite-en-08-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "en",
+      "family": 8,
+      "prompt": "Delivery K128 has 14 damaged items. Please replace them; I am not requesting a refund.",
+      "required": [
+        "14",
+        "K128"
+      ]
+    },
+    {
+      "id": "screening-rewrite-en-09-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "en",
+      "family": 9,
+      "prompt": "Our volunteer team needs 12 helpers for event K129. Participation is optional and there is no fee.",
+      "required": [
+        "12",
+        "K129"
+      ]
+    },
+    {
+      "id": "screening-summary-en-00-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "en",
+      "family": 0,
+      "prompt": "The workshop starts at 12:00 in room K120. Bring gloves; tools are provided.",
+      "required": [
+        "12"
+      ]
+    },
+    {
+      "id": "screening-summary-en-01-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "en",
+      "family": 1,
+      "prompt": "Please move my appointment to 13:00. I cannot attend in the morning. My booking is K121.",
+      "required": [
+        "13"
+      ]
+    },
+    {
+      "id": "screening-summary-en-02-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "en",
+      "family": 2,
+      "prompt": "The order K122 contains 14 notebooks, not pens. Please confirm this quantity.",
+      "required": [
+        "14"
+      ]
+    },
+    {
+      "id": "screening-summary-en-03-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "en",
+      "family": 3,
+      "prompt": "We have reserved 12 seats for group K123. No payment has been made yet.",
+      "required": [
+        "12"
+      ]
+    },
+    {
+      "id": "screening-summary-en-04-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "en",
+      "family": 4,
+      "prompt": "Train K124 is delayed by 13 minutes. The reason has not been announced.",
+      "required": [
+        "13"
+      ]
+    },
+    {
+      "id": "screening-summary-en-05-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "en",
+      "family": 5,
+      "prompt": "The library lends 14 books per person. The new rule starts on 12 October; notice K125 explains it.",
+      "required": [
+        "14"
+      ]
+    },
+    {
+      "id": "screening-summary-en-06-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "en",
+      "family": 6,
+      "prompt": "Project K126 needs 12 additional hours. This is an estimate, not a confirmed delivery date.",
+      "required": [
+        "12"
+      ]
+    },
+    {
+      "id": "screening-summary-en-07-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "en",
+      "family": 7,
+      "prompt": "The room temperature is 13 degrees. Sensor K127 was checked today, but the heater was not inspected.",
+      "required": [
+        "13"
+      ]
+    },
+    {
+      "id": "screening-summary-en-08-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "en",
+      "family": 8,
+      "prompt": "Delivery K128 has 14 damaged items. Please replace them; I am not requesting a refund.",
+      "required": [
+        "14"
+      ]
+    },
+    {
+      "id": "screening-summary-en-09-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "en",
+      "family": 9,
+      "prompt": "Our volunteer team needs 12 helpers for event K129. Participation is optional and there is no fee.",
+      "required": [
+        "12"
+      ]
+    },
+    {
+      "id": "screening-ideas-en-00-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "en",
+      "family": 0,
+      "prompt": "Suggest three free indoor activities for 12 adults, using paper.",
+      "required": []
+    },
+    {
+      "id": "screening-ideas-en-01-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "en",
+      "family": 1,
+      "prompt": "Suggest three ways to organize 13 library books without buying anything.",
+      "required": []
+    },
+    {
+      "id": "screening-ideas-en-02-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "en",
+      "family": 2,
+      "prompt": "Suggest three activities for a 14-minute team break without screens.",
+      "required": []
+    },
+    {
+      "id": "screening-ideas-en-03-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "en",
+      "family": 3,
+      "prompt": "Suggest three practical uses for 12 empty cardboard boxes at home.",
+      "required": []
+    },
+    {
+      "id": "screening-ideas-en-04-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "en",
+      "family": 4,
+      "prompt": "Suggest three ways to practice vocabulary for 13 minutes without internet.",
+      "required": []
+    },
+    {
+      "id": "screening-ideas-en-05-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "en",
+      "family": 5,
+      "prompt": "Suggest three quiet welcome activities for 14 new volunteers.",
+      "required": []
+    },
+    {
+      "id": "screening-ideas-en-06-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "en",
+      "family": 6,
+      "prompt": "Suggest three ways to label 12 storage jars using reused materials.",
+      "required": []
+    },
+    {
+      "id": "screening-ideas-en-07-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "en",
+      "family": 7,
+      "prompt": "Suggest three non-digital ways to plan 13 garden tasks.",
+      "required": []
+    },
+    {
+      "id": "screening-ideas-en-08-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "en",
+      "family": 8,
+      "prompt": "Suggest three ways to structure a 14-minute reading group.",
+      "required": []
+    },
+    {
+      "id": "screening-ideas-en-09-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "en",
+      "family": 9,
+      "prompt": "Suggest three ways to reuse 12 pages of one-sided scrap paper.",
+      "required": []
+    },
+    {
+      "id": "screening-freeform-en-00-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "en",
+      "family": 0,
+      "prompt": "Only answer with the result: 12 + 2.\nExercise reference: K120.",
+      "required": [
+        "14"
+      ]
+    },
+    {
+      "id": "screening-freeform-en-01-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "en",
+      "family": 1,
+      "prompt": "Context: My parcel code is K121. What is my parcel code?\nExercise reference: K121.",
+      "required": [
+        "K121"
+      ]
+    },
+    {
+      "id": "screening-freeform-en-02-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "en",
+      "family": 2,
+      "prompt": "Context: The earlier time was 10:00. The corrected time is 14:00. What is the current time?\nExercise reference: K122.",
+      "required": [
+        "14"
+      ]
+    },
+    {
+      "id": "screening-freeform-en-03-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "en",
+      "family": 3,
+      "prompt": "Which number is greater: 12 or 2? Answer only with the number.\nExercise reference: K123.",
+      "required": [
+        "12"
+      ]
+    },
+    {
+      "id": "screening-freeform-en-04-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "en",
+      "family": 4,
+      "prompt": "Context: I need 13 boxes. Assistant: How many labels per box? User: Two. How many labels total?\nExercise reference: K124.",
+      "required": [
+        "26"
+      ]
+    },
+    {
+      "id": "screening-freeform-en-05-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "en",
+      "family": 5,
+      "prompt": "Tell me my private account balance. You have no account data or tools.\nExercise reference: K125.",
+      "required": []
+    },
+    {
+      "id": "screening-freeform-en-06-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "en",
+      "family": 6,
+      "prompt": "Book it for me. No object, date or booking tools have been supplied. What information is missing?\nExercise reference: K126.",
+      "required": []
+    },
+    {
+      "id": "screening-freeform-en-07-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "en",
+      "family": 7,
+      "prompt": "Explain why a seed needs water in at most three short sentences.\nExercise reference: K127.",
+      "required": []
+    },
+    {
+      "id": "screening-freeform-en-08-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "en",
+      "family": 8,
+      "prompt": "The note says 14 attendees are possible, not confirmed. Are those attendees confirmed?\nExercise reference: K128.",
+      "required": []
+    },
+    {
+      "id": "screening-freeform-en-09-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "en",
+      "family": 9,
+      "prompt": "Context: Code K129 is a made-up label. What does it stand for? If not specified, say so.\nExercise reference: K129.",
+      "required": []
+    },
+    {
+      "id": "screening-rewrite-de-00-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "de",
+      "family": 0,
+      "prompt": "Der Workshop beginnt um 12:00 in Raum K120. Bringe Handschuhe mit; Werkzeug wird gestellt.",
+      "required": [
+        "12",
+        "K120"
+      ]
+    },
+    {
+      "id": "screening-rewrite-de-01-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "de",
+      "family": 1,
+      "prompt": "Bitte verschiebe meinen Termin auf 13:00. Vormittags kann ich nicht kommen. Meine Buchung lautet K121.",
+      "required": [
+        "13",
+        "K121"
+      ]
+    },
+    {
+      "id": "screening-rewrite-de-02-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "de",
+      "family": 2,
+      "prompt": "Die Bestellung K122 enthält 14 Hefte, keine Stifte. Bitte bestätige diese Menge.",
+      "required": [
+        "14",
+        "K122"
+      ]
+    },
+    {
+      "id": "screening-rewrite-de-03-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "de",
+      "family": 3,
+      "prompt": "Für Gruppe K123 sind 12 Plätze reserviert. Es wurde noch nichts bezahlt.",
+      "required": [
+        "12",
+        "K123"
+      ]
+    },
+    {
+      "id": "screening-rewrite-de-04-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "de",
+      "family": 4,
+      "prompt": "Zug K124 hat 13 Minuten Verspätung. Der Grund wurde nicht bekannt gegeben.",
+      "required": [
+        "13",
+        "K124"
+      ]
+    },
+    {
+      "id": "screening-rewrite-de-05-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "de",
+      "family": 5,
+      "prompt": "Die Bibliothek verleiht 14 Bücher pro Person. Die neue Regel beginnt am 12. Oktober; Aushang K125 erklärt sie.",
+      "required": [
+        "14",
+        "K125"
+      ]
+    },
+    {
+      "id": "screening-rewrite-de-06-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "de",
+      "family": 6,
+      "prompt": "Projekt K126 benötigt schätzungsweise 12 weitere Stunden. Das ist kein bestätigter Liefertermin.",
+      "required": [
+        "12",
+        "K126"
+      ]
+    },
+    {
+      "id": "screening-rewrite-de-07-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "de",
+      "family": 7,
+      "prompt": "Die Raumtemperatur beträgt 13 Grad. Sensor K127 wurde heute geprüft, die Heizung jedoch nicht.",
+      "required": [
+        "13",
+        "K127"
+      ]
+    },
+    {
+      "id": "screening-rewrite-de-08-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "de",
+      "family": 8,
+      "prompt": "Lieferung K128 hat 14 beschädigte Artikel. Bitte ersetze sie; ich fordere keine Erstattung.",
+      "required": [
+        "14",
+        "K128"
+      ]
+    },
+    {
+      "id": "screening-rewrite-de-09-0",
+      "split": "screening",
+      "task": "rewrite",
+      "language": "de",
+      "family": 9,
+      "prompt": "Unser Team benötigt 12 Helfer für Veranstaltung K129. Die Teilnahme ist freiwillig und kostenlos.",
+      "required": [
+        "12",
+        "K129"
+      ]
+    },
+    {
+      "id": "screening-summary-de-00-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "de",
+      "family": 0,
+      "prompt": "Der Workshop beginnt um 12:00 in Raum K120. Bringe Handschuhe mit; Werkzeug wird gestellt.",
+      "required": [
+        "12"
+      ]
+    },
+    {
+      "id": "screening-summary-de-01-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "de",
+      "family": 1,
+      "prompt": "Bitte verschiebe meinen Termin auf 13:00. Vormittags kann ich nicht kommen. Meine Buchung lautet K121.",
+      "required": [
+        "13"
+      ]
+    },
+    {
+      "id": "screening-summary-de-02-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "de",
+      "family": 2,
+      "prompt": "Die Bestellung K122 enthält 14 Hefte, keine Stifte. Bitte bestätige diese Menge.",
+      "required": [
+        "14"
+      ]
+    },
+    {
+      "id": "screening-summary-de-03-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "de",
+      "family": 3,
+      "prompt": "Für Gruppe K123 sind 12 Plätze reserviert. Es wurde noch nichts bezahlt.",
+      "required": [
+        "12"
+      ]
+    },
+    {
+      "id": "screening-summary-de-04-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "de",
+      "family": 4,
+      "prompt": "Zug K124 hat 13 Minuten Verspätung. Der Grund wurde nicht bekannt gegeben.",
+      "required": [
+        "13"
+      ]
+    },
+    {
+      "id": "screening-summary-de-05-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "de",
+      "family": 5,
+      "prompt": "Die Bibliothek verleiht 14 Bücher pro Person. Die neue Regel beginnt am 12. Oktober; Aushang K125 erklärt sie.",
+      "required": [
+        "14"
+      ]
+    },
+    {
+      "id": "screening-summary-de-06-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "de",
+      "family": 6,
+      "prompt": "Projekt K126 benötigt schätzungsweise 12 weitere Stunden. Das ist kein bestätigter Liefertermin.",
+      "required": [
+        "12"
+      ]
+    },
+    {
+      "id": "screening-summary-de-07-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "de",
+      "family": 7,
+      "prompt": "Die Raumtemperatur beträgt 13 Grad. Sensor K127 wurde heute geprüft, die Heizung jedoch nicht.",
+      "required": [
+        "13"
+      ]
+    },
+    {
+      "id": "screening-summary-de-08-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "de",
+      "family": 8,
+      "prompt": "Lieferung K128 hat 14 beschädigte Artikel. Bitte ersetze sie; ich fordere keine Erstattung.",
+      "required": [
+        "14"
+      ]
+    },
+    {
+      "id": "screening-summary-de-09-0",
+      "split": "screening",
+      "task": "summary",
+      "language": "de",
+      "family": 9,
+      "prompt": "Unser Team benötigt 12 Helfer für Veranstaltung K129. Die Teilnahme ist freiwillig und kostenlos.",
+      "required": [
+        "12"
+      ]
+    },
+    {
+      "id": "screening-ideas-de-00-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "de",
+      "family": 0,
+      "prompt": "Nenne drei kostenlose Aktivitäten für 12 Erwachsene drinnen mit Papier.",
+      "required": []
+    },
+    {
+      "id": "screening-ideas-de-01-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "de",
+      "family": 1,
+      "prompt": "Nenne drei Möglichkeiten, 13 Bücher ohne Einkäufe zu ordnen.",
+      "required": []
+    },
+    {
+      "id": "screening-ideas-de-02-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "de",
+      "family": 2,
+      "prompt": "Nenne drei Aktivitäten für eine 14-minütige Teampause ohne Bildschirm.",
+      "required": []
+    },
+    {
+      "id": "screening-ideas-de-03-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "de",
+      "family": 3,
+      "prompt": "Nenne drei praktische Verwendungen für 12 leere Kartons zu Hause.",
+      "required": []
+    },
+    {
+      "id": "screening-ideas-de-04-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "de",
+      "family": 4,
+      "prompt": "Nenne drei Möglichkeiten, 13 Minuten ohne Internet Vokabeln zu üben.",
+      "required": []
+    },
+    {
+      "id": "screening-ideas-de-05-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "de",
+      "family": 5,
+      "prompt": "Nenne drei leise Kennenlernaktivitäten für 14 neue Ehrenamtliche.",
+      "required": []
+    },
+    {
+      "id": "screening-ideas-de-06-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "de",
+      "family": 6,
+      "prompt": "Nenne drei Möglichkeiten, 12 Vorratsgläser mit wiederverwendeten Materialien zu beschriften.",
+      "required": []
+    },
+    {
+      "id": "screening-ideas-de-07-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "de",
+      "family": 7,
+      "prompt": "Nenne drei analoge Möglichkeiten, 13 Gartenaufgaben zu planen.",
+      "required": []
+    },
+    {
+      "id": "screening-ideas-de-08-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "de",
+      "family": 8,
+      "prompt": "Nenne drei Möglichkeiten, eine 14-minütige Leserunde zu gestalten.",
+      "required": []
+    },
+    {
+      "id": "screening-ideas-de-09-0",
+      "split": "screening",
+      "task": "ideas",
+      "language": "de",
+      "family": 9,
+      "prompt": "Nenne drei Möglichkeiten, 12 einseitig bedruckte Papierseiten wiederzuverwenden.",
+      "required": []
+    },
+    {
+      "id": "screening-freeform-de-00-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "de",
+      "family": 0,
+      "prompt": "Antworte nur mit dem Ergebnis: 12 + 2.\nÜbungsreferenz: K120.",
+      "required": [
+        "14"
+      ]
+    },
+    {
+      "id": "screening-freeform-de-01-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "de",
+      "family": 1,
+      "prompt": "Kontext: Mein Paketcode ist K121. Wie lautet mein Paketcode?\nÜbungsreferenz: K121.",
+      "required": [
+        "K121"
+      ]
+    },
+    {
+      "id": "screening-freeform-de-02-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "de",
+      "family": 2,
+      "prompt": "Kontext: Die ursprüngliche Uhrzeit war 10:00. Die korrigierte Uhrzeit ist 14:00. Welche Uhrzeit gilt?\nÜbungsreferenz: K122.",
+      "required": [
+        "14"
+      ]
+    },
+    {
+      "id": "screening-freeform-de-03-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "de",
+      "family": 3,
+      "prompt": "Welche Zahl ist größer: 12 oder 2? Antworte nur mit der Zahl.\nÜbungsreferenz: K123.",
+      "required": [
+        "12"
+      ]
+    },
+    {
+      "id": "screening-freeform-de-04-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "de",
+      "family": 4,
+      "prompt": "Kontext: Ich brauche 13 Kartons. Assistent: Wie viele Etiketten pro Karton? Nutzer: Zwei. Wie viele Etiketten insgesamt?\nÜbungsreferenz: K124.",
+      "required": [
+        "26"
+      ]
+    },
+    {
+      "id": "screening-freeform-de-05-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "de",
+      "family": 5,
+      "prompt": "Nenne meinen privaten Kontostand. Dir liegen keine Kontodaten oder Werkzeuge vor.\nÜbungsreferenz: K125.",
+      "required": []
+    },
+    {
+      "id": "screening-freeform-de-06-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "de",
+      "family": 6,
+      "prompt": "Buche es für mich. Gegenstand, Datum und Buchungswerkzeuge fehlen. Welche Angaben fehlen?\nÜbungsreferenz: K126.",
+      "required": []
+    },
+    {
+      "id": "screening-freeform-de-07-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "de",
+      "family": 7,
+      "prompt": "Erkläre in höchstens drei kurzen Sätzen, warum ein Samen Wasser benötigt.\nÜbungsreferenz: K127.",
+      "required": []
+    },
+    {
+      "id": "screening-freeform-de-08-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "de",
+      "family": 8,
+      "prompt": "Laut Notiz sind 14 Teilnehmer möglich, aber nicht bestätigt. Sind diese Teilnehmer bestätigt?\nÜbungsreferenz: K128.",
+      "required": []
+    },
+    {
+      "id": "screening-freeform-de-09-0",
+      "split": "screening",
+      "task": "freeform",
+      "language": "de",
+      "family": 9,
+      "prompt": "Kontext: Code K129 ist eine erfundene Bezeichnung. Wofür steht sie? Sage, wenn das nicht angegeben ist.\nÜbungsreferenz: K129.",
+      "required": []
+    },
+    {
+      "id": "acceptance-rewrite-en-00-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 0,
+      "prompt": "The workshop starts at 17:00 in room K320. Bring gloves; tools are provided.",
+      "required": [
+        "17",
+        "K320"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-01-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 1,
+      "prompt": "Please move my appointment to 18:00. I cannot attend in the morning. My booking is K321.",
+      "required": [
+        "18",
+        "K321"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-02-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 2,
+      "prompt": "The order K322 contains 19 notebooks, not pens. Please confirm this quantity.",
+      "required": [
+        "19",
+        "K322"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-03-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 3,
+      "prompt": "We have reserved 17 seats for group K323. No payment has been made yet.",
+      "required": [
+        "17",
+        "K323"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-04-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 4,
+      "prompt": "Train K324 is delayed by 18 minutes. The reason has not been announced.",
+      "required": [
+        "18",
+        "K324"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-05-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 5,
+      "prompt": "The library lends 19 books per person. The new rule starts on 12 October; notice K325 explains it.",
+      "required": [
+        "19",
+        "K325"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-06-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 6,
+      "prompt": "Project K326 needs 17 additional hours. This is an estimate, not a confirmed delivery date.",
+      "required": [
+        "17",
+        "K326"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-07-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 7,
+      "prompt": "The room temperature is 18 degrees. Sensor K327 was checked today, but the heater was not inspected.",
+      "required": [
+        "18",
+        "K327"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-08-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 8,
+      "prompt": "Delivery K328 has 19 damaged items. Please replace them; I am not requesting a refund.",
+      "required": [
+        "19",
+        "K328"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-09-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 9,
+      "prompt": "Our volunteer team needs 17 helpers for event K329. Participation is optional and there is no fee.",
+      "required": [
+        "17",
+        "K329"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-00-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 0,
+      "prompt": "The workshop starts at 18:00 in room K340. Bring gloves; tools are provided.",
+      "required": [
+        "18",
+        "K340"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-01-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 1,
+      "prompt": "Please move my appointment to 19:00. I cannot attend in the morning. My booking is K341.",
+      "required": [
+        "19",
+        "K341"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-02-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 2,
+      "prompt": "The order K342 contains 20 notebooks, not pens. Please confirm this quantity.",
+      "required": [
+        "20",
+        "K342"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-03-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 3,
+      "prompt": "We have reserved 18 seats for group K343. No payment has been made yet.",
+      "required": [
+        "18",
+        "K343"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-04-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 4,
+      "prompt": "Train K344 is delayed by 19 minutes. The reason has not been announced.",
+      "required": [
+        "19",
+        "K344"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-05-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 5,
+      "prompt": "The library lends 20 books per person. The new rule starts on 12 October; notice K345 explains it.",
+      "required": [
+        "20",
+        "K345"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-06-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 6,
+      "prompt": "Project K346 needs 18 additional hours. This is an estimate, not a confirmed delivery date.",
+      "required": [
+        "18",
+        "K346"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-07-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 7,
+      "prompt": "The room temperature is 19 degrees. Sensor K347 was checked today, but the heater was not inspected.",
+      "required": [
+        "19",
+        "K347"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-08-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 8,
+      "prompt": "Delivery K348 has 20 damaged items. Please replace them; I am not requesting a refund.",
+      "required": [
+        "20",
+        "K348"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-09-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 9,
+      "prompt": "Our volunteer team needs 18 helpers for event K349. Participation is optional and there is no fee.",
+      "required": [
+        "18",
+        "K349"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-00-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 0,
+      "prompt": "The workshop starts at 19:00 in room K360. Bring gloves; tools are provided.",
+      "required": [
+        "19",
+        "K360"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-01-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 1,
+      "prompt": "Please move my appointment to 20:00. I cannot attend in the morning. My booking is K361.",
+      "required": [
+        "20",
+        "K361"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-02-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 2,
+      "prompt": "The order K362 contains 21 notebooks, not pens. Please confirm this quantity.",
+      "required": [
+        "21",
+        "K362"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-03-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 3,
+      "prompt": "We have reserved 19 seats for group K363. No payment has been made yet.",
+      "required": [
+        "19",
+        "K363"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-04-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 4,
+      "prompt": "Train K364 is delayed by 20 minutes. The reason has not been announced.",
+      "required": [
+        "20",
+        "K364"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-05-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 5,
+      "prompt": "The library lends 21 books per person. The new rule starts on 12 October; notice K365 explains it.",
+      "required": [
+        "21",
+        "K365"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-06-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 6,
+      "prompt": "Project K366 needs 19 additional hours. This is an estimate, not a confirmed delivery date.",
+      "required": [
+        "19",
+        "K366"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-07-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 7,
+      "prompt": "The room temperature is 20 degrees. Sensor K367 was checked today, but the heater was not inspected.",
+      "required": [
+        "20",
+        "K367"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-08-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 8,
+      "prompt": "Delivery K368 has 21 damaged items. Please replace them; I am not requesting a refund.",
+      "required": [
+        "21",
+        "K368"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-09-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 9,
+      "prompt": "Our volunteer team needs 19 helpers for event K369. Participation is optional and there is no fee.",
+      "required": [
+        "19",
+        "K369"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-00-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 0,
+      "prompt": "The workshop starts at 20:00 in room K380. Bring gloves; tools are provided.",
+      "required": [
+        "20",
+        "K380"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-01-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 1,
+      "prompt": "Please move my appointment to 21:00. I cannot attend in the morning. My booking is K381.",
+      "required": [
+        "21",
+        "K381"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-02-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 2,
+      "prompt": "The order K382 contains 22 notebooks, not pens. Please confirm this quantity.",
+      "required": [
+        "22",
+        "K382"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-03-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 3,
+      "prompt": "We have reserved 20 seats for group K383. No payment has been made yet.",
+      "required": [
+        "20",
+        "K383"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-04-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 4,
+      "prompt": "Train K384 is delayed by 21 minutes. The reason has not been announced.",
+      "required": [
+        "21",
+        "K384"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-05-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 5,
+      "prompt": "The library lends 22 books per person. The new rule starts on 12 October; notice K385 explains it.",
+      "required": [
+        "22",
+        "K385"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-06-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 6,
+      "prompt": "Project K386 needs 20 additional hours. This is an estimate, not a confirmed delivery date.",
+      "required": [
+        "20",
+        "K386"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-07-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 7,
+      "prompt": "The room temperature is 21 degrees. Sensor K387 was checked today, but the heater was not inspected.",
+      "required": [
+        "21",
+        "K387"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-08-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 8,
+      "prompt": "Delivery K388 has 22 damaged items. Please replace them; I am not requesting a refund.",
+      "required": [
+        "22",
+        "K388"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-09-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 9,
+      "prompt": "Our volunteer team needs 20 helpers for event K389. Participation is optional and there is no fee.",
+      "required": [
+        "20",
+        "K389"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-00-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 0,
+      "prompt": "The workshop starts at 21:00 in room K400. Bring gloves; tools are provided.",
+      "required": [
+        "21",
+        "K400"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-01-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 1,
+      "prompt": "Please move my appointment to 22:00. I cannot attend in the morning. My booking is K401.",
+      "required": [
+        "22",
+        "K401"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-02-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 2,
+      "prompt": "The order K402 contains 23 notebooks, not pens. Please confirm this quantity.",
+      "required": [
+        "23",
+        "K402"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-03-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 3,
+      "prompt": "We have reserved 21 seats for group K403. No payment has been made yet.",
+      "required": [
+        "21",
+        "K403"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-04-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 4,
+      "prompt": "Train K404 is delayed by 22 minutes. The reason has not been announced.",
+      "required": [
+        "22",
+        "K404"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-05-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 5,
+      "prompt": "The library lends 23 books per person. The new rule starts on 12 October; notice K405 explains it.",
+      "required": [
+        "23",
+        "K405"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-06-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 6,
+      "prompt": "Project K406 needs 21 additional hours. This is an estimate, not a confirmed delivery date.",
+      "required": [
+        "21",
+        "K406"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-07-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 7,
+      "prompt": "The room temperature is 22 degrees. Sensor K407 was checked today, but the heater was not inspected.",
+      "required": [
+        "22",
+        "K407"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-08-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 8,
+      "prompt": "Delivery K408 has 23 damaged items. Please replace them; I am not requesting a refund.",
+      "required": [
+        "23",
+        "K408"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-en-09-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "en",
+      "family": 9,
+      "prompt": "Our volunteer team needs 21 helpers for event K409. Participation is optional and there is no fee.",
+      "required": [
+        "21",
+        "K409"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-00-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 0,
+      "prompt": "The workshop starts at 17:00 in room K320. Bring gloves; tools are provided.",
+      "required": [
+        "17"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-01-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 1,
+      "prompt": "Please move my appointment to 18:00. I cannot attend in the morning. My booking is K321.",
+      "required": [
+        "18"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-02-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 2,
+      "prompt": "The order K322 contains 19 notebooks, not pens. Please confirm this quantity.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-03-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 3,
+      "prompt": "We have reserved 17 seats for group K323. No payment has been made yet.",
+      "required": [
+        "17"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-04-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 4,
+      "prompt": "Train K324 is delayed by 18 minutes. The reason has not been announced.",
+      "required": [
+        "18"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-05-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 5,
+      "prompt": "The library lends 19 books per person. The new rule starts on 12 October; notice K325 explains it.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-06-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 6,
+      "prompt": "Project K326 needs 17 additional hours. This is an estimate, not a confirmed delivery date.",
+      "required": [
+        "17"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-07-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 7,
+      "prompt": "The room temperature is 18 degrees. Sensor K327 was checked today, but the heater was not inspected.",
+      "required": [
+        "18"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-08-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 8,
+      "prompt": "Delivery K328 has 19 damaged items. Please replace them; I am not requesting a refund.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-09-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 9,
+      "prompt": "Our volunteer team needs 17 helpers for event K329. Participation is optional and there is no fee.",
+      "required": [
+        "17"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-00-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 0,
+      "prompt": "The workshop starts at 18:00 in room K340. Bring gloves; tools are provided.",
+      "required": [
+        "18"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-01-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 1,
+      "prompt": "Please move my appointment to 19:00. I cannot attend in the morning. My booking is K341.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-02-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 2,
+      "prompt": "The order K342 contains 20 notebooks, not pens. Please confirm this quantity.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-03-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 3,
+      "prompt": "We have reserved 18 seats for group K343. No payment has been made yet.",
+      "required": [
+        "18"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-04-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 4,
+      "prompt": "Train K344 is delayed by 19 minutes. The reason has not been announced.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-05-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 5,
+      "prompt": "The library lends 20 books per person. The new rule starts on 12 October; notice K345 explains it.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-06-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 6,
+      "prompt": "Project K346 needs 18 additional hours. This is an estimate, not a confirmed delivery date.",
+      "required": [
+        "18"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-07-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 7,
+      "prompt": "The room temperature is 19 degrees. Sensor K347 was checked today, but the heater was not inspected.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-08-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 8,
+      "prompt": "Delivery K348 has 20 damaged items. Please replace them; I am not requesting a refund.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-09-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 9,
+      "prompt": "Our volunteer team needs 18 helpers for event K349. Participation is optional and there is no fee.",
+      "required": [
+        "18"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-00-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 0,
+      "prompt": "The workshop starts at 19:00 in room K360. Bring gloves; tools are provided.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-01-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 1,
+      "prompt": "Please move my appointment to 20:00. I cannot attend in the morning. My booking is K361.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-02-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 2,
+      "prompt": "The order K362 contains 21 notebooks, not pens. Please confirm this quantity.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-03-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 3,
+      "prompt": "We have reserved 19 seats for group K363. No payment has been made yet.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-04-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 4,
+      "prompt": "Train K364 is delayed by 20 minutes. The reason has not been announced.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-05-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 5,
+      "prompt": "The library lends 21 books per person. The new rule starts on 12 October; notice K365 explains it.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-06-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 6,
+      "prompt": "Project K366 needs 19 additional hours. This is an estimate, not a confirmed delivery date.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-07-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 7,
+      "prompt": "The room temperature is 20 degrees. Sensor K367 was checked today, but the heater was not inspected.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-08-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 8,
+      "prompt": "Delivery K368 has 21 damaged items. Please replace them; I am not requesting a refund.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-09-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 9,
+      "prompt": "Our volunteer team needs 19 helpers for event K369. Participation is optional and there is no fee.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-00-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 0,
+      "prompt": "The workshop starts at 20:00 in room K380. Bring gloves; tools are provided.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-01-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 1,
+      "prompt": "Please move my appointment to 21:00. I cannot attend in the morning. My booking is K381.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-02-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 2,
+      "prompt": "The order K382 contains 22 notebooks, not pens. Please confirm this quantity.",
+      "required": [
+        "22"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-03-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 3,
+      "prompt": "We have reserved 20 seats for group K383. No payment has been made yet.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-04-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 4,
+      "prompt": "Train K384 is delayed by 21 minutes. The reason has not been announced.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-05-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 5,
+      "prompt": "The library lends 22 books per person. The new rule starts on 12 October; notice K385 explains it.",
+      "required": [
+        "22"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-06-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 6,
+      "prompt": "Project K386 needs 20 additional hours. This is an estimate, not a confirmed delivery date.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-07-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 7,
+      "prompt": "The room temperature is 21 degrees. Sensor K387 was checked today, but the heater was not inspected.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-08-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 8,
+      "prompt": "Delivery K388 has 22 damaged items. Please replace them; I am not requesting a refund.",
+      "required": [
+        "22"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-09-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 9,
+      "prompt": "Our volunteer team needs 20 helpers for event K389. Participation is optional and there is no fee.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-00-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 0,
+      "prompt": "The workshop starts at 21:00 in room K400. Bring gloves; tools are provided.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-01-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 1,
+      "prompt": "Please move my appointment to 22:00. I cannot attend in the morning. My booking is K401.",
+      "required": [
+        "22"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-02-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 2,
+      "prompt": "The order K402 contains 23 notebooks, not pens. Please confirm this quantity.",
+      "required": [
+        "23"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-03-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 3,
+      "prompt": "We have reserved 21 seats for group K403. No payment has been made yet.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-04-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 4,
+      "prompt": "Train K404 is delayed by 22 minutes. The reason has not been announced.",
+      "required": [
+        "22"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-05-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 5,
+      "prompt": "The library lends 23 books per person. The new rule starts on 12 October; notice K405 explains it.",
+      "required": [
+        "23"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-06-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 6,
+      "prompt": "Project K406 needs 21 additional hours. This is an estimate, not a confirmed delivery date.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-07-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 7,
+      "prompt": "The room temperature is 22 degrees. Sensor K407 was checked today, but the heater was not inspected.",
+      "required": [
+        "22"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-08-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 8,
+      "prompt": "Delivery K408 has 23 damaged items. Please replace them; I am not requesting a refund.",
+      "required": [
+        "23"
+      ]
+    },
+    {
+      "id": "acceptance-summary-en-09-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "en",
+      "family": 9,
+      "prompt": "Our volunteer team needs 21 helpers for event K409. Participation is optional and there is no fee.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-ideas-en-00-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 0,
+      "prompt": "Suggest three free indoor activities for 17 adults, using paper.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-01-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 1,
+      "prompt": "Suggest three ways to organize 18 library books without buying anything.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-02-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 2,
+      "prompt": "Suggest three activities for a 19-minute team break without screens.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-03-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 3,
+      "prompt": "Suggest three practical uses for 17 empty cardboard boxes at home.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-04-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 4,
+      "prompt": "Suggest three ways to practice vocabulary for 18 minutes without internet.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-05-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 5,
+      "prompt": "Suggest three quiet welcome activities for 19 new volunteers.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-06-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 6,
+      "prompt": "Suggest three ways to label 17 storage jars using reused materials.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-07-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 7,
+      "prompt": "Suggest three non-digital ways to plan 18 garden tasks.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-08-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 8,
+      "prompt": "Suggest three ways to structure a 19-minute reading group.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-09-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 9,
+      "prompt": "Suggest three ways to reuse 17 pages of one-sided scrap paper.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-00-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 0,
+      "prompt": "Suggest three free indoor activities for 18 adults, using paper.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-01-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 1,
+      "prompt": "Suggest three ways to organize 19 library books without buying anything.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-02-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 2,
+      "prompt": "Suggest three activities for a 20-minute team break without screens.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-03-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 3,
+      "prompt": "Suggest three practical uses for 18 empty cardboard boxes at home.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-04-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 4,
+      "prompt": "Suggest three ways to practice vocabulary for 19 minutes without internet.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-05-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 5,
+      "prompt": "Suggest three quiet welcome activities for 20 new volunteers.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-06-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 6,
+      "prompt": "Suggest three ways to label 18 storage jars using reused materials.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-07-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 7,
+      "prompt": "Suggest three non-digital ways to plan 19 garden tasks.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-08-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 8,
+      "prompt": "Suggest three ways to structure a 20-minute reading group.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-09-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 9,
+      "prompt": "Suggest three ways to reuse 18 pages of one-sided scrap paper.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-00-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 0,
+      "prompt": "Suggest three free indoor activities for 19 adults, using paper.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-01-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 1,
+      "prompt": "Suggest three ways to organize 20 library books without buying anything.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-02-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 2,
+      "prompt": "Suggest three activities for a 21-minute team break without screens.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-03-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 3,
+      "prompt": "Suggest three practical uses for 19 empty cardboard boxes at home.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-04-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 4,
+      "prompt": "Suggest three ways to practice vocabulary for 20 minutes without internet.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-05-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 5,
+      "prompt": "Suggest three quiet welcome activities for 21 new volunteers.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-06-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 6,
+      "prompt": "Suggest three ways to label 19 storage jars using reused materials.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-07-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 7,
+      "prompt": "Suggest three non-digital ways to plan 20 garden tasks.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-08-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 8,
+      "prompt": "Suggest three ways to structure a 21-minute reading group.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-09-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 9,
+      "prompt": "Suggest three ways to reuse 19 pages of one-sided scrap paper.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-00-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 0,
+      "prompt": "Suggest three free indoor activities for 20 adults, using paper.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-01-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 1,
+      "prompt": "Suggest three ways to organize 21 library books without buying anything.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-02-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 2,
+      "prompt": "Suggest three activities for a 22-minute team break without screens.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-03-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 3,
+      "prompt": "Suggest three practical uses for 20 empty cardboard boxes at home.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-04-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 4,
+      "prompt": "Suggest three ways to practice vocabulary for 21 minutes without internet.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-05-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 5,
+      "prompt": "Suggest three quiet welcome activities for 22 new volunteers.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-06-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 6,
+      "prompt": "Suggest three ways to label 20 storage jars using reused materials.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-07-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 7,
+      "prompt": "Suggest three non-digital ways to plan 21 garden tasks.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-08-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 8,
+      "prompt": "Suggest three ways to structure a 22-minute reading group.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-09-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 9,
+      "prompt": "Suggest three ways to reuse 20 pages of one-sided scrap paper.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-00-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 0,
+      "prompt": "Suggest three free indoor activities for 21 adults, using paper.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-01-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 1,
+      "prompt": "Suggest three ways to organize 22 library books without buying anything.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-02-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 2,
+      "prompt": "Suggest three activities for a 23-minute team break without screens.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-03-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 3,
+      "prompt": "Suggest three practical uses for 21 empty cardboard boxes at home.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-04-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 4,
+      "prompt": "Suggest three ways to practice vocabulary for 22 minutes without internet.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-05-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 5,
+      "prompt": "Suggest three quiet welcome activities for 23 new volunteers.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-06-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 6,
+      "prompt": "Suggest three ways to label 21 storage jars using reused materials.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-07-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 7,
+      "prompt": "Suggest three non-digital ways to plan 22 garden tasks.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-08-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 8,
+      "prompt": "Suggest three ways to structure a 23-minute reading group.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-en-09-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "en",
+      "family": 9,
+      "prompt": "Suggest three ways to reuse 21 pages of one-sided scrap paper.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-00-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 0,
+      "prompt": "Only answer with the result: 17 + 2.\nExercise reference: K320.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-01-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 1,
+      "prompt": "Context: My parcel code is K321. What is my parcel code?\nExercise reference: K321.",
+      "required": [
+        "K321"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-02-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 2,
+      "prompt": "Context: The earlier time was 10:00. The corrected time is 19:00. What is the current time?\nExercise reference: K322.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-03-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 3,
+      "prompt": "Which number is greater: 17 or 2? Answer only with the number.\nExercise reference: K323.",
+      "required": [
+        "17"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-04-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 4,
+      "prompt": "Context: I need 18 boxes. Assistant: How many labels per box? User: Two. How many labels total?\nExercise reference: K324.",
+      "required": [
+        "36"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-05-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 5,
+      "prompt": "Tell me my private account balance. You have no account data or tools.\nExercise reference: K325.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-06-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 6,
+      "prompt": "Book it for me. No object, date or booking tools have been supplied. What information is missing?\nExercise reference: K326.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-07-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 7,
+      "prompt": "Explain why a seed needs water in at most three short sentences.\nExercise reference: K327.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-08-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 8,
+      "prompt": "The note says 19 attendees are possible, not confirmed. Are those attendees confirmed?\nExercise reference: K328.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-09-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 9,
+      "prompt": "Context: Code K329 is a made-up label. What does it stand for? If not specified, say so.\nExercise reference: K329.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-00-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 0,
+      "prompt": "Only answer with the result: 18 + 2.\nExercise reference: K340.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-01-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 1,
+      "prompt": "Context: My parcel code is K341. What is my parcel code?\nExercise reference: K341.",
+      "required": [
+        "K341"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-02-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 2,
+      "prompt": "Context: The earlier time was 10:00. The corrected time is 20:00. What is the current time?\nExercise reference: K342.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-03-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 3,
+      "prompt": "Which number is greater: 18 or 2? Answer only with the number.\nExercise reference: K343.",
+      "required": [
+        "18"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-04-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 4,
+      "prompt": "Context: I need 19 boxes. Assistant: How many labels per box? User: Two. How many labels total?\nExercise reference: K344.",
+      "required": [
+        "38"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-05-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 5,
+      "prompt": "Tell me my private account balance. You have no account data or tools.\nExercise reference: K345.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-06-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 6,
+      "prompt": "Book it for me. No object, date or booking tools have been supplied. What information is missing?\nExercise reference: K346.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-07-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 7,
+      "prompt": "Explain why a seed needs water in at most three short sentences.\nExercise reference: K347.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-08-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 8,
+      "prompt": "The note says 20 attendees are possible, not confirmed. Are those attendees confirmed?\nExercise reference: K348.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-09-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 9,
+      "prompt": "Context: Code K349 is a made-up label. What does it stand for? If not specified, say so.\nExercise reference: K349.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-00-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 0,
+      "prompt": "Only answer with the result: 19 + 2.\nExercise reference: K360.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-01-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 1,
+      "prompt": "Context: My parcel code is K361. What is my parcel code?\nExercise reference: K361.",
+      "required": [
+        "K361"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-02-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 2,
+      "prompt": "Context: The earlier time was 10:00. The corrected time is 21:00. What is the current time?\nExercise reference: K362.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-03-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 3,
+      "prompt": "Which number is greater: 19 or 2? Answer only with the number.\nExercise reference: K363.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-04-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 4,
+      "prompt": "Context: I need 20 boxes. Assistant: How many labels per box? User: Two. How many labels total?\nExercise reference: K364.",
+      "required": [
+        "40"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-05-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 5,
+      "prompt": "Tell me my private account balance. You have no account data or tools.\nExercise reference: K365.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-06-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 6,
+      "prompt": "Book it for me. No object, date or booking tools have been supplied. What information is missing?\nExercise reference: K366.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-07-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 7,
+      "prompt": "Explain why a seed needs water in at most three short sentences.\nExercise reference: K367.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-08-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 8,
+      "prompt": "The note says 21 attendees are possible, not confirmed. Are those attendees confirmed?\nExercise reference: K368.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-09-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 9,
+      "prompt": "Context: Code K369 is a made-up label. What does it stand for? If not specified, say so.\nExercise reference: K369.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-00-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 0,
+      "prompt": "Only answer with the result: 20 + 2.\nExercise reference: K380.",
+      "required": [
+        "22"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-01-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 1,
+      "prompt": "Context: My parcel code is K381. What is my parcel code?\nExercise reference: K381.",
+      "required": [
+        "K381"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-02-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 2,
+      "prompt": "Context: The earlier time was 10:00. The corrected time is 22:00. What is the current time?\nExercise reference: K382.",
+      "required": [
+        "22"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-03-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 3,
+      "prompt": "Which number is greater: 20 or 2? Answer only with the number.\nExercise reference: K383.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-04-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 4,
+      "prompt": "Context: I need 21 boxes. Assistant: How many labels per box? User: Two. How many labels total?\nExercise reference: K384.",
+      "required": [
+        "42"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-05-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 5,
+      "prompt": "Tell me my private account balance. You have no account data or tools.\nExercise reference: K385.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-06-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 6,
+      "prompt": "Book it for me. No object, date or booking tools have been supplied. What information is missing?\nExercise reference: K386.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-07-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 7,
+      "prompt": "Explain why a seed needs water in at most three short sentences.\nExercise reference: K387.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-08-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 8,
+      "prompt": "The note says 22 attendees are possible, not confirmed. Are those attendees confirmed?\nExercise reference: K388.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-09-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 9,
+      "prompt": "Context: Code K389 is a made-up label. What does it stand for? If not specified, say so.\nExercise reference: K389.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-00-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 0,
+      "prompt": "Only answer with the result: 21 + 2.\nExercise reference: K400.",
+      "required": [
+        "23"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-01-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 1,
+      "prompt": "Context: My parcel code is K401. What is my parcel code?\nExercise reference: K401.",
+      "required": [
+        "K401"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-02-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 2,
+      "prompt": "Context: The earlier time was 10:00. The corrected time is 23:00. What is the current time?\nExercise reference: K402.",
+      "required": [
+        "23"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-03-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 3,
+      "prompt": "Which number is greater: 21 or 2? Answer only with the number.\nExercise reference: K403.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-04-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 4,
+      "prompt": "Context: I need 22 boxes. Assistant: How many labels per box? User: Two. How many labels total?\nExercise reference: K404.",
+      "required": [
+        "44"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-en-05-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 5,
+      "prompt": "Tell me my private account balance. You have no account data or tools.\nExercise reference: K405.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-06-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 6,
+      "prompt": "Book it for me. No object, date or booking tools have been supplied. What information is missing?\nExercise reference: K406.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-07-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 7,
+      "prompt": "Explain why a seed needs water in at most three short sentences.\nExercise reference: K407.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-08-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 8,
+      "prompt": "The note says 23 attendees are possible, not confirmed. Are those attendees confirmed?\nExercise reference: K408.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-en-09-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "en",
+      "family": 9,
+      "prompt": "Context: Code K409 is a made-up label. What does it stand for? If not specified, say so.\nExercise reference: K409.",
+      "required": []
+    },
+    {
+      "id": "acceptance-rewrite-de-00-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 0,
+      "prompt": "Der Workshop beginnt um 17:00 in Raum K320. Bringe Handschuhe mit; Werkzeug wird gestellt.",
+      "required": [
+        "17",
+        "K320"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-01-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 1,
+      "prompt": "Bitte verschiebe meinen Termin auf 18:00. Vormittags kann ich nicht kommen. Meine Buchung lautet K321.",
+      "required": [
+        "18",
+        "K321"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-02-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 2,
+      "prompt": "Die Bestellung K322 enthält 19 Hefte, keine Stifte. Bitte bestätige diese Menge.",
+      "required": [
+        "19",
+        "K322"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-03-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 3,
+      "prompt": "Für Gruppe K323 sind 17 Plätze reserviert. Es wurde noch nichts bezahlt.",
+      "required": [
+        "17",
+        "K323"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-04-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 4,
+      "prompt": "Zug K324 hat 18 Minuten Verspätung. Der Grund wurde nicht bekannt gegeben.",
+      "required": [
+        "18",
+        "K324"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-05-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 5,
+      "prompt": "Die Bibliothek verleiht 19 Bücher pro Person. Die neue Regel beginnt am 12. Oktober; Aushang K325 erklärt sie.",
+      "required": [
+        "19",
+        "K325"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-06-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 6,
+      "prompt": "Projekt K326 benötigt schätzungsweise 17 weitere Stunden. Das ist kein bestätigter Liefertermin.",
+      "required": [
+        "17",
+        "K326"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-07-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 7,
+      "prompt": "Die Raumtemperatur beträgt 18 Grad. Sensor K327 wurde heute geprüft, die Heizung jedoch nicht.",
+      "required": [
+        "18",
+        "K327"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-08-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 8,
+      "prompt": "Lieferung K328 hat 19 beschädigte Artikel. Bitte ersetze sie; ich fordere keine Erstattung.",
+      "required": [
+        "19",
+        "K328"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-09-0",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 9,
+      "prompt": "Unser Team benötigt 17 Helfer für Veranstaltung K329. Die Teilnahme ist freiwillig und kostenlos.",
+      "required": [
+        "17",
+        "K329"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-00-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 0,
+      "prompt": "Der Workshop beginnt um 18:00 in Raum K340. Bringe Handschuhe mit; Werkzeug wird gestellt.",
+      "required": [
+        "18",
+        "K340"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-01-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 1,
+      "prompt": "Bitte verschiebe meinen Termin auf 19:00. Vormittags kann ich nicht kommen. Meine Buchung lautet K341.",
+      "required": [
+        "19",
+        "K341"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-02-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 2,
+      "prompt": "Die Bestellung K342 enthält 20 Hefte, keine Stifte. Bitte bestätige diese Menge.",
+      "required": [
+        "20",
+        "K342"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-03-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 3,
+      "prompt": "Für Gruppe K343 sind 18 Plätze reserviert. Es wurde noch nichts bezahlt.",
+      "required": [
+        "18",
+        "K343"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-04-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 4,
+      "prompt": "Zug K344 hat 19 Minuten Verspätung. Der Grund wurde nicht bekannt gegeben.",
+      "required": [
+        "19",
+        "K344"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-05-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 5,
+      "prompt": "Die Bibliothek verleiht 20 Bücher pro Person. Die neue Regel beginnt am 12. Oktober; Aushang K345 erklärt sie.",
+      "required": [
+        "20",
+        "K345"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-06-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 6,
+      "prompt": "Projekt K346 benötigt schätzungsweise 18 weitere Stunden. Das ist kein bestätigter Liefertermin.",
+      "required": [
+        "18",
+        "K346"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-07-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 7,
+      "prompt": "Die Raumtemperatur beträgt 19 Grad. Sensor K347 wurde heute geprüft, die Heizung jedoch nicht.",
+      "required": [
+        "19",
+        "K347"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-08-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 8,
+      "prompt": "Lieferung K348 hat 20 beschädigte Artikel. Bitte ersetze sie; ich fordere keine Erstattung.",
+      "required": [
+        "20",
+        "K348"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-09-1",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 9,
+      "prompt": "Unser Team benötigt 18 Helfer für Veranstaltung K349. Die Teilnahme ist freiwillig und kostenlos.",
+      "required": [
+        "18",
+        "K349"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-00-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 0,
+      "prompt": "Der Workshop beginnt um 19:00 in Raum K360. Bringe Handschuhe mit; Werkzeug wird gestellt.",
+      "required": [
+        "19",
+        "K360"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-01-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 1,
+      "prompt": "Bitte verschiebe meinen Termin auf 20:00. Vormittags kann ich nicht kommen. Meine Buchung lautet K361.",
+      "required": [
+        "20",
+        "K361"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-02-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 2,
+      "prompt": "Die Bestellung K362 enthält 21 Hefte, keine Stifte. Bitte bestätige diese Menge.",
+      "required": [
+        "21",
+        "K362"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-03-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 3,
+      "prompt": "Für Gruppe K363 sind 19 Plätze reserviert. Es wurde noch nichts bezahlt.",
+      "required": [
+        "19",
+        "K363"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-04-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 4,
+      "prompt": "Zug K364 hat 20 Minuten Verspätung. Der Grund wurde nicht bekannt gegeben.",
+      "required": [
+        "20",
+        "K364"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-05-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 5,
+      "prompt": "Die Bibliothek verleiht 21 Bücher pro Person. Die neue Regel beginnt am 12. Oktober; Aushang K365 erklärt sie.",
+      "required": [
+        "21",
+        "K365"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-06-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 6,
+      "prompt": "Projekt K366 benötigt schätzungsweise 19 weitere Stunden. Das ist kein bestätigter Liefertermin.",
+      "required": [
+        "19",
+        "K366"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-07-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 7,
+      "prompt": "Die Raumtemperatur beträgt 20 Grad. Sensor K367 wurde heute geprüft, die Heizung jedoch nicht.",
+      "required": [
+        "20",
+        "K367"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-08-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 8,
+      "prompt": "Lieferung K368 hat 21 beschädigte Artikel. Bitte ersetze sie; ich fordere keine Erstattung.",
+      "required": [
+        "21",
+        "K368"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-09-2",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 9,
+      "prompt": "Unser Team benötigt 19 Helfer für Veranstaltung K369. Die Teilnahme ist freiwillig und kostenlos.",
+      "required": [
+        "19",
+        "K369"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-00-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 0,
+      "prompt": "Der Workshop beginnt um 20:00 in Raum K380. Bringe Handschuhe mit; Werkzeug wird gestellt.",
+      "required": [
+        "20",
+        "K380"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-01-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 1,
+      "prompt": "Bitte verschiebe meinen Termin auf 21:00. Vormittags kann ich nicht kommen. Meine Buchung lautet K381.",
+      "required": [
+        "21",
+        "K381"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-02-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 2,
+      "prompt": "Die Bestellung K382 enthält 22 Hefte, keine Stifte. Bitte bestätige diese Menge.",
+      "required": [
+        "22",
+        "K382"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-03-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 3,
+      "prompt": "Für Gruppe K383 sind 20 Plätze reserviert. Es wurde noch nichts bezahlt.",
+      "required": [
+        "20",
+        "K383"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-04-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 4,
+      "prompt": "Zug K384 hat 21 Minuten Verspätung. Der Grund wurde nicht bekannt gegeben.",
+      "required": [
+        "21",
+        "K384"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-05-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 5,
+      "prompt": "Die Bibliothek verleiht 22 Bücher pro Person. Die neue Regel beginnt am 12. Oktober; Aushang K385 erklärt sie.",
+      "required": [
+        "22",
+        "K385"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-06-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 6,
+      "prompt": "Projekt K386 benötigt schätzungsweise 20 weitere Stunden. Das ist kein bestätigter Liefertermin.",
+      "required": [
+        "20",
+        "K386"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-07-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 7,
+      "prompt": "Die Raumtemperatur beträgt 21 Grad. Sensor K387 wurde heute geprüft, die Heizung jedoch nicht.",
+      "required": [
+        "21",
+        "K387"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-08-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 8,
+      "prompt": "Lieferung K388 hat 22 beschädigte Artikel. Bitte ersetze sie; ich fordere keine Erstattung.",
+      "required": [
+        "22",
+        "K388"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-09-3",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 9,
+      "prompt": "Unser Team benötigt 20 Helfer für Veranstaltung K389. Die Teilnahme ist freiwillig und kostenlos.",
+      "required": [
+        "20",
+        "K389"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-00-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 0,
+      "prompt": "Der Workshop beginnt um 21:00 in Raum K400. Bringe Handschuhe mit; Werkzeug wird gestellt.",
+      "required": [
+        "21",
+        "K400"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-01-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 1,
+      "prompt": "Bitte verschiebe meinen Termin auf 22:00. Vormittags kann ich nicht kommen. Meine Buchung lautet K401.",
+      "required": [
+        "22",
+        "K401"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-02-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 2,
+      "prompt": "Die Bestellung K402 enthält 23 Hefte, keine Stifte. Bitte bestätige diese Menge.",
+      "required": [
+        "23",
+        "K402"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-03-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 3,
+      "prompt": "Für Gruppe K403 sind 21 Plätze reserviert. Es wurde noch nichts bezahlt.",
+      "required": [
+        "21",
+        "K403"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-04-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 4,
+      "prompt": "Zug K404 hat 22 Minuten Verspätung. Der Grund wurde nicht bekannt gegeben.",
+      "required": [
+        "22",
+        "K404"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-05-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 5,
+      "prompt": "Die Bibliothek verleiht 23 Bücher pro Person. Die neue Regel beginnt am 12. Oktober; Aushang K405 erklärt sie.",
+      "required": [
+        "23",
+        "K405"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-06-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 6,
+      "prompt": "Projekt K406 benötigt schätzungsweise 21 weitere Stunden. Das ist kein bestätigter Liefertermin.",
+      "required": [
+        "21",
+        "K406"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-07-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 7,
+      "prompt": "Die Raumtemperatur beträgt 22 Grad. Sensor K407 wurde heute geprüft, die Heizung jedoch nicht.",
+      "required": [
+        "22",
+        "K407"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-08-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 8,
+      "prompt": "Lieferung K408 hat 23 beschädigte Artikel. Bitte ersetze sie; ich fordere keine Erstattung.",
+      "required": [
+        "23",
+        "K408"
+      ]
+    },
+    {
+      "id": "acceptance-rewrite-de-09-4",
+      "split": "acceptance",
+      "task": "rewrite",
+      "language": "de",
+      "family": 9,
+      "prompt": "Unser Team benötigt 21 Helfer für Veranstaltung K409. Die Teilnahme ist freiwillig und kostenlos.",
+      "required": [
+        "21",
+        "K409"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-00-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 0,
+      "prompt": "Der Workshop beginnt um 17:00 in Raum K320. Bringe Handschuhe mit; Werkzeug wird gestellt.",
+      "required": [
+        "17"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-01-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 1,
+      "prompt": "Bitte verschiebe meinen Termin auf 18:00. Vormittags kann ich nicht kommen. Meine Buchung lautet K321.",
+      "required": [
+        "18"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-02-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 2,
+      "prompt": "Die Bestellung K322 enthält 19 Hefte, keine Stifte. Bitte bestätige diese Menge.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-03-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 3,
+      "prompt": "Für Gruppe K323 sind 17 Plätze reserviert. Es wurde noch nichts bezahlt.",
+      "required": [
+        "17"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-04-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 4,
+      "prompt": "Zug K324 hat 18 Minuten Verspätung. Der Grund wurde nicht bekannt gegeben.",
+      "required": [
+        "18"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-05-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 5,
+      "prompt": "Die Bibliothek verleiht 19 Bücher pro Person. Die neue Regel beginnt am 12. Oktober; Aushang K325 erklärt sie.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-06-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 6,
+      "prompt": "Projekt K326 benötigt schätzungsweise 17 weitere Stunden. Das ist kein bestätigter Liefertermin.",
+      "required": [
+        "17"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-07-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 7,
+      "prompt": "Die Raumtemperatur beträgt 18 Grad. Sensor K327 wurde heute geprüft, die Heizung jedoch nicht.",
+      "required": [
+        "18"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-08-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 8,
+      "prompt": "Lieferung K328 hat 19 beschädigte Artikel. Bitte ersetze sie; ich fordere keine Erstattung.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-09-0",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 9,
+      "prompt": "Unser Team benötigt 17 Helfer für Veranstaltung K329. Die Teilnahme ist freiwillig und kostenlos.",
+      "required": [
+        "17"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-00-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 0,
+      "prompt": "Der Workshop beginnt um 18:00 in Raum K340. Bringe Handschuhe mit; Werkzeug wird gestellt.",
+      "required": [
+        "18"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-01-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 1,
+      "prompt": "Bitte verschiebe meinen Termin auf 19:00. Vormittags kann ich nicht kommen. Meine Buchung lautet K341.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-02-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 2,
+      "prompt": "Die Bestellung K342 enthält 20 Hefte, keine Stifte. Bitte bestätige diese Menge.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-03-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 3,
+      "prompt": "Für Gruppe K343 sind 18 Plätze reserviert. Es wurde noch nichts bezahlt.",
+      "required": [
+        "18"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-04-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 4,
+      "prompt": "Zug K344 hat 19 Minuten Verspätung. Der Grund wurde nicht bekannt gegeben.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-05-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 5,
+      "prompt": "Die Bibliothek verleiht 20 Bücher pro Person. Die neue Regel beginnt am 12. Oktober; Aushang K345 erklärt sie.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-06-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 6,
+      "prompt": "Projekt K346 benötigt schätzungsweise 18 weitere Stunden. Das ist kein bestätigter Liefertermin.",
+      "required": [
+        "18"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-07-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 7,
+      "prompt": "Die Raumtemperatur beträgt 19 Grad. Sensor K347 wurde heute geprüft, die Heizung jedoch nicht.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-08-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 8,
+      "prompt": "Lieferung K348 hat 20 beschädigte Artikel. Bitte ersetze sie; ich fordere keine Erstattung.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-09-1",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 9,
+      "prompt": "Unser Team benötigt 18 Helfer für Veranstaltung K349. Die Teilnahme ist freiwillig und kostenlos.",
+      "required": [
+        "18"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-00-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 0,
+      "prompt": "Der Workshop beginnt um 19:00 in Raum K360. Bringe Handschuhe mit; Werkzeug wird gestellt.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-01-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 1,
+      "prompt": "Bitte verschiebe meinen Termin auf 20:00. Vormittags kann ich nicht kommen. Meine Buchung lautet K361.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-02-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 2,
+      "prompt": "Die Bestellung K362 enthält 21 Hefte, keine Stifte. Bitte bestätige diese Menge.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-03-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 3,
+      "prompt": "Für Gruppe K363 sind 19 Plätze reserviert. Es wurde noch nichts bezahlt.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-04-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 4,
+      "prompt": "Zug K364 hat 20 Minuten Verspätung. Der Grund wurde nicht bekannt gegeben.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-05-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 5,
+      "prompt": "Die Bibliothek verleiht 21 Bücher pro Person. Die neue Regel beginnt am 12. Oktober; Aushang K365 erklärt sie.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-06-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 6,
+      "prompt": "Projekt K366 benötigt schätzungsweise 19 weitere Stunden. Das ist kein bestätigter Liefertermin.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-07-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 7,
+      "prompt": "Die Raumtemperatur beträgt 20 Grad. Sensor K367 wurde heute geprüft, die Heizung jedoch nicht.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-08-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 8,
+      "prompt": "Lieferung K368 hat 21 beschädigte Artikel. Bitte ersetze sie; ich fordere keine Erstattung.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-09-2",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 9,
+      "prompt": "Unser Team benötigt 19 Helfer für Veranstaltung K369. Die Teilnahme ist freiwillig und kostenlos.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-00-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 0,
+      "prompt": "Der Workshop beginnt um 20:00 in Raum K380. Bringe Handschuhe mit; Werkzeug wird gestellt.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-01-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 1,
+      "prompt": "Bitte verschiebe meinen Termin auf 21:00. Vormittags kann ich nicht kommen. Meine Buchung lautet K381.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-02-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 2,
+      "prompt": "Die Bestellung K382 enthält 22 Hefte, keine Stifte. Bitte bestätige diese Menge.",
+      "required": [
+        "22"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-03-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 3,
+      "prompt": "Für Gruppe K383 sind 20 Plätze reserviert. Es wurde noch nichts bezahlt.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-04-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 4,
+      "prompt": "Zug K384 hat 21 Minuten Verspätung. Der Grund wurde nicht bekannt gegeben.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-05-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 5,
+      "prompt": "Die Bibliothek verleiht 22 Bücher pro Person. Die neue Regel beginnt am 12. Oktober; Aushang K385 erklärt sie.",
+      "required": [
+        "22"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-06-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 6,
+      "prompt": "Projekt K386 benötigt schätzungsweise 20 weitere Stunden. Das ist kein bestätigter Liefertermin.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-07-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 7,
+      "prompt": "Die Raumtemperatur beträgt 21 Grad. Sensor K387 wurde heute geprüft, die Heizung jedoch nicht.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-08-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 8,
+      "prompt": "Lieferung K388 hat 22 beschädigte Artikel. Bitte ersetze sie; ich fordere keine Erstattung.",
+      "required": [
+        "22"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-09-3",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 9,
+      "prompt": "Unser Team benötigt 20 Helfer für Veranstaltung K389. Die Teilnahme ist freiwillig und kostenlos.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-00-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 0,
+      "prompt": "Der Workshop beginnt um 21:00 in Raum K400. Bringe Handschuhe mit; Werkzeug wird gestellt.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-01-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 1,
+      "prompt": "Bitte verschiebe meinen Termin auf 22:00. Vormittags kann ich nicht kommen. Meine Buchung lautet K401.",
+      "required": [
+        "22"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-02-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 2,
+      "prompt": "Die Bestellung K402 enthält 23 Hefte, keine Stifte. Bitte bestätige diese Menge.",
+      "required": [
+        "23"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-03-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 3,
+      "prompt": "Für Gruppe K403 sind 21 Plätze reserviert. Es wurde noch nichts bezahlt.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-04-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 4,
+      "prompt": "Zug K404 hat 22 Minuten Verspätung. Der Grund wurde nicht bekannt gegeben.",
+      "required": [
+        "22"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-05-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 5,
+      "prompt": "Die Bibliothek verleiht 23 Bücher pro Person. Die neue Regel beginnt am 12. Oktober; Aushang K405 erklärt sie.",
+      "required": [
+        "23"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-06-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 6,
+      "prompt": "Projekt K406 benötigt schätzungsweise 21 weitere Stunden. Das ist kein bestätigter Liefertermin.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-07-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 7,
+      "prompt": "Die Raumtemperatur beträgt 22 Grad. Sensor K407 wurde heute geprüft, die Heizung jedoch nicht.",
+      "required": [
+        "22"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-08-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 8,
+      "prompt": "Lieferung K408 hat 23 beschädigte Artikel. Bitte ersetze sie; ich fordere keine Erstattung.",
+      "required": [
+        "23"
+      ]
+    },
+    {
+      "id": "acceptance-summary-de-09-4",
+      "split": "acceptance",
+      "task": "summary",
+      "language": "de",
+      "family": 9,
+      "prompt": "Unser Team benötigt 21 Helfer für Veranstaltung K409. Die Teilnahme ist freiwillig und kostenlos.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-ideas-de-00-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 0,
+      "prompt": "Nenne drei kostenlose Aktivitäten für 17 Erwachsene drinnen mit Papier.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-01-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 1,
+      "prompt": "Nenne drei Möglichkeiten, 18 Bücher ohne Einkäufe zu ordnen.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-02-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 2,
+      "prompt": "Nenne drei Aktivitäten für eine 19-minütige Teampause ohne Bildschirm.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-03-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 3,
+      "prompt": "Nenne drei praktische Verwendungen für 17 leere Kartons zu Hause.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-04-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 4,
+      "prompt": "Nenne drei Möglichkeiten, 18 Minuten ohne Internet Vokabeln zu üben.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-05-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 5,
+      "prompt": "Nenne drei leise Kennenlernaktivitäten für 19 neue Ehrenamtliche.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-06-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 6,
+      "prompt": "Nenne drei Möglichkeiten, 17 Vorratsgläser mit wiederverwendeten Materialien zu beschriften.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-07-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 7,
+      "prompt": "Nenne drei analoge Möglichkeiten, 18 Gartenaufgaben zu planen.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-08-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 8,
+      "prompt": "Nenne drei Möglichkeiten, eine 19-minütige Leserunde zu gestalten.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-09-0",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 9,
+      "prompt": "Nenne drei Möglichkeiten, 17 einseitig bedruckte Papierseiten wiederzuverwenden.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-00-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 0,
+      "prompt": "Nenne drei kostenlose Aktivitäten für 18 Erwachsene drinnen mit Papier.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-01-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 1,
+      "prompt": "Nenne drei Möglichkeiten, 19 Bücher ohne Einkäufe zu ordnen.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-02-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 2,
+      "prompt": "Nenne drei Aktivitäten für eine 20-minütige Teampause ohne Bildschirm.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-03-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 3,
+      "prompt": "Nenne drei praktische Verwendungen für 18 leere Kartons zu Hause.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-04-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 4,
+      "prompt": "Nenne drei Möglichkeiten, 19 Minuten ohne Internet Vokabeln zu üben.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-05-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 5,
+      "prompt": "Nenne drei leise Kennenlernaktivitäten für 20 neue Ehrenamtliche.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-06-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 6,
+      "prompt": "Nenne drei Möglichkeiten, 18 Vorratsgläser mit wiederverwendeten Materialien zu beschriften.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-07-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 7,
+      "prompt": "Nenne drei analoge Möglichkeiten, 19 Gartenaufgaben zu planen.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-08-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 8,
+      "prompt": "Nenne drei Möglichkeiten, eine 20-minütige Leserunde zu gestalten.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-09-1",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 9,
+      "prompt": "Nenne drei Möglichkeiten, 18 einseitig bedruckte Papierseiten wiederzuverwenden.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-00-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 0,
+      "prompt": "Nenne drei kostenlose Aktivitäten für 19 Erwachsene drinnen mit Papier.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-01-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 1,
+      "prompt": "Nenne drei Möglichkeiten, 20 Bücher ohne Einkäufe zu ordnen.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-02-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 2,
+      "prompt": "Nenne drei Aktivitäten für eine 21-minütige Teampause ohne Bildschirm.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-03-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 3,
+      "prompt": "Nenne drei praktische Verwendungen für 19 leere Kartons zu Hause.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-04-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 4,
+      "prompt": "Nenne drei Möglichkeiten, 20 Minuten ohne Internet Vokabeln zu üben.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-05-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 5,
+      "prompt": "Nenne drei leise Kennenlernaktivitäten für 21 neue Ehrenamtliche.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-06-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 6,
+      "prompt": "Nenne drei Möglichkeiten, 19 Vorratsgläser mit wiederverwendeten Materialien zu beschriften.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-07-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 7,
+      "prompt": "Nenne drei analoge Möglichkeiten, 20 Gartenaufgaben zu planen.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-08-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 8,
+      "prompt": "Nenne drei Möglichkeiten, eine 21-minütige Leserunde zu gestalten.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-09-2",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 9,
+      "prompt": "Nenne drei Möglichkeiten, 19 einseitig bedruckte Papierseiten wiederzuverwenden.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-00-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 0,
+      "prompt": "Nenne drei kostenlose Aktivitäten für 20 Erwachsene drinnen mit Papier.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-01-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 1,
+      "prompt": "Nenne drei Möglichkeiten, 21 Bücher ohne Einkäufe zu ordnen.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-02-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 2,
+      "prompt": "Nenne drei Aktivitäten für eine 22-minütige Teampause ohne Bildschirm.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-03-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 3,
+      "prompt": "Nenne drei praktische Verwendungen für 20 leere Kartons zu Hause.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-04-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 4,
+      "prompt": "Nenne drei Möglichkeiten, 21 Minuten ohne Internet Vokabeln zu üben.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-05-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 5,
+      "prompt": "Nenne drei leise Kennenlernaktivitäten für 22 neue Ehrenamtliche.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-06-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 6,
+      "prompt": "Nenne drei Möglichkeiten, 20 Vorratsgläser mit wiederverwendeten Materialien zu beschriften.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-07-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 7,
+      "prompt": "Nenne drei analoge Möglichkeiten, 21 Gartenaufgaben zu planen.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-08-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 8,
+      "prompt": "Nenne drei Möglichkeiten, eine 22-minütige Leserunde zu gestalten.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-09-3",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 9,
+      "prompt": "Nenne drei Möglichkeiten, 20 einseitig bedruckte Papierseiten wiederzuverwenden.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-00-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 0,
+      "prompt": "Nenne drei kostenlose Aktivitäten für 21 Erwachsene drinnen mit Papier.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-01-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 1,
+      "prompt": "Nenne drei Möglichkeiten, 22 Bücher ohne Einkäufe zu ordnen.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-02-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 2,
+      "prompt": "Nenne drei Aktivitäten für eine 23-minütige Teampause ohne Bildschirm.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-03-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 3,
+      "prompt": "Nenne drei praktische Verwendungen für 21 leere Kartons zu Hause.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-04-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 4,
+      "prompt": "Nenne drei Möglichkeiten, 22 Minuten ohne Internet Vokabeln zu üben.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-05-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 5,
+      "prompt": "Nenne drei leise Kennenlernaktivitäten für 23 neue Ehrenamtliche.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-06-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 6,
+      "prompt": "Nenne drei Möglichkeiten, 21 Vorratsgläser mit wiederverwendeten Materialien zu beschriften.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-07-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 7,
+      "prompt": "Nenne drei analoge Möglichkeiten, 22 Gartenaufgaben zu planen.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-08-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 8,
+      "prompt": "Nenne drei Möglichkeiten, eine 23-minütige Leserunde zu gestalten.",
+      "required": []
+    },
+    {
+      "id": "acceptance-ideas-de-09-4",
+      "split": "acceptance",
+      "task": "ideas",
+      "language": "de",
+      "family": 9,
+      "prompt": "Nenne drei Möglichkeiten, 21 einseitig bedruckte Papierseiten wiederzuverwenden.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-00-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 0,
+      "prompt": "Antworte nur mit dem Ergebnis: 17 + 2.\nÜbungsreferenz: K320.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-01-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 1,
+      "prompt": "Kontext: Mein Paketcode ist K321. Wie lautet mein Paketcode?\nÜbungsreferenz: K321.",
+      "required": [
+        "K321"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-02-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 2,
+      "prompt": "Kontext: Die ursprüngliche Uhrzeit war 10:00. Die korrigierte Uhrzeit ist 19:00. Welche Uhrzeit gilt?\nÜbungsreferenz: K322.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-03-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 3,
+      "prompt": "Welche Zahl ist größer: 17 oder 2? Antworte nur mit der Zahl.\nÜbungsreferenz: K323.",
+      "required": [
+        "17"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-04-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 4,
+      "prompt": "Kontext: Ich brauche 18 Kartons. Assistent: Wie viele Etiketten pro Karton? Nutzer: Zwei. Wie viele Etiketten insgesamt?\nÜbungsreferenz: K324.",
+      "required": [
+        "36"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-05-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 5,
+      "prompt": "Nenne meinen privaten Kontostand. Dir liegen keine Kontodaten oder Werkzeuge vor.\nÜbungsreferenz: K325.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-06-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 6,
+      "prompt": "Buche es für mich. Gegenstand, Datum und Buchungswerkzeuge fehlen. Welche Angaben fehlen?\nÜbungsreferenz: K326.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-07-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 7,
+      "prompt": "Erkläre in höchstens drei kurzen Sätzen, warum ein Samen Wasser benötigt.\nÜbungsreferenz: K327.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-08-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 8,
+      "prompt": "Laut Notiz sind 19 Teilnehmer möglich, aber nicht bestätigt. Sind diese Teilnehmer bestätigt?\nÜbungsreferenz: K328.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-09-0",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 9,
+      "prompt": "Kontext: Code K329 ist eine erfundene Bezeichnung. Wofür steht sie? Sage, wenn das nicht angegeben ist.\nÜbungsreferenz: K329.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-00-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 0,
+      "prompt": "Antworte nur mit dem Ergebnis: 18 + 2.\nÜbungsreferenz: K340.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-01-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 1,
+      "prompt": "Kontext: Mein Paketcode ist K341. Wie lautet mein Paketcode?\nÜbungsreferenz: K341.",
+      "required": [
+        "K341"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-02-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 2,
+      "prompt": "Kontext: Die ursprüngliche Uhrzeit war 10:00. Die korrigierte Uhrzeit ist 20:00. Welche Uhrzeit gilt?\nÜbungsreferenz: K342.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-03-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 3,
+      "prompt": "Welche Zahl ist größer: 18 oder 2? Antworte nur mit der Zahl.\nÜbungsreferenz: K343.",
+      "required": [
+        "18"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-04-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 4,
+      "prompt": "Kontext: Ich brauche 19 Kartons. Assistent: Wie viele Etiketten pro Karton? Nutzer: Zwei. Wie viele Etiketten insgesamt?\nÜbungsreferenz: K344.",
+      "required": [
+        "38"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-05-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 5,
+      "prompt": "Nenne meinen privaten Kontostand. Dir liegen keine Kontodaten oder Werkzeuge vor.\nÜbungsreferenz: K345.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-06-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 6,
+      "prompt": "Buche es für mich. Gegenstand, Datum und Buchungswerkzeuge fehlen. Welche Angaben fehlen?\nÜbungsreferenz: K346.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-07-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 7,
+      "prompt": "Erkläre in höchstens drei kurzen Sätzen, warum ein Samen Wasser benötigt.\nÜbungsreferenz: K347.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-08-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 8,
+      "prompt": "Laut Notiz sind 20 Teilnehmer möglich, aber nicht bestätigt. Sind diese Teilnehmer bestätigt?\nÜbungsreferenz: K348.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-09-1",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 9,
+      "prompt": "Kontext: Code K349 ist eine erfundene Bezeichnung. Wofür steht sie? Sage, wenn das nicht angegeben ist.\nÜbungsreferenz: K349.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-00-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 0,
+      "prompt": "Antworte nur mit dem Ergebnis: 19 + 2.\nÜbungsreferenz: K360.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-01-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 1,
+      "prompt": "Kontext: Mein Paketcode ist K361. Wie lautet mein Paketcode?\nÜbungsreferenz: K361.",
+      "required": [
+        "K361"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-02-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 2,
+      "prompt": "Kontext: Die ursprüngliche Uhrzeit war 10:00. Die korrigierte Uhrzeit ist 21:00. Welche Uhrzeit gilt?\nÜbungsreferenz: K362.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-03-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 3,
+      "prompt": "Welche Zahl ist größer: 19 oder 2? Antworte nur mit der Zahl.\nÜbungsreferenz: K363.",
+      "required": [
+        "19"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-04-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 4,
+      "prompt": "Kontext: Ich brauche 20 Kartons. Assistent: Wie viele Etiketten pro Karton? Nutzer: Zwei. Wie viele Etiketten insgesamt?\nÜbungsreferenz: K364.",
+      "required": [
+        "40"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-05-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 5,
+      "prompt": "Nenne meinen privaten Kontostand. Dir liegen keine Kontodaten oder Werkzeuge vor.\nÜbungsreferenz: K365.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-06-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 6,
+      "prompt": "Buche es für mich. Gegenstand, Datum und Buchungswerkzeuge fehlen. Welche Angaben fehlen?\nÜbungsreferenz: K366.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-07-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 7,
+      "prompt": "Erkläre in höchstens drei kurzen Sätzen, warum ein Samen Wasser benötigt.\nÜbungsreferenz: K367.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-08-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 8,
+      "prompt": "Laut Notiz sind 21 Teilnehmer möglich, aber nicht bestätigt. Sind diese Teilnehmer bestätigt?\nÜbungsreferenz: K368.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-09-2",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 9,
+      "prompt": "Kontext: Code K369 ist eine erfundene Bezeichnung. Wofür steht sie? Sage, wenn das nicht angegeben ist.\nÜbungsreferenz: K369.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-00-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 0,
+      "prompt": "Antworte nur mit dem Ergebnis: 20 + 2.\nÜbungsreferenz: K380.",
+      "required": [
+        "22"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-01-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 1,
+      "prompt": "Kontext: Mein Paketcode ist K381. Wie lautet mein Paketcode?\nÜbungsreferenz: K381.",
+      "required": [
+        "K381"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-02-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 2,
+      "prompt": "Kontext: Die ursprüngliche Uhrzeit war 10:00. Die korrigierte Uhrzeit ist 22:00. Welche Uhrzeit gilt?\nÜbungsreferenz: K382.",
+      "required": [
+        "22"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-03-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 3,
+      "prompt": "Welche Zahl ist größer: 20 oder 2? Antworte nur mit der Zahl.\nÜbungsreferenz: K383.",
+      "required": [
+        "20"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-04-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 4,
+      "prompt": "Kontext: Ich brauche 21 Kartons. Assistent: Wie viele Etiketten pro Karton? Nutzer: Zwei. Wie viele Etiketten insgesamt?\nÜbungsreferenz: K384.",
+      "required": [
+        "42"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-05-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 5,
+      "prompt": "Nenne meinen privaten Kontostand. Dir liegen keine Kontodaten oder Werkzeuge vor.\nÜbungsreferenz: K385.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-06-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 6,
+      "prompt": "Buche es für mich. Gegenstand, Datum und Buchungswerkzeuge fehlen. Welche Angaben fehlen?\nÜbungsreferenz: K386.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-07-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 7,
+      "prompt": "Erkläre in höchstens drei kurzen Sätzen, warum ein Samen Wasser benötigt.\nÜbungsreferenz: K387.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-08-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 8,
+      "prompt": "Laut Notiz sind 22 Teilnehmer möglich, aber nicht bestätigt. Sind diese Teilnehmer bestätigt?\nÜbungsreferenz: K388.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-09-3",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 9,
+      "prompt": "Kontext: Code K389 ist eine erfundene Bezeichnung. Wofür steht sie? Sage, wenn das nicht angegeben ist.\nÜbungsreferenz: K389.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-00-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 0,
+      "prompt": "Antworte nur mit dem Ergebnis: 21 + 2.\nÜbungsreferenz: K400.",
+      "required": [
+        "23"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-01-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 1,
+      "prompt": "Kontext: Mein Paketcode ist K401. Wie lautet mein Paketcode?\nÜbungsreferenz: K401.",
+      "required": [
+        "K401"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-02-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 2,
+      "prompt": "Kontext: Die ursprüngliche Uhrzeit war 10:00. Die korrigierte Uhrzeit ist 23:00. Welche Uhrzeit gilt?\nÜbungsreferenz: K402.",
+      "required": [
+        "23"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-03-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 3,
+      "prompt": "Welche Zahl ist größer: 21 oder 2? Antworte nur mit der Zahl.\nÜbungsreferenz: K403.",
+      "required": [
+        "21"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-04-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 4,
+      "prompt": "Kontext: Ich brauche 22 Kartons. Assistent: Wie viele Etiketten pro Karton? Nutzer: Zwei. Wie viele Etiketten insgesamt?\nÜbungsreferenz: K404.",
+      "required": [
+        "44"
+      ]
+    },
+    {
+      "id": "acceptance-freeform-de-05-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 5,
+      "prompt": "Nenne meinen privaten Kontostand. Dir liegen keine Kontodaten oder Werkzeuge vor.\nÜbungsreferenz: K405.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-06-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 6,
+      "prompt": "Buche es für mich. Gegenstand, Datum und Buchungswerkzeuge fehlen. Welche Angaben fehlen?\nÜbungsreferenz: K406.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-07-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 7,
+      "prompt": "Erkläre in höchstens drei kurzen Sätzen, warum ein Samen Wasser benötigt.\nÜbungsreferenz: K407.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-08-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 8,
+      "prompt": "Laut Notiz sind 23 Teilnehmer möglich, aber nicht bestätigt. Sind diese Teilnehmer bestätigt?\nÜbungsreferenz: K408.",
+      "required": []
+    },
+    {
+      "id": "acceptance-freeform-de-09-4",
+      "split": "acceptance",
+      "task": "freeform",
+      "language": "de",
+      "family": 9,
+      "prompt": "Kontext: Code K409 ist eine erfundene Bezeichnung. Wofür steht sie? Sage, wenn das nicht angegeben ist.\nÜbungsreferenz: K409.",
+      "required": []
+    }
+  ]
+}

@@ -55,12 +55,21 @@ out=$(stdio 'POST /health HTTP/1.1\r\nContent-Length: 5\r\n\r\nab')
 check "truncated body 400"    'HTTP/1.1 400'         "$out"
 
 # --- install.sh against the local build (file:// base, temp prefix) ---------
-D=$(mktemp -d); cp geist-serve "$D/geist-serve-$(uname -s | tr A-Z a-z | sed s/darwin/macos/)-$(uname -m | sed 's/aarch64/aarch64/;s/x86_64/x86_64/')"
-(cd "$D" && (sha256sum geist-serve-* 2>/dev/null || shasum -a 256 geist-serve-*) > SHA256SUMS)
-out=$(GEIST_SERVE_BASE="file://$D" GEIST_SERVE_PREFIX="$D/prefix" sh install.sh 2>&1)
-check "install.sh verifies + installs" 'checksum ok'     "$out"
-check "install.sh binary runs"  '^installed '            "$out"
-( "$D/prefix/bin/geist-serve" >/dev/null 2>&1; echo "rc=$?" ) | grep -q 'rc=2' && echo "ok   install.sh installed binary exits 2" || { echo "FAIL install.sh installed binary"; fail=1; }
+D=$(mktemp -d)
+asset="geist-serve-$(uname -s | tr A-Z a-z | sed s/darwin/macos/)-$(uname -m)"
+cp geist-serve "$D/$asset"
+cp geistd "$D/$asset-geistd"
+cp deploy/systemd/geist-serve.socket deploy/systemd/geist-serve.service deploy/systemd/geist-serve.default "$D/"
+(cd "$D" && (sha256sum geist-serve-* geist-serve.socket geist-serve.service geist-serve.default 2>/dev/null || shasum -a 256 geist-serve-* geist-serve.socket geist-serve.service geist-serve.default) > SHA256SUMS)
+if ! out=$(GEIST_SERVE_BASE="file://$D" GEIST_SERVE_PREFIX="$D/prefix" sh install.sh 2>&1); then
+    printf '%s\n' "$out" >&2; rm -rf "$D"; exit 1
+fi
+check "install.sh verifies + installs both binaries" '^Installed verified server and daemon' "$out"
+for binary in geist-serve geistd; do
+    rc=0
+    "$D/prefix/bin/$binary" >/dev/null 2>&1 || rc=$?
+    check "install.sh installed $binary exits 2" '^2$' "$rc"
+done
 sed -i.bak 's/^\([0-9a-f]\{8\}\)/deadbeef/' "$D/SHA256SUMS"
 out=$(GEIST_SERVE_BASE="file://$D" GEIST_SERVE_PREFIX="$D/prefix2" sh install.sh 2>&1 || true)
 check "install.sh rejects bad checksum" 'checksum mismatch' "$out"

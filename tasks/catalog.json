@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "tasks": [
+    {"id":"rewrite","version":"1.0.0","title":"Rewrite a message","description":"Turn a rough message into a clear, friendly draft.","instruction":"Rewrite the following message clearly and politely. Keep its meaning. Return only the rewritten message.","example":"I cannot attend our meeting tomorrow. Could we move it to Friday morning?","input_limit":6000,"output_limit":160,"quality":"unverified","evidence":[],"url":""},
+    {"id":"summary","version":"1.0.0","title":"Summarize a note","description":"Extract the main point from a short note.","instruction":"Summarize the following note in one sentence. Use only facts in the note. Return only the summary.","example":"The garden workshop takes place on Saturday at 10 am. Bring gloves and a small container. Seeds and tools will be provided. The event ends at noon.","input_limit":6000,"output_limit":96,"quality":"unverified","evidence":[],"url":""},
+    {"id":"ideas","version":"1.0.0","title":"Explore an idea","description":"Get a short starting point to develop yourself.","instruction":"Suggest three practical ideas for the following request. Use one short sentence for each.","example":"Useful things to do with a Raspberry Pi at home.","input_limit":3000,"output_limit":160,"quality":"unverified","evidence":[],"url":""},
+    {"id":"freeform","version":"1.0.0","title":"Try your own request","description":"An open experiment with the model you choose.","instruction":"","example":"Explain how a seed grows into a plant in three sentences.","input_limit":12000,"output_limit":256,"quality":"unverified","evidence":[],"url":""},
+    {"id":"home-assistant","version":"1.0.0","title":"Control Home Assistant","description":"Use the existing Home Assistant integration. Device permissions and execution stay in Home Assistant. Product validation is still in progress.","instruction":"","example":"","input_limit":0,"output_limit":0,"quality":"unverified","evidence":["https://github.com/geisten/geist-home-assistant/issues/15","https://github.com/geisten/geist-home-assistant/issues/16"],"url":"https://github.com/geisten/geist-home-assistant"}
+  ]
+}

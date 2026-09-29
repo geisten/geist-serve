@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Geist</title><link rel="stylesheet" href="/app.css">
+<script src="/i18n.js" defer></script><script src="/marked.js" defer></script><script src="/katex.js" defer></script><script src="/markdown.js" defer></script><script src="/app.js" defer></script>
+</head>
+<body class="manager-page">
+<a class="skip" href="#main">Skip to content</a>
+<header><a class="brand" href="#" aria-label="Geist home">geist</a>
+<nav aria-label="Navigation">
+<button data-page="models-page" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 1v4m6-4v4M9 19v4m6-4v4M1 9h4m-4 6h4m14-6h4m-4 6h4"/></svg><span>Models</span></button>
+<button id="open-tools" data-page="connect-page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 13 4-4m-7 6-1 1a4 4 0 0 0 6 6l4-4m1-9 1-1a4 4 0 0 0-6-6L8 6"/></svg><span>Connect</span></button>
+<button id="open-preferences" data-page="settings-page" type="button" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3-1 3-3 1 1 3-2 2 2 2-1 3 3 1 1 3h6l1-3 3-1-1-3 2-2-2-2 1-3-3-1-1-3z"/><circle cx="12" cy="12" r="3"/></svg><span>Settings</span></button>
+</nav></header>
+<main id="main">
+<section id="models-page" class="page model-home" aria-labelledby="models-title">
+  <h1 id="models-title" class="sr-only">Models &amp; quick test</h1>
+  <aside class="model-sidebar" aria-label="Model manager" tabindex="0">
+  <div class="model-overview">
+    <section id="model-chooser" aria-labelledby="available-title"><h2 id="available-title" class="sr-only">Available models</h2><div id="models" aria-label="Available models"></div></section>
+  </div>
+
+</aside>
+
+<section id="test-page" aria-labelledby="task-title">
+  <div id="test-unavailable"><h2 id="model-prompt">Choose a model to begin.</h2></div>
+  <div id="workspace" hidden>
+    <div class="chat-heading"><div><h2 id="task-title" class="sr-only">Quick test</h2><h2 id="runtime-model" class="runtime-model"><span id="runtime-state" class="status-light" role="img" aria-label="Model ready" title="Model ready"></span><span id="runtime-name"></span></h2></div></div>
+    <div class="execution-row">
+      <fieldset id="execution-choice" class="execution-choice" aria-describedby="execution-description"><legend class="sr-only">Execution</legend>
+        <label><input type="radio" name="execution" value="auto"><span>Auto</span></label>
+        <label><input type="radio" name="execution" value="cpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option" id="history-cpu"><span>CPU</span><small id="history-cpu-rate">— tok/s</small></span><small class="recommended-mark" aria-hidden="true" hidden></small></label>
+        <label><input type="radio" name="execution" value="gpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option" id="history-gpu"><span>GPU</span><small class="processor-backend" hidden></small><small id="history-gpu-rate">— tok/s</small></span><small class="recommended-mark" aria-hidden="true" hidden></small></label>
+      </fieldset>
+      <span id="execution-current" class="sr-only" role="status" aria-live="polite"></span>
+      <span id="execution-description" class="sr-only"></span>
+    </div>
+    <p id="profile-error" class="hint" role="status" hidden></p>
+    <p id="execution-notice" class="hint" role="status" hidden></p>
+    <p id="execution-performance" class="execution-warning" role="status" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 21h20L12 3zM12 9v5m0 3v.01"/></svg><span id="execution-performance-text"></span></p>
+    <details id="performance" class="model-performance">
+    <summary class="model-metrics" aria-label="Model performance details" aria-describedby="test-speed test-memory test-size" title="Model performance details">
+      <span id="test-speed"><span>First text</span> <span id="profile-first">—</span></span>
+      <span title="Model process RAM" aria-label="Model process RAM"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 10v4m5-4v4m5-4v4M6 3v4m6-4v4m6-4v4M6 17v4m6-4v4m6-4v4"/></svg><span id="test-memory">— RAM</span><small>now</small></span>
+      <span title="Download size" aria-label="Download size"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 15h18M16 18h1"/></svg><span id="test-size">—</span></span>
+      <span class="profile-label">Profile</span><svg class="metrics-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </summary>
+        <div class="performance-content" tabindex="0" role="region" aria-label="Model performance details">
+          <p id="profile-group" class="hint"></p>
+          <table class="profile-table"><caption id="processor-history-title">Local performance profile</caption><thead><tr><th scope="col">Measurement</th><th scope="col">CPU<small id="profile-cpu-confidence"></small></th><th scope="col">GPU<small id="profile-gpu-confidence"></small></th></tr></thead><tbody><tr><th scope="row">Typical speed</th><td id="history-cpu-typical">—</td><td id="history-gpu-typical">—</td></tr>
+<tr><th scope="row">Usual range</th><td id="history-cpu-range">—</td><td id="history-gpu-range">—</td></tr>
+<tr><th scope="row">First text</th><td id="history-cpu-first">—</td><td id="history-gpu-first">—</td></tr>
+<tr><th scope="row">Total time</th><td id="history-cpu-total">—</td><td id="history-gpu-total">—</td></tr>
+<tr><th scope="row">Output tokens</th><td id="history-cpu-tokens">—</td><td id="history-gpu-tokens">—</td></tr>
+<tr><th scope="row">Model RAM · after reply</th><td id="history-cpu-ram">—</td><td id="history-gpu-ram">—</td></tr>
+<tr><th scope="row">Sampled peak · 2 s</th><td id="history-cpu-peak">—</td><td id="history-gpu-peak">—</td></tr>
+<tr><th scope="row">Observations</th><td id="history-cpu-count">—</td><td id="history-gpu-count">—</td></tr>
+<tr><th scope="row">Measured</th><td id="history-cpu-time">—</td><td id="history-gpu-time">—</td></tr>
+</tbody></table>
+          <p class="hint" id="profile-confidence"></p>
+          <details class="profile-info"><summary>About these measurements</summary><p>Median of up to 30 comparable replies. Range: middle 50%. Different prompts are observations, not a controlled speed comparison. First text includes hidden preparation. RAM is process RSS; sampled peaks can miss brief spikes. GPU memory and power are not measured.</p>
+          <p id="performance-system" class="system-name"></p><p id="performance-os" class="hint"></p>
+          <dl class="performance-grid"><div><dt>Model CPU · now</dt><dd id="performance-cpu">—</dd></div><div><dt>System RAM</dt><dd id="performance-ram">—</dd></div><div><dt>Available RAM</dt><dd id="performance-available">—</dd></div></dl></details>
+          <details class="profile-info"><summary>Recent observations</summary><ol id="profile-recent"></ol></details>
+          <div class="profile-actions"><button id="benchmark" class="text-button" type="button" disabled>Measure comparison</button><button id="comparison-stop" type="button" hidden>Cancel comparison</button></div><p id="comparison-status" class="hint" role="status"></p>
+        </div>
+    </details>
+    <div id="transcript" tabindex="0" role="region" aria-label="Conversation">
+      <div id="chat-empty"><h3>Test a message.</h3></div>
+      <div id="result" hidden></div>
+    </div>
+    <div class="composer-area">
+      <button id="latest" class="text-button" type="button" hidden>↓ Latest message</button>
+      <form id="task-form"><label class="sr-only" for="prompt">Your input</label>
+        <textarea id="prompt" rows="1" placeholder="Message Geist…" aria-describedby="composer-hint"></textarea>
+        <div class="actions"><details id="chat-help"><summary aria-label="What can I ask?" title="What can I ask?"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.01"/></svg></summary><div class="help-content"><p>Just describe what you need. No mode to choose.</p><ul><li>Rewrite this email in a friendlier tone: …</li><li>Summarize this text in three points: …</li><li>Suggest three ideas for …</li></ul><p>Answers support Markdown. Copy keeps the original formatting. Web addresses can be copied; external images are not loaded.</p><p>This conversation stays in this window. Clear chat, reloading or quitting clears it. Check answers before using them.</p></div></details><button id="new-chat" class="text-button" type="button" aria-label="Clear chat" title="Clear chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button><span class="spacer"></span><button id="stop" class="icon-button" type="button" aria-label="Stop response" title="Stop response" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button><button id="run" class="primary icon-button" type="submit" disabled aria-label="Send message" title="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button></div>
+      </form>
+      <p id="composer-hint" class="hint">↵ Send · ⇧↵ New line</p>
+
+    </div>
+    <p id="chat-announcement" class="sr-only" role="status" aria-live="polite"></p>
+  </div>
+</section>
+</section>
+<p id="notice" role="status" aria-live="polite"></p>
+  <section id="connect-page" class="page connections" aria-labelledby="connections-title" hidden>
+    <h2 id="connections-title">Connect your program.</h2><p>Your editor and this window use the same model. Closing the window keeps the service running.</p>
+    <dl><dt>Local endpoint</dt><dd id="connection-endpoint" class="connection-value"></dd><dt>Model</dt><dd id="connection-model" class="connection-value"></dd></dl>
+    <label for="connection-client">Use with</label><select id="connection-client"><option value="terminal">Terminal</option><option value="continue">VS Code · Continue</option><option value="opencode">OpenCode · text chat</option></select>
+    <p id="connection-help" class="hint"></p><div class="actions"><button id="copy-connection" type="button" disabled>Copy configuration</button><button id="test-connection" type="button" disabled>Test local connection</button></div><p id="connection-result" role="status" aria-live="polite"></p>
+    <p class="hint">Text chat is available after loading a model. Agent tools are not supported. Context: 4096 tokens. Copied configurations contain your private local key: keep them out of repositories.</p>
+    <details class="settings"><summary>Home Assistant</summary><p class="hint">Use the existing Home Assistant integration. Device permissions and execution stay in Home Assistant. Product validation is still in progress.</p><a href="https://github.com/geisten/geist-home-assistant" target="_blank" rel="noreferrer">Open Home Assistant integration ↗</a></details>
+  </section>
+
+  <section id="settings-page" class="page preferences-page" aria-labelledby="settings-title" hidden>
+    <h2 id="settings-title">Settings</h2>
+    <div class="settings-row"><label for="ui-language">Interface language</label><select id="ui-language"><option value="system">System language</option><option value="en" lang="en">English</option><option value="de" lang="de">Deutsch</option></select></div>
+    <div class="settings-row"><label for="language-choice">Answer language</label><select id="language-choice"><option value="en" lang="en">English</option><option value="de" lang="de">Deutsch</option></select></div>
+    <section class="preference-group" aria-labelledby="catalog-title"><div class="catalog-heading"><h3 id="catalog-title">Model catalog</h3><span id="catalog-revision" class="hint"></span></div>
+      <label for="catalog-file" class="sr-only">Model catalog JSON file</label><input id="catalog-file" type="file" accept=".json,application/json">
+      <p class="hint">Import a newer JSON file from a source you trust. No automatic online updates.</p>
+      <p id="catalog-result" class="hint" role="status"></p>
+    </section>
+    <section class="preference-group" aria-labelledby="history-title"><h3 id="history-title">Local measurements</h3>
+      <div class="settings-row"><label for="history-enabled">Collect numeric performance</label><input type="checkbox" id="history-enabled"></div>
+      <div class="settings-row"><label for="history-days">Keep history</label><select id="history-days"><option value="30">30 days</option><option value="90">90 days</option><option value="365">365 days</option></select></div>
+      <p class="hint">No prompts or replies. Stored only on this computer.</p><p id="history-storage" class="hint"></p>
+      <div class="actions"><button id="history-export" type="button">Export JSONL</button><button id="history-clear" type="button">Delete history</button></div><p id="history-result" class="hint" role="status"></p>
+    </section>
+    <section class="preference-group" aria-labelledby="storage-title"><h3 id="storage-title">Storage</h3><p id="disk-space" class="hint"></p></section>
+  </section>
+<footer>Models stay on this computer. Prompts and results are not saved as chat history.</footer>
+</main></body></html>

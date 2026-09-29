@@ -132,8 +132,11 @@ static int read_frame(struct conn *c, char **hdr, unsigned char **body, size_t *
         return -1;
     *hdr  = malloc(hl + 1);
     *body = bl ? malloc(bl) : nullptr;
-    if (*hdr == nullptr || (bl && *body == nullptr))
+    if (*hdr == nullptr || (bl && *body == nullptr)) {
+        free(*hdr);
+        free(*body);
         return -1;
+    }
     if (!read_all(c, hl, (unsigned char *) *hdr) || (bl && !read_all(c, bl, *body))) {
         free(*hdr);
         free(*body);
@@ -308,12 +311,13 @@ static bool op_info(struct daemon *d, struct conn *c) {
         live += d->sess[i].live;
     sb_printf(&h,
               "],\"ctx\":%d,\"vocab\":%zu,\"add_bos\":%s,\"bos\":%d,\"template\":\"%s\","
-              "\"sessions\":%d,\"max_sessions\":%d}",
+              "\"agent_api\":1,\"backend\":\"%s\",\"sessions\":%d,\"max_sessions\":%d}",
               CTX_CAP,
               d->vocab,
               d->add_bos ? "true" : "false",
               geist_model_bos_token(d->m),
               chat_family_name(d->family),
+              geist_backend_name(d->be),
               live,
               d->n_max);
     return reply(c, &h, 0, nullptr);
@@ -566,6 +570,8 @@ static bool op_generate(struct daemon *d, struct conn *c, struct sess *x, const 
             if (j->tok[i].parent == sarr && json_is_str(j, i))
                 stops[n_str++] = json_strdup(j, i);
 
+    struct timespec start;
+    clock_gettime(CLOCK_MONOTONIC, &start);
     char        tail[512] = "";
     const char *reason    = "max";
     size_t      k         = 0;
@@ -586,18 +592,25 @@ static bool op_generate(struct daemon *d, struct conn *c, struct sess *x, const 
             stop |= (t == stop_ids[i]);
         if (p) {
             size_t pl = strlen(p), tl = strlen(tail);
-            if (tl + pl >= sizeof tail) {
-                memmove(tail,
-                        tail + (tl + pl - sizeof tail + 1),
-                        sizeof tail - (tl + pl - sizeof tail + 1));
-                tl = strlen(tail);
+            if (pl >= sizeof tail) {
+                memcpy(tail, p + pl - sizeof tail + 1, sizeof tail - 1);
+                tail[sizeof tail - 1] = 0;
+            } else {
+                if (tl + pl >= sizeof tail) {
+                    size_t drop = tl + pl - sizeof tail + 1;
+                    memmove(tail, tail + drop, tl - drop + 1);
+                    tl -= drop;
+                }
+                memcpy(tail + tl, p, pl + 1);
             }
-            memcpy(tail + tl, p, pl + 1);
             for (size_t i = 0; i < n_str; i++)
                 stop |= strstr(tail, stops[i]) != nullptr;
         }
         struct sb h = {};
-        sb_printf(&h, "{\"ok\":true,\"token\":%d,\"done\":false,\"piece\":", t);
+        sb_printf(&h,
+                  "{\"ok\":true,\"token\":%d,\"done\":false,\"stop\":%s,\"piece\":",
+                  t,
+                  stop ? "true" : "false");
         if (p)
             sb_json_str(&h, strlen(p), p);
         else
@@ -617,12 +630,17 @@ static bool op_generate(struct daemon *d, struct conn *c, struct sess *x, const 
         free(stops[i]);
     if (c->broken)
         return false;
-    struct sb h = {};
+    struct timespec end;
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    double    elapsed_ns = (end.tv_sec - start.tv_sec) * 1e9 + end.tv_nsec - start.tv_nsec;
+    struct sb h          = {};
     sb_printf(&h,
-              "{\"ok\":true,\"done\":true,\"reason\":\"%s\",\"generated\":%zu,\"n\":%zu}",
+              "{\"ok\":true,\"done\":true,\"reason\":\"%s\",\"generated\":%zu,\"n\":%zu,\"duration_"
+              "ns\":%.0f}",
               reason,
               k,
-              x->n_hist);
+              x->n_hist,
+              elapsed_ns);
     return reply(c, &h, 0, nullptr);
 }
 
@@ -672,7 +690,28 @@ static bool handle(struct daemon       *d,
     free(sid);
     if (strcmp(op, "info") == 0)
         ok = op_info(d, c);
-    else if (strcmp(op, "open") == 0)
+    else if (strcmp(op, "token_id") == 0) {
+        char *text = json_strdup(&j, json_get(&j, 0, "text"));
+        if (!text)
+            ok = reply_error(c, "token_id: text required");
+        else {
+            struct sb h = {};
+            sb_printf(&h, "{\"ok\":true,\"token\":%d}", geist_model_token_by_text(d->m, text));
+            ok = reply(c, &h, 0, nullptr);
+        }
+        free(text);
+    } else if (strcmp(op, "unpin") == 0) {
+        if (!x)
+            ok = reply_error(c, "unpin: unknown session");
+        else if (geist_session_pin_prefix(x->s, 0, x->hist) != GEIST_OK)
+            ok = reply_error(c, "unpin: unsupported");
+        else {
+            x->pinned = x->n_hist = 0;
+            struct sb h           = {};
+            sb_puts(&h, "{\"ok\":true}");
+            ok = reply(c, &h, 0, nullptr);
+        }
+    } else if (strcmp(op, "open") == 0)
         ok = op_open(d, c, &j);
     else if (strcmp(op, "tokenize") == 0)
         ok = op_tokenize(d, c, &j);
@@ -710,8 +749,8 @@ static bool handle(struct daemon       *d,
         else if (geist_session_pin_prefix(x->s, n, x->hist) != GEIST_OK)
             ok = reply_error(c, "pin: unsupported by this architecture");
         else {
-            x->pinned   = n;
-            struct sb h = {};
+            x->pinned = x->n_hist = n;
+            struct sb h           = {};
             sb_printf(&h, "{\"ok\":true,\"pinned\":%zu}", n);
             ok = reply(c, &h, 0, nullptr);
         }
@@ -765,21 +804,69 @@ static int usage(const char *argv0) {
             "hello first\n"
             "  --sessions N   resident sessions (default 4, max %d); --idle S  evict after S s "
             "idle (default 1800)\n"
-            "  --stdio        one connection on stdin/stdout\n",
+            "  --stdio        one connection on stdin/stdout\n"
+            "  --backend cpu|gpu   choose execution backend\n"
+            "  --backends     print available backends as JSON\n",
             argv0,
             SESS_MAX);
     return 2;
 }
 
+/* No model is loaded while probing the compiled backends. */
+static const char *backend_name_for(const char *kind) {
+    if (!strcmp(kind, "cpu")) {
+#if defined(__aarch64__) || defined(__arm64__)
+        return "cpu_neon";
+#elif defined(__x86_64__)
+        return "cpu_x86";
+#else
+        return "cpu_scalar";
+#endif
+    }
+#ifdef __APPLE__
+    if (!strcmp(kind, "gpu"))
+        return "metal";
+#else
+    if (!strcmp(kind, "gpu"))
+        return "vulkan";
+#endif
+    return nullptr;
+}
+static int print_backends(void) {
+    printf("{");
+    for (int i = 0; i < 2; ++i) {
+        const char           *kind = i ? "gpu" : "cpu", *name = backend_name_for(kind);
+        struct geist_backend *probe = nullptr;
+        bool available = geist_backend_create(name, nullptr, nullptr, &probe) == GEIST_OK;
+        printf("%s\"%s\":{\"name\":\"%s\",\"available\":%s}",
+               i ? "," : "",
+               kind,
+               name,
+               available ? "true" : "false");
+        if (!available)
+            fprintf(stderr, "%s: %s\n", name, geist_last_create_error());
+        if (probe)
+            geist_backend_destroy(probe);
+    }
+    puts("}");
+    return 0;
+}
+
 int main(int argc, char **argv) {
-    const char   *model = nullptr, *sock = nullptr, *host = nullptr;
+    if (argc == 2 && !strcmp(argv[1], "--backends"))
+        return print_backends();
+    const char   *model = nullptr, *sock = nullptr, *host = nullptr, *backend = "auto";
     int           port  = 0;
     bool          stdio = false;
     struct daemon d     = {.n_max = 4, .idle_s = 1800};
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--stdio") == 0)
             stdio = true;
-        else if (strcmp(argv[i], "--socket") == 0 && i + 1 < argc)
+        else if (strcmp(argv[i], "--backend") == 0 && i + 1 < argc) {
+            backend = backend_name_for(argv[++i]);
+            if (!backend)
+                return usage(argv[0]);
+        } else if (strcmp(argv[i], "--socket") == 0 && i + 1 < argc)
             sock = argv[++i];
         else if (strcmp(argv[i], "--host") == 0 && i + 1 < argc)
             host = argv[++i];
@@ -839,7 +926,7 @@ int main(int argc, char **argv) {
             return 1;
     }
 
-    if (geist_backend_create("auto", nullptr, nullptr, &d.be) != GEIST_OK) {
+    if (geist_backend_create(backend, nullptr, nullptr, &d.be) != GEIST_OK) {
         fprintf(stderr, "backend: %s\n", d.be ? geist_backend_errmsg(d.be) : "create failed");
         return 1;
     }

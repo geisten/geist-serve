@@ -1,0 +1,9 @@
+# Permit WebKit sandbox namespaces only for the Geist desktop process tree.
+# This does not impose full filesystem or network confinement on the host.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile geist-desktop /usr/bin/geist-desktop flags=(unconfined) {
+    userns,
+    include if exists <local/geist-desktop>
+}

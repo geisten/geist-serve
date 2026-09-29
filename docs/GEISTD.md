@@ -132,3 +132,11 @@ prefills (the whole context, once).
   for a trusted LAN; across anything else, tunnel.
 - The daemon never reads files on request, never writes, and holds no
   secrets beyond the token.
+
+## Additive app/agent capabilities
+
+`info.agent_api: 1` advertises the explicit remote-agent contract. `token_id {text}` looks up an exact vocabulary entry (`-1` when missing). `unpin {session}` clears both the engine prefix and daemon history; `pin` immediately truncates daemon history to the engine's pinned length.
+
+Generation token frames include `stop`; clients displaying text suppress those terminal pieces while retaining their IDs in session history. Final frames add `duration_ns`, measured monotonically around generation including streaming. This is generation wall time, not isolated kernel time. Existing fields and the Python client's history behavior are unchanged.
+
+The C client supports `geistd_limits` for per-operation deadlines and cancellation; its Unix path, frame sizes and receive allocations are bounded. TCP hostname resolution still uses the platform resolver and is not covered by that deadline. The app uses Unix sockets exclusively.
