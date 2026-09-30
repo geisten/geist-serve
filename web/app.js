@@ -119,6 +119,15 @@ const bytes = n => n < 1e9 ? `${formatNumber(n / 1e6)} MB` : `${formatNumber(n /
 const gib = n => `${formatNumber(n / 2 ** 30, 1)} GiB`;
 
 const variantLabel = model => ({Q4_0:'4 bit · Q4_0', Q8_0:'8 bit · Q8_0', PQ2_0:`${t('Ternary')} · PQ2_0`, I2_S:`${t('Ternary')} · I2_S`}[model?.quantization] || model?.quantization || t('Default'));
+// #51: the variant's primary line is plain language; the technical label is secondary.
+const plainVariant = model => ({Q8_0:'High quality', Q4_0:'Balanced', Q4_K_M:'Balanced', I2_S:'Very compact', PQ2_0:'Very compact'})[model?.quantization] || 'Default';
+const hostName = () => window.geistDesktop === 'mac' ? 'Mac' : 'computer';
+// The platform default or fallback, until the user has chosen: exactly one card.
+const recommendedModel = snapshot => {
+  const rec = snapshot?.recommendation;
+  return rec?.eligible && rec.source !== 'saved' ? snapshot.models?.find(m => m.id === rec.id) || null : null;
+};
+const ramReasons = new Set(['RAM is smaller than the model file, before context and OS memory.', 'Below the RAM recommendation; swapping or allocation failures are possible.', 'Available RAM is tight now. Close other apps before loading this model.']);
 const modelLabel = model => model ? model.quantization ? `${model.group_name || model.name} · ${model.quantization}` : model.name : state?.active || '';
 const knownNumber = value => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 const backendName = value => ({metal:'Metal',vulkan:'Vulkan',cuda:'CUDA',hip:'ROCm',sycl:'SYCL'})[value] || value || '';
@@ -368,6 +377,11 @@ const fitIcons = [
   '<path d="m12 3 10 18H2zM12 9v5m0 3v.01"/>',
   '<circle cx="12" cy="12" r="9"/><path d="m6 6 12 12"/>'
 ];
+function renderModelLegend() {
+  const icon = path => `<svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg>`;
+  $('model-legend').innerHTML = `<span>${icon(fitIcons[0])}<span data-ui-text="Fits this computer"></span></span><span>${icon(capabilityIcons.chat.path)}<span data-ui-text="Text chat"></span></span>`;
+  $('model-legend').querySelectorAll('[data-ui-text]').forEach(e => { e.textContent = t(e.dataset.uiText); });
+}
 function renderModelBadges(element, model) {
   const fit = [0, 1, 2].includes(model.resource_fit) ? model.resource_fit : 1;
   const label = ['Fits this computer', 'Limited on this computer', 'Unavailable on this computer'][fit];
@@ -448,7 +462,7 @@ function modelCard(model) {
   if (!card) {
     card = document.createElement('article'); card.className = 'model'; card.dataset.id = model.id; card.setAttribute('role', 'listitem');
     // One button covers the name and download state. Information and removal are siblings.
-    card.innerHTML = '<button class="model-pick" type="button"><span class="model-ring"></span><span class="model-info"><span class="model-name"></span><span class="variant-size"></span><span class="variant-active"></span><span class="download-state"></span></span></button><span class="model-badges" role="img" tabindex="0"></span><span class="variant-warning"></span><span class="transfer-detail"></span><button class="remove text-button icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button>';
+    card.innerHTML = '<button class="model-pick" type="button"><span class="model-ring"></span><span class="model-info"><span class="model-name"></span><span class="variant-recommended" hidden></span><span class="variant-size"></span><span class="variant-active"></span><span class="download-state"></span></span></button><span class="model-badges" role="img" tabindex="0"></span><span class="variant-warning"></span><span class="transfer-detail"></span><button class="remove text-button icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button>';
     card.querySelector('.model-pick').addEventListener('click', event => { if (event.detail < 2) choose(model.id); });
     card.querySelector('.model-pick').addEventListener('keydown', event => {
       if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
@@ -461,13 +475,17 @@ function modelCard(model) {
   const preparing = state.job_model === model.id && (!!state.phase || state.loading);
   const paused = canPause(model);
   card.className = `model${active ? ' active' : ''}${preparing || pending ? ' preparing' : ''}${model.resource_fit === 2 ? ' unavailable' : ''}`;
-  card.querySelector('.model-name').textContent = variantLabel(model);
-  card.querySelector('.variant-size').textContent = model.bytes ? bytes(model.bytes) : '';
+  card.querySelector('.model-name').textContent = t(plainVariant(model));
+  card.querySelector('.variant-size').textContent = [variantLabel(model), model.bytes ? bytes(model.bytes).replace(' ', '\u00a0') : ''].filter(Boolean).join(' · ');
+  const recommendedTag = card.querySelector('.variant-recommended');
+  recommendedTag.hidden = recommendedModel(state)?.id !== model.id || active;
+  recommendedTag.textContent = t(`Recommended for this ${hostName()}`);
   card.querySelector('.variant-active').textContent = t('Active');
   card.querySelector('.variant-active').hidden = !active;
   const warning = card.querySelector('.variant-warning');
   warning.hidden = !model.resource_fit;
-  warning.textContent = model.resource_fit ? t(shortFitReasons[model.reason] || model.reason || 'Limited on this computer') : '';
+  warning.textContent = model.resource_fit ? t(shortFitReasons[model.reason] || model.reason || 'Limited on this computer') +
+    (ramReasons.has(model.reason) && model.ram_gib ? ` · ${t(`Needs ${model.ram_gib} GB memory`)}` : '') : '';
   warning.title = model.resource_fit ? t(model.reason || 'Limited on this computer') : '';
   const download = renderRing(card.querySelector('.model-ring'), model);
   // The button's complete name exposes status; a duplicate nested progress role
@@ -517,6 +535,10 @@ function render(next) {
   $('workspace').hidden = !usable && !retained && !(next.activity?.load && !next.activity.load.outcome);
   $('test-unavailable').hidden = !$('workspace').hidden;
   $('model-prompt').textContent = t(working ? 'Getting ready…' : 'Choose a model to begin.');
+  const suggestion = working ? null : recommendedModel(next);
+  $('model-prompt-hint').hidden = !suggestion;
+  if (suggestion) $('model-prompt-hint').textContent = t(`We recommend ${modelLabel(suggestion)} (${bytes(suggestion.bytes)}) for this ${hostName()}.`);
+  $('model-legend').hidden = !!next.active_id;
   if (usable && previouslyHidden && !$('workspace').hidden && !$('models-page').hidden &&
       (document.activeElement === document.body || document.activeElement.closest('.model-pick'))) $('prompt').focus({preventScroll:true});
   $('disk-space').textContent = t(next.hardware.disk_known ? `${bytes(next.hardware.disk)} disk space available` : 'Disk space could not be read');
@@ -549,6 +571,9 @@ async function choose(id) {
   const model = visibleModels().find(item => item.id === id);
   if (!model || modelActionDisabled(model)) return;
   const pause = canPause(model);
+  // #51: say the size before a multi-GB download starts; a resume or a small model starts directly.
+  if (!pause && !model.installed && !model.partial && model.bytes > 1e9 &&
+      !confirm(t(`Download ${modelLabel(model)} (${bytes(model.bytes)})? You can pause or remove it later.`))) return;
   downloadRequest = !!state.ready && state.active_id !== id && (pause || !model.installed);
   requesting = true; pendingModel = id; buttonStates(); visibleModels().forEach(modelCard); message('', false);
   try {
@@ -782,6 +807,10 @@ $('test-connection').addEventListener('click', async () => {
   } catch (error) { uiText($('connection-result'), error.message); }
   finally { connectionTesting = false; buttonStates(); }
 });
+renderModelLegend();
+// #51: focusing or clicking a card's icons spells out their meaning (not hover-only).
+$('models').addEventListener('focusin', event => event.target.closest('.model-badges')?.classList.add('show-meaning'));
+$('models').addEventListener('focusout', event => event.target.closest('.model-badges')?.classList.remove('show-meaning'));
 if (!/^[a-f0-9]{64}$/.test(token)) message('Open Geist using the private link from the app or Pi launcher. The link contains your private local API key.');
 else { loadTasks().catch(error => message(error.message)); poll(); timer = setInterval(poll, statusPollInterval); }
 

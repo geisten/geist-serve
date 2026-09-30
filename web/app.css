@@ -1009,3 +1009,13 @@ body.manager-page main { max-width:1180px }
 #connection-disabled { margin-top:8px }
 #connection-disabled .text-button { padding:0 2px; font-size:inherit }
 
+/* #51: first-launch guidance. The recommended tag, the icon legend, and the
+ * icon meaning on focus or click (the badges are focusable and labelled). */
+.model-info .variant-recommended { display:inline-block; white-space:nowrap; line-height:1.5; width:max-content; margin:2px 0; padding:1px 6px; border-radius:6px; background:#e7f3eb; color:#27623c; font-size:11px; font-weight:550 }
+.model-legend { display:flex; flex-wrap:wrap; gap:4px 14px; margin:0 8px 8px; font-size:11px }
+.model-legend>span { display:inline-flex; align-items:center; gap:5px }
+.model-legend svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.6 }
+.model-badges { position:relative }
+.model-badges.show-meaning::after { content:attr(aria-label); position:absolute; left:0; top:calc(100% + 4px); z-index:5; width:max-content; max-width:240px; padding:4px 8px; border-radius:6px; background:var(--ink); color:#fff; font-size:11px; line-height:1.35; white-space:normal }
+#model-prompt-hint { margin:8px 0 0; text-align:center }
+

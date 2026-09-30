@@ -167,6 +167,8 @@ const german = {
   'Load a model first to copy or test the connection.': 'Lade zuerst ein Modell, um die Verbindung zu kopieren oder zu testen.',
   'Wait until the current answer finishes to test the connection.': 'Warte, bis die aktuelle Antwort fertig ist, um die Verbindung zu testen.',
   'Paste the copied curl command into your terminal to try the loaded model. You can also run geist test and geist chat.': 'Füge den kopierten curl-Befehl im Terminal ein, um das geladene Modell auszuprobieren. Du kannst auch geist test und geist chat verwenden.',
+  'High quality': 'Hohe Qualität', 'Balanced': 'Ausgewogen', 'Very compact': 'Sehr kompakt',
+  'Recommended for this Mac': 'Empfohlen für diesen Mac', 'Recommended for this computer': 'Empfohlen für diesen Rechner',
   'Service unavailable. Reopen Geist to reconnect.': 'Dienst nicht erreichbar. Öffne Geist erneut, um die Verbindung wiederherzustellen.',
   'Stop the current task first.': 'Stoppe zuerst die laufende Aufgabe.', 'Another task is active.': 'Eine andere Aufgabe läuft bereits.',
   'Unload this model before removing it.': 'Entlade das Modell, bevor du es löschst.', 'Cannot remove this download safely.': 'Dieser Download konnte nicht sicher gelöscht werden.',
@@ -184,6 +186,10 @@ Object.assign(german, {
 });
 const germanPatterns = [
   [/^Paste the copied curl command into your terminal to try the loaded model\. The command line tool is at (.+)\.$/, (_, a) => `Füge den kopierten curl-Befehl im Terminal ein, um das geladene Modell auszuprobieren. Das Befehlszeilenwerkzeug liegt unter ${a}.`],
+
+  [/^We recommend (.+) \((.+)\) for this (Mac|computer)\.$/, (_, a, b, c) => `Wir empfehlen ${a} (${b}) für diesen ${c === 'Mac' ? 'Mac' : 'Rechner'}.`],
+  [/^Download (.+) \((.+)\)\? You can pause or remove it later\.$/, (_, a, b) => `${a} (${b}) herunterladen? Du kannst den Download später pausieren oder löschen.`],
+  [/^Needs (\d+) GB memory$/, (_, n) => `Braucht ${n} GB Arbeitsspeicher`],
   [/^Downloading · (\d+)%$/, (_, n) => `Wird geladen · ${n}%`],
   [/^Paused · (\d+)%$/, (_, n) => `Pausiert · ${n}%`],
   [/^About (\d+) min left$/, (_, n) => `Noch etwa ${n} Min.`],

@@ -327,6 +327,13 @@ async function checkActivityUX(assert, tick) {
       assert(pick().closest('#models') && !pick().disabled, 'undownloaded model is directly available in the main list');
       assert(!$('setup-start') && !$('setup') && !$('go-setup'), 'no second setup or start control');
       assert(pick().querySelector('.download-state').hidden && pick().getAttribute('aria-label').includes(t('Not downloaded')), 'missing state uses symbols while retaining an accessible explanation');
+      // #51: a multi-GB download says its size first; cancelling starts nothing.
+      {let asked=''; window.confirm=text=>{asked=text;return false;};
+       const size=fixtureModel().bytes; fixtureModel().bytes=3e9; render(JSON.parse(JSON.stringify(fixture)));
+       pick().querySelector('.model-name').click(); await settle();
+       assert(!modelCalls.length && asked.includes(bytes(3e9)),'#51: a large download asks with its size, and cancel starts nothing');
+       fixtureModel().bytes=size; render(JSON.parse(JSON.stringify(fixture)));}
+      window.confirm = () => true;
       pick().querySelector('.model-name').click(); await settle();
       assert(JSON.stringify(modelCalls.map(([path]) => path)) === JSON.stringify(['/app/preview','/app/download']), 'one name click grants preview and starts exactly one download');
       assert(modelCalls.every(([, body]) => body.id === modelID), 'action keeps the explicitly requested model');
@@ -359,7 +366,7 @@ async function checkActivityUX(assert, tick) {
       assert(document.activeElement === pick() && !pick().disabled && pick().getAttribute('aria-label').includes(t('Download and start')) && remove.hidden, 'deletion restores keyboard focus to the available download action');
       modelCalls=[]; pick().click(); await settle();
       assert(modelCalls.at(-1)[0] === '/app/download', 'a deleted model can be downloaded again directly');
-      window.confirm = originalConfirm;
+      window.confirm = () => true;
       resetFixture();
       const badges = pick().closest('.model').querySelector('.model-badges');
       assert(!pick().closest('.model').querySelector('details') && !$('catalog-preview') && !document.querySelector('.model-action'), 'no preview banner, detail blocks or second action icon');
@@ -389,9 +396,10 @@ async function checkActivityUX(assert, tick) {
       release(); release=null; await settle(); fault='';
     } finally {
       if (release) { release(); await settle(); }
-      api=chatAPI; render(realState); message('', false); input('');
+      api=chatAPI; window.confirm=originalConfirm; render(realState); message('', false); input('');
     }
     window.chatChecksStage = 'model-variants';
+    window.confirm=()=>true; // #51 size prompt for multi-GB variants; restored in this section's finally
     while (polling) await tick();
     const variantRealState = state, variantAPI = api;
     const vf = JSON.parse(JSON.stringify(state));
@@ -425,8 +433,8 @@ async function checkActivityUX(assert, tick) {
       assert(!row(q4).querySelector('.variant-active').hidden && row(q8).querySelector('.variant-active').hidden, 'active is separate from suitability and download state');
       assert(action(q4).getAttribute('aria-label').includes('Q4_0') && action(q8).getAttribute('aria-label').includes('Q8_0'), 'action labels identify the exact variant');
       assert($('runtime-name').textContent === 'Qwen3.8 27B · Q4_0', 'loaded header identifies actual quantization');
-      assert(!row(q8).querySelector('.variant-warning').hidden && row(q8).querySelector('.variant-warning').textContent === t('Available RAM is tight'), 'warning reason is visible without hover');
-      assert(row(q8).querySelector('.variant-size').textContent === bytes(q8.bytes), 'each variant exposes its own download size');
+      assert(!row(q8).querySelector('.variant-warning').hidden && row(q8).querySelector('.variant-warning').textContent.startsWith(t('Available RAM is tight')) && row(q8).querySelector('.variant-warning').textContent.includes(t(`Needs ${vf.models.find(m=>m.id==='qwen38-27b-q8').ram_gib} GB memory`)), 'warning reason and RAM need are visible without hover');
+      assert(row(q8).querySelector('.variant-size').textContent.endsWith(bytes(q8.bytes).replace(' ','\u00a0')), 'each variant exposes its own download size');
       for (const lang of ['de','en']) {
         $('ui-language').value=lang; $('ui-language').dispatchEvent(new Event('change')); await tick();
         assert(row(q4).querySelector('.variant-active').textContent === t('Active') && action(q8).getAttribute('aria-label').includes(t('Download model')), 'variant states translate without changing identity');
@@ -473,6 +481,7 @@ async function checkActivityUX(assert, tick) {
     Object.assign(bm,{installed:false,partial:0,preview_accepted:false,resource_fit:0});
     const backgroundCalls=[]; let backgroundStream, backgroundRelease;
     const backgroundPick=()=>cards.get(bm.id).querySelector('.model-pick');
+    window.confirm=()=>true; // #51 size prompt; restored in this section's finally
     const backgroundPaint=()=>{
       bf.inference_busy=!!controller; bf.busy=!!controller||!!bf.phase;
       bf.background_download=!!bf.phase;
@@ -666,6 +675,24 @@ async function checkActivityUX(assert, tick) {
      const orders=[fresh,installed,active].map(s=>{render(structuredClone(s));return groupsOf();});
      render(base);
      assert(orders.every(o=>JSON.stringify(o)===JSON.stringify(expected)),`#57: platform default first, then catalog order, in every state: ${JSON.stringify({expected,orders})}`);}
+
+    {// #51: first launch names one recommendation, explains the icons and speaks plainly.
+     const base=structuredClone(state), pickModel=base.models.find(m=>m.resource_fit!==2);
+     const fresh={...base,ready:false,active_id:'',recommendation:{...base.recommendation,id:pickModel.id,source:'default',eligible:true},
+       models:base.models.map(m=>({...m,installed:false}))};
+     fresh.models.find(m=>m.id!==pickModel.id).reason='RAM is smaller than the model file, before context and OS memory.';
+     const tight=fresh.models.find(m=>m.id!==pickModel.id); tight.resource_fit=1; tight.ram_gib=16;
+     render(structuredClone(fresh));
+     const tags=[...document.querySelectorAll('.variant-recommended')].filter(e=>!e.hidden);
+     assert(tags.length===1 && tags[0].closest('.model').dataset.id===pickModel.id,'#51: exactly one visible recommendation');
+     assert(!$('model-prompt-hint').hidden && $('model-prompt-hint').textContent.includes(pickModel.group_name||pickModel.name),'#51: the empty state names the recommended model');
+     assert(!$('model-legend').hidden && $('model-legend').textContent.includes(t('Fits this computer')),'#51: the icon legend is visible on first launch');
+     assert(cards.get(pickModel.id).querySelector('.model-name').textContent===t(plainVariant(pickModel)) && cards.get(pickModel.id).querySelector('.variant-size').textContent.includes(variantLabel(pickModel)),'#51: plain label first, technical label second');
+     assert(cards.get(tight.id).querySelector('.variant-warning').textContent.includes(t('Needs 16 GB memory')),'#51: RAM needs in plain words');
+     const badges=cards.get(pickModel.id).querySelector('.model-badges'); badges.focus();
+     assert(badges.classList.contains('show-meaning') && getComputedStyle(badges,'::after').content.includes(t('Fits this computer')),'#51: focusing the icons shows their meaning');badges.blur();
+     render(base);
+     assert($('model-legend').hidden===!!base.active_id,'#51: the legend steps back once a model is active');}
     assert(window.geistNavigate('invalid') === false && !$('models-page').hidden, 'native routing is allowlisted');
     showPage('test-page');
     window.chatChecksStage = 'markdown';
