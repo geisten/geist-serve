@@ -66,24 +66,27 @@ all: geist-serve geistd
 help:
 	@grep "^#>" Makefile | cut -c4-
 
-SHARED := src/template.c src/json.c src/net.c
-HDRS   := src/template.h src/json.h src/net.h src/jsmn.h
+# geist-serve: HTTP, the generation core, and its two API dialects on top of
+# what it shares with geistd (model, GGUF header, chat templates, JSON, listeners).
+SHARED := src/model.c src/gguf.c src/template.c src/json.c src/net.c
+SERVE  := src/serve.c src/http.c src/generate.c src/openai.c src/ollama.c
+HDRS   := $(wildcard src/*.h)
 
-geist-serve: src/serve.c $(SHARED) $(HDRS) $(LIB)
-	$(CC) $(CFLAGS) -o $@ src/serve.c $(SHARED) $(LIB) $(LDFLAGS) $(LDLIBS)
+geist-serve: $(SERVE) $(SHARED) $(HDRS) $(LIB)
+	$(CC) $(CFLAGS) -o $@ $(SERVE) $(SHARED) $(LIB) $(LDFLAGS) $(LDLIBS)
 
 # geistd: libgeist over a socket for agents (resident sessions, logits).
 GEISTD_OUTPUT ?= geistd
 DAEMON_SOURCES := $(shell cat scripts/daemon-sources.list)
-$(GEISTD_OUTPUT): $(DAEMON_SOURCES) scripts/daemon-sources.list src/lifecycle.h src/resource_sampler.h $(HDRS) $(LIB) scripts/engine-provenance.py
+$(GEISTD_OUTPUT): $(DAEMON_SOURCES) scripts/daemon-sources.list $(HDRS) $(LIB) scripts/engine-provenance.py
 	@mkdir -p $(@D)
 	python3 scripts/engine-provenance.py capture $(GEISTLIB) --archive $(LIB) --expected $(ENGINE_SOURCE_ID) --output build/engine-build.h
 	$(CC) $(CFLAGS) -Ibuild -o $@ $(DAEMON_SOURCES) $(LIB) $(LDFLAGS) $(LDLIBS)
 
-# Model-free unit test of the chat renderers; no engine needed.
-build/test_template: tests/test_template.c src/template.c src/template.h
+# Model-free unit test of the chat renderers and GGUF scan; no engine needed.
+build/test_template: tests/test_template.c src/template.c src/template.h src/gguf.c src/gguf.h
 	@mkdir -p build
-	$(CC) -std=c23 -O1 -g -Wall -Wextra -fsanitize=address,undefined -o $@ tests/test_template.c src/template.c
+	$(CC) -std=c23 -O1 -g -Wall -Wextra -fsanitize=address,undefined -o $@ tests/test_template.c src/template.c src/gguf.c
 
 # Always delegate: the engine's own make is incremental, and a plain file
 # target goes stale on a GEIST_REF bump.

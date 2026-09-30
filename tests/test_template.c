@@ -1,6 +1,7 @@
 /* test_template.c — model-free goldens for the chat renderers, the family
  * fingerprint, oldest-turn truncation, and the GGUF header scan on a
  * synthetic file. Framework-free: a failed check prints and exits 1. */
+#include "../src/gguf.h"
 #include "../src/template.h"
 
 #include <stdint.h>

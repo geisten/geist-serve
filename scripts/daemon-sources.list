@@ -4,3 +4,5 @@ src/resource_sampler.c
 src/template.c
 src/json.c
 src/net.c
+src/model.c
+src/gguf.c

@@ -17,14 +17,13 @@
 #include <geist_util.h>
 
 #include "json.h"
+#include "model.h"
 #include "net.h"
 #include "lifecycle.h"
 #include "resource_sampler.h"
-#include "template.h"
 
 #include <errno.h>
 #include <fcntl.h>
-#include <libgen.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,7 +34,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#define CTX_CAP 4096 /* engine cap today (geistlib#428) */
 #define HDR_CAP (64u * 1024u)
 #define BODY_CAP (16u * 1024u * 1024u)
 #define TOPK_MAX 256
@@ -58,21 +56,13 @@ struct sess {
 
 struct daemon {
     struct resource_sampler resources;
-    struct geist_backend *be;
-    struct geist_model   *m;
-    char                  name[128];
-    struct gguf_meta      meta;
-    enum chat_family      family;
-    bool                  add_bos;
-    geist_token_t         eos;
-    geist_token_t         eot[6];
-    int                   n_eot;
-    size_t                vocab;
-    struct sess           sess[SESS_MAX];
-    int                   n_max;
-    int                   idle_s;
-    const char           *token; /* required off-loopback; nullptr = none */
-    bool                  need_hello;
+    struct model            mo;
+    size_t                  vocab;
+    struct sess             sess[SESS_MAX];
+    int                     n_max;
+    int                     idle_s;
+    const char             *token; /* required off-loopback; nullptr = none */
+    bool                    need_hello;
 };
 
 /* ====================================================================== */
@@ -284,15 +274,6 @@ static void sb_topk(struct sb *h, size_t n, const float x[static n], size_t k) {
 /* Ops                                                                     */
 /* ====================================================================== */
 
-static bool is_stop_token(const struct daemon *d, geist_token_t t) {
-    if (t == d->eos)
-        return true;
-    for (int k = 0; k < d->n_eot; k++)
-        if (t == d->eot[k])
-            return true;
-    return false;
-}
-
 static bool hist_push(struct sess *x, size_t n, const geist_token_t ids[static n]) {
     if (x->n_hist + n > CTX_CAP)
         return false;
@@ -321,11 +302,11 @@ static bool op_info(struct daemon *d, struct conn *c) {
     struct sb h = {};
     sb_printf(&h,
               "{\"ok\":true,\"model\":\"%s\",\"arch\":\"%s\",\"eos\":%d,\"eot\":[",
-              d->name,
-              geist_model_arch(d->m),
-              d->eos);
-    for (int k = 0; k < d->n_eot; k++)
-        sb_printf(&h, "%s%d", k ? "," : "", d->eot[k]);
+              d->mo.name,
+              geist_model_arch(d->mo.m),
+              d->mo.eos);
+    for (int k = 0; k < d->mo.n_eot; k++)
+        sb_printf(&h, "%s%d", k ? "," : "", d->mo.eot[k]);
     int live = 0;
     for (int i = 0; i < d->n_max; i++)
         live += d->sess[i].live;
@@ -334,10 +315,10 @@ static bool op_info(struct daemon *d, struct conn *c) {
               "\"agent_api\":1,\"backend\":\"%s\",\"sessions\":%d,\"max_sessions\":%d,\"engine\":",
               CTX_CAP,
               d->vocab,
-              d->add_bos ? "true" : "false",
-              geist_model_bos_token(d->m),
-              chat_family_name(d->family),
-              geist_backend_name(d->be),
+              d->mo.meta.add_bos ? "true" : "false",
+              geist_model_bos_token(d->mo.m),
+              chat_family_name(d->mo.family),
+              geist_backend_name(d->mo.be),
               live,
               d->n_max);
     engine_info(&h);
@@ -359,7 +340,7 @@ static bool op_open(struct daemon *d, struct conn *c, const struct json *j) {
         return reply_error(c, "open: a sampler field has the wrong type");
     sess_evict_idle(d);
     struct sess *x = sess_slot(d);
-    if (geist_session_create(d->m, d->be, &o, &x->s) != GEIST_OK) {
+    if (geist_session_create(d->mo.m, d->mo.be, &o, &x->s) != GEIST_OK) {
         const char *why = x->s ? geist_session_errmsg(x->s) : "session create failed";
         char        msg[300];
         snprintf(msg, sizeof msg, "open: %s", why);
@@ -392,7 +373,7 @@ static bool op_tokenize(struct daemon *d, struct conn *c, const struct json *j) 
     struct geist_session *s   = x ? x->s : nullptr;
     if (s == nullptr) {
         struct geist_session_opts o = {.max_seq_len = 16};
-        if (geist_session_create(d->m, d->be, &o, &tmp) != GEIST_OK) {
+        if (geist_session_create(d->mo.m, d->mo.be, &o, &tmp) != GEIST_OK) {
             free(text);
             return reply_error(c, "tokenize: no session");
         }
@@ -559,7 +540,7 @@ static bool op_step(struct daemon *d, struct conn *c, struct sess *x, const stru
     sb_printf(&h,
               ",\"token\":%d,\"stop\":%s,\"n\":%zu,\"piece\":",
               t,
-              is_stop_token(d, t) ? "true" : "false",
+              model_is_stop(&d->mo, t) ? "true" : "false",
               x->n_hist);
     if (p)
         sb_json_str(&h, strlen(p), p);
@@ -609,7 +590,7 @@ static bool op_generate(struct daemon *d, struct conn *c, struct sess *x, const 
         }
         hist_push(x, 1, &t);
         const char *p    = geist_session_token_to_str(x->s, t);
-        bool        stop = is_stop_token(d, t);
+        bool        stop = model_is_stop(&d->mo, t);
         for (size_t i = 0; i < n_stop; i++)
             stop |= (t == stop_ids[i]);
         if (p) {
@@ -719,7 +700,7 @@ static bool handle(struct daemon       *d,
             ok = reply_error(c, "token_id: text required");
         else {
             struct sb h = {};
-            sb_printf(&h, "{\"ok\":true,\"token\":%d}", geist_model_token_by_text(d->m, text));
+            sb_printf(&h, "{\"ok\":true,\"token\":%d}", geist_model_token_by_text(d->mo.m, text));
             ok = reply(c, &h, 0, nullptr);
         }
         free(text);
@@ -966,53 +947,30 @@ int main(int argc, char **argv) {
 
     struct lifecycle_shared *lifecycle = lifecycle_inherit();
     lifecycle_phase(lifecycle, LC_BACKEND);
-    if (geist_backend_create(backend, nullptr, nullptr, &d.be) != GEIST_OK) {
-        fprintf(stderr, "backend: %s\n", d.be ? geist_backend_errmsg(d.be) : "create failed");
+    if (geist_backend_create(backend, nullptr, nullptr, &d.mo.be) != GEIST_OK) {
+        fprintf(stderr, "backend: %s\n", d.mo.be ? geist_backend_errmsg(d.mo.be) : "create failed");
         return 1;
     }
-    resource_sampler_start(&d.resources, d.be, lifecycle);
+    resource_sampler_start(&d.resources, d.mo.be, lifecycle);
     lifecycle_phase(lifecycle, LC_MODEL);
-    if (geist_model_load(model, d.be, &d.m) != GEIST_OK) {
-        fprintf(stderr, "model: %s\n", d.m ? geist_model_errmsg(d.m) : "load failed");
+    if (geist_model_load(model, d.mo.be, &d.mo.m) != GEIST_OK) {
+        fprintf(stderr, "model: %s\n", d.mo.m ? geist_model_errmsg(d.mo.m) : "load failed");
         resource_sampler_stop(&d.resources);
-        geist_model_destroy(d.m);
-        geist_backend_destroy(d.be);
+        geist_model_destroy(d.mo.m);
+        geist_backend_destroy(d.mo.be);
         lifecycle_close(&lifecycle);
         return 1;
     }
     lifecycle_phase(lifecycle, LC_METADATA);
-    char path_copy[1024];
-    snprintf(path_copy, sizeof path_copy, "%s", model);
-    snprintf(d.name, sizeof d.name, "%s", basename(path_copy));
-    char *dot = strrchr(d.name, '.');
-    if (dot && strcmp(dot, ".gguf") == 0)
-        *dot = '\0';
-    gguf_read_meta(model, &d.meta);
-    d.add_bos = d.meta.add_bos;
-    d.family  = chat_family_from_template(d.meta.tpl);
-    if (d.family == CHAT_UNKNOWN)
-        d.family = chat_family_from_arch(geist_model_arch(d.m));
-    d.eos = geist_model_eos_token(d.m);
-    for (const char **t = (const char *[]) {"<end_of_turn>",
-                                            "<turn|>",
-                                            "<|im_end|>",
-                                            "<|eot_id|>",
-                                            "<|end_of_text|>",
-                                            nullptr};
-         *t && d.n_eot < 6;
-         t++) {
-        geist_token_t id = geist_model_token_by_text(d.m, *t);
-        if (id != GEIST_TOKEN_NONE)
-            d.eot[d.n_eot++] = id;
-    }
+    model_describe(&d.mo, model);
     lifecycle_phase(lifecycle, LC_WARMUP);
     /* Vocabulary size: one forward pass over BOS in a throwaway session. */
     {
         struct geist_session_opts o   = {.max_seq_len = 16};
         struct geist_session     *s   = nullptr;
-        geist_token_t             bos = geist_model_bos_token(d.m);
-        if (geist_session_create(d.m, d.be, &o, &s) == GEIST_OK) {
-            geist_token_t one = bos != GEIST_TOKEN_NONE ? bos : d.eos;
+        geist_token_t             bos = geist_model_bos_token(d.mo.m);
+        if (geist_session_create(d.mo.m, d.mo.be, &o, &s) == GEIST_OK) {
+            geist_token_t one = bos != GEIST_TOKEN_NONE ? bos : d.mo.eos;
             if (geist_session_prefill_tokens(s, 1, &one) == GEIST_OK) {
                 size_t n = 0;
                 if (geist_session_peek_logits(&n, s))
@@ -1024,8 +982,8 @@ int main(int argc, char **argv) {
     fprintf(stderr,
             "geistd: loaded %s as \"%s\" (%s), vocab %zu, %d sessions, idle %ds%s\n",
             model,
-            d.name,
-            geist_model_arch(d.m),
+            d.mo.name,
+            geist_model_arch(d.mo.m),
             d.vocab,
             d.n_max,
             d.idle_s,
@@ -1062,10 +1020,8 @@ int main(int argc, char **argv) {
     for (int i = 0; i < SESS_MAX; i++)
         if (d.sess[i].live)
             sess_free(&d.sess[i]);
-    gguf_meta_free(&d.meta);
     resource_sampler_stop(&d.resources);
     lifecycle_close(&lifecycle);
-    geist_model_destroy(d.m);
-    geist_backend_destroy(d.be);
+    model_close(&d.mo);
     return 0;
 }

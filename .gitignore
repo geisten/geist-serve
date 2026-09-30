@@ -7,3 +7,4 @@
 *.tar.gz
 __pycache__/
 /tests/results/
+/geistd
