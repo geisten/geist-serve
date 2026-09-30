@@ -1,42 +1,36 @@
 /* child.c — geistd supervision: backend probe, spawn, poll, stop, lifecycle sampling. */
 #include "app.h"
 
-/* Probe the packaged engine once. Old CPU-only daemons remain usable. */
-void probe_backends(void) {
-#if defined(__aarch64__) || defined(__arm64__)
-    strcpy(app.backend.cpu, "cpu_neon");
-#elif defined(__x86_64__)
-    strcpy(app.backend.cpu, "cpu_x86");
-#else
-    strcpy(app.backend.cpu, "cpu_scalar");
-#endif
+/* Run the packaged daemon with one informational flag and capture its stdout.
+ * Bounded to ~5 s and 1 KiB; true only for a clean exit 0. */
+static bool server_output(const char *flag, char output[static 1024]) {
     int pipefd[2];
+    output[0] = 0;
     if (pipe(pipefd))
-        return;
+        return false;
     fcntl(pipefd[0], F_SETFD, FD_CLOEXEC);
     fcntl(pipefd[1], F_SETFD, FD_CLOEXEC);
     posix_spawn_file_actions_t actions;
     if (posix_spawn_file_actions_init(&actions)) {
         close(pipefd[0]);
         close(pipefd[1]);
-        return;
+        return false;
     }
     int rc = posix_spawn_file_actions_adddup2(&actions, pipefd[1], STDOUT_FILENO);
     if (!rc)
         rc = posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0);
-    char *args[] = {app.paths.server, "--backends", nullptr};
+    char *args[] = {app.paths.server, (char *) flag, nullptr};
     pid_t child  = 0;
     if (!rc)
         rc = posix_spawn(&child, app.paths.server, &actions, nullptr, args, environ);
     posix_spawn_file_actions_destroy(&actions);
     close(pipefd[1]);
-    char   output[1024] = {0};
-    size_t used         = 0;
-    int    status       = 0;
-    bool   ended        = false;
+    size_t used   = 0;
+    int    status = 0;
+    bool   ended  = false;
     fcntl(pipefd[0], F_SETFL, O_NONBLOCK);
     for (unsigned attempt = 0; !rc && attempt < 100; ++attempt) {
-        ssize_t n = read(pipefd[0], output + used, sizeof output - 1 - used);
+        ssize_t n = read(pipefd[0], output + used, 1023 - used);
         if (n > 0)
             used += (size_t) n;
         if (waitpid(child, &status, WNOHANG) == child) {
@@ -51,14 +45,26 @@ void probe_backends(void) {
         while (waitpid(child, nullptr, 0) < 0 && errno == EINTR) {
         }
     }
-    ssize_t n = read(pipefd[0], output + used, sizeof output - 1 - used);
+    ssize_t n = read(pipefd[0], output + used, 1023 - used);
     if (n > 0)
         used += (size_t) n;
     output[used] = 0;
     close(pipefd[0]);
+    return !rc && ended && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
+/* Probe the packaged engine once. Old CPU-only daemons remain usable. */
+void probe_backends(void) {
+#if defined(__aarch64__) || defined(__arm64__)
+    strcpy(app.backend.cpu, "cpu_neon");
+#elif defined(__x86_64__)
+    strcpy(app.backend.cpu, "cpu_x86");
+#else
+    strcpy(app.backend.cpu, "cpu_scalar");
+#endif
+    char         output[1024];
     struct json *j = calloc(1, sizeof *j);
-    if (!rc && ended && WIFEXITED(status) && WEXITSTATUS(status) == 0 && j &&
-        json_parse(j, used, output) >= 0) {
+    if (server_output("--backends", output) && j && json_parse(j, strlen(output), output) >= 0) {
         int   gpu  = json_get(j, 0, "gpu");
         char *name = json_strdup(j, json_get(j, gpu, "name"));
         if (name && (!strcmp(name, "metal") || !strcmp(name, "vulkan"))) {
@@ -66,6 +72,23 @@ void probe_backends(void) {
             app.backend.gpu_available = json_bool(j, json_get(j, gpu, "available"), false);
         }
         free(name);
+    }
+    free(j);
+}
+
+static struct app_engine packaged_engine; /* from --build-info; empty for legacy daemons */
+
+/* The packaged engine's provenance before any model loads (#55); the info
+ * handshake replaces it with the running daemon's own report. A daemon
+ * without --build-info (legacy) leaves it unreported. */
+void probe_engine(void) {
+    char              output[1024];
+    struct app_engine identity;
+    struct json      *j = calloc(1, sizeof *j);
+    if (server_output("--build-info", output) && j && json_parse(j, strlen(output), output) >= 0 &&
+        app_engine_parse(&identity, j, 0) && identity.version[0]) {
+        snprintf(identity.payload_sha256, sizeof identity.payload_sha256, "%s", app.child.engine.payload_sha256);
+        app.child.engine = packaged_engine = identity;
     }
     free(j);
 }
@@ -307,7 +330,7 @@ static bool start_child_mode_impl(const char *path, const char *id, const char *
         activity_change(&app.activity.load, ACT_STOPPING);
     stop_child();
     activity_change(&app.activity.load, ACT_STARTING);
-    app.child.engine = (struct app_engine) {0};
+    app.child.engine = packaged_engine; /* until this daemon's handshake reports its own */
     (void) app_engine_sha256(app.paths.server, app.child.engine.payload_sha256);
     struct app_hardware hardware;
     bool                known = app_hardware_read(&hardware, app.paths.home);
