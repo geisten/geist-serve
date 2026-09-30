@@ -129,6 +129,14 @@ const executionLoading = () => pendingExecution !== null || !!state?.loading;
 // status JSON and the JSONL export for diagnosis.
 const sourceNames = {'macos.proc_pid_rusage.ri_resident_size': 'Measured by macOS', 'linux.proc_pid_stat.rss': 'Measured by Linux', 'metal.MTLDevice.currentAllocatedSize': 'Reported by Metal'};
 const sourceText = source => source ? t(sourceNames[source] || 'Measured by the system') : null;
+
+// #55: one wording for the engine line in both dialogs. Unreported provenance
+// (legacy daemon, or none yet) hides the line instead of "Unknown · Unknown".
+function engineText(engine) {
+  const lib = engine?.geistlib;
+  if (!lib?.version) return '';
+  return `geistlib ${lib.version}${lib.revision ? ` · ${lib.revision.slice(0, 12)}` : ''}${lib.source_state === 'modified' ? ` · ${t('Modified build')}` : ''}`;
+}
 const rateText = value => `${knownNumber(value) ? formatNumber(value, 1) : '—'} ${t('tok/s')}`;
 const timeText = value => knownNumber(value) ? `${formatNumber(value, 2)} s` : '—';
 function renderReplyMetrics(element) {
@@ -194,8 +202,9 @@ function renderPerformance() {
     $(`history-${mode}-time`).textContent = sample?.recorded_at ? new Intl.DateTimeFormat(interfaceLanguage, {dateStyle:'short',timeStyle:'short'}).format(new Date(sample.recorded_at * 1000)) : '—';
     $(`history-${mode}`).title = `${mode.toUpperCase()}: ${t(sample ? sample.count < 5 ? 'First observations' : 'Typical' : 'Not measured yet')} · ${sample?.count || 0}`;
   }
-  const engine = compatible ? profile[state?.execution?.active]?.engine?.geistlib : null;
-  $('profile-engine').textContent = `geistlib ${engine?.version || t('Unknown')} · ${engine?.revision?.slice(0,12) || t('Unknown')}${engine?.source_state === 'modified' ? ' · ' + t('Modified build') : ''}`;
+  // The engine that produced these measurements, else the one installed now (#55).
+  const engineLine = engineText((compatible ? profile[state?.execution?.active]?.engine : null) || state?.engine);
+  $('profile-engine').textContent = engineLine; $('profile-engine').hidden = !engineLine;
   const group = compatible ? profile.group : null;
   $('profile-collection').textContent = t(profile?.enabled ? 'Collection enabled' : 'Collection disabled');
   $('profile-group').textContent = group ? [t('Latest workload'), `${t('Input')}: ${['≤512','513–2048','>2048'][group.input]}`, `${t('Output')}: ${['<32','32–127','128–511','≥512'][group.output]}`, t('tokens'), t(group.cached ? 'Cache reused' : 'No cache reuse'), t(group.cold ? 'First reply after load' : 'Warm'), group.contention ? t('Download overlap') : '', group.controlled ? t('Controlled comparison') : t('Ordinary use')].filter(Boolean).join(' · ') : t('Not measured yet');
@@ -995,8 +1004,8 @@ function renderActivity() {
   $('activity-summary').replaceChildren(...summary.flatMap(([key,value])=>{const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=t(key);dd.textContent=value;return [dt,dd];}));
   const phases=a?.phases||[];
   $('activity-phases').replaceChildren(...phases.map(p=>{const row=document.createElement('li');row.textContent=`${t(activityLabels[p.stage]||'Working')} · ${timeText(p.duration_ms/1000)}`;return row;}));
-  const engine=a?.engine?.geistlib;
-  $('activity-engine').textContent=`geistlib ${engine?.version||t('Unknown')} · ${engine?.revision?.slice(0,12)||t('Unknown')}`;
+  const engineLine=engineText(a?.engine?.geistlib?.version ? a.engine : state?.engine);
+  $('activity-engine').textContent=engineLine; $('activity-engine').hidden=!engineLine;
 }
 $('open-activity').addEventListener('click',()=>{activityReturn=document.activeElement;closeMeasurements();$('activity-dialog').showModal();$('close-activity').focus({preventScroll:true});renderActivity();});
 $('close-activity').addEventListener('click',()=>$('activity-dialog').close());
