@@ -1,5 +1,5 @@
-# Tag v* → three static binaries + SHA256SUMS + the systemd units, attached
-# to a GitHub release. Linux is musl-static from Alpine (runs on any 64-bit
+# Tag v* → three static binaries + SHA256SUMS + the systemd units + a CycloneDX
+# SBOM, with signed build provenance, attached to a GitHub release. Linux is musl-static from Alpine (runs on any 64-bit
 # distro, Raspberry Pi OS included); macOS links libomp statically.
 name: release
 
@@ -97,6 +97,8 @@ jobs:
     environment: release
     permissions:
       contents: write
+      id-token: write     # Sigstore signing for the provenance attestation
+      attestations: write
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -116,12 +118,21 @@ jobs:
           cp deploy/systemd/geist-serve.socket deploy/systemd/geist-serve.service deploy/systemd/geist-serve.default dist/
           cp candidates/ubuntu-amd64-candidate/*.deb dist/
           cp "candidates/ubuntu-arm64-candidate/geist_${PACKAGE_VERSION}_arm64.deb" dist/
+          python3 scripts/sbom.py dist/geist-serve.cdx.json "$PACKAGE_VERSION"
           python3 scripts/release-manifest.py dist "$PACKAGE_VERSION"
           (cd dist && sha256sum -c SHA256SUMS)
       - name: installer against these exact assets
         run: |
           GEIST_SERVE_BASE="file://$PWD/dist" GEIST_SERVE_PREFIX=/tmp/gs-prefix sh install.sh
           /tmp/gs-prefix/bin/geist-serve 2>/dev/null || test $? -eq 2
+      # Signed build provenance (Sigstore, stored by GitHub) for every file
+      # that is uploaded, SBOM and checksum files included (#34 §2). Check a
+      # download with: gh attestation verify <file> --repo geisten/geist-serve
+      - name: attest build provenance
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
       - name: release
         if: startsWith(github.ref, 'refs/tags/v')
         env:

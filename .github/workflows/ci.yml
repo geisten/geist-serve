@@ -39,6 +39,7 @@ jobs:
         run: |
           python3 tests/install/legacy_test.py
           python3 tests/install/manifest_test.py
+          python3 tests/install/sbom_test.py
       - name: unit tests (model-free)
         run: make CC=gcc-14 TARGET=linux build/test_template && ./build/test_template
       - name: systemd units parse
@@ -61,6 +62,7 @@ jobs:
         run: |
           python3 tests/install/legacy_test.py
           python3 tests/install/manifest_test.py
+          python3 tests/install/sbom_test.py
       - name: unit tests (model-free)
         run: make build/test_template && ./build/test_template
 
