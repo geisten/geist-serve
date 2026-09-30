@@ -11,6 +11,7 @@
 #> make               build ./geist-serve and ./geistd (syncs + builds libgeist.a on demand)
 #> make fetch-model   the 369 MB SmolLM2 reference GGUF into the engine tree (SHA-pinned)
 #> make test          model-free unit tests + HTTP smoke against a GGUF (skips without one)
+#> make app test-app  the C23 app and its tests; run plain 'make' first (they need ./geistd)
 #> make format        clang-format, shared style file with the engine
 #> make clean         drop the binary; distclean also drops the engine
 #>
