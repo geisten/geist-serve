@@ -584,6 +584,7 @@ async function checkActivityUX(assert, tick) {
       openMeasurements();await tick();
       const cpu = document.querySelector('[name="execution"][value="cpu"]'), gpu=document.querySelector('[name="execution"][value="gpu"]');
       assert(document.querySelector('[name="execution"]:checked').value==='auto' && !gpu.closest('label').querySelector('.recommended-mark').hidden, 'recommendation and selected mode remain distinct');
+      assert(gpu.closest('label').querySelector('.recommended-mark').getAttribute('aria-label')===t('Recommended processor') && document.querySelector('.recommended-legend'),'#52: the star has a name and a visible legend');
       assert(cpu.closest('label').classList.contains('is-active') && !gpu.closest('label').classList.contains('is-active'), 'Auto exposes the actual processor inside its option');
       assert(cpu.getAttribute('aria-label').includes(t('Active processor')) && gpu.closest('label').querySelector('.processor-backend').textContent==='Metal', 'active processor is accessible and GPU backend is an option sublabel');
       assert($('execution-current').classList.contains('sr-only'), 'no duplicate visible processor label outside the choices');
@@ -824,6 +825,10 @@ $$
       assert(bounds.top>=metricsBounds.top && bounds.bottom<=metricsBounds.bottom+1, `${id} fits inside the three-row summary without clipping`);
     }
     assert($('memory-live').textContent.includes('Process RSS') && $('memory-source').textContent.includes('values overlap'), 'scopes and shared-memory overlap are visible');
+    // #52: figures live behind Measurements; sources are words; the main view keeps model, processor, speed.
+    assert(!document.querySelector('.runtime-panel #test-memory, .runtime-panel #test-gpu-memory') && $('test-memory').closest('dialog'),'#52: RSS and Metal figures are in the Measurements dialog, not the main view');
+    assert(!/proc_pid|MTLDevice|proc_pid_stat/.test($('memory-source').textContent + $('test-gpu-memory').title + $('test-memory').title) && $('memory-source').textContent.includes(t('Reported by Metal')),'#52: no raw API identifier is shown, a plain source is');
+    assert($('open-measurements').closest('.runtime-panel') && $('open-measurements').title && $('open-measurements').textContent.trim(),'#52: Measurements stays one click away and keeps its name');
     state.memory.gpu_allocated_bytes=0;renderMemory();
     assert($('test-gpu-memory').textContent==='0.0 GiB', 'known zero Metal differs from unavailable');
     stateReceivedAt-=6100;renderMemory();

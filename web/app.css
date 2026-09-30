@@ -993,3 +993,10 @@ body.manager-page main { max-width:1180px }
     mask-image:linear-gradient(to bottom,#000 calc(100% - 18px),transparent) }
   .model-group { scroll-snap-align:start }
 }
+
+/* #52: the main view keeps model, processor and speed; figures live behind this
+ * icon (named "Measurements" for assistive tech and as a tooltip). */
+.execution-row #open-measurements { flex:none; width:32px; justify-content:center; padding:4px }
+.execution-row #open-measurements>span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap }
+.recommended-legend { display:flex; align-items:center; gap:6px }
+
