@@ -1,5 +1,5 @@
 #!/bin/sh
-# geistd.sh — the daemon end to end: ops suite over the Unix socket, TCP with
+# geistd.sh — the daemon end to end: ops suite and the C client over the Unix socket, TCP with
 # and without the token, --stdio, and the short-calls timing against
 # geist-serve. Needs a GGUF (GEIST_MODEL, else the CI reference); skips otherwise.
 set -eu
@@ -19,6 +19,10 @@ wait_log "listening" 60 || { bad "geistd start: $(tail -2 "$LOG")"; exit 1; }
 case "$(uname -s)" in Darwin) MODE=$(stat -f %Lp "$SOCK") ;; *) MODE=$(stat -c %a "$SOCK") ;; esac
 [ "$MODE" = 600 ] && ok "socket mode 0600" || bad "socket mode $MODE"
 python3 -u tests/geistd_ops.py "$SOCK" || fail=1
+# the C client (clients/geistd_client.h) against the same daemon
+mkdir -p build
+${CC:-cc} -std=c23 -D_POSIX_C_SOURCE=200809L -D_DARWIN_C_SOURCE -Wall -Wextra -I clients -I src tests/geistd_client_test.c -o build/geistd_client_test \
+    && ./build/geistd_client_test "$SOCK" && ok "C client" || bad "C client"
 
 # --- --stdio ------------------------------------------------------------------
 out=$(python3 -c 'import struct,json,sys; h=json.dumps({"op":"info"}).encode(); sys.stdout.buffer.write(struct.pack("<II",len(h),0)+h)' \
