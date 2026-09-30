@@ -150,6 +150,15 @@ async function checkActivityUX(assert, tick) {
     assert(!$('activity-cpu-hint').hidden,'long CPU wait explained in the ordinary view');
     assert($('activity-label').getAttribute('aria-live')==='polite' && $('activity-time').getAttribute('aria-hidden')==='true','timer does not announce every second');
     assert(rect().flat().every((value,i)=>Math.abs(value-before.flat()[i])<=1),`activity keeps transcript and composer geometry: ${JSON.stringify({before,after:rect()})}`);
+    // #49: the conversation gets the height. Activity shares the model-name row, each
+    // processor choice is one line, and the chrome above the transcript stays within budget.
+    assert($('activity-lane').closest('.chat-heading'),'activity lane shares the model-name row');
+    {const heading=document.querySelector('.chat-heading'),h0=heading.getBoundingClientRect().height,name=$('runtime-name').textContent;
+     $('runtime-name').textContent='A model with a very long name '.repeat(8);
+     assert(Math.abs(heading.getBoundingClientRect().height-h0)<=0.5,'a long model name cannot grow the model-name row');
+     $('runtime-name').textContent=name;}
+    assert([...document.querySelectorAll('.execution-choice label')].every(l=>l.getBoundingClientRect().height<=34),'each processor choice is a single line');
+    if (innerHeight>=600) assert($('transcript').getBoundingClientRect().top-document.querySelector('.runtime-panel').getBoundingClientRect().top<=124,`chat chrome within budget: ${$('transcript').getBoundingClientRect().top-document.querySelector('.runtime-panel').getBoundingClientRect().top}px`);
     const labelNode=$('activity-label').firstChild;renderActivity();assert($('activity-label').firstChild===labelNode,'unchanged stage does not repeat the live announcement');
     const previous=activitySnapshot.request;
     acceptActivity({...fixture.activity,request:operation(99,'answer',{generation:7})});renderActivity();
@@ -575,6 +584,7 @@ async function checkActivityUX(assert, tick) {
       openMeasurements();await tick();
       const cpu = document.querySelector('[name="execution"][value="cpu"]'), gpu=document.querySelector('[name="execution"][value="gpu"]');
       assert(document.querySelector('[name="execution"]:checked').value==='auto' && !gpu.closest('label').querySelector('.recommended-mark').hidden, 'recommendation and selected mode remain distinct');
+      assert(gpu.closest('label').querySelector('.recommended-mark').getAttribute('aria-label')===t('Recommended processor') && document.querySelector('.recommended-legend'),'#52: the star has a name and a visible legend');
       assert(cpu.closest('label').classList.contains('is-active') && !gpu.closest('label').classList.contains('is-active'), 'Auto exposes the actual processor inside its option');
       assert(cpu.getAttribute('aria-label').includes(t('Active processor')) && gpu.closest('label').querySelector('.processor-backend').textContent==='Metal', 'active processor is accessible and GPU backend is an option sublabel');
       assert($('execution-current').classList.contains('sr-only'), 'no duplicate visible processor label outside the choices');
@@ -815,6 +825,10 @@ $$
       assert(bounds.top>=metricsBounds.top && bounds.bottom<=metricsBounds.bottom+1, `${id} fits inside the three-row summary without clipping`);
     }
     assert($('memory-live').textContent.includes('Process RSS') && $('memory-source').textContent.includes('values overlap'), 'scopes and shared-memory overlap are visible');
+    // #52: figures live behind Measurements; sources are words; the main view keeps model, processor, speed.
+    assert(!document.querySelector('.runtime-panel #test-memory, .runtime-panel #test-gpu-memory') && $('test-memory').closest('dialog'),'#52: RSS and Metal figures are in the Measurements dialog, not the main view');
+    assert(!/proc_pid|MTLDevice|proc_pid_stat/.test($('memory-source').textContent + $('test-gpu-memory').title + $('test-memory').title) && $('memory-source').textContent.includes(t('Reported by Metal')),'#52: no raw API identifier is shown, a plain source is');
+    assert($('open-measurements').closest('.runtime-panel') && $('open-measurements').title && $('open-measurements').textContent.trim(),'#52: Measurements stays one click away and keeps its name');
     state.memory.gpu_allocated_bytes=0;renderMemory();
     assert($('test-gpu-memory').textContent==='0.0 GiB', 'known zero Metal differs from unavailable');
     stateReceivedAt-=6100;renderMemory();

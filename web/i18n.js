@@ -15,6 +15,8 @@ const formatNumber = (value, digits = 0) => new Intl.NumberFormat(interfaceLangu
   minimumFractionDigits: digits, maximumFractionDigits: digits
 }).format(value);
 const german = {
+  'Measured by macOS':'Von macOS gemessen','Measured by Linux':'Von Linux gemessen','Reported by Metal':'Von Metal gemeldet','Measured by the system':'Vom System gemessen',
+  'Recommended processor':'Empfohlener Prozessor','Recommended processor for this model':'Empfohlener Prozessor für dieses Modell',
   'Metal allocated': 'Metal-Belegung', 'Metal allocated · after reply': 'Metal-Belegung · nach Antwort',
   'Metal sampled peak · 2 s': 'Metal-Stichprobenmaximum · 2 s', 'Sample age': 'Alter der Messung',
   'Shared memory; values overlap.': 'Gemeinsamer Speicher; Werte überschneiden sich.',

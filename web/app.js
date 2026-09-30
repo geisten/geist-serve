@@ -125,6 +125,10 @@ const backendName = value => ({metal:'Metal',vulkan:'Vulkan',cuda:'CUDA',hip:'RO
 const modelIdentity = () => JSON.stringify([state?.active_id, state?.active, state?.execution?.backend]);
 const workspaceIdentity = () => JSON.stringify([state?.active_id, state?.active, state?.models.find(m => m.id === state.active_id)?.sha256]);
 const executionLoading = () => pendingExecution !== null || !!state?.loading;
+// #52: say where a number comes from in words; the raw API names stay in the
+// status JSON and the JSONL export for diagnosis.
+const sourceNames = {'macos.proc_pid_rusage.ri_resident_size': 'Measured by macOS', 'linux.proc_pid_stat.rss': 'Measured by Linux', 'metal.MTLDevice.currentAllocatedSize': 'Reported by Metal'};
+const sourceText = source => source ? t(sourceNames[source] || 'Measured by the system') : null;
 const rateText = value => `${knownNumber(value) ? formatNumber(value, 1) : '—'} ${t('tok/s')}`;
 const timeText = value => knownNumber(value) ? `${formatNumber(value, 2)} s` : '—';
 function renderReplyMetrics(element) {
@@ -140,17 +144,17 @@ function renderMemory() {
   const rss = !executionLoading() && state?.ready && rssFresh && r?.scope === 'geistd' && knownNumber(memory?.process_rss_bytes) ? memory.process_rss_bytes : null;
   const rssReason=t(!rssFresh && knownNumber(memory?.process_rss_sample_age_ms) ? 'Stale measurement' : ({query_failed:'Measurement failed',stale:'Stale measurement'})[memory?.rss_unavailable_reason] || 'Not measured yet');
   $('test-memory').textContent = rss === null ? '—' : gib(rss);
-  $('test-memory').title=rss===null ? rssReason : memory.rss_source || t('Process RSS');
+  $('test-memory').title=rss===null ? rssReason : sourceText(memory.rss_source) || t('Process RSS');
   $('test-memory').setAttribute('aria-label',`${t('Process RSS')}: ${rss===null?rssReason:gib(rss)}`);
   const age=(memory?.gpu_sample_age_ms ?? 0)+localAge;
   const stale=age>6000;
   const gpuMemory = !executionLoading() && !stale && memory?.status===1 && knownNumber(memory.gpu_allocated_bytes) ? memory.gpu_allocated_bytes : null;
   const memoryReason = t(stale ? 'Stale measurement' : ({unsupported:'Unsupported',query_failed:'Measurement failed',stale:'Stale measurement'})[memory?.gpu_unavailable_reason] || 'Not measured yet');
   $('test-gpu-memory').textContent = gpuMemory===null ? '—' : gib(gpuMemory);
-  $('test-gpu-memory').title = gpuMemory===null ? memoryReason : `${memory.gpu_source} · ${formatNumber(age/1000,1)} s`;
+  $('test-gpu-memory').title = gpuMemory===null ? memoryReason : `${sourceText(memory.gpu_source)} · ${formatNumber(age/1000,1)} s`;
   $('test-gpu-memory').setAttribute('aria-label',`${t('Metal allocated')}: ${gpuMemory===null ? memoryReason : gib(gpuMemory)}`);
   $('memory-live').textContent = `${t('Process RSS')}: ${rss===null?rssReason:gib(rss)} · ${t('Metal allocated')}: ${gpuMemory===null?memoryReason:gib(gpuMemory)}`;
-  $('memory-source').textContent = [memory?.rss_source, memory?.gpu_source, memory?.gpu_source && knownNumber(memory?.gpu_sample_age_ms) ? `${t('Sample age')}: ${formatNumber(age/1000,1)} s` : null, memory?.unified_memory ? t('Shared memory; values overlap.') : null].filter(Boolean).join(' · ');
+  $('memory-source').textContent = [sourceText(memory?.rss_source), sourceText(memory?.gpu_source), memory?.gpu_source && knownNumber(memory?.gpu_sample_age_ms) ? `${t('Sample age')}: ${formatNumber(age/1000,1)} s` : null, memory?.unified_memory ? t('Shared memory; values overlap.') : null].filter(Boolean).join(' · ');
 }
 function renderPerformance() {
   if (lastReply && lastReply.model !== modelIdentity()) lastReply = null;
@@ -168,7 +172,7 @@ function renderPerformance() {
   const compatible = profile && profile.artifact === model?.sha256;
   for (const mode of ['cpu', 'gpu']) {
     const sample = compatible ? profile[mode] : null;
-    for (const id of ['rate','typical']) $(`history-${mode}-${id}`).textContent = rateText(sample?.rate);
+    for (const id of ['rate','typical']) $(`history-${mode}-${id}`).textContent = knownNumber(sample?.rate) ? rateText(sample.rate) : t('Not measured yet');
     $(`history-${mode}-range`).textContent = sample?.count > 1 ? `${formatNumber(sample.q25,1)}–${formatNumber(sample.q75,1)} ${t('tok/s')}` : '—';
     $(`summary-${mode}-first`).textContent = `◷ ${timeText(sample?.first_answer)}`;
     const availability = mode==='gpu' && !state?.execution?.gpu_available ? 'Not available' : profile?.recent?.some(r=>r.historical && (mode==='gpu' ? r.backend==='metal' : r.backend?.startsWith('cpu'))) ? 'Historical' : 'Not measured yet';
@@ -471,6 +475,7 @@ function visibleModels() {
   const models = state?.models || [];
   return state?.active_id === 'custom' && state.ready ? [{id:'custom', name:state.active, installed:true, resource_fit:0, capabilities:{chat:true}}, ...models] : models;
 }
+let shownActive = ''; // last active model scrolled into view (#50)
 function render(next) {
   const modelChanged = state && (state.active_id !== next.active_id || state.active !== next.active);
   state = next;
@@ -499,6 +504,11 @@ function render(next) {
   $('catalog-file').disabled = requesting || next.busy || next.loading || !!next.phase || !!controller;
   if (!working) { transfer.id = ''; transfer.samples = []; }
   renderModelGroups(models);
+  // Stacked layout (#50): bring the newly active card into the list's view once, not on every poll.
+  if (next.active_id && next.active_id !== shownActive) {
+    shownActive = next.active_id;
+    document.querySelector(`.model[data-id="${CSS.escape(next.active_id)}"]`)?.scrollIntoView({block: 'nearest'});
+  }
   if (!controller && !requesting && (!localMessage || next.message !== lastServerMessage)) message(working ? '' : next.message || '', false);
   lastServerMessage = next.message;
   buttonStates(); chatLayout();
@@ -870,7 +880,8 @@ function renderExecution() {
     label.classList.toggle('is-loading', pending);
     if (mark) {
       mark.hidden = input.value !== execution?.recommended;
-      mark.title = t('Recommended');
+      mark.title = t('Recommended processor');
+      mark.setAttribute('aria-label', t('Recommended processor'));
     }
     const backend = input.value === 'gpu' ? backendName(execution?.gpu_backend || (execution?.active === 'gpu' ? execution?.backend : '')) : '';
     const detail = label.querySelector('.processor-backend');
