@@ -88,6 +88,11 @@ build/test_template: tests/test_template.c src/template.c src/template.h src/ggu
 	@mkdir -p build
 	$(CC) -std=c23 -O1 -g -Wall -Wextra -fsanitize=address,undefined -o $@ tests/test_template.c src/template.c src/gguf.c
 
+# SIGTERM must stop the accept loop whichever thread receives it (#69); no engine needed.
+build/test_net_signal: tests/test_net_signal.c src/net.c src/net.h
+	@mkdir -p build
+	$(CC) -std=c23 -O1 -g -Wall -Wextra -D_POSIX_C_SOURCE=200809L -D_DARWIN_C_SOURCE -o $@ tests/test_net_signal.c src/net.c -lpthread
+
 # Always delegate: the engine's own make is incremental, and a plain file
 # target goes stale on a GEIST_REF bump.
 $(LIB): FORCE
@@ -102,8 +107,9 @@ FORCE:
 fetch-model:
 	$(MAKE) -C $(GEISTLIB) fetch-llama-model
 
-test: geist-serve geistd build/test_template
+test: geist-serve geistd build/test_template build/test_net_signal
 	./build/test_template
+	./build/test_net_signal
 	sh tests/smoke.sh
 	sh tests/geistd.sh
 

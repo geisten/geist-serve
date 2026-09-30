@@ -3,6 +3,7 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <poll.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,6 +25,25 @@ void net_install_signals(void) {
     struct sigaction sa = {.sa_handler = on_stop};
     sigaction(SIGTERM, &sa, nullptr);
     sigaction(SIGINT, &sa, nullptr);
+}
+
+/* The signal may run on any thread (an OpenMP worker, say) or just before
+ * accept() is entered; either way a blocking accept() would sleep until the
+ * next client. Wait in poll() with a short timeout instead, so net_stop is
+ * seen within 250 ms whatever thread took the signal and whenever (#69). */
+int net_accept(int lfd) {
+    while (!net_stop) {
+        struct pollfd p = {.fd = lfd, .events = POLLIN};
+        int           ready = poll(&p, 1, 250);
+        if (ready < 0 && errno != EINTR)
+            return -1;
+        if (ready <= 0)
+            continue;
+        int fd = accept(lfd, nullptr, nullptr);
+        if (fd >= 0 || (errno != EINTR && errno != EAGAIN && errno != ECONNABORTED))
+            return fd;
+    }
+    return -1;
 }
 
 /* SO_ACCEPTCONN is unreliable on macOS, so probe the way that works
