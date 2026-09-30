@@ -114,10 +114,20 @@ jobs:
       - name: assemble
         env:
           PACKAGE_VERSION: ${{ needs.version.outputs.package }}
+          GEIST_MANIFEST_SIGNING_KEY: ${{ secrets.GEIST_MANIFEST_SIGNING_KEY }}
         run: |
           cp deploy/systemd/geist-serve.socket deploy/systemd/geist-serve.service deploy/systemd/geist-serve.default dist/
           cp candidates/ubuntu-amd64-candidate/*.deb dist/
           cp "candidates/ubuntu-arm64-candidate/geist_${PACKAGE_VERSION}_arm64.deb" dist/
+          if [ -n "$GEIST_MANIFEST_SIGNING_KEY" ]; then
+            cp candidates/ubuntu-*-candidate/geist-"$PACKAGE_VERSION"-linux-*.tar.gz scripts/install-geist.sh dist/
+            python3 scripts/installer-manifest.py dist "$PACKAGE_VERSION" "$GITHUB_SHA" "$(sed -n 's/^GEIST_REF *?= *//p' Makefile)"
+            key=$(mktemp); trap 'rm -f "$key"' EXIT
+            printf '%s\n' "$GEIST_MANIFEST_SIGNING_KEY" >"$key"
+            sh scripts/sign-manifest.sh dist/geist-manifest "$key"
+          else
+            echo "::notice::GEIST_MANIFEST_SIGNING_KEY is not set: no rootless Linux installer assets (#46)"
+          fi
           python3 scripts/sbom.py dist/geist-serve.cdx.json "$PACKAGE_VERSION"
           python3 scripts/release-manifest.py dist "$PACKAGE_VERSION"
           (cd dist && sha256sum -c SHA256SUMS)
