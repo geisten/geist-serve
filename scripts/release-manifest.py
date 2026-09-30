@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Fail closed unless the release directory has the complete expected payload."""
+"""Fail closed unless the release directory has the complete expected payload
+(binaries, DEBs, service files and the CycloneDX SBOM from scripts/sbom.py)."""
 import hashlib
 from pathlib import Path
 import re
@@ -13,7 +14,7 @@ def assemble(directory: Path, version: str):
     binaries = [f'geist-serve-{p}{suffix}' for p in platforms for suffix in ('', '-geistd')]
     packages = [f'geist_{version}_{arch}.deb' for arch in ('amd64', 'arm64')]
     packages.append(f'geist-desktop_{version}_all.deb')
-    payload = sorted(binaries+packages+['geist-serve.socket','geist-serve.service','geist-serve.default'])
+    payload = sorted(binaries+packages+['geist-serve.socket','geist-serve.service','geist-serve.default','geist-serve.cdx.json'])
     expected = set(payload)
     actual = {p.name for p in directory.iterdir()}
     if actual != expected:

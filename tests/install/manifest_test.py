@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Release upload contract: all platform pairs, DEBs and service files."""
+"""Release upload contract: all platform pairs, DEBs, service files and the SBOM."""
 import hashlib
 import importlib.util
 from pathlib import Path
@@ -14,13 +14,13 @@ class ManifestTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
-        self.assets=[f'geist-serve-{p}{s}' for p in ['linux-x86_64','linux-aarch64','macos-arm64'] for s in ['', '-geistd']]+['geist-serve.socket','geist-serve.service','geist-serve.default','geist_1.2.3_amd64.deb','geist_1.2.3_arm64.deb','geist-desktop_1.2.3_all.deb']
+        self.assets=[f'geist-serve-{p}{s}' for p in ['linux-x86_64','linux-aarch64','macos-arm64'] for s in ['', '-geistd']]+['geist-serve.socket','geist-serve.service','geist-serve.default','geist_1.2.3_amd64.deb','geist_1.2.3_arm64.deb','geist-desktop_1.2.3_all.deb','geist-serve.cdx.json']
         for name in self.assets: (self.root/name).write_text(name)
 
     def test_all_payloads_and_package_sidecars_verified(self):
         self.assertEqual(set(manifest.assemble(self.root,'1.2.3')),set(self.assets))
         entries=(self.root/'SHA256SUMS').read_text().splitlines()
-        self.assertEqual(len(entries),12)
+        self.assertEqual(len(entries),13)
         for line in entries:
             digest,name=line.split()
             self.assertEqual(digest,hashlib.sha256((self.root/name).read_bytes()).hexdigest())
