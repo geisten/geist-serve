@@ -508,6 +508,14 @@ void completions(int fd, const struct request *r, struct app_arena *arena) {
     if (!rc && chat.stream && !p.transport.started && !completion_send(&p, ""))
         rc = 502;
     struct app_buffer b = {.data = body, .cap = 65536};
+    /* A clean, connected completion leaves the daemon idle: release the shared
+     * model before the final bytes, so a client that sends its next request as
+     * soon as it reads this answer is admitted instead of getting 429 (#68).
+     * Failures keep the old order; observation_end may reap the child first.
+     * Cost: a failed final send is recorded as completed, not disconnected. */
+    bool observed = !rc && !p.transport.disconnected;
+    if (observed)
+        observation_end(&observation, 0, p.transport.first, monotonic_ms() - p.transport.start, &stats);
     if (rc) {
         if (!p.transport.started)
             api_error(fd, rc, error);
@@ -563,9 +571,10 @@ void completions(int fd, const struct request *r, struct app_arena *arena) {
         } else if (!response(fd, 200, "application/json", body, b.len))
             rc = 498;
     }
-    observation_end(&observation,
-                    p.transport.disconnected ? 498 : rc,
-                    p.transport.first,
-                    monotonic_ms() - p.transport.start,
-                    &stats);
+    if (!observed)
+        observation_end(&observation,
+                        p.transport.disconnected ? 498 : rc,
+                        p.transport.first,
+                        monotonic_ms() - p.transport.start,
+                        &stats);
 }
