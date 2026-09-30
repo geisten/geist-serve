@@ -1,4 +1,5 @@
-# Raspberry Pi 5: build, the full HTTP contract, and one decode number —
+# Raspberry Pi 5: build, the full HTTP contract, one decode number, and the
+# C23 app suite with real inference —
 # on the reference board through its self-hosted runner. Manual only: the
 # board is shared and thermally fragile, so every heavy step goes through
 # ~/bin/with-pi-lock (see CLAUDE.local.md in the engine repo).
@@ -38,3 +39,16 @@ jobs:
             curl -s http://127.0.0.1:28090/api/generate -d "{\"prompt\":\"Write a paragraph about rivers.\",\"stream\":false,\"options\":{\"num_predict\":64,\"temperature\":0}}" \
               | python3 -c "import json,sys; d=json.load(sys.stdin); print(\"decode tok/s:\", round(d[\"eval_count\"]/(d[\"eval_duration\"]/1e9),1), \"prefill tok/s:\", round(d[\"prompt_eval_count\"]/(d[\"prompt_eval_duration\"]/1e9),1))"
             kill $pid; wait $pid'
+      # The app suite comes last: it heats the board, and the decode number
+      # above must be measured cool. Nothing is installed on the shared board;
+      # a missing dependency fails with the command to run by hand.
+      - name: app dependencies present (libcurl and OpenSSL headers)
+        run: |
+          for p in libcurl openssl; do
+            pkg-config --exists $p || { echo "missing $p development files; on the board run: sudo apt-get install libcurl4-openssl-dev libssl-dev"; exit 1; }
+          done
+      - name: C23 app suite with real inference (geist-app + this build's geistd)
+        timeout-minutes: 50
+        run: |
+          OMP_NUM_THREADS=4 GEIST_TEST_MODEL="$PWD/geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf" \
+            GEIST_EXECUTION_DAEMON="$PWD/geistd" ~/bin/with-pi-lock make app test-app
