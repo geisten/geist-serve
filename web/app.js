@@ -282,7 +282,17 @@ function buttonStates() {
   $('test-connection').disabled = !state?.ready || inferenceBusy() || connectionTesting || runtimeRequest() || !!controller;
   $('copy-connection').disabled = !state?.ready;
   $('connection-endpoint').textContent = t(`${location.origin}/v1`);
-  $('connection-model').textContent = t(state?.active_id || 'Choose a model');
+  // #58: without a model this is a hint, not a copyable value.
+  $('connection-model').classList.toggle('is-empty', !state?.active_id);
+  if (state?.active_id) $('connection-model').textContent = state.active_id;
+  else uiText($('connection-model'), 'No model loaded yet');
+  // #59: say why the buttons are disabled, one cause at a time.
+  const connectionReason = !state ? 'Service unavailable. Reopen Geist to reconnect.'
+    : !state.ready ? 'Load a model first to copy or test the connection.'
+    : $('test-connection').disabled && !connectionTesting ? 'Wait until the current answer finishes to test the connection.' : '';
+  $('connection-disabled').hidden = !connectionReason;
+  if (connectionReason) uiText($('connection-disabled-text'), connectionReason);
+  $('connection-choose').hidden = !state || !!state.ready;
   const ready = selectedTask && !selectedTask.url && state?.ready && !inferenceBusy() && !runtimeRequest() && !controller && !connectionTesting && allowed(state?.models.find(m => m.id === state.active_id));
   $('run').disabled = !ready || !$('prompt').value.trim();
   $('run').hidden = !!controller;
@@ -729,14 +739,22 @@ $('history-export').addEventListener('click', async () => {
 document.querySelector('.brand').addEventListener('click', event => { event.preventDefault(); showPage('models-page'); });
 document.querySelector('.skip').addEventListener('click', event => { event.preventDefault(); const main = $('main'); main.tabIndex = -1; main.focus(); });
 window.addEventListener('beforeunload', () => controller?.abort());
+// #60: the Terminal hint names only the host's own command line tool. The Mac
+// shell injects the installed geist-cli path; a plain browser gets both.
+const terminalHelp = window.geistDesktop === 'mac'
+  ? `Paste the copied curl command into your terminal to try the loaded model. The command line tool is at ${window.geistCLIPath || '/Applications/Geist.app/Contents/MacOS/geist-cli'}.`
+  : window.geistDesktop === 'linux'
+  ? 'Paste the copied curl command into your terminal to try the loaded model. You can also run geist test and geist chat.'
+  : 'Paste the copied curl command into your terminal to try the loaded model. Ubuntu also installs geist test and geist chat. On Mac, the CLI is bundled at /Applications/Geist.app/Contents/MacOS/geist-cli.';
 const connectionHelp = {
-  terminal: 'Paste the copied curl command into your terminal to try the loaded model. Ubuntu also installs geist test and geist chat. On Mac, the CLI is bundled at /Applications/Geist.app/Contents/MacOS/geist-cli.',
+  terminal: terminalHelp,
   continue: 'In Continue, open your local config.yaml and add the model from this configuration. JSON is valid YAML. Select Geist and use Chat mode. Preserve your existing configuration.',
   opencode: 'Save as opencode.json in a private test folder. Run opencode there and choose geist-chat. This profile disables tools; it does not enable coding-agent workflows.'
 };
 function updateConnectionHelp() { $('connection-help').textContent = t(connectionHelp[$('connection-client').value]); }
 $('connection-client').addEventListener('change', updateConnectionHelp);
 updateConnectionHelp();
+$('connection-choose').addEventListener('click', () => showPage('models-page'));
 $('copy-connection').addEventListener('click', async () => {
   try {
     const c = await (await api('/app/connections')).json();

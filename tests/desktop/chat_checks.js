@@ -517,6 +517,16 @@ async function checkActivityUX(assert, tick) {
       assert(controller && bf.phase==='downloading' && backgroundCalls.filter(([path])=>path==='/app/download').length===2,'resume while generating issues exactly one new transfer');
       backgroundFinish();await idle();
       assert(! $('run').disabled && ! $('test-connection').disabled && $('prompt').value==='My next draft','finished response allows the next prompt and editor test during transfer');
+      // #58/#59: Connect explains a missing model and every disabled cause; #60: the Mac hint is Mac-only.
+      assert($('connection-disabled').hidden && !$('connection-model').classList.contains('is-empty'),'ready service shows the model and no disabled reason');
+      {const saved=state;
+       state={...saved,ready:false,active_id:''};buttonStates();
+       assert(!$('connection-disabled').hidden && $('connection-disabled-text').dataset.uiText==='Load a model first to copy or test the connection.' && !$('connection-choose').hidden && $('connection-model').classList.contains('is-empty') && getComputedStyle($('connection-model')).fontFamily!==getComputedStyle($('connection-endpoint')).fontFamily,'no model: hint in body font, reason and a way to Models');
+       assert($('copy-connection').getAttribute('aria-describedby')==='connection-disabled' && $('test-connection').getAttribute('aria-describedby')==='connection-disabled','disabled reason is announced with the buttons');
+       state=null;buttonStates();
+       assert($('connection-disabled-text').dataset.uiText==='Service unavailable. Reopen Geist to reconnect.' && $('connection-choose').hidden,'service down has its own reason');
+       state=saved;buttonStates();}
+      if (window.geistDesktop==='mac') assert(!/Ubuntu/.test(connectionHelp.terminal) && /geist-cli/.test(connectionHelp.terminal),'Mac terminal hint names only the Mac command line tool');
       key();await tick();backgroundEmit({response:'A second answer during checksum verification.'});await tick();
       bf.phase='verifying';backgroundPaint();
       assert(controller && backgroundPick().disabled && backgroundPick().querySelector('.model-ring').dataset.stage==='verifying' && !$('workspace').hidden,'verification locks only the transfer row');
