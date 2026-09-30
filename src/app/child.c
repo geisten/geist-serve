@@ -4,11 +4,11 @@
 /* Probe the packaged engine once. Old CPU-only daemons remain usable. */
 void probe_backends(void) {
 #if defined(__aarch64__) || defined(__arm64__)
-    strcpy(app.cpu_backend, "cpu_neon");
+    strcpy(app.backend.cpu, "cpu_neon");
 #elif defined(__x86_64__)
-    strcpy(app.cpu_backend, "cpu_x86");
+    strcpy(app.backend.cpu, "cpu_x86");
 #else
-    strcpy(app.cpu_backend, "cpu_scalar");
+    strcpy(app.backend.cpu, "cpu_scalar");
 #endif
     int pipefd[2];
     if (pipe(pipefd))
@@ -24,10 +24,10 @@ void probe_backends(void) {
     int rc = posix_spawn_file_actions_adddup2(&actions, pipefd[1], STDOUT_FILENO);
     if (!rc)
         rc = posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0);
-    char *args[] = {app.server, "--backends", nullptr};
+    char *args[] = {app.paths.server, "--backends", nullptr};
     pid_t child  = 0;
     if (!rc)
-        rc = posix_spawn(&child, app.server, &actions, nullptr, args, environ);
+        rc = posix_spawn(&child, app.paths.server, &actions, nullptr, args, environ);
     posix_spawn_file_actions_destroy(&actions);
     close(pipefd[1]);
     char   output[1024] = {0};
@@ -62,8 +62,8 @@ void probe_backends(void) {
         int   gpu  = json_get(j, 0, "gpu");
         char *name = json_strdup(j, json_get(j, gpu, "name"));
         if (name && (!strcmp(name, "metal") || !strcmp(name, "vulkan"))) {
-            snprintf(app.gpu_backend, sizeof app.gpu_backend, "%s", name);
-            app.gpu_available = json_bool(j, json_get(j, gpu, "available"), false);
+            snprintf(app.backend.gpu, sizeof app.backend.gpu, "%s", name);
+            app.backend.gpu_available = json_bool(j, json_get(j, gpu, "available"), false);
         }
         free(name);
     }
@@ -71,8 +71,8 @@ void probe_backends(void) {
 }
 
 bool gpu_supported(const struct app_model *model) {
-    unsigned bit = !strcmp(app.gpu_backend, "metal") ? 2 : 4;
-    return app.gpu_available && model && (model->backends & bit);
+    unsigned bit = !strcmp(app.backend.gpu, "metal") ? 2 : 4;
+    return app.backend.gpu_available && model && (model->backends & bit);
 }
 bool recommend_gpu(const struct app_model *model) {
     /* A hardware default, not a claim of measured performance. */
@@ -87,25 +87,25 @@ void begin_activity(struct activity    *a,
                            enum activity_stage stage,
                            uint64_t            generation,
                            const char         *model) {
-    activity_begin(a, ++app.operation_id, generation, stage, monotonic_ms());
+    activity_begin(a, ++app.child.operation_id, generation, stage, monotonic_ms());
     snprintf(a->model, sizeof a->model, "%s", model ? model : "custom");
-    snprintf(a->backend, sizeof a->backend, "%s", app.backend);
-    a->engine = app.engine;
+    snprintf(a->backend, sizeof a->backend, "%s", app.backend.active);
+    a->engine = app.child.engine;
 }
 
 static void runtime_paths_close(void) {
-    lifecycle_close(&app.lifecycle);
-    if (app.socket_path[0])
-        unlink(app.socket_path);
-    if (app.runtime_dir[0])
-        rmdir(app.runtime_dir);
-    app.socket_path[0] = app.runtime_dir[0] = 0;
+    lifecycle_close(&app.child.lifecycle);
+    if (app.child.socket_path[0])
+        unlink(app.child.socket_path);
+    if (app.child.runtime_dir[0])
+        rmdir(app.child.runtime_dir);
+    app.child.socket_path[0] = app.child.runtime_dir[0] = 0;
 }
 
 static bool archive_load_failure(void) {
     char source[APP_PATH_CAP], archive[APP_PATH_CAP];
-    if (!path_join(source, app.home, "server.log") ||
-        !path_join(archive, app.home, "load-failure-XXXXXX"))
+    if (!path_join(source, app.paths.home, "server.log") ||
+        !path_join(archive, app.paths.home, "load-failure-XXXXXX"))
         return false;
     int fd = mkstemp(archive);
     if (fd < 0)
@@ -121,61 +121,61 @@ static bool archive_load_failure(void) {
  * Ollama or another user's process. Reap before inspecting health. */
 static void lifecycle_sample(void) {
     struct lifecycle_snapshot sample;
-    if (!lifecycle_read(app.lifecycle, app.generation, &sample) ||
-        sample.process != (uint64_t) app.child)
+    if (!lifecycle_read(app.child.lifecycle, app.generation, &sample) ||
+        sample.process != (uint64_t) app.child.pid)
         return;
-    app.lifecycle_snapshot                    = sample;
+    app.child.lifecycle_snapshot                    = sample;
     static const enum activity_stage stages[] = {
             ACT_NONE, ACT_BACKEND, ACT_MODEL, ACT_METADATA, ACT_WARMUP, ACT_READY};
-    for (unsigned i = app.lifecycle_phase + 1; i < LC_READY; i++) {
+    for (unsigned i = app.child.lifecycle_phase + 1; i < LC_READY; i++) {
         if (!sample.phase_ns[i])
             break;
         double when = (double) sample.phase_ns[i] / 1e6;
-        if (when < app.load_activity.event_at)
-            when = app.load_activity.event_at;
+        if (when < app.activity.load.event_at)
+            when = app.activity.load.event_at;
         (void) activity_step(
-                &app.load_activity, app.load_activity.id, app.generation, stages[i], when);
-        app.lifecycle_phase = i;
+                &app.activity.load, app.activity.load.id, app.generation, stages[i], when);
+        app.child.lifecycle_phase = i;
     }
 }
 
 void poll_child(void) {
-    if (!app.child || app.stopping)
+    if (!app.child.pid || app.stopping)
         return;
-    if (atomic_load(&load_cancelled) && !app.ready) {
-        activity_change(&app.load_activity, ACT_STOPPING);
+    if (atomic_load(&load_cancelled) && !app.child.ready) {
+        activity_change(&app.activity.load, ACT_STOPPING);
         stop_child();
         (void) archive_load_failure();
-        (void) activity_end(&app.load_activity, "cancelled", 499, monotonic_ms());
+        (void) activity_end(&app.activity.load, "cancelled", 499, monotonic_ms());
         return;
     }
     lifecycle_sample();
     int   status;
-    pid_t result    = waitpid(app.child, &status, WNOHANG);
-    bool  timed_out = !app.ready && monotonic_ms() - app.loading_started > 120000;
-    if (result == app.child || (result < 0 && errno == ECHILD) || timed_out) {
+    pid_t result    = waitpid(app.child.pid, &status, WNOHANG);
+    bool  timed_out = !app.child.ready && monotonic_ms() - app.child.loading_started > 120000;
+    if (result == app.child.pid || (result < 0 && errno == ECHILD) || timed_out) {
         if (timed_out)
             stop_child();
         else {
-            app.previous_pid = app.child;
-            app.reaped_ms    = monotonic_ms();
+            app.child.previous_pid = app.child.pid;
+            app.child.reaped_ms    = monotonic_ms();
             runtime_paths_close();
         }
-        app.child = 0;
-        app.ready = false;
+        app.child.pid = 0;
+        app.child.ready = false;
         /* A replacement's verification may already have failed or be active.
          * Reaping the previous generation must not overwrite that newer
          * outcome, restart the old GPU choice or erase its diagnostic. */
-        if (app.load_activity.generation > app.generation)
+        if (app.activity.load.generation > app.generation)
             return;
-        (void) activity_end(&app.load_activity, "failed", timed_out ? 504 : 502, monotonic_ms());
-        if (strcmp(app.backend, app.cpu_backend)) {
+        (void) activity_end(&app.activity.load, "failed", timed_out ? 504 : 502, monotonic_ms());
+        if (strcmp(app.backend.active, app.backend.cpu)) {
             char path[APP_PATH_CAP], id[64], log[APP_PATH_CAP], archive[APP_PATH_CAP];
-            snprintf(path, sizeof path, "%s", app.chosen);
-            snprintf(id, sizeof id, "%s", app.active_id);
+            snprintf(path, sizeof path, "%s", app.child.chosen);
+            snprintf(id, sizeof id, "%s", app.child.active_id);
             bool preserved = false;
-            if (path_join(log, app.home, "server.log") &&
-                path_join(archive, app.home, "gpu-failure-XXXXXX")) {
+            if (path_join(log, app.paths.home, "server.log") &&
+                path_join(archive, app.paths.home, "gpu-failure-XXXXXX")) {
                 int saved = mkstemp(archive);
                 if (saved >= 0) {
                     close(saved);
@@ -191,14 +191,14 @@ void poll_child(void) {
                          "stopped.");
                 return;
             }
-            snprintf(app.execution_notice,
-                     sizeof app.execution_notice,
+            snprintf(app.backend.notice,
+                     sizeof app.backend.notice,
                      "GPU stopped or failed to load. Restored CPU; diagnostics are kept in the app "
                      "data folder.");
             if (start_child_mode(path, id, "cpu"))
                 return;
         }
-        bool archived = !app.generating && archive_load_failure();
+        bool archived = !app.child.generating && archive_load_failure();
         snprintf(app.message,
                  sizeof app.message,
                  archived ? "The model process stopped. Its diagnostics were preserved. Retry the "
@@ -206,65 +206,65 @@ void poll_child(void) {
                           : "The model process stopped. See server.log in the app data folder.");
         return;
     }
-    if (app.ready)
+    if (app.child.ready)
         return;
-    if (monotonic_ms() - app.child_probe_ms < 250)
+    if (monotonic_ms() - app.child.probe_ms < 250)
         return;
-    app.child_probe_ms = monotonic_ms();
+    app.child.probe_ms = monotonic_ms();
     char              reported[24];
     struct app_engine identity;
-    if (app_daemon_identity(app.socket_path, reported, &identity)) {
+    if (app_daemon_identity(app.child.socket_path, reported, &identity)) {
         /* The engine can complete several phases during the bounded info
          * handshake. Capture them before publishing readiness. */
         lifecycle_sample();
         snprintf(identity.payload_sha256,
                  sizeof identity.payload_sha256,
                  "%s",
-                 app.engine.payload_sha256);
-        app.engine           = identity;
-        app.backend_verified = !strcmp(reported, app.backend);
-        if (reported[0] && !app.backend_verified) {
+                 app.child.engine.payload_sha256);
+        app.child.engine           = identity;
+        app.backend.verified = !strcmp(reported, app.backend.active);
+        if (reported[0] && !app.backend.verified) {
             stop_child();
-            (void) activity_end(&app.load_activity, "failed", 502, monotonic_ms());
+            (void) activity_end(&app.activity.load, "failed", 502, monotonic_ms());
             snprintf(app.message,
                      sizeof app.message,
                      "The engine reported a different processor. Reload the model.");
             return;
         }
-        app.loaded_ms            = monotonic_ms() - app.loading_started;
-        app.ready                = true;
-        app.load_activity.engine = app.engine;
-        activity_change(&app.load_activity, ACT_READY);
-        (void) activity_end(&app.load_activity, "completed", 0, monotonic_ms());
+        app.child.loaded_ms            = monotonic_ms() - app.child.loading_started;
+        app.child.ready                = true;
+        app.activity.load.engine = app.child.engine;
+        activity_change(&app.activity.load, ACT_READY);
+        (void) activity_end(&app.activity.load, "completed", 0, monotonic_ms());
         app.message[0]                = 0;
-        const struct app_model *model = app_model_find(app.active_id);
-        if (app.save_execution && model) {
+        const struct app_model *model = app_model_find(app.child.active_id);
+        if (app.backend.save && model) {
             char key[80];
             snprintf(key, sizeof key, "backend-%s", model->sha256);
-            if (!save_preference(key, app.execution_mode))
-                snprintf(app.execution_notice,
-                         sizeof app.execution_notice,
+            if (!save_preference(key, app.backend.mode))
+                snprintf(app.backend.notice,
+                         sizeof app.backend.notice,
                          "The model is running, but its execution preference could not be saved.");
         }
-        app.save_execution = false;
+        app.backend.save = false;
     }
 }
 
 void stop_child(void) {
     /* Readiness is revoked before releasing the mutex. Other workers can report
      * cached status, but cannot replace, reuse or reap this owned process. */
-    app.ready    = false;
+    app.child.ready    = false;
     app.stopping = true;
-    if (!app.child)
+    if (!app.child.pid)
         goto cleanup;
-    app.previous_pid = app.child;
-    kill(app.child, SIGTERM);
+    app.child.previous_pid = app.child.pid;
+    kill(app.child.pid, SIGTERM);
     for (unsigned i = 0; i < 20; ++i) {
         int   status;
-        pid_t result = waitpid(app.child, &status, WNOHANG);
-        if (result == app.child || (result < 0 && errno == ECHILD)) {
-            app.child     = 0;
-            app.reaped_ms = monotonic_ms();
+        pid_t result = waitpid(app.child.pid, &status, WNOHANG);
+        if (result == app.child.pid || (result < 0 && errno == ECHILD)) {
+            app.child.pid     = 0;
+            app.child.reaped_ms = monotonic_ms();
             break;
         }
         struct timespec pause = {.tv_nsec = 25000000};
@@ -272,19 +272,19 @@ void stop_child(void) {
         nanosleep(&pause, nullptr);
         pthread_mutex_lock(&app.mutex);
     }
-    if (app.child) {
-        kill(app.child, SIGKILL);
-        while (waitpid(app.child, nullptr, 0) < 0 && errno == EINTR) {
+    if (app.child.pid) {
+        kill(app.child.pid, SIGKILL);
+        while (waitpid(app.child.pid, nullptr, 0) < 0 && errno == EINTR) {
         }
     }
-    app.child     = 0;
-    app.reaped_ms = monotonic_ms();
+    app.child.pid     = 0;
+    app.child.reaped_ms = monotonic_ms();
 cleanup:
     runtime_paths_close();
-    app.lifecycle_snapshot = (struct lifecycle_snapshot) {0};
-    app.lifecycle_phase    = 0;
+    app.child.lifecycle_snapshot = (struct lifecycle_snapshot) {0};
+    app.child.lifecycle_phase    = 0;
     app.stopping           = false;
-    app.ready              = false;
+    app.child.ready              = false;
 }
 
 static bool start_child_mode_impl(const char *path, const char *id, const char *mode) {
@@ -296,38 +296,38 @@ static bool start_child_mode_impl(const char *path, const char *id, const char *
                  "GPU is not supported by this model and packaged engine.");
         return false;
     }
-    if (!app.load_activity.id || app.load_activity.outcome[0])
-        begin_activity(&app.load_activity, ACT_STARTING, app.generation + 1, id);
-    snprintf(app.load_activity.backend,
-             sizeof app.load_activity.backend,
+    if (!app.activity.load.id || app.activity.load.outcome[0])
+        begin_activity(&app.activity.load, ACT_STARTING, app.generation + 1, id);
+    snprintf(app.activity.load.backend,
+             sizeof app.activity.load.backend,
              "%s",
-             gpu ? app.gpu_backend : app.cpu_backend);
+             gpu ? app.backend.gpu : app.backend.cpu);
     atomic_store(&load_cancelled, false);
-    if (app.child)
-        activity_change(&app.load_activity, ACT_STOPPING);
+    if (app.child.pid)
+        activity_change(&app.activity.load, ACT_STOPPING);
     stop_child();
-    activity_change(&app.load_activity, ACT_STARTING);
-    app.engine = (struct app_engine) {0};
-    (void) app_engine_sha256(app.server, app.engine.payload_sha256);
+    activity_change(&app.activity.load, ACT_STARTING);
+    app.child.engine = (struct app_engine) {0};
+    (void) app_engine_sha256(app.paths.server, app.child.engine.payload_sha256);
     struct app_hardware hardware;
-    bool                known = app_hardware_read(&hardware, app.home);
+    bool                known = app_hardware_read(&hardware, app.paths.home);
     if (!known || !hardware.supported) {
         snprintf(app.message,
                  sizeof app.message,
                  "This CPU/platform does not support the bundled inference engine.");
         return false;
     }
-    strcpy(app.runtime_dir, "/tmp/geist-app-XXXXXX");
-    if (!mkdtemp(app.runtime_dir)) {
-        app.runtime_dir[0] = 0;
+    strcpy(app.child.runtime_dir, "/tmp/geist-app-XXXXXX");
+    if (!mkdtemp(app.child.runtime_dir)) {
+        app.child.runtime_dir[0] = 0;
         return false;
     }
-    snprintf(app.socket_path, sizeof app.socket_path, "%s/inference.sock", app.runtime_dir);
+    snprintf(app.child.socket_path, sizeof app.child.socket_path, "%s/inference.sock", app.child.runtime_dir);
     struct sockaddr_un sa = {.sun_family = AF_UNIX};
-    snprintf(sa.sun_path, sizeof sa.sun_path, "%s", app.socket_path);
+    snprintf(sa.sun_path, sizeof sa.sun_path, "%s", app.child.socket_path);
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd < 0 || fcntl(fd, F_SETFD, FD_CLOEXEC) != 0 ||
-        bind(fd, (struct sockaddr *) &sa, sizeof sa) != 0 || chmod(app.socket_path, 0600) != 0 ||
+        bind(fd, (struct sockaddr *) &sa, sizeof sa) != 0 || chmod(app.child.socket_path, 0600) != 0 ||
         listen(fd, 8) != 0) {
         if (fd >= 0)
             close(fd);
@@ -335,7 +335,7 @@ static bool start_child_mode_impl(const char *path, const char *id, const char *
         return false;
     }
     char logpath[APP_PATH_CAP];
-    if (!path_join(logpath, app.home, "server.log")) {
+    if (!path_join(logpath, app.paths.home, "server.log")) {
         close(fd);
         return false;
     }
@@ -345,7 +345,7 @@ static bool start_child_mode_impl(const char *path, const char *id, const char *
         return false;
     }
     char *args[] = {
-            app.server, (char *) path, "--socket", app.socket_path, "--sessions", "1", nullptr};
+            app.paths.server, (char *) path, "--socket", app.child.socket_path, "--sessions", "1", nullptr};
     size_t count = 0;
     while (environ[count])
         ++count;
@@ -355,7 +355,7 @@ static bool start_child_mode_impl(const char *path, const char *id, const char *
         close(log);
         return false;
     }
-    int lifecycle_fd = lifecycle_create(app.runtime_dir, app.generation + 1, &app.lifecycle);
+    int lifecycle_fd = lifecycle_create(app.child.runtime_dir, app.generation + 1, &app.child.lifecycle);
     if (lifecycle_fd < 0) {
         free(env);
         close(fd);
@@ -374,8 +374,8 @@ static bool start_child_mode_impl(const char *path, const char *id, const char *
     unsigned limit = known && hardware.device == APP_PI5 ? 4 : 2;
     if (cores > limit)
         cores = limit;
-    app.runtime_threads  = cores;
-    app.runtime_requests = 0;
+    app.child.runtime_threads  = cores;
+    app.child.runtime_requests = 0;
     char threads[40];
     snprintf(threads, sizeof threads, "OMP_NUM_THREADS=%u", cores);
     env[used++] = threads;
@@ -386,7 +386,7 @@ static bool start_child_mode_impl(const char *path, const char *id, const char *
     snprintf(backend_env,
              sizeof backend_env,
              "GEIST_BACKEND=%s",
-             gpu ? app.gpu_backend : app.cpu_backend);
+             gpu ? app.backend.gpu : app.backend.cpu);
     env[used++] = backend_env;
     posix_spawn_file_actions_t actions;
     int                        rc = posix_spawn_file_actions_init(&actions);
@@ -401,8 +401,8 @@ static bool start_child_mode_impl(const char *path, const char *id, const char *
         if (!rc)
             rc = posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
         if (!rc) {
-            app.spawned_ms = monotonic_ms();
-            rc             = posix_spawn(&app.child, app.server, &actions, nullptr, args, env);
+            app.child.spawned_ms = monotonic_ms();
+            rc             = posix_spawn(&app.child.pid, app.paths.server, &actions, nullptr, args, env);
         }
         posix_spawn_file_actions_destroy(&actions);
     }
@@ -411,25 +411,25 @@ static bool start_child_mode_impl(const char *path, const char *id, const char *
     close(fd);
     close(log);
     if (rc) {
-        app.child = 0;
+        app.child.pid = 0;
         snprintf(app.message, sizeof app.message, "Cannot start geistd: %s", strerror(rc));
         return false;
     }
-    snprintf(app.chosen, sizeof app.chosen, "%s", path);
-    snprintf(app.active_id, sizeof app.active_id, "%s", id ? id : "custom");
-    snprintf(app.execution_mode, sizeof app.execution_mode, "%s", mode);
-    snprintf(app.backend, sizeof app.backend, "%s", gpu ? app.gpu_backend : app.cpu_backend);
+    snprintf(app.child.chosen, sizeof app.child.chosen, "%s", path);
+    snprintf(app.child.active_id, sizeof app.child.active_id, "%s", id ? id : "custom");
+    snprintf(app.backend.mode, sizeof app.backend.mode, "%s", mode);
+    snprintf(app.backend.active, sizeof app.backend.active, "%s", gpu ? app.backend.gpu : app.backend.cpu);
     ++app.generation;
-    app.load_activity.generation = app.generation;
-    app.load_activity.engine     = app.engine;
-    activity_change(&app.load_activity, ACT_LOADING);
-    app.loading_started  = monotonic_ms();
-    app.backend_verified = false;
-    app.save_execution   = true;
+    app.activity.load.generation = app.generation;
+    app.activity.load.engine     = app.child.engine;
+    activity_change(&app.activity.load, ACT_LOADING);
+    app.child.loading_started  = monotonic_ms();
+    app.backend.verified = false;
+    app.backend.save   = true;
     const char *base     = strrchr(path, '/');
     base                 = base ? base + 1 : path;
-    snprintf(app.active, sizeof app.active, "%s", base);
-    char *ext = strstr(app.active, ".gguf");
+    snprintf(app.child.active, sizeof app.child.active, "%s", base);
+    char *ext = strstr(app.child.active, ".gguf");
     if (ext)
         *ext = 0;
     snprintf(app.message, sizeof app.message, "Loading the model into memory…");
@@ -441,7 +441,7 @@ bool start_child_mode(const char *path, const char *id, const char *mode) {
     if (!ok) {
         stop_child();
         (void) archive_load_failure();
-        (void) activity_end(&app.load_activity, "failed", 502, monotonic_ms());
+        (void) activity_end(&app.activity.load, "failed", 502, monotonic_ms());
     }
     return ok;
 }
@@ -456,6 +456,6 @@ bool start_child(const char *path, const char *id) {
             (!strcmp(mode, "gpu") && !gpu_supported(model)))
             strcpy(mode, "auto");
     }
-    app.execution_notice[0] = 0;
+    app.backend.notice[0] = 0;
     return start_child_mode(path, id, mode);
 }

@@ -34,9 +34,9 @@ void connections(int fd, bool models) {
     pthread_mutex_lock(&app.mutex);
     if (models) {
         app_put(&b, "{\"object\":\"list\",\"data\":[");
-        if (app.ready) {
+        if (app.child.ready) {
             app_put(&b, "{\"id\":");
-            app_quote(&b, app.active_id);
+            app_quote(&b, app.child.active_id);
             app_put(&b,
                     ",\"object\":\"model\",\"created\":0,\"owned_by\":\"local\",\"context_window\":"
                     "4096,\"capabilities\":{\"chat\":true,\"tools\":false,\"vision\":false}}");
@@ -46,12 +46,12 @@ void connections(int fd, bool models) {
         app_printf(&b, "{\"base_url\":\"http://127.0.0.1:%u/v1\",\"api_key\":", app.port);
         app_quote(&b, app.token);
         app_put(&b, ",\"model\":");
-        app_quote(&b, app.active_id);
+        app_quote(&b, app.child.active_id);
         app_printf(&b,
                    ",\"ready\":%s,\"daemon_pid\":%ld,\"context_tokens\":4096,\"max_output_tokens\":"
                    "4095,\"chat\":true,\"tools\":false,\"quality\":\"unverified\"}",
-                   app.ready ? "true" : "false",
-                   (long) app.child);
+                   app.child.ready ? "true" : "false",
+                   (long) app.child.pid);
     }
     pthread_mutex_unlock(&app.mutex);
     if (b.failed)
@@ -142,7 +142,7 @@ void handle(int fd, struct app_arena *arena) {
         if (perf_save_export()) {
             char              data[APP_PATH_CAP * 2], path[APP_PATH_CAP];
             struct app_buffer b = {.data = data, .cap = sizeof data};
-            snprintf(path, sizeof path, "%s/performance/export.jsonl", app.home);
+            snprintf(path, sizeof path, "%s/performance/export.jsonl", app.paths.home);
             app_put(&b, "{\"path\":");
             app_quote(&b, path);
             app_put(&b, "}");
@@ -237,20 +237,20 @@ void handle(int fd, struct app_arena *arena) {
         double       generation = parsed ? json_num(j, json_get(j, 0, "generation"), -1) : -1;
         char        *instance   = parsed ? json_strdup(j, json_get(j, 0, "instance")) : nullptr;
         pthread_mutex_lock(&app.mutex);
-        struct activity *a = app.generating ? &app.request_activity : &app.load_activity;
+        struct activity *a = app.child.generating ? &app.activity.request : &app.activity.load;
         bool valid = instance && !strcmp(instance, app.instance) &&
                      generation == (double) a->generation && id > 0 && id == (double) a->id &&
                      !a->outcome[0] &&
-                     (app.generating || app.job_running || (app.child && !app.ready));
+                     (app.child.generating || app.job.running || (app.child.pid && !app.child.ready));
         if (valid) {
             activity_change(a, ACT_STOPPING);
-            if (app.generating) {
+            if (app.child.generating) {
                 atomic_store(&request_cancelled, true);
-                if (app.comparing)
+                if (app.compare.running)
                     atomic_store(&compare_cancelled, true);
             } else {
                 atomic_store(&load_cancelled, true);
-                if (app.job_activate)
+                if (app.job.activate)
                     atomic_store(&cancelled, true);
             }
         }
@@ -269,7 +269,7 @@ void handle(int fd, struct app_arena *arena) {
     }
     if (strcmp(r.path, "/app/quit-if-idle") == 0) {
         pthread_mutex_lock(&app.mutex);
-        bool busy = app.comparing || app.generating || app.job_running || (app.child && !app.ready);
+        bool busy = app.compare.running || app.child.generating || app.job.running || (app.child.pid && !app.child.ready);
         if (!busy)
             atomic_store(&closing, true);
         pthread_mutex_unlock(&app.mutex);
@@ -286,14 +286,14 @@ void handle(int fd, struct app_arena *arena) {
     }
     if (strcmp(r.path, "/app/stop") == 0) {
         pthread_mutex_lock(&app.mutex);
-        if (app.stopping || app.comparing || app.generating || app.job_running) {
+        if (app.stopping || app.compare.running || app.child.generating || app.job.running) {
             pthread_mutex_unlock(&app.mutex);
             error_response(fd, 409, "Stop the current task first.");
             return;
         }
         stop_child();
-        app.active[0]    = 0;
-        app.active_id[0] = 0;
+        app.child.active[0]    = 0;
+        app.child.active_id[0] = 0;
         pthread_mutex_unlock(&app.mutex);
         response(fd, 200, "application/json", "{}", 2);
         return;
@@ -323,7 +323,7 @@ void handle(int fd, struct app_arena *arena) {
         pthread_mutex_lock(&app.mutex);
         bool ok = valid && save_preference("answer-language", language);
         if (ok)
-            snprintf(app.answer_language, sizeof app.answer_language, "%s", language);
+            snprintf(app.prefs.answer_language, sizeof app.prefs.answer_language, "%s", language);
         pthread_mutex_unlock(&app.mutex);
         free(language);
         if (!valid)
@@ -345,10 +345,10 @@ void handle(int fd, struct app_arena *arena) {
     }
     /* Consent and another artifact's download do not mutate the resident
      * runtime. Selection/removal/setup retain their exclusive boundary. */
-    bool background = download && app.child > 0 && strcmp(model->id, app.active_id);
-    if (atomic_load(&closing) || app.stopping || app.comparing || (!preview && app.job_running) ||
-        (app.generating && !preview && !background) ||
-        (download && app.child > 0 && !strcmp(model->id, app.active_id))) {
+    bool background = download && app.child.pid > 0 && strcmp(model->id, app.child.active_id);
+    if (atomic_load(&closing) || app.stopping || app.compare.running || (!preview && app.job.running) ||
+        (app.child.generating && !preview && !background) ||
+        (download && app.child.pid > 0 && !strcmp(model->id, app.child.active_id))) {
         pthread_mutex_unlock(&app.mutex);
         error_response(fd, 409, "Another task is active.");
         return;
@@ -359,7 +359,7 @@ void handle(int fd, struct app_arena *arena) {
         snprintf(key, sizeof key, "preview-%s", model->sha256);
         bool ok = consent && save_preference(key, "v1");
         if (ok)
-            app.preview_accepted[model - app_models] = true;
+            app.prefs.preview_accepted[model - app_models] = true;
         pthread_mutex_unlock(&app.mutex);
         if (!consent)
             error_response(fd, 400, "Preview consent must be explicit.");
@@ -370,7 +370,7 @@ void handle(int fd, struct app_arena *arena) {
         return;
     }
     char path[APP_PATH_CAP], part[APP_PATH_CAP];
-    bool valid     = path_join(path, app.models, model->file);
+    bool valid     = path_join(path, app.paths.models, model->file);
     bool installed = valid && regular_size(path) == model->bytes;
     if (remove) {
         if (!valid) {
@@ -379,7 +379,7 @@ void handle(int fd, struct app_arena *arena) {
             return;
         }
         // Catalog filenames only; never follow a replaced directory or a symlink.
-        int         directory = open(app.models, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        int         directory = open(app.paths.models, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
         char        partial_name[256];
         bool        safe    = directory >= 0 &&
                               snprintf(partial_name, sizeof partial_name, "%s.part", model->file) <
@@ -396,22 +396,22 @@ void handle(int fd, struct app_arena *arena) {
          * and hold the same lock through stop/removal so no client can start a
          * new generation between those operations. Busy requests are rejected
          * above. The catalog entry itself is immutable and remains available. */
-        if (safe && app.child > 0 &&
-            (!strcmp(app.active_id, model->id) || !strcmp(app.chosen, path)))
+        if (safe && app.child.pid > 0 &&
+            (!strcmp(app.child.active_id, model->id) || !strcmp(app.child.chosen, path)))
             stop_child();
         for (unsigned i = 0; safe && i < 2; ++i)
             if (unlinkat(directory, names[i], 0) != 0 && errno != ENOENT)
                 safe = false;
         if (directory >= 0)
             close(directory);
-        if (safe && !strcmp(app.selected, model->id))
+        if (safe && !strcmp(app.prefs.selected, model->id))
             safe = save_selection("");
         if (safe) {
-            if (!strcmp(app.active_id, model->id)) {
-                app.active_id[0] = app.active[0] = 0;
+            if (!strcmp(app.child.active_id, model->id)) {
+                app.child.active_id[0] = app.child.active[0] = 0;
             }
-            app.measurements[model - app_models].tps    = 0;
-            app.measurements[model - app_models].tokens = 0;
+            app.prefs.measurements[model - app_models].tps    = 0;
+            app.prefs.measurements[model - app_models].tokens = 0;
         }
         pthread_mutex_unlock(&app.mutex);
         if (safe)
@@ -423,8 +423,8 @@ void handle(int fd, struct app_arena *arena) {
     /* A live identical model needs no replacement process. Still validate the
      * trusted receipt stamp: replacing or modifying its file invalidates this
      * no-op just as it invalidates the normal cached loading path. */
-    if (!download && installed && app.ready && !strcmp(app.active_id, model->id) &&
-        !strcmp(app.chosen, path)) {
+    if (!download && installed && app.child.ready && !strcmp(app.child.active_id, model->id) &&
+        !strcmp(app.child.chosen, path)) {
         char key[80], stamp[512], receipt[512];
         snprintf(key, sizeof key, "verified-%s", model->sha256);
         if (model_stamp(path, model, stamp) && read_preference(key, receipt, sizeof receipt) &&
@@ -435,7 +435,7 @@ void handle(int fd, struct app_arena *arena) {
         }
     }
     struct app_hardware h;
-    bool                known = app_hardware_read(&h, app.models);
+    bool                known = app_hardware_read(&h, app.paths.models);
     if (valid && snprintf(part, sizeof part, "%s.part", path) < (int) sizeof part) {
         uint64_t partial = regular_size(part);
         if (partial <= model->bytes && UINT64_MAX - h.disk > partial)
@@ -447,9 +447,9 @@ void handle(int fd, struct app_arena *arena) {
         /* Re-evaluate resources on the server. Never silently accept a different
          * model from the one whose download/preview the user just approved. */
         struct app_hardware       current;
-        bool                      current_known = app_hardware_read(&current, app.models);
+        bool                      current_known = app_hardware_read(&current, app.paths.models);
         struct app_recommendation choice        = app_recommend(
-                &current, inventory, app.selected, app.ready ? app.active_id : nullptr);
+                &current, inventory, app.prefs.selected, app.child.ready ? app.child.active_id : nullptr);
         if (!current_known || !choice.eligible || choice.model != model) {
             pthread_mutex_unlock(&app.mutex);
             error_response(
@@ -468,7 +468,7 @@ void handle(int fd, struct app_arena *arena) {
                                                                    : "Download this model first."));
         return;
     }
-    bool activate = !download || app.child <= 0;
+    bool activate = !download || app.child.pid <= 0;
     bool ok = (!activate || save_selection(model->id)) && begin_job(model, download, activate);
     pthread_mutex_unlock(&app.mutex);
     if (ok)

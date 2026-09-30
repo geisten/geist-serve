@@ -26,8 +26,8 @@ static bool proxy_cancel(void *opaque) {
     if (p->stats && p->stats->stage && strcmp(p->phase, p->stats->stage)) {
         snprintf(p->phase, sizeof p->phase, "%s", p->stats->stage);
         pthread_mutex_lock(&app.mutex);
-        snprintf(app.request_phase, sizeof app.request_phase, "%s", p->phase);
-        (void) activity_step(&app.request_activity,
+        snprintf(app.activity.request_phase, sizeof app.activity.request_phase, "%s", p->phase);
+        (void) activity_step(&app.activity.request,
                              p->operation,
                              p->generation,
                              activity_request_stage(p->phase),
@@ -82,13 +82,13 @@ static bool proxy_decode(struct proxy *p, const char *piece) {
     bool ok = app_output_feed(&p->output, decoded, p->send, p->target);
     if (*decoded) {
         pthread_mutex_lock(&app.mutex);
-        if (app.request_activity.id == p->operation &&
-            app.request_activity.generation == p->generation) {
-            activity_progress(&app.request_activity, ++p->pieces, monotonic_ms());
+        if (app.activity.request.id == p->operation &&
+            app.activity.request.generation == p->generation) {
+            activity_progress(&app.activity.request, ++p->pieces, monotonic_ms());
             if (p->output.visible)
-                activity_change(&app.request_activity, ACT_ANSWER);
+                activity_change(&app.activity.request, ACT_ANSWER);
             else if (p->output.state == OUTPUT_REASONING)
-                activity_change(&app.request_activity, ACT_PREPARING);
+                activity_change(&app.activity.request, ACT_PREPARING);
         }
         pthread_mutex_unlock(&app.mutex);
     }
@@ -102,13 +102,13 @@ static bool proxy_emit(void *opaque, const char *piece) {
     return proxy_decode(opaque, piece);
 }
 static void proxy_init(struct proxy *p) {
-    p->operation                  = app.request_activity.id;
-    p->generation                 = app.request_activity.generation;
-    const struct app_model *model = app_model_find(app.active_id);
+    p->operation                  = app.activity.request.id;
+    p->generation                 = app.activity.request.generation;
+    const struct app_model *model = app_model_find(app.child.active_id);
     app_output_init(&p->output, model ? model->reasoning_format : nullptr);
-    app.last_error[0] = app.error_stage[0] = app.error_model[0] = app.error_backend[0] = 0;
-    app.error_code                                                                     = 0;
-    strcpy(app.request_phase, "connect");
+    app.error.message[0] = app.error.stage[0] = app.error.model[0] = app.error.backend[0] = 0;
+    app.error.code                                                                     = 0;
+    strcpy(app.activity.request_phase, "connect");
 }
 static void
 proxy_finish(struct proxy *p, struct app_run_stats *stats, int *rc, char error[static 256]) {
@@ -124,14 +124,14 @@ proxy_finish(struct proxy *p, struct app_run_stats *stats, int *rc, char error[s
     }
     pthread_mutex_lock(&app.mutex);
     if (*rc && *rc != 499 && !p->disconnected) {
-        snprintf(app.last_error, sizeof app.last_error, "%s", error);
-        snprintf(app.error_stage,
-                 sizeof app.error_stage,
+        snprintf(app.error.message, sizeof app.error.message, "%s", error);
+        snprintf(app.error.stage,
+                 sizeof app.error.stage,
                  "%s",
                  stats->stage ? stats->stage : "output");
-        snprintf(app.error_model, sizeof app.error_model, "%s", app.active_id);
-        snprintf(app.error_backend, sizeof app.error_backend, "%s", app.backend);
-        app.error_code = *rc;
+        snprintf(app.error.model, sizeof app.error.model, "%s", app.child.active_id);
+        snprintf(app.error.backend, sizeof app.error.backend, "%s", app.backend.active);
+        app.error.code = *rc;
     }
     pthread_mutex_unlock(&app.mutex);
 }
@@ -233,27 +233,27 @@ void generate(int fd, struct request *r, struct app_arena *arena) {
              task->instruction,
              prompt);
     pthread_mutex_lock(&app.mutex);
-    if (atomic_load(&closing) || !app.ready || app.comparing || app.generating ||
-        (app.job_running && app.job_activate)) {
+    if (atomic_load(&closing) || !app.child.ready || app.compare.running || app.child.generating ||
+        (app.job.running && app.job.activate)) {
         pthread_mutex_unlock(&app.mutex);
         free(prompt);
         error_response(fd, 409, "Wait until the model is ready and idle.");
         return;
     }
-    if (conversation && strcmp(chat.model, app.active_id)) {
+    if (conversation && strcmp(chat.model, app.child.active_id)) {
         pthread_mutex_unlock(&app.mutex);
         free(prompt);
         error_response(fd, 409, "The loaded model changed. Check the model and send again.");
         return;
     }
     struct app_hardware hardware;
-    bool                hardware_known = app_hardware_read(&hardware, app.models);
-    enum app_quality    quality = app_task_quality(app_model_find(app.active_id),
+    bool                hardware_known = app_hardware_read(&hardware, app.paths.models);
+    enum app_quality    quality = app_task_quality(app_model_find(app.child.active_id),
                                                    task,
                                                    language,
                                                    hardware_known ? hardware.device : APP_UNKNOWN);
     /* Single-task quality evidence does not certify multi-turn conversation. */
-    if ((conversation || strcmp(app.backend, app.cpu_backend) || quality != APP_QUALITY_PASSED) &&
+    if ((conversation || strcmp(app.backend.active, app.backend.cpu) || quality != APP_QUALITY_PASSED) &&
         !json_bool(json, json_get(json, 0, "experimental"), false)) {
         pthread_mutex_unlock(&app.mutex);
         free(prompt);
@@ -266,9 +266,9 @@ void generate(int fd, struct request *r, struct app_arena *arena) {
     bool benchmark   = json_bool(json, json_get(json, 0, "benchmark"), false);
     int  model_index = -1;
     for (size_t i = 0; i < app_model_count; ++i)
-        if (strcmp(app.active_id, app_models[i].id) == 0)
+        if (strcmp(app.child.active_id, app_models[i].id) == 0)
             model_index = i;
-    app.generating = true;
+    app.child.generating = true;
     struct perf_record observation;
     observation_begin(&observation,
                       "app",
@@ -287,7 +287,7 @@ void generate(int fd, struct request *r, struct app_arena *arena) {
     proxy_init(&proxy);
     pthread_mutex_unlock(&app.mutex);
     char error[256];
-    int  rc = conversation ? app_daemon_chat(app.socket_path,
+    int  rc = conversation ? app_daemon_chat(app.child.socket_path,
                                              chat.count,
                                              chat.messages,
                                              chat.max_tokens,
@@ -298,7 +298,7 @@ void generate(int fd, struct request *r, struct app_arena *arena) {
                                              &proxy,
                                              &stats,
                                              error)
-                           : app_daemon_run(app.socket_path,
+                           : app_daemon_run(app.child.socket_path,
                                             composed,
                                             benchmark ? 64 : task->output_limit,
                                             proxy_emit,
@@ -349,8 +349,8 @@ void generate(int fd, struct request *r, struct app_arena *arena) {
         if (delivered && model_index >= 0) {
             pthread_mutex_lock(&app.mutex);
             if (!stats.no_answer && stats.tokens >= 16 && stats.generation_ns > 1e6) {
-                app.measurements[model_index].tps    = stats.tokens / (stats.generation_ns / 1e9);
-                app.measurements[model_index].tokens = (unsigned) stats.tokens;
+                app.prefs.measurements[model_index].tps    = stats.tokens / (stats.generation_ns / 1e9);
+                app.prefs.measurements[model_index].tokens = (unsigned) stats.tokens;
             }
 
             pthread_mutex_unlock(&app.mutex);
@@ -452,26 +452,26 @@ void completions(int fd, const struct request *r, struct app_arena *arena) {
              (long) getpid(),
              atomic_fetch_add(&sequence, 1));
     pthread_mutex_lock(&app.mutex);
-    if (atomic_load(&closing) || !app.ready || app.comparing ||
-        (app.job_running && app.job_activate)) {
+    if (atomic_load(&closing) || !app.child.ready || app.compare.running ||
+        (app.job.running && app.job.activate)) {
         pthread_mutex_unlock(&app.mutex);
         api_error(fd, 503, "Select and load a model in Geist first.");
         return;
     }
-    if (strcmp(chat.model, app.active_id)) {
+    if (strcmp(chat.model, app.child.active_id)) {
         pthread_mutex_unlock(&app.mutex);
         api_error(fd,
                   404,
                   "Requested model is not loaded. Refresh /v1/models after changing models.");
         return;
     }
-    if (app.generating) {
+    if (app.child.generating) {
         pthread_mutex_unlock(&app.mutex);
         api_error(fd, 429, "The shared model is busy. Retry after the current request completes.");
         return;
     }
-    snprintf(p.model, sizeof p.model, "%s", app.active_id);
-    app.generating = true;
+    snprintf(p.model, sizeof p.model, "%s", app.child.active_id);
+    app.child.generating = true;
     struct perf_record observation;
     observation_begin(&observation, "api", chat.max_tokens, chat.temperature, chat.top_p);
     struct app_run_stats stats = {0};
@@ -482,7 +482,7 @@ void completions(int fd, const struct request *r, struct app_arena *arena) {
     proxy_init(&p.transport);
     pthread_mutex_unlock(&app.mutex);
     char error[256];
-    int  rc = app_daemon_chat(app.socket_path,
+    int  rc = app_daemon_chat(app.child.socket_path,
                               chat.count,
                               chat.messages,
                               chat.max_tokens,

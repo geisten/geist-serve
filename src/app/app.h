@@ -61,62 +61,96 @@ extern atomic_bool closing, cancelled, compare_cancelled, request_cancelled, loa
 struct processor_measurement {
     double rate, first, total, tokens, rss, recorded;
 };
-/* All mutable app state; guarded by app.mutex unless a field says otherwise. */
-struct app_state {
-    pthread_mutex_t            mutex;
-    pthread_cond_t             drained;
-    char                       home[APP_PATH_CAP], server[APP_PATH_CAP], models[APP_PATH_CAP];
-    char                       token[65], message[512], active[160], active_id[64];
-    char                       chosen[APP_PATH_CAP], selected[64], answer_language[3];
-    char                       execution_mode[8], backend[24], cpu_backend[24], gpu_backend[24];
-    char                       execution_notice[256];
-    char                       request_phase[24], last_error[256], error_stage[24];
-    char                       error_model[64], error_backend[24];
-    int error_code;
-    bool                       gpu_available, save_execution, backend_verified;
-    double loading_started, loaded_ms;
-    unsigned runtime_requests, runtime_threads;
-    char                       profile_series[768];
-    struct app_engine engine;
-    struct activity load_activity, request_activity, download_activity;
-    uint64_t operation_id, generation;
-    char                       instance[80];
-    bool                       stopping;
-    double child_probe_ms;
-    struct lifecycle_shared *lifecycle;
+/* geistd, the one child process: its lifecycle and the model it serves. */
+struct app_child {
+    pid_t                     pid, previous_pid;
+    double                    probe_ms, reaped_ms, spawned_ms, loading_started, loaded_ms;
+    char                      runtime_dir[64], socket_path[100];
+    struct lifecycle_shared  *lifecycle;
     struct lifecycle_snapshot lifecycle_snapshot;
-    unsigned lifecycle_phase;
-    pid_t                      previous_pid;
-    double reaped_ms, spawned_ms;
-    bool                       receipt_checked, receipt_hit;
-    uint64_t verified_bytes;
-    struct perf_record *observation;
-    struct app_resource_window observation_window;
-    double sample_ms, cpu_sum;
-    struct app_process_sample memory_process;
-    double memory_process_ms;
-    uint64_t memory_generation;
-    unsigned cpu_samples;
-    bool                       preview_accepted[APP_MODEL_COUNT];
-    unsigned port, workers;
-    char                       runtime_dir[64], socket_path[100];
-    pid_t                      child;
-    bool                       ready, generating, job_running, job_joinable;
-    bool                       comparing, compare_joinable;
-    pthread_t                  comparison;
-    char                       compare_phase[24], compare_result[24];
-    unsigned compare_step;
-    pthread_t                  job;
-    const struct app_model *job_model;
-    bool                       job_download, job_activate;
-    uint64_t received;
-    char                       phase[32];
+    unsigned                  lifecycle_phase, runtime_requests, runtime_threads;
+    struct app_engine         engine;
+    bool                      ready, generating;
+    char                      active[160], active_id[64], chosen[APP_PATH_CAP];
+    uint64_t                  operation_id;
+};
+
+/* Which processor runs the model: the user's mode and what was probed. */
+struct app_backend {
+    char mode[8], active[24], cpu[24], gpu[24], notice[256];
+    bool gpu_available, verified, save;
+};
+
+/* The one model job: download, verify, activate. */
+struct app_job {
+    pthread_t               thread;
+    const struct app_model *model;
+    bool                    running, joinable, download, activate;
+    uint64_t                received, verified_bytes;
+    char                    phase[32];
+    bool                    receipt_checked, receipt_hit;
+};
+
+/* The CPU/GPU comparison run. */
+struct app_compare {
+    pthread_t thread;
+    bool      running, joinable;
+    char      phase[24], result[24];
+    unsigned  step;
+};
+
+/* Memory and resource sampling around a model operation. */
+struct app_observe {
+    struct perf_record        *record;
+    struct app_resource_window window;
+    double                     sample_ms, cpu_sum, process_ms;
+    unsigned                   cpu_samples;
+    struct app_process_sample  process;
+    uint64_t                   generation;
+};
+
+/* What the UI shows as progress, and the last failure. */
+struct app_activity {
+    struct activity load, request, download;
+    char            request_phase[24];
+};
+struct app_error {
+    char message[256], stage[24], model[64], backend[24];
+    int  code;
+};
+
+/* Persisted choices and per-model measurements. */
+struct app_prefs {
+    char selected[64], answer_language[3], profile_series[768], measurement_identity[512];
+    bool preview_accepted[APP_MODEL_COUNT];
     struct {
-        double tps;
+        double   tps;
         unsigned tokens;
     } measurements[APP_MODEL_COUNT];
     struct processor_measurement history[APP_MODEL_COUNT][2];
-    char                         measurement_identity[512];
+};
+
+/* All mutable app state, guarded by app.mutex. The sub-structs group fields
+ * by the file that owns them; they share the one lock on purpose (no lock
+ * ordering to get wrong). */
+struct app_state {
+    pthread_mutex_t mutex;
+    pthread_cond_t  drained;
+    struct {
+        char home[APP_PATH_CAP], server[APP_PATH_CAP], models[APP_PATH_CAP];
+    } paths;
+    char                token[65], instance[80], message[512];
+    unsigned            port, workers;
+    uint64_t            generation;
+    bool                stopping;
+    struct app_child    child;
+    struct app_backend  backend;
+    struct app_job      job;
+    struct app_compare  compare;
+    struct app_observe  observe;
+    struct app_activity activity;
+    struct app_error    error;
+    struct app_prefs    prefs;
 };
 extern struct app_state app;
 

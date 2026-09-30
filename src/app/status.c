@@ -13,10 +13,10 @@ void execution_response(int fd, const char *text) {
         return;
     }
     pthread_mutex_lock(&app.mutex);
-    const struct app_model *model = app_model_find(app.active_id);
+    const struct app_model *model = app_model_find(app.child.active_id);
     int                     code  = 202;
     const char             *error = nullptr;
-    if (!app.ready || app.comparing || app.generating || app.job_running) {
+    if (!app.child.ready || app.compare.running || app.child.generating || app.job.running) {
         code  = 409;
         error = "Wait until the loaded model is idle before changing execution.";
     } else if (!strcmp(mode, "gpu") && !gpu_supported(model)) {
@@ -24,8 +24,8 @@ void execution_response(int fd, const char *text) {
         error = "GPU is not supported by this model and packaged engine.";
     } else {
         bool        gpu = !strcmp(mode, "gpu") || (!strcmp(mode, "auto") && recommend_gpu(model));
-        const char *backend = gpu ? app.gpu_backend : app.cpu_backend;
-        if (!strcmp(backend, app.backend)) {
+        const char *backend = gpu ? app.backend.gpu : app.backend.cpu;
+        if (!strcmp(backend, app.backend.active)) {
             char key[80];
             if (model)
                 snprintf(key, sizeof key, "backend-%s", model->sha256);
@@ -33,16 +33,16 @@ void execution_response(int fd, const char *text) {
                 code  = 500;
                 error = "Cannot save execution preference.";
             } else {
-                snprintf(app.execution_mode, sizeof app.execution_mode, "%s", mode);
+                snprintf(app.backend.mode, sizeof app.backend.mode, "%s", mode);
                 code = 200;
             }
         } else {
             char path[APP_PATH_CAP], id[64];
-            snprintf(path, sizeof path, "%s", app.chosen);
-            snprintf(id, sizeof id, "%s", app.active_id);
-            app.execution_notice[0] = 0;
+            snprintf(path, sizeof path, "%s", app.child.chosen);
+            snprintf(id, sizeof id, "%s", app.child.active_id);
+            app.backend.notice[0] = 0;
             if (model)
-                memset(&app.measurements[model - app_models], 0, sizeof app.measurements[0]);
+                memset(&app.prefs.measurements[model - app_models], 0, sizeof app.prefs.measurements[0]);
             if (!start_child_mode(path, id, mode)) {
                 code  = 500;
                 error = "Cannot change execution. Restoring CPU.";
@@ -66,16 +66,16 @@ void import_catalog(int fd, const char *text) {
     }
     pthread_mutex_lock(&app.mutex);
     int code = 200;
-    if (app.comparing || app.job_running || app.generating || (app.child && !app.ready)) {
+    if (app.compare.running || app.job.running || app.child.generating || (app.child.pid && !app.child.ready)) {
         code = 409;
         snprintf(why, sizeof why, "Finish the current operation before importing a catalog.");
     } else if (app_catalog_version(candidate) <= app_catalog_revision) {
         code = 409;
         snprintf(why, sizeof why, "Import a catalog with a newer revision.");
     } else {
-        const struct app_model *old  = app_model_find(app.active_id);
-        const struct app_model *next = app_catalog_find(candidate, app.active_id);
-        if (app.ready && old &&
+        const struct app_model *old  = app_model_find(app.child.active_id);
+        const struct app_model *next = app_catalog_find(candidate, app.child.active_id);
+        if (app.child.ready && old &&
             (!next || strcmp(old->sha256, next->sha256) || strcmp(old->file, next->file) ||
              old->backends != next->backends || old->bytes != next->bytes)) {
             code = 409;
@@ -90,7 +90,7 @@ void import_catalog(int fd, const char *text) {
                 if (replacement && !strcmp(previous->file, replacement->file) &&
                     (strcmp(previous->sha256, replacement->sha256) ||
                      previous->bytes != replacement->bytes) &&
-                    path_join(path, app.models, previous->file) &&
+                    path_join(path, app.paths.models, previous->file) &&
                     (regular_size(path) ||
                      (snprintf(part, sizeof part, "%s.part", path) < (int) sizeof part &&
                       regular_size(part)))) {
@@ -110,11 +110,11 @@ void import_catalog(int fd, const char *text) {
     if (code == 200) {
         app_catalog_apply(candidate);
         candidate = nullptr;
-        memset(app.measurements, 0, sizeof app.measurements);
+        memset(app.prefs.measurements, 0, sizeof app.prefs.measurements);
         restore_preview_preferences();
         restore_measurements();
-        if (!app_model_find(app.selected))
-            app.selected[0] = 0;
+        if (!app_model_find(app.prefs.selected))
+            app.prefs.selected[0] = 0;
     }
     pthread_mutex_unlock(&app.mutex);
     app_catalog_discard(candidate);
@@ -134,12 +134,12 @@ void status_response(int fd, struct app_arena *arena) {
     }
     struct app_buffer   b = {.data = body, .cap = 65536};
     struct app_hardware h;
-    bool                known = app_hardware_read(&h, app.models);
+    bool                known = app_hardware_read(&h, app.paths.models);
     pthread_mutex_lock(&app.mutex);
     struct app_inventory inventory[APP_MODEL_COUNT];
     model_inventory(inventory);
     struct app_recommendation recommendation =
-            app_recommend(&h, inventory, app.selected, app.ready ? app.active_id : nullptr);
+            app_recommend(&h, inventory, app.prefs.selected, app.child.ready ? app.child.active_id : nullptr);
     app_put(&b, "{\"version\":");
     app_quote(&b, APP_VERSION);
     app_printf(&b, ",\"catalog_revision\":%u", app_catalog_revision);
@@ -154,42 +154,42 @@ void status_response(int fd, struct app_arena *arena) {
     app_printf(&b,
                ",\"eligible\":%s},\"answer_language\":",
                recommendation.eligible ? "true" : "false");
-    app_quote(&b, app.answer_language);
-    const struct app_model *execution_model = app_model_find(app.active_id);
+    app_quote(&b, app.prefs.answer_language);
+    const struct app_model *execution_model = app_model_find(app.child.active_id);
     bool                    gpu             = gpu_supported(execution_model);
     app_put(&b, ",\"engine\":");
-    app_engine_json(&b, &app.engine);
+    app_engine_json(&b, &app.child.engine);
     app_put(&b, ",\"activity\":{\"instance\":");
     app_quote(&b, app.instance);
     app_put(&b, ",\"load\":");
     activity_json(&b,
-                  &app.load_activity,
+                  &app.activity.load,
                   monotonic_ms(),
-                  app.child && app.load_activity.generation == app.generation);
+                  app.child.pid && app.activity.load.generation == app.generation);
     app_put(&b, ",\"request\":");
     activity_json(&b,
-                  &app.request_activity,
+                  &app.activity.request,
                   monotonic_ms(),
-                  app.child && app.request_activity.generation == app.generation);
+                  app.child.pid && app.activity.request.generation == app.generation);
     app_put(&b, ",\"download\":");
-    activity_json(&b, &app.download_activity, monotonic_ms(), false);
+    activity_json(&b, &app.activity.download, monotonic_ms(), false);
     app_printf(&b, "},\"process_generation\":%llu", (unsigned long long) app.generation);
     app_put(&b, ",\"lifecycle\":{");
     app_printf(&b,
                "\"generation\":%llu,\"pid\":%ld,\"previous_pid\":%ld,\"spawned_ms\":%.3f,\"reaped_"
                "ms\":%.3f,\"receipt\":",
                (unsigned long long) app.generation,
-               (long) app.child,
-               (long) app.previous_pid,
-               app.spawned_ms,
-               app.reaped_ms);
-    app_quote(&b, app.receipt_checked ? (app.receipt_hit ? "hit" : "miss") : "not_checked");
+               (long) app.child.pid,
+               (long) app.child.previous_pid,
+               app.child.spawned_ms,
+               app.child.reaped_ms);
+    app_quote(&b, app.job.receipt_checked ? (app.job.receipt_hit ? "hit" : "miss") : "not_checked");
     app_printf(&b,
                ",\"verified_bytes\":%llu,\"engine_phases\":[",
-               (unsigned long long) app.verified_bytes);
+               (unsigned long long) app.job.verified_bytes);
     bool phase_comma = false;
     for (unsigned i = LC_BACKEND; i < LC_PHASES; i++) {
-        uint64_t start = app.lifecycle_snapshot.phase_ns[i];
+        uint64_t start = app.child.lifecycle_snapshot.phase_ns[i];
         if (!start)
             continue;
         if (phase_comma)
@@ -197,8 +197,8 @@ void status_response(int fd, struct app_arena *arena) {
         phase_comma  = true;
         uint64_t end = i == LC_READY ? start : lifecycle_now_ns();
         for (unsigned j = i + 1; j < LC_PHASES; j++)
-            if (app.lifecycle_snapshot.phase_ns[j]) {
-                end = app.lifecycle_snapshot.phase_ns[j];
+            if (app.child.lifecycle_snapshot.phase_ns[j]) {
+                end = app.child.lifecycle_snapshot.phase_ns[j];
                 break;
             }
         app_put(&b, "{\"stage\":");
@@ -210,29 +210,29 @@ void status_response(int fd, struct app_arena *arena) {
     }
     app_put(&b, "]}");
     app_put(&b, ",\"request_phase\":");
-    app_quote(&b, app.generating ? app.request_phase : "idle");
+    app_quote(&b, app.child.generating ? app.activity.request_phase : "idle");
     app_put(&b, ",\"last_error\":{\"message\":");
-    app_quote(&b, app.last_error);
+    app_quote(&b, app.error.message);
     app_put(&b, ",\"stage\":");
-    app_quote(&b, app.error_stage);
+    app_quote(&b, app.error.stage);
     app_put(&b, ",\"model\":");
-    app_quote(&b, app.error_model);
+    app_quote(&b, app.error.model);
     app_put(&b, ",\"backend\":");
-    app_quote(&b, app.error_backend);
-    app_printf(&b, ",\"code\":%d}", app.error_code);
+    app_quote(&b, app.error.backend);
+    app_printf(&b, ",\"code\":%d}", app.error.code);
     app_put(&b, ",\"execution\":{\"mode\":");
-    app_quote(&b, app.execution_mode[0] ? app.execution_mode : "auto");
+    app_quote(&b, app.backend.mode[0] ? app.backend.mode : "auto");
     app_put(&b, ",\"active\":");
-    app_quote(&b, app.ready ? (!strcmp(app.backend, app.cpu_backend) ? "cpu" : "gpu") : "");
+    app_quote(&b, app.child.ready ? (!strcmp(app.backend.active, app.backend.cpu) ? "cpu" : "gpu") : "");
     app_put(&b, ",\"backend\":");
-    app_quote(&b, app.ready ? app.backend : "");
+    app_quote(&b, app.child.ready ? app.backend.active : "");
     app_put(&b, ",\"recommended\":");
     app_quote(&b, recommend_gpu(execution_model) ? "gpu" : "cpu");
     app_printf(&b,
                ",\"basis\":\"hardware\",\"verified\":%s,\"gpu_available\":%s,\"gpu_backend\":",
-               app.ready && app.backend_verified ? "true" : "false",
+               app.child.ready && app.backend.verified ? "true" : "false",
                gpu ? "true" : "false");
-    app_quote(&b, app.gpu_backend);
+    app_quote(&b, app.backend.gpu);
     app_put(&b, ",\"reason\":");
     app_quote(&b,
               !gpu ? "GPU is not supported by this model and packaged engine."
@@ -242,11 +242,11 @@ void status_response(int fd, struct app_arena *arena) {
                       : "CPU is suggested for this small model. This is a hardware default, not a "
                         "measured speed comparison.");
     app_put(&b, ",\"notice\":");
-    app_quote(&b, app.execution_notice);
+    app_quote(&b, app.backend.notice);
     double execution_rate = 0;
-    if (app.ready && app.backend_verified && execution_model) {
-        unsigned slot  = !strcmp(app.backend, app.cpu_backend) ? 0 : 1;
-        execution_rate = app.history[execution_model - app_models][slot].rate;
+    if (app.child.ready && app.backend.verified && execution_model) {
+        unsigned slot  = !strcmp(app.backend.active, app.backend.cpu) ? 0 : 1;
+        execution_rate = app.prefs.history[execution_model - app_models][slot].rate;
     }
     app_printf(&b,
                ",\"performance\":{\"target_tps\":%.1f,\"below_target\":%s,\"rate\":",
@@ -259,25 +259,25 @@ void status_response(int fd, struct app_arena *arena) {
     app_put(&b, "}}");
     app_printf(&b,
                ",\"comparison\":{\"running\":%s,\"step\":%u,\"phase\":",
-               app.comparing ? "true" : "false",
-               app.compare_step);
-    app_quote(&b, app.compare_phase);
+               app.compare.running ? "true" : "false",
+               app.compare.step);
+    app_quote(&b, app.compare.phase);
     app_put(&b, ",\"result\":");
-    app_quote(&b, app.compare_result);
+    app_quote(&b, app.compare.result);
     app_put(&b, "}");
     app_put(&b, ",\"performance_history\":[");
     bool comma = false;
     if (execution_model) {
         for (unsigned slot = 0; slot < 2; ++slot) {
             const struct processor_measurement *m =
-                    &app.history[execution_model - app_models][slot];
+                    &app.prefs.history[execution_model - app_models][slot];
             if (!m->recorded)
                 continue;
             if (comma)
                 app_put(&b, ",");
             comma = true;
             app_printf(&b, "{\"processor\":\"%s\",\"backend\":", slot ? "gpu" : "cpu");
-            app_quote(&b, slot ? app.gpu_backend : app.cpu_backend);
+            app_quote(&b, slot ? app.backend.gpu : app.backend.cpu);
             app_printf(&b,
                        ",\"rate\":%.6f,\"first\":%.6f,\"total\":%.6f,\"tokens\":%.0f,"
                        "\"rss_bytes\":%.0f,\"recorded_at\":%.0f}",
@@ -313,7 +313,7 @@ void status_response(int fd, struct app_arena *arena) {
                h.disk_known ? "true" : "false",
                h.available_known ? "true" : "false");
     struct app_process_sample sample;
-    bool                      sampled = app.child > 0 && app_process_read(app.child, &sample);
+    bool                      sampled = app.child.pid > 0 && app_process_read(app.child.pid, &sample);
     app_resource_update(&resource_window, sampled ? &sample : nullptr, h.logical_cpus);
     app_put(&b, "\"resources\":{\"scope\":\"geistd\",\"rss_bytes\":");
     if (sampled)
@@ -328,42 +328,42 @@ void status_response(int fd, struct app_arena *arena) {
     app_printf(&b, ",\"cpu_interval_ms\":%.0f},", resource_window.interval_ms);
     struct app_memory_record live_memory;
     app_memory_reset(&live_memory);
-    if (app.child > 0 && !app.stopping)
+    if (app.child.pid > 0 && !app.stopping)
         memory_generation(live_memory.generation, sizeof live_memory.generation);
     memory_observe(&live_memory);
-    double live_rss        = app.child > 0 && app.memory_generation == app.generation &&
-                                             app.memory_process.pid == app.child &&
-                                             monotonic_ms() - app.memory_process_ms <= 6000
-                                     ? (double) app.memory_process.rss
+    double live_rss        = app.child.pid > 0 && app.observe.generation == app.generation &&
+                                             app.observe.process.pid == app.child.pid &&
+                                             monotonic_ms() - app.observe.process_ms <= 6000
+                                     ? (double) app.observe.process.rss
                                      : -1;
-    live_memory.rss_age_ms = app.child > 0 && app.memory_generation == app.generation
-                                     ? monotonic_ms() - app.memory_process_ms
+    live_memory.rss_age_ms = app.child.pid > 0 && app.observe.generation == app.generation
+                                     ? monotonic_ms() - app.observe.process_ms
                                      : -1;
     app_put(&b, "\"memory\":");
     app_memory_json(&b, &live_memory, live_rss, -1, live_rss >= 0 ? 1 : 0);
     app_put(&b, ",");
     app_put(&b, "\"runtime\":\"geistd\",\"active\":");
-    app_quote(&b, app.active);
+    app_quote(&b, app.child.active);
     app_put(&b, ",\"active_id\":");
-    app_quote(&b, app.active_id);
+    app_quote(&b, app.child.active_id);
     app_put(&b, ",\"message\":");
     app_quote(&b, app.message);
     app_put(&b, ",\"phase\":");
-    app_quote(&b, app.phase);
+    app_quote(&b, app.job.phase);
     app_put(&b, ",\"job_model\":");
-    app_quote(&b, app.job_running ? app.job_model->id : "");
+    app_quote(&b, app.job.running ? app.job.model->id : "");
     app_printf(&b,
                ",\"received\":%llu,\"ready\":%s,\"loading\":%s,\"busy\":%s,"
                "\"inference_busy\":%s,\"background_download\":%s,\"models\":[",
-               (unsigned long long) app.received,
-               app.ready ? "true" : "false",
-               app.child && !app.ready ? "true" : "false",
-               app.comparing || app.job_running || app.generating ? "true" : "false",
-               app.comparing || app.generating || (app.job_running && app.job_activate) ||
-                               (app.child && !app.ready)
+               (unsigned long long) app.job.received,
+               app.child.ready ? "true" : "false",
+               app.child.pid && !app.child.ready ? "true" : "false",
+               app.compare.running || app.job.running || app.child.generating ? "true" : "false",
+               app.compare.running || app.child.generating || (app.job.running && app.job.activate) ||
+                               (app.child.pid && !app.child.ready)
                        ? "true"
                        : "false",
-               app.job_running && !app.job_activate ? "true" : "false");
+               app.job.running && !app.job.activate ? "true" : "false");
     for (size_t i = 0; i < app_model_count; ++i) {
         const struct app_model *m         = &app_models[i];
         bool                    installed = inventory[i].installed;
@@ -376,9 +376,9 @@ void status_response(int fd, struct app_arena *arena) {
         struct app_assessment a = app_assess_device(&adjusted,
                                                     m,
                                                     installed,
-                                                    app.history[i][0].rate,
+                                                    app.prefs.history[i][0].rate,
                                                     gpu_supported(m),
-                                                    app.history[i][1].rate);
+                                                    app.prefs.history[i][1].rate);
         if (i)
             app_put(&b, ",");
         app_put(&b, "{\"id\":");
@@ -408,20 +408,20 @@ void status_response(int fd, struct app_arena *arena) {
         app_put(&b,
                 ",\"capabilities\":{\"chat\":true,\"vision\":false,"
                 "\"speech_recognition\":false}");
-        app_printf(&b, ",\"preview_accepted\":%s", app.preview_accepted[i] ? "true" : "false");
+        app_printf(&b, ",\"preview_accepted\":%s", app.prefs.preview_accepted[i] ? "true" : "false");
         app_put(&b, ",\"performance\":");
         app_quote(&b, a.performance);
         app_printf(&b,
                    ",\"measured_tps\":%.3f,\"measured_tokens\":%u}",
-                   app.measurements[i].tps,
-                   app.measurements[i].tokens);
+                   app.prefs.measurements[i].tps,
+                   app.prefs.measurements[i].tokens);
     }
     char artifact[65] = "";
     if (execution_model)
         snprintf(artifact, sizeof artifact, "%s", execution_model->sha256);
     app_put(&b, "],\"performance_profile\":");
     pthread_mutex_unlock(&app.mutex);
-    perf_view(&b, artifact, app.profile_series, app.cpu_backend, app.gpu_backend);
+    perf_view(&b, artifact, app.prefs.profile_series, app.backend.cpu, app.backend.gpu);
     app_put(&b, "}");
     if (b.failed)
         error_response(fd, 503, "Status exceeds the response memory budget.");

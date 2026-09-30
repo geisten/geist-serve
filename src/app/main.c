@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
     app.port          = 8766;
     const char *home  = getenv("GEIST_HOME");
     if (home)
-        snprintf(app.home, sizeof app.home, "%s", home);
+        snprintf(app.paths.home, sizeof app.paths.home, "%s", home);
     else {
         const char *user = getenv("HOME");
         if (!user) {
@@ -66,13 +66,13 @@ int main(int argc, char **argv) {
             return 2;
         }
 #ifdef __APPLE__
-        snprintf(app.home, sizeof app.home, "%s/Library/Application Support/Geist", user);
+        snprintf(app.paths.home, sizeof app.paths.home, "%s/Library/Application Support/Geist", user);
 #else
         const char *data = getenv("XDG_DATA_HOME");
         if (data)
-            snprintf(app.home, sizeof app.home, "%s/geist", data);
+            snprintf(app.paths.home, sizeof app.paths.home, "%s/geist", data);
         else
-            snprintf(app.home, sizeof app.home, "%s/.local/share/geist", user);
+            snprintf(app.paths.home, sizeof app.paths.home, "%s/.local/share/geist", user);
 #endif
     }
     char executable[APP_PATH_CAP];
@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
     if (!slash)
         return 2;
     *slash = 0;
-    if (!path_join(app.server, executable, "geistd"))
+    if (!path_join(app.paths.server, executable, "geistd"))
         return 2;
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--check") == 0)
@@ -107,7 +107,7 @@ int main(int argc, char **argv) {
             app.port = (unsigned) value;
         } else if ((strcmp(argv[i], "--home") == 0 || strcmp(argv[i], "--daemon") == 0) &&
                    i + 1 < argc) {
-            char *out = strcmp(argv[i], "--home") == 0 ? app.home : app.server;
+            char *out = strcmp(argv[i], "--home") == 0 ? app.paths.home : app.paths.server;
             if (strlen(argv[i + 1]) >= APP_PATH_CAP)
                 return 2;
             strcpy(out, argv[++i]);
@@ -117,13 +117,13 @@ int main(int argc, char **argv) {
         }
     }
     umask(077);
-    if (!mkdirs(app.home) || !path_join(app.models, app.home, "models") || !mkdirs(app.models)) {
+    if (!mkdirs(app.paths.home) || !path_join(app.paths.models, app.paths.home, "models") || !mkdirs(app.paths.models)) {
         perror("geist-app: data folder");
         return 1;
     }
     if (check) {
         struct app_hardware h;
-        if (!app_hardware_read(&h, app.models))
+        if (!app_hardware_read(&h, app.paths.models))
             return 1;
         printf("%s | %s | %llu MiB RAM | %u cores\n",
                h.name,
@@ -142,19 +142,19 @@ int main(int argc, char **argv) {
         return 0;
     }
     char lockpath[APP_PATH_CAP];
-    if (!path_join(lockpath, app.home, "app.lock"))
+    if (!path_join(lockpath, app.paths.home, "app.lock"))
         return 1;
     int lock = open(lockpath, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600);
     if (lock < 0 || flock(lock, LOCK_EX | LOCK_NB) != 0) {
         fprintf(stderr, "Geist is already running for this data folder.\n");
         return 1;
     }
-    if (access(app.server, X_OK) != 0) {
-        fprintf(stderr, "Missing executable geistd: %s\n", app.server);
+    if (access(app.paths.server, X_OK) != 0) {
+        fprintf(stderr, "Missing executable geistd: %s\n", app.paths.server);
         close(lock);
         return 1;
     }
-    if (!app_key(app.home, app.token)) {
+    if (!app_key(app.paths.home, app.token)) {
         fprintf(stderr,
                 "Cannot create or read the private API key. Check data-folder ownership and "
                 "permissions.\n");
@@ -178,7 +178,7 @@ int main(int argc, char **argv) {
         close(lock);
         return 1;
     }
-    if (!app_connection_write(app.home, app.port, app.token)) {
+    if (!app_connection_write(app.paths.home, app.port, app.token)) {
         fprintf(stderr, "Cannot save private connection details.\n");
         close(fd);
         close(lock);
@@ -190,13 +190,13 @@ int main(int argc, char **argv) {
     fprintf(stderr,
             "Runs here. Stays here.\nData: %s\nFor a headless Pi, forward port %u over SSH and "
             "open the private link on your computer.\n",
-            app.home,
+            app.paths.home,
             app.port);
     probe_backends();
     struct app_hardware measurement_hardware = {0};
-    if (app_hardware_read(&measurement_hardware, app.models)) {
-        int n = snprintf(app.measurement_identity,
-                         sizeof app.measurement_identity,
+    if (app_hardware_read(&measurement_hardware, app.paths.models)) {
+        int n = snprintf(app.prefs.measurement_identity,
+                         sizeof app.prefs.measurement_identity,
                          "v1 %s\n%s|%s|%s|%llu|%u\n",
                          APP_VERSION,
                          measurement_hardware.name,
@@ -204,17 +204,17 @@ int main(int argc, char **argv) {
                          measurement_hardware.os,
                          (unsigned long long) measurement_hardware.ram,
                          measurement_hardware.logical_cpus);
-        if (n < 0 || (size_t) n >= sizeof app.measurement_identity)
-            app.measurement_identity[0] = 0;
+        if (n < 0 || (size_t) n >= sizeof app.prefs.measurement_identity)
+            app.prefs.measurement_identity[0] = 0;
     }
     char     engine_hash[65]   = "unknown";
-    bool     engine_identified = app_engine_sha256(app.server, engine_hash);
+    bool     engine_identified = app_engine_sha256(app.paths.server, engine_hash);
     unsigned profile_threads   = measurement_hardware.cores;
     unsigned profile_limit     = measurement_hardware.device == APP_PI5 ? 4 : 2;
     if (profile_threads > profile_limit)
         profile_threads = profile_limit;
-    snprintf(app.profile_series,
-             sizeof app.profile_series,
+    snprintf(app.prefs.profile_series,
+             sizeof app.prefs.profile_series,
              "v1;engine=%s;host=%s|%s|%s|%llu|%u;ctx=4096;sessions=1;threads=%u;wait=passive;kv="
              "engine-default;offload=engine-default",
              engine_identified ? engine_hash : "unknown",
@@ -224,7 +224,7 @@ int main(int argc, char **argv) {
              (unsigned long long) measurement_hardware.ram,
              measurement_hardware.logical_cpus,
              profile_threads);
-    perf_init(app.home);
+    perf_init(app.paths.home);
     char *catalog_text = malloc(APP_CATALOG_BYTES + 1);
     if (catalog_text && read_preference("catalog.json", catalog_text, APP_CATALOG_BYTES + 1)) {
         char                why[256];
@@ -239,23 +239,23 @@ int main(int argc, char **argv) {
         }
     }
     free(catalog_text);
-    (void) read_preference("answer-language", app.answer_language, sizeof app.answer_language);
-    if (strcmp(app.answer_language, "en") && strcmp(app.answer_language, "de"))
-        app.answer_language[0] = 0;
+    (void) read_preference("answer-language", app.prefs.answer_language, sizeof app.prefs.answer_language);
+    if (strcmp(app.prefs.answer_language, "en") && strcmp(app.prefs.answer_language, "de"))
+        app.prefs.answer_language[0] = 0;
     restore_preview_preferences();
     migrate_measurements();
     restore_measurements();
-    (void) read_preference("selected", app.selected, sizeof app.selected);
+    (void) read_preference("selected", app.prefs.selected, sizeof app.prefs.selected);
     if (model) {
         pthread_mutex_lock(&app.mutex);
         (void) start_child(model, "custom");
         pthread_mutex_unlock(&app.mutex);
     } else {
-        const struct app_model *m = app_model_find(app.selected);
+        const struct app_model *m = app_model_find(app.prefs.selected);
         char                    path[APP_PATH_CAP];
         /* A missing/cancelled download remains a resumable choice. Never start
          * verification of a missing file on reopen, or download without action. */
-        if (m && path_join(path, app.models, m->file) && regular_size(path) == m->bytes) {
+        if (m && path_join(path, app.paths.models, m->file) && regular_size(path) == m->bytes) {
             pthread_mutex_lock(&app.mutex);
             (void) begin_job(m, false, true);
             pthread_mutex_unlock(&app.mutex);
@@ -314,15 +314,15 @@ int main(int argc, char **argv) {
     while (app.workers)
         pthread_cond_wait(&app.drained, &app.mutex);
     pthread_mutex_unlock(&app.mutex);
-    if (app.compare_joinable)
-        pthread_join(app.comparison, nullptr);
-    if (app.job_joinable)
-        pthread_join(app.job, nullptr);
+    if (app.compare.joinable)
+        pthread_join(app.compare.thread, nullptr);
+    if (app.job.joinable)
+        pthread_join(app.job.thread, nullptr);
     pthread_mutex_lock(&app.mutex);
     stop_child();
     pthread_mutex_unlock(&app.mutex);
     perf_close();
-    app_connection_remove(app.home);
+    app_connection_remove(app.paths.home);
     curl_global_cleanup();
     close(lock);
     return 0;

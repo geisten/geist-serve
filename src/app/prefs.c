@@ -5,7 +5,7 @@
  * contain prompts, output or capabilities. Callers hold app.mutex after startup. */
 bool read_preference(const char *name, char *out, size_t cap) {
     char path[APP_PATH_CAP];
-    if (!path_join(path, app.home, name))
+    if (!path_join(path, app.paths.home, name))
         return false;
     int fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
     if (fd < 0)
@@ -25,7 +25,7 @@ bool read_preference(const char *name, char *out, size_t cap) {
 
 bool save_preference(const char *name, const char *value) {
     char target[APP_PATH_CAP], temporary[APP_PATH_CAP];
-    if (!path_join(target, app.home, name) || !path_join(temporary, app.home, ".preference-XXXXXX"))
+    if (!path_join(target, app.paths.home, name) || !path_join(temporary, app.paths.home, ".preference-XXXXXX"))
         return false;
     int fd = mkstemp(temporary);
     if (fd < 0)
@@ -43,7 +43,7 @@ bool save_preference(const char *name, const char *value) {
 /* Legacy last-reply files remain readable for one-time archival migration. */
 static void measurement_key(char key[128], const struct app_model *model, unsigned slot) {
     snprintf(
-            key, 128, "performance-%s-%s", model->sha256, slot ? app.gpu_backend : app.cpu_backend);
+            key, 128, "performance-%s-%s", model->sha256, slot ? app.backend.gpu : app.backend.cpu);
 }
 static bool valid_measurement(const struct processor_measurement *m) {
     return isfinite(m->rate) && m->rate > 0 && m->rate <= 1e9 && isfinite(m->first) &&
@@ -54,14 +54,14 @@ static bool valid_measurement(const struct processor_measurement *m) {
            m->recorded <= (double) time(nullptr) + 300;
 }
 void restore_measurements(void) {
-    memset(app.history, 0, sizeof app.history);
+    memset(app.prefs.history, 0, sizeof app.prefs.history);
     for (size_t i = 0; i < app_model_count; i++)
         for (unsigned slot = 0; slot < 2; slot++) {
-            const char        *backend = slot ? app.gpu_backend : app.cpu_backend;
+            const char        *backend = slot ? app.backend.gpu : app.backend.cpu;
             struct perf_record r;
-            perf_last(app_models[i].sha256, app.profile_series, backend, &r);
+            perf_last(app_models[i].sha256, app.prefs.profile_series, backend, &r);
             if (r.id[0])
-                app.history[i][slot] =
+                app.prefs.history[i][slot] =
                         (struct processor_measurement) {.rate  = r.output / (r.generation_ns / 1e9),
                                                         .first = r.first_ns / 1e9,
                                                         .total = r.total_ns / 1e9,
@@ -73,7 +73,7 @@ void restore_measurements(void) {
 void migrate_measurements(void) {
     for (size_t i = 0; i < app_model_count; i++)
         for (unsigned slot = 0; slot < 2; slot++) {
-            if (slot && !app.gpu_backend[0])
+            if (slot && !app.backend.gpu[0])
                 continue;
             char key[128], text[1024];
             measurement_key(key, &app_models[i], slot);
@@ -110,7 +110,7 @@ void migrate_measurements(void) {
                                     .top_p         = 1};
             snprintf(r.model, sizeof r.model, "%s", app_models[i].id);
             snprintf(r.artifact, sizeof r.artifact, "%s", app_models[i].sha256);
-            snprintf(r.backend, sizeof r.backend, "%s", slot ? app.gpu_backend : app.cpu_backend);
+            snprintf(r.backend, sizeof r.backend, "%s", slot ? app.backend.gpu : app.backend.cpu);
             snprintf(r.quantization, sizeof r.quantization, "%s", app_models[i].quantization);
             snprintf(r.id, sizeof r.id, "legacy-%s-%s-%.0f", r.artifact, r.backend, m.recorded);
             snprintf(r.series, sizeof r.series, "legacy;unknown-engine-config;%s", identity + 1);
@@ -123,15 +123,15 @@ void migrate_measurements(void) {
 bool save_selection(const char *id) {
     if (!save_preference("selected", id))
         return false;
-    snprintf(app.selected, sizeof app.selected, "%s", id);
+    snprintf(app.prefs.selected, sizeof app.prefs.selected, "%s", id);
     return true;
 }
 
 void restore_preview_preferences(void) {
-    memset(app.preview_accepted, 0, sizeof app.preview_accepted);
+    memset(app.prefs.preview_accepted, 0, sizeof app.prefs.preview_accepted);
     for (size_t i = 0; i < app_model_count; ++i) {
         char key[80], value[8] = "";
         snprintf(key, sizeof key, "preview-%s", app_models[i].sha256);
-        app.preview_accepted[i] = read_preference(key, value, sizeof value) && !strcmp(value, "v1");
+        app.prefs.preview_accepted[i] = read_preference(key, value, sizeof value) && !strcmp(value, "v1");
     }
 }

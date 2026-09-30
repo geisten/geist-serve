@@ -4,12 +4,12 @@
 void model_inventory(struct app_inventory items[static APP_MODEL_COUNT]) {
     for (size_t i = 0; i < app_model_count; ++i) {
         char path[APP_PATH_CAP], part[APP_PATH_CAP];
-        bool valid = path_join(path, app.models, app_models[i].file);
+        bool valid = path_join(path, app.paths.models, app_models[i].file);
         items[i]   = (struct app_inventory) {.installed = valid &&
                                                           regular_size(path) == app_models[i].bytes,
-                                             .tps = app_device_rate(app.history[i][0].rate,
+                                             .tps = app_device_rate(app.prefs.history[i][0].rate,
                                                                     gpu_supported(&app_models[i]),
-                                                                    app.history[i][1].rate)};
+                                                                    app.prefs.history[i][1].rate)};
         if (valid && snprintf(part, sizeof part, "%s.part", path) < (int) sizeof part)
             items[i].partial = regular_size(part);
     }
@@ -29,8 +29,8 @@ static size_t download_write(char *p, size_t size, size_t n, void *opaque) {
     size_t written = fwrite(p, 1, total, s->file);
     s->bytes += written;
     pthread_mutex_lock(&app.mutex);
-    app.received = s->bytes;
-    activity_progress(app.job_activate ? &app.load_activity : &app.download_activity,
+    app.job.received = s->bytes;
+    activity_progress(app.job.activate ? &app.activity.load : &app.activity.download,
                       s->bytes,
                       monotonic_ms());
     pthread_mutex_unlock(&app.mutex);
@@ -166,31 +166,31 @@ bool model_stamp(const char *path, const struct app_model *m, char out[static 51
 
 static void *model_job(void *unused) {
     (void) unused;
-    const struct app_model *m                    = app.job_model;
+    const struct app_model *m                    = app.job.model;
     char                    target[APP_PATH_CAP] = "", part[APP_PATH_CAP], hash[65], why[512] = "";
-    bool                    ok = path_join(target, app.models, m->file);
+    bool                    ok = path_join(target, app.paths.models, m->file);
     int                     n  = snprintf(part, sizeof part, "%s.part", target);
     ok                         = ok && n > 0 && (size_t) n < sizeof part;
-    if (ok && app.job_download)
+    if (ok && app.job.download)
         ok = download_model(m, part, why, sizeof why);
-    const char *verify = app.job_download ? part : target;
+    const char *verify = app.job.download ? part : target;
     char        key[80], before[512] = "", after[512] = "", receipt[512] = "";
     snprintf(key, sizeof key, "verified-%s", m->sha256);
     bool stamped = ok && model_stamp(verify, m, before);
-    bool cached  = !app.job_download && stamped && read_preference(key, receipt, sizeof receipt) &&
+    bool cached  = !app.job.download && stamped && read_preference(key, receipt, sizeof receipt) &&
                    !strcmp(before, receipt);
     pthread_mutex_lock(&app.mutex);
-    if (app.job_activate) {
-        app.receipt_checked = true;
-        app.receipt_hit     = cached;
-        app.verified_bytes  = 0;
+    if (app.job.activate) {
+        app.job.receipt_checked = true;
+        app.job.receipt_hit     = cached;
+        app.job.verified_bytes  = 0;
     }
     pthread_mutex_unlock(&app.mutex);
     if (ok && !atomic_load(&cancelled) && !atomic_load(&closing)) {
         if (!cached) {
             pthread_mutex_lock(&app.mutex);
-            strcpy(app.phase, "verifying");
-            activity_change(app.job_activate ? &app.load_activity : &app.download_activity,
+            strcpy(app.job.phase, "verifying");
+            activity_change(app.job.activate ? &app.activity.load : &app.activity.download,
                             ACT_HASH);
             pthread_mutex_unlock(&app.mutex);
 #ifdef APP_TESTING
@@ -200,8 +200,8 @@ static void *model_job(void *unused) {
         bool size_ok = stamped;
         bool hash_ok = cached || (size_ok && app_sha256_interruptible(verify, hash, job_cancelled));
         pthread_mutex_lock(&app.mutex);
-        if (app.job_activate && !cached && hash_ok)
-            app.verified_bytes = m->bytes;
+        if (app.job.activate && !cached && hash_ok)
+            app.job.verified_bytes = m->bytes;
         pthread_mutex_unlock(&app.mutex);
         bool stable = model_stamp(verify, m, after) && !strcmp(before, after);
         ok          = hash_ok && stable && (cached || strcmp(hash, m->sha256) == 0);
@@ -217,7 +217,7 @@ static void *model_job(void *unused) {
                         sizeof why,
                         "Cannot read the model for verification. Check disk and file permissions.");
         }
-        if (ok && app.job_download) {
+        if (ok && app.job.download) {
             /* Keep the verified inode open across rename. Capture its new ctime
              * only if the destination still describes that exact file. */
             int         verified_fd = open(part, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC);
@@ -244,21 +244,21 @@ static void *model_job(void *unused) {
                  sizeof app.message,
                  "Download or verification cancelled. Partial downloads can be resumed.");
     } else if (ok) {
-        if (!app.job_activate)
+        if (!app.job.activate)
             snprintf(app.message, sizeof app.message, "Download complete.");
         else if (start_child(target, m->id))
             (void) save_selection(m->id);
     } else
         snprintf(app.message, sizeof app.message, "%s", *why ? why : "Cannot prepare the model.");
-    struct activity *job_activity = app.job_activate ? &app.load_activity : &app.download_activity;
+    struct activity *job_activity = app.job.activate ? &app.activity.load : &app.activity.download;
     if (atomic_load(&cancelled) || atomic_load(&closing))
         (void) activity_end(job_activity, "cancelled", 499, monotonic_ms());
-    else if (!ok || (app.job_activate && !app.child))
+    else if (!ok || (app.job.activate && !app.child.pid))
         (void) activity_end(job_activity, "failed", 502, monotonic_ms());
-    else if (!app.job_activate)
+    else if (!app.job.activate)
         (void) activity_end(job_activity, "completed", 0, monotonic_ms());
-    app.job_running = false;
-    app.phase[0]    = 0;
+    app.job.running = false;
+    app.job.phase[0]    = 0;
     pthread_mutex_unlock(&app.mutex);
     return nullptr;
 }
@@ -273,43 +273,43 @@ bool begin_job(const struct app_model *m, bool download, bool activate) {
                  "engine.");
         return false;
     }
-    if (app.job_joinable) {
-        pthread_join(app.job, nullptr);
-        app.job_joinable = false;
+    if (app.job.joinable) {
+        pthread_join(app.job.thread, nullptr);
+        app.job.joinable = false;
     }
     if (activate) {
-        app.receipt_checked = false;
-        app.receipt_hit     = false;
-        app.verified_bytes  = 0;
+        app.job.receipt_checked = false;
+        app.job.receipt_hit     = false;
+        app.job.verified_bytes  = 0;
     }
-    begin_activity(activate ? &app.load_activity : &app.download_activity,
+    begin_activity(activate ? &app.activity.load : &app.activity.download,
                    download ? ACT_DOWNLOAD : ACT_RECEIPT,
                    activate ? app.generation + 1 : app.generation,
                    m->id);
     if (activate)
         atomic_store(&load_cancelled, false);
-    app.job_model    = m;
-    app.job_download = download;
+    app.job.model    = m;
+    app.job.download = download;
     /* Captured under the mutex. A background download must never replace the
      * resident daemon, even if it becomes idle or exits before completion. */
-    app.job_activate = activate;
-    app.job_running  = true;
-    if (download && app.observation)
-        app.observation->contention = true;
-    app.received   = 0;
+    app.job.activate = activate;
+    app.job.running  = true;
+    if (download && app.observe.record)
+        app.observe.record->contention = true;
+    app.job.received   = 0;
     app.message[0] = 0;
-    strcpy(app.phase, download ? "downloading" : "preparing");
+    strcpy(app.job.phase, download ? "downloading" : "preparing");
     atomic_store(&cancelled, false);
-    if (pthread_create(&app.job, nullptr, model_job, nullptr) != 0) {
-        app.job_running = false;
-        app.phase[0]    = 0;
-        (void) activity_end(activate ? &app.load_activity : &app.download_activity,
+    if (pthread_create(&app.job.thread, nullptr, model_job, nullptr) != 0) {
+        app.job.running = false;
+        app.job.phase[0]    = 0;
+        (void) activity_end(activate ? &app.activity.load : &app.activity.download,
                             "failed",
                             503,
                             monotonic_ms());
         strcpy(app.message, "Cannot start model worker.");
         return false;
     }
-    app.job_joinable = true;
+    app.job.joinable = true;
     return true;
 }

@@ -14,7 +14,7 @@ static bool comparison_cancel(void *context) {
     struct compare_output *o = context;
     if (o && o->stats && o->stats->stage) {
         pthread_mutex_lock(&app.mutex);
-        (void) activity_step(&app.request_activity,
+        (void) activity_step(&app.activity.request,
                              o->operation,
                              o->generation,
                              activity_request_stage(o->stats->stage),
@@ -37,7 +37,7 @@ static bool comparison_ready(bool restoring) {
         if (atomic_load(&closing) || (!restoring && comparison_cancel(nullptr)))
             return false;
         pthread_mutex_lock(&app.mutex);
-        bool ready = app.ready, exists = app.child > 0;
+        bool ready = app.child.ready, exists = app.child.pid > 0;
         pthread_mutex_unlock(&app.mutex);
         if (ready)
             return true;
@@ -53,23 +53,23 @@ static void *comparison_main(void *unused) {
     char path[APP_PATH_CAP], id[64], previous[8], run[80];
     bool gpu;
     pthread_mutex_lock(&app.mutex);
-    snprintf(path, sizeof path, "%s", app.chosen);
-    snprintf(id, sizeof id, "%s", app.active_id);
-    snprintf(previous, sizeof previous, "%s", app.execution_mode);
+    snprintf(path, sizeof path, "%s", app.child.chosen);
+    snprintf(id, sizeof id, "%s", app.child.active_id);
+    snprintf(previous, sizeof previous, "%s", app.backend.mode);
     gpu = gpu_supported(app_model_find(id));
     snprintf(run, sizeof run, "compare-v1-%ld-%.0f", (long) getpid(), monotonic_ms());
     pthread_mutex_unlock(&app.mutex);
     bool ok = true;
     for (unsigned slot = 0; ok && slot < (gpu ? 2u : 1u); slot++) {
         pthread_mutex_lock(&app.mutex);
-        strcpy(app.compare_phase, "loading");
+        strcpy(app.compare.phase, "loading");
         ok = !comparison_cancel(nullptr) && start_child_mode(path, id, slot ? "gpu" : "cpu");
         /* Comparison must not rewrite the user's saved processor preference. */
-        app.save_execution = false;
+        app.backend.save = false;
         pthread_mutex_unlock(&app.mutex);
         ok = ok && comparison_ready(false);
         pthread_mutex_lock(&app.mutex);
-        ok = ok && !strcmp(app.backend, slot ? app.gpu_backend : app.cpu_backend);
+        ok = ok && !strcmp(app.backend.active, slot ? app.backend.gpu : app.backend.cpu);
         pthread_mutex_unlock(&app.mutex);
         for (unsigned repeat = 0; ok && repeat < 4; repeat++) {
             if (comparison_cancel(nullptr)) {
@@ -78,9 +78,9 @@ static void *comparison_main(void *unused) {
             }
             struct perf_record r;
             pthread_mutex_lock(&app.mutex);
-            app.generating   = true;
-            app.compare_step = slot * 4 + repeat + 1;
-            strcpy(app.compare_phase, repeat ? "measuring" : "warmup");
+            app.child.generating   = true;
+            app.compare.step = slot * 4 + repeat + 1;
+            strcpy(app.compare.phase, repeat ? "measuring" : "warmup");
             observation_begin(&r, "controlled_test", 128, 0, 1);
             r.warmup = !repeat;
             snprintf(r.run, sizeof r.run, "%s", run);
@@ -93,9 +93,9 @@ static void *comparison_main(void *unused) {
             char                  error[256];
             struct compare_output output = {.start      = monotonic_ms(),
                                             .stats      = &stats,
-                                            .operation  = app.request_activity.id,
+                                            .operation  = app.activity.request.id,
                                             .generation = app.generation};
-            int                   rc     = app_daemon_chat(app.socket_path,
+            int                   rc     = app_daemon_chat(app.child.socket_path,
                                                            1,
                                                            &prompt,
                                                            128,
@@ -115,19 +115,19 @@ static void *comparison_main(void *unused) {
         }
     }
     pthread_mutex_lock(&app.mutex);
-    strcpy(app.compare_phase, "restoring");
+    strcpy(app.compare.phase, "restoring");
     bool restore       = !atomic_load(&closing) && start_child_mode(path, id, previous);
-    app.save_execution = false;
+    app.backend.save = false;
     pthread_mutex_unlock(&app.mutex);
     restore = restore && comparison_ready(true);
     pthread_mutex_lock(&app.mutex);
-    strcpy(app.compare_result,
+    strcpy(app.compare.result,
            !restore                     ? "restore_failed"
            : comparison_cancel(nullptr) ? "cancelled"
            : ok                         ? "completed"
                                         : "failed");
-    app.compare_phase[0] = 0;
-    app.comparing        = false;
+    app.compare.phase[0] = 0;
+    app.compare.running        = false;
     pthread_mutex_unlock(&app.mutex);
     return nullptr;
 }
@@ -139,25 +139,25 @@ void comparison_start(int fd, const char *body, struct app_arena *arena) {
         return;
     }
     pthread_mutex_lock(&app.mutex);
-    if (!app.ready || app.generating || app.job_running || app.comparing ||
-        !app_model_find(app.active_id)) {
+    if (!app.child.ready || app.child.generating || app.job.running || app.compare.running ||
+        !app_model_find(app.child.active_id)) {
         pthread_mutex_unlock(&app.mutex);
         error_response(fd, 409, "Load a model and wait for other work to finish.");
         return;
     }
-    if (app.compare_joinable) {
-        pthread_join(app.comparison, nullptr);
-        app.compare_joinable = false;
+    if (app.compare.joinable) {
+        pthread_join(app.compare.thread, nullptr);
+        app.compare.joinable = false;
     }
-    app.comparing         = true;
-    app.compare_step      = 0;
-    app.compare_result[0] = 0;
-    strcpy(app.compare_phase, "loading");
+    app.compare.running         = true;
+    app.compare.step      = 0;
+    app.compare.result[0] = 0;
+    strcpy(app.compare.phase, "loading");
     atomic_store(&compare_cancelled, false);
-    bool ok              = pthread_create(&app.comparison, nullptr, comparison_main, nullptr) == 0;
-    app.compare_joinable = ok;
+    bool ok              = pthread_create(&app.compare.thread, nullptr, comparison_main, nullptr) == 0;
+    app.compare.joinable = ok;
     if (!ok)
-        app.comparing = false;
+        app.compare.running = false;
     pthread_mutex_unlock(&app.mutex);
     if (ok)
         response(fd, 202, "application/json", "{}", 2);
