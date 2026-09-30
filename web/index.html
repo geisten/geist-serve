@@ -78,7 +78,8 @@
     <div class="settings-row"><label for="ui-language">Interface language</label><select id="ui-language"><option value="system">System language</option><option value="en" lang="en">English</option><option value="de" lang="de">Deutsch</option></select></div>
     <div class="settings-row"><label for="language-choice">Answer language</label><select id="language-choice"><option value="en" lang="en">English</option><option value="de" lang="de">Deutsch</option></select></div>
     <section class="preference-group" aria-labelledby="catalog-title"><div class="catalog-heading"><h3 id="catalog-title">Model catalog</h3><span id="catalog-revision" class="hint"></span></div>
-      <label for="catalog-file" class="sr-only">Model catalog JSON file</label><input id="catalog-file" type="file" accept=".json,application/json">
+      <label for="catalog-file" class="sr-only">Model catalog JSON file</label><input id="catalog-file" class="sr-only" type="file" accept=".json,application/json" tabindex="-1">
+      <div class="catalog-pick"><button id="catalog-choose" type="button" aria-describedby="catalog-file-name">Import catalog…</button> <span id="catalog-file-name" class="hint">No file selected</span></div>
       <p class="hint">Import a newer JSON file from a source you trust. No automatic online updates.</p>
       <p id="catalog-result" class="hint" role="status"></p>
     </section>
@@ -127,7 +128,7 @@
 <dialog id="activity-dialog" class="measurement-sheet" aria-labelledby="activity-title">
 <div class="sheet-heading"><h2 id="activity-title">Activity</h2><button id="close-activity" type="button" aria-label="Close" title="Close" autofocus><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
 <div class="performance-content" tabindex="0" role="region" aria-label="Activity">
-<p id="activity-hint"></p><dl id="activity-summary" class="activity-summary"></dl>
-<h3>Phases</h3><ol id="activity-phases"></ol>
-<p id="activity-engine" class="hint"></p><p class="hint">A running service does not prove that the model is making progress. No input progress counter is available.</p>
+<p id="activity-hint"></p><div id="activity-details"><dl id="activity-summary" class="activity-summary"></dl>
+<h3>Phases</h3><ol id="activity-phases"></ol></div>
+<p id="activity-engine" class="hint"></p><p id="activity-footnote" class="hint" hidden>Progress is estimated. Large models can pause for a while during loading.</p>
 </div></dialog></body></html>
