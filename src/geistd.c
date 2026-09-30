@@ -999,13 +999,10 @@ int main(int argc, char **argv) {
                 inherited ? "inherited socket"
                 : host    ? "tcp"
                           : sock);
-        while (!net_stop) {
-            int fd = accept(lfd, nullptr, nullptr);
-            if (fd < 0) {
-                if (errno == EINTR)
-                    continue;
+        for (;;) {
+            int fd = net_accept(lfd);
+            if (fd < 0)
                 break;
-            }
             struct timeval tv = {.tv_sec = 30};
             setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
             serve_conn(&d, fd, fd);

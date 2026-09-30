@@ -114,12 +114,11 @@ static void serve_conn(struct server *sv, int in, int out) {
 }
 
 static void accept_loop(struct server *sv, int lfd) {
-    while (!net_stop) {
-        int fd = accept(lfd, nullptr, nullptr);
+    for (;;) {
+        int fd = net_accept(lfd);
         if (fd < 0) {
-            if (errno == EINTR)
-                continue;
-            fprintf(stderr, "geist-serve: accept: %s\n", strerror(errno));
+            if (!net_stop)
+                fprintf(stderr, "geist-serve: accept: %s\n", strerror(errno));
             break;
         }
         /* A stalled client must not hold the one serving thread forever. */

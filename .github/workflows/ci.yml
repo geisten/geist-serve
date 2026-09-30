@@ -41,7 +41,7 @@ jobs:
           python3 tests/install/manifest_test.py
           python3 tests/install/sbom_test.py
       - name: unit tests (model-free)
-        run: make CC=gcc-14 TARGET=linux build/test_template && ./build/test_template
+        run: make CC=gcc-14 TARGET=linux build/test_template build/test_net_signal && ./build/test_template && ./build/test_net_signal
       - name: systemd units parse
         run: |
           sudo install -m 0755 geist-serve /usr/local/bin/geist-serve
@@ -64,7 +64,7 @@ jobs:
           python3 tests/install/manifest_test.py
           python3 tests/install/sbom_test.py
       - name: unit tests (model-free)
-        run: make build/test_template && ./build/test_template
+        run: make build/test_template build/test_net_signal && ./build/test_template && ./build/test_net_signal
 
   # The real thing: the HTTP contract against a model, on every runner OS
   # and CPU we ship for. ~369 MB SmolLM2, cached under the same key the
