@@ -522,7 +522,7 @@ function render(next) {
   $('disk-space').textContent = t(next.hardware.disk_known ? `${bytes(next.hardware.disk)} disk space available` : 'Disk space could not be read');
   const models = visibleModels();
   for (const [id, card] of cards) if (!models.some(model => model.id === id)) { card.remove(); cards.delete(id); }
-  $('catalog-revision').textContent = next.catalog_revision ? `#${next.catalog_revision}` : '';
+  $('catalog-revision').textContent = next.catalog_revision ? `${t('Version')} ${next.catalog_revision}` : ''; // #56: not a bare #N
   $('catalog-file').disabled = requesting || next.busy || next.loading || !!next.phase || !!controller;
   $('catalog-choose').disabled = $('catalog-file').disabled;
   if (!working) { transfer.id = ''; transfer.samples = []; }

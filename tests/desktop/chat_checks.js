@@ -644,7 +644,7 @@ async function checkActivityUX(assert, tick) {
       };
       const catalogFixture={schema:2,revision:42,models:[...executionFixture.models,{...executionFixture.models[0],id:'imported-model',name:'Imported model',group_id:'imported-model',group_name:'Imported model',installed:false}]};
       await upload(catalogFixture);
-      assert(cards.has('imported-model') && $('catalog-revision').textContent==='#42' && $('catalog-result').textContent===t('Catalog updated.'), 'JSON file import updates visible list and revision');
+      assert(cards.has('imported-model') && $('catalog-revision').textContent===`${t('Version')} 42` && $('catalog-result').textContent===t('Catalog updated.'), 'JSON file import updates visible list and revision');
       {const input=$('catalog-file'),box=input.getBoundingClientRect(),button=$('catalog-choose');
        assert(box.width<=1 && getComputedStyle(input).clipPath.includes('inset(50%)') && input.tabIndex===-1 && !button.hidden && button.getBoundingClientRect().width>1,'#54: the native file control is hidden; a page button opens it');
        assert(/\.json$/.test($('catalog-file-name').textContent) && button.getAttribute('aria-describedby')==='catalog-file-name','#54: the chosen file name is shown and described');
