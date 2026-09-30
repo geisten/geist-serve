@@ -69,7 +69,12 @@ with tempfile.TemporaryDirectory(prefix='geist-compat-') as home:
             # Worker completion alone is not readiness for the next editor.
             app.wait(lambda s:not s['busy'] and s['ready'],timeout=30)
             assert app.request('/v1/chat/completions',base)[0]==200
-            assert app.request('/v1/chat/completions',base|{'messages':[{'role':'user','content':' xy'*7000}]})[0]==400
+            # #68: an editor sends its next request as soon as it reads an answer.
+            # The shared model must already be free then: never 429 back to back.
+            codes=[app.request('/v1/chat/completions',base)[0] for _ in range(5)]
+            assert codes==[200]*5, f'back-to-back requests: {codes}'
+            code,body,_=app.request('/v1/chat/completions',base|{'messages':[{'role':'user','content':' xy'*7000}]})
+            assert code==400,(code,body[:300])
             assert not app.status()['busy']
         old_token,port=app.token,app.port
     finally: app.close()
