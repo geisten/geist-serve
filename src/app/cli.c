@@ -220,6 +220,18 @@ static bool start(void) {
         if (snprintf(executable, sizeof executable, "%s/geist-app", directory) >=
             (int) sizeof executable)
             return false;
+        /* geist-app refuses to start without its geistd, but its stderr goes to
+         * /dev/null below: say so here instead of a misleading port hint (#70). */
+        char daemon[APP_PATH_CAP];
+        if (snprintf(daemon, sizeof daemon, "%s/geistd", directory) >= (int) sizeof daemon)
+            return false;
+        if (access(daemon, X_OK) != 0) {
+            fprintf(stderr,
+                    "Geist is incomplete: %s is missing. Reinstall Geist, or in a source "
+                    "checkout run 'make' first.\n",
+                    daemon);
+            return false;
+        }
         const char *port_arg = getenv("GEIST_PORT");
         if (!port_arg)
             port_arg = "8766";
