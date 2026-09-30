@@ -93,6 +93,8 @@ def main():
             state = app.status()
             assert len(state["models"]) == len(json.loads((ROOT/"models/catalog.json").read_text())["models"]) and state["hardware"]["ram"] > 0
             assert state['runtime'] == 'geistd'
+            # #55: a daemon without --build-info leaves provenance unreported, never invented
+            assert state['engine']['geistlib']['version'] is None and state['engine']['unavailable_reason'] == 'not_reported'
             assert all(m['capabilities'] == {'chat':True, 'vision':False, 'speech_recognition':False} for m in state['models'])
             assert state['hardware']['os'] and state['hardware']['logical_cpus'] > 0
             assert state['resources'] == {'scope':'geistd','rss_bytes':None,'cpu_percent':None,'cpu_interval_ms':0}
@@ -208,6 +210,9 @@ def main():
             shutil.copyfile(model, directory / "smollm2-360m-instruct-q8_0.gguf")
             app = App(home, binary=binary, server=Path(os.environ.get("GEIST_EXECUTION_DAEMON", ROOT / "geistd")))
             try:
+                # #55: the packaged engine's identity is known before any model is chosen
+                engine = app.status()['engine']
+                assert engine['geistlib']['version'] and engine['unavailable_reason'] is None, engine
                 assert app.request("/app/select", {"id": "smollm2-360m"})[0] == 202
                 app.wait(lambda state: state["ready"], timeout=60)
                 code, body, _ = app.request("/app/generate", {

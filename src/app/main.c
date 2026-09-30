@@ -193,6 +193,7 @@ int main(int argc, char **argv) {
             app.paths.home,
             app.port);
     probe_backends();
+    probe_engine();
     struct app_hardware measurement_hardware = {0};
     if (app_hardware_read(&measurement_hardware, app.paths.models)) {
         int n = snprintf(app.prefs.measurement_identity,

@@ -205,6 +205,7 @@ int listener(unsigned *port);
 
 /* child.c — geistd supervision: backend probe, spawn, poll, stop, lifecycle sampling */
 void probe_backends(void);
+void probe_engine(void);
 bool gpu_supported(const struct app_model *model);
 bool recommend_gpu(const struct app_model *model);
 void activity_change(struct activity *a, enum activity_stage stage);
