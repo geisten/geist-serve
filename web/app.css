@@ -1003,3 +1003,9 @@ body.manager-page main { max-width:1180px }
 /* #54: translated picker button; the native input stays for .click() and assistive tech. */
 .catalog-pick { display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px; margin:6px 0 }
 #catalog-file-name { margin:0; overflow-wrap:anywhere }
+
+/* #58: a missing value is a hint in the body font, never styled like copyable code. */
+.connection-value.is-empty { font-family:inherit; color:var(--muted) }
+#connection-disabled { margin-top:8px }
+#connection-disabled .text-button { padding:0 2px; font-size:inherit }
+

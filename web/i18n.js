@@ -163,6 +163,10 @@ const german = {
   'Asking the loaded model through the editor endpoint…': 'Das geladene Modell wird über den Editor-Endpunkt angesprochen…',
   'The model completed without text. Try another model.': 'Das Modell lieferte keinen Text. Versuche ein anderes Modell.',
   'Open Geist using the private link from the app or Pi launcher. The link contains your private local API key.': 'Öffne Geist über den privaten Link aus der App oder dem Pi-Starter. Der Link enthält deinen privaten lokalen API-Schlüssel.',
+  'No model loaded yet': 'Noch kein Modell geladen',
+  'Load a model first to copy or test the connection.': 'Lade zuerst ein Modell, um die Verbindung zu kopieren oder zu testen.',
+  'Wait until the current answer finishes to test the connection.': 'Warte, bis die aktuelle Antwort fertig ist, um die Verbindung zu testen.',
+  'Paste the copied curl command into your terminal to try the loaded model. You can also run geist test and geist chat.': 'Füge den kopierten curl-Befehl im Terminal ein, um das geladene Modell auszuprobieren. Du kannst auch geist test und geist chat verwenden.',
   'Service unavailable. Reopen Geist to reconnect.': 'Dienst nicht erreichbar. Öffne Geist erneut, um dich zu verbinden.',
   'Stop the current task first.': 'Stoppe zuerst die laufende Aufgabe.', 'Another task is active.': 'Eine andere Aufgabe läuft bereits.',
   'Unload this model before removing it.': 'Entlade das Modell, bevor du es löschst.', 'Cannot remove this download safely.': 'Dieser Download konnte nicht sicher gelöscht werden.',
@@ -179,6 +183,7 @@ Object.assign(german, {
   'Less than a minute left': 'Noch weniger als eine Minute'
 });
 const germanPatterns = [
+  [/^Paste the copied curl command into your terminal to try the loaded model\. The command line tool is at (.+)\.$/, (_, a) => `Füge den kopierten curl-Befehl im Terminal ein, um das geladene Modell auszuprobieren. Das Befehlszeilenwerkzeug liegt unter ${a}.`],
   [/^Downloading · (\d+)%$/, (_, n) => `Wird geladen · ${n}%`],
   [/^Paused · (\d+)%$/, (_, n) => `Pausiert · ${n}%`],
   [/^About (\d+) min left$/, (_, n) => `Noch etwa ${n} Min.`],
