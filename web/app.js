@@ -471,6 +471,7 @@ function visibleModels() {
   const models = state?.models || [];
   return state?.active_id === 'custom' && state.ready ? [{id:'custom', name:state.active, installed:true, resource_fit:0, capabilities:{chat:true}}, ...models] : models;
 }
+let shownActive = ''; // last active model scrolled into view (#50)
 function render(next) {
   const modelChanged = state && (state.active_id !== next.active_id || state.active !== next.active);
   state = next;
@@ -499,6 +500,11 @@ function render(next) {
   $('catalog-file').disabled = requesting || next.busy || next.loading || !!next.phase || !!controller;
   if (!working) { transfer.id = ''; transfer.samples = []; }
   renderModelGroups(models);
+  // Stacked layout (#50): bring the newly active card into the list's view once, not on every poll.
+  if (next.active_id && next.active_id !== shownActive) {
+    shownActive = next.active_id;
+    document.querySelector(`.model[data-id="${CSS.escape(next.active_id)}"]`)?.scrollIntoView({block: 'nearest'});
+  }
   if (!controller && !requesting && (!localMessage || next.message !== lastServerMessage)) message(working ? '' : next.message || '', false);
   lastServerMessage = next.message;
   buttonStates(); chatLayout();
