@@ -174,11 +174,18 @@ async function checkActivityUX(assert, tick) {
     $('open-activity').focus();$('open-activity').click();await tick();
     assert($('activity-dialog').open && document.activeElement===$('close-activity'),'inspector uses modal focus');
     assert($('activity-summary').textContent.includes(t('Last progress report')) && !$('activity-summary').textContent.includes('Unsent'),'inspector is numeric and private');
+    assert(!$('activity-details').hidden && !$('activity-footnote').hidden,'#53: a live operation shows its table and the progress footnote');
     document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));await tick();
     assert(!$('activity-dialog').open && document.activeElement===$('open-activity'),'Escape returns focus');
     update(operation(100,'prefill',{sequence:4,outcome:'failed',error_code:504}));
     $('open-activity').click();renderActivity();
     assert($('activity-summary').textContent.includes(t('Processing input')) && $('activity-summary').textContent.includes('504'),'failure retains actual failed phase');
+    assert($('activity-footnote').hidden,'#53: no progress footnote once an operation has ended');
+    update(operation(200,'generating',{sequence:1,outcome:'completed',runtime_alive:false}));renderActivity();
+    assert(!$('activity-summary').textContent.includes(t('Ready')) && $('activity-summary').textContent.includes(t('No model loaded')),'#53: a stopped runtime is never "Ready"');
+    // A missing operation keeps the last known one (by design); true idle is a fresh service instance.
+    fixture={...saved,activity:{instance:'idle-activity-fixture',request:null,load:null,download:null}};render(structuredClone(fixture));renderActivity();
+    assert($('activity-details').hidden && $('activity-footnote').hidden && $('activity-hint').textContent===t('Nothing is running right now.'),'#53: nothing to report is one sentence, not a table of dashes');
     $('close-activity').click();await tick();
     update(operation(100,'prefill',{sequence:5,outcome:'cancelled'}),operation(102,'loading',{generation:9}));
     $('activity-stop').click();for(let i=0;i<30&&cancellingActivity;i++)await tick();
@@ -628,11 +635,27 @@ async function checkActivityUX(assert, tick) {
       const catalogFixture={schema:2,revision:42,models:[...executionFixture.models,{...executionFixture.models[0],id:'imported-model',name:'Imported model',group_id:'imported-model',group_name:'Imported model',installed:false}]};
       await upload(catalogFixture);
       assert(cards.has('imported-model') && $('catalog-revision').textContent==='#42' && $('catalog-result').textContent===t('Catalog updated.'), 'JSON file import updates visible list and revision');
+      {const input=$('catalog-file'),box=input.getBoundingClientRect(),button=$('catalog-choose');
+       assert(box.width<=1 && getComputedStyle(input).clipPath.includes('inset(50%)') && input.tabIndex===-1 && !button.hidden && button.getBoundingClientRect().width>1,'#54: the native file control is hidden; a page button opens it');
+       assert(/\.json$/.test($('catalog-file-name').textContent) && button.getAttribute('aria-describedby')==='catalog-file-name','#54: the chosen file name is shown and described');
+       assert(button.textContent===t('Import catalog…'),'#54: the picker button follows the interface language');}
       await upload({...catalogFixture,schema:0});
       assert(cards.has('imported-model') && $('catalog-result').textContent===t('Invalid model catalog. Check schema, entries and unique IDs/files.'), 'invalid import keeps current catalog and explains error');
     } finally {
       api=beforeExecutionAPI;render(executionRealState);message('',false);input('');showPage('models-page');
     }
+    {// #57: one order for one catalog, whatever is installed, active or recommended by selection.
+     const base=structuredClone(state), groupsOf=()=>[...$('models').children].map(g=>g.dataset.group);
+     const groupIds=[];for(const m of base.models){const g=m.group_id||m.id;if(!groupIds.includes(g))groupIds.push(g);}
+     const preferredModel=base.models.find(m=>m.id===base.recommendation?.preferred_id), preferredGroup=preferredModel&&(preferredModel.group_id||preferredModel.id);
+     const expected=preferredGroup?[preferredGroup,...groupIds.filter(g=>g!==preferredGroup)]:groupIds;
+     const last=base.models.at(-1).id;
+     const fresh={...base,ready:false,active_id:'',recommendation:{...base.recommendation,id:''},models:base.models.map(m=>({...m,installed:false}))};
+     const installed={...fresh,models:fresh.models.map(m=>m.id===last?{...m,installed:true}:m)};
+     const active={...installed,ready:true,active_id:last,recommendation:{...base.recommendation,id:last,source:'saved'}};
+     const orders=[fresh,installed,active].map(s=>{render(structuredClone(s));return groupsOf();});
+     render(base);
+     assert(orders.every(o=>JSON.stringify(o)===JSON.stringify(expected)),`#57: platform default first, then catalog order, in every state: ${JSON.stringify({expected,orders})}`);}
     assert(window.geistNavigate('invalid') === false && !$('models-page').hidden, 'native routing is allowlisted');
     showPage('test-page');
     window.chatChecksStage = 'markdown';

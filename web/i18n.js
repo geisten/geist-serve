@@ -466,7 +466,9 @@ Object.assign(german, {'Earlier configuration':'Frühere Konfiguration'});
 
 Object.assign(german, {
   'Activity':'Aktivität','Stop':'Stopp','Phases':'Phasen','Sending…':'Wird gesendet…',
-  'A running service does not prove that the model is making progress. No input progress counter is available.':'Ein laufender Dienst belegt keinen Modellfortschritt. Für die Eingabeverarbeitung ist kein Fortschrittszähler verfügbar.',
+  'Nothing is running right now.':'Gerade läuft nichts.',
+  'Import catalog…':'Katalog importieren…','No file selected':'Keine Datei ausgewählt',
+  'Progress is estimated. Large models can pause for a while during loading.':'Der Fortschritt ist geschätzt. Große Modelle können beim Laden eine Weile pausieren.',
   'Validating local artifact':'Lokale Datei prüfen','Checking model':'Modell prüfen','Downloading model':'Modell herunterladen',
   'Stopping':'Wird gestoppt','Starting runtime':'Laufzeit starten','Loading model':'Modell laden','Ready':'Bereit',
   'Connecting':'Verbindung herstellen','Opening session':'Sitzung öffnen','Reading input':'Eingabe einlesen',

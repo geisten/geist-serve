@@ -1000,3 +1000,6 @@ body.manager-page main { max-width:1180px }
 .execution-row #open-measurements>span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap }
 .recommended-legend { display:flex; align-items:center; gap:6px }
 
+/* #54: translated picker button; the native input stays for .click() and assistive tech. */
+.catalog-pick { display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px; margin:6px 0 }
+#catalog-file-name { margin:0; overflow-wrap:anywhere }

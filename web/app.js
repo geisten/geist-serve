@@ -384,9 +384,12 @@ function renderModelGroups(models) {
     if (!grouped.has(id)) grouped.set(id, []);
     grouped.get(id).push(model);
   }
-  // Establish initial priority once, then keep groups still as live status changes.
-  const priority = variants => Math.min(...variants.map(m => m.id === state.active_id ? 0 : m.id === state.recommendation?.id ? 1 : m.installed ? 2 : 3));
-  const ordered = modelGroups.size ? [...grouped] : [...grouped].sort((a,b) => priority(a[1]) - priority(b[1]));
+  // #57: one order for one catalog: the platform default group first, then catalog
+  // order. It never depends on selection, downloads, timing or language, so a row
+  // never moves under the pointer; only a catalog change can reorder groups.
+  const preferred = state.recommendation?.preferred_id;
+  const ordered = [...grouped].sort((a, b) => (b[1].some(m => m.id === preferred)) - (a[1].some(m => m.id === preferred)));
+  ordered.forEach(([id], index) => { const group = modelGroups.get(id); if (group && $('models').children[index] !== group) $('models').insertBefore(group, $('models').children[index] || null); });
   for (const [id, variants] of ordered) {
     let group = modelGroups.get(id);
     if (!group) {
@@ -394,7 +397,7 @@ function renderModelGroups(models) {
       const heading = document.createElement('h3'); heading.id = `model-group-${++groupSequence}`;
       const rows = document.createElement('div'); rows.className = 'model-variants'; rows.setAttribute('role', 'list');
       group.setAttribute('aria-labelledby', heading.id); group.append(heading, rows);
-      modelGroups.set(id, group); $('models').append(group);
+      modelGroups.set(id, group); $('models').insertBefore(group, $('models').children[ordered.findIndex(([key]) => key === id)] || null);
     }
     group.querySelector('h3').textContent = variants[0].group_name || variants[0].name;
     const rows = group.querySelector('.model-variants');
@@ -502,6 +505,7 @@ function render(next) {
   for (const [id, card] of cards) if (!models.some(model => model.id === id)) { card.remove(); cards.delete(id); }
   $('catalog-revision').textContent = next.catalog_revision ? `#${next.catalog_revision}` : '';
   $('catalog-file').disabled = requesting || next.busy || next.loading || !!next.phase || !!controller;
+  $('catalog-choose').disabled = $('catalog-file').disabled;
   if (!working) { transfer.id = ''; transfer.samples = []; }
   renderModelGroups(models);
   // Stacked layout (#50): bring the newly active card into the list's view once, not on every poll.
@@ -917,10 +921,14 @@ for (const input of document.querySelectorAll('[name="execution"]')) input.addEv
     if (state) render(state); else buttonStates();
   }
 });
+// #54: WebKit draws the native file control in the bundle's language, not the page's;
+// a translated button opens it and the chosen name is shown beside it.
+$('catalog-choose').addEventListener('click', () => $('catalog-file').click());
 $('catalog-file').addEventListener('change', async () => {
   const file = $('catalog-file').files[0];
+  if (file) $('catalog-file-name').textContent = file.name;
   if (!file || requesting) return;
-  requesting = true; buttonStates(); $('catalog-file').disabled = true;
+  requesting = true; buttonStates(); $('catalog-file').disabled = $('catalog-choose').disabled = true;
   try {
     if (file.size > 24576) throw new Error('The catalog must be at most 24 KiB.');
     const catalog = await file.text();
@@ -977,9 +985,13 @@ function renderActivity() {
   $('activity-cpu-hint').hidden=!longCPU;
   if (longCPU) uiText($('activity-cpu-hint'),'Large models can take time on CPU.');
   if (!$('activity-dialog').open) return;
-  const text=stale?'Status is stale. Reconnect to see current activity.':a?.outcome==='failed'?'The operation failed. Retry the model or choose another processor.':running&&elapsed>=15&&a.backend?.startsWith('cpu')?'Large models can take time on CPU.':'No progress report available';
+  // #53: nothing to report is one sentence, not a table of dashes; the footnote only
+  // explains a live operation; "Ready" is never shown next to a stopped runtime.
+  const text=stale?'Status is stale. Reconnect to see current activity.':a?.outcome==='failed'?'The operation failed. Retry the model or choose another processor.':running&&elapsed>=15&&a.backend?.startsWith('cpu')?'Large models can take time on CPU.':!a?'Nothing is running right now.':'No progress report available';
   $('activity-hint').textContent=t(text);
-  const summary=[['Operation',a?.id ? `${activityInstance} / ${a.id}` : t('Not available')],['Stage',t(activityLabels[a?.stage]||phase)],['Phase elapsed',timeText(a?elapsed:null)],['Total elapsed',timeText(a?(a.elapsed_ms+(running&&!stale?age:0))/1000:null)],['Last progress report',a?timeText((a.event_age_ms+age)/1000):'—'],['Runtime',t(a?.runtime_alive?'Process alive':'Not running')],['Processor',a?.backend||'—'],['Error code',a?.error_code||'—']];
+  $('activity-details').hidden=!a;
+  $('activity-footnote').hidden=!running;
+  const summary=[['Operation',a?.id ? `${activityInstance} / ${a.id}` : t('Not available')],['Stage',t(a&&!a.runtime_alive&&!running&&phase==='Ready'?'No model loaded':activityLabels[a?.stage]||phase)],['Phase elapsed',timeText(a?elapsed:null)],['Total elapsed',timeText(a?(a.elapsed_ms+(running&&!stale?age:0))/1000:null)],['Last progress report',a?timeText((a.event_age_ms+age)/1000):'—'],['Runtime',t(a?.runtime_alive?'Process alive':'Not running')],['Processor',a?.backend||'—'],['Error code',a?.error_code||'—']];
   $('activity-summary').replaceChildren(...summary.flatMap(([key,value])=>{const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=t(key);dd.textContent=value;return [dt,dd];}));
   const phases=a?.phases||[];
   $('activity-phases').replaceChildren(...phases.map(p=>{const row=document.createElement('li');row.textContent=`${t(activityLabels[p.stage]||'Working')} · ${timeText(p.duration_ms/1000)}`;return row;}));
