@@ -150,6 +150,11 @@ async function checkActivityUX(assert, tick) {
     assert(!$('activity-cpu-hint').hidden,'long CPU wait explained in the ordinary view');
     assert($('activity-label').getAttribute('aria-live')==='polite' && $('activity-time').getAttribute('aria-hidden')==='true','timer does not announce every second');
     assert(rect().flat().every((value,i)=>Math.abs(value-before.flat()[i])<=1),`activity keeps transcript and composer geometry: ${JSON.stringify({before,after:rect()})}`);
+    // #49: the conversation gets the height. Activity shares the model-name row, each
+    // processor choice is one line, and the chrome above the transcript stays within budget.
+    assert($('activity-lane').closest('.chat-heading'),'activity lane shares the model-name row');
+    assert([...document.querySelectorAll('.execution-choice label')].every(l=>l.getBoundingClientRect().height<=34),'each processor choice is a single line');
+    if (innerHeight>=600) assert($('transcript').getBoundingClientRect().top-document.querySelector('.runtime-panel').getBoundingClientRect().top<=124,`chat chrome within budget: ${$('transcript').getBoundingClientRect().top-document.querySelector('.runtime-panel').getBoundingClientRect().top}px`);
     const labelNode=$('activity-label').firstChild;renderActivity();assert($('activity-label').firstChild===labelNode,'unchanged stage does not repeat the live announcement');
     const previous=activitySnapshot.request;
     acceptActivity({...fixture.activity,request:operation(99,'answer',{generation:7})});renderActivity();
