@@ -28,7 +28,7 @@ jobs:
         runner: [ubuntu-24.04, ubuntu-24.04-arm]
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: deps
         run: sudo apt-get update -q && sudo apt-get install -y -q gcc-14 libcurl4-openssl-dev libssl-dev
       - name: build
@@ -50,7 +50,7 @@ jobs:
     timeout-minutes: 25
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: deps
         run: brew install libomp
       - name: build
@@ -82,7 +82,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: deps (linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update -q && sudo apt-get install -y -q gcc-14 libcurl4-openssl-dev libssl-dev curl python3
@@ -92,7 +92,7 @@ jobs:
       - name: build
         run: ${{ matrix.make }}
       - name: cache reference model
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf
           key: geist-model-smollm2-360m-q8-48ab3034d0dd
