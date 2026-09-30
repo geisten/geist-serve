@@ -37,6 +37,7 @@ Or build it:
 ```sh
 make                                   # pins and builds the engine, then ./geist-serve
 make fetch-model && make test          # unit test + 70-odd HTTP checks against SmolLM2-360M
+make app test-app                      # the C23 app and its tests (after plain `make`: they need ./geistd)
 ./geist-serve model.gguf               # 127.0.0.1:11434, the Ollama port
 ./geist-serve model.gguf --host 0.0.0.0 --port 8080
 ```

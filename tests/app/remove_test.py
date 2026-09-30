@@ -48,7 +48,7 @@ if fixture:
         (home/'models').mkdir()
         target = home/'models/smollm2-360m-instruct-q8_0.gguf'
         shutil.copyfile(fixture, target)
-        app = App(home, server=ROOT/'geistd')
+        app = App(home, server=Path(os.environ.get('GEIST_EXECUTION_DAEMON', ROOT/'geistd')))
         try:
             assert app.request('/app/select', {'id':'smollm2-360m'})[0] == 202
             app.wait(lambda s:s['ready'],timeout=60)
@@ -61,7 +61,8 @@ if fixture:
             assert app.request('/app/remove', {'id':'smollm2-360m'})[0] == 409
             assert target.exists() and app.status()['ready']
             response.close(); connection.close()
-            app.wait(lambda s:not s['busy'],timeout=15)
+            # Cancelling reaps/reloads the owned runtime: wait for readiness, not only idle.
+            app.wait(lambda s:not s['busy'] and s['ready'],timeout=60)
             # Unsafe paths must not stop a healthy running model.
             backup=target.with_suffix('.saved')
             target.rename(backup); target.symlink_to(backup)
