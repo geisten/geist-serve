@@ -21,6 +21,8 @@ build/test_app_core: build/app_models.h tests/app/core_test.c $(APP_SOURCE) src/
 	@mkdir -p build
 	$(APP_CC) $(APP_CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ tests/app/core_test.c $(APP_SOURCE) src/json.c $(APP_LDLIBS)
 test-app: build/test_app_memory_journal build/test_app_memory build/test_app_lifecycle build/test_app_activity build/test_app_engine build/test_app_output build/test_app_engine_identity build/test_app_performance build/test_app_resources build/geist-app-old build/geist-app-new build/geist-app-legacy build/geist-app-test geist-app geist build/test_app_core build/test_app_client build/test_app_tasks
+	@# The CLI and lifecycle tests start geist-app, which needs a real geistd (#70).
+	@test -x "$${GEIST_EXECUTION_DAEMON:-geistd}" || { echo "test-app needs ./geistd (or GEIST_EXECUTION_DAEMON): run 'make' first."; exit 1; }
 	./build/test_app_memory
 	python3 -c 'import tempfile,subprocess; d=tempfile.TemporaryDirectory(); [subprocess.run(["./build/test_app_memory_journal",d.name,mode],check=True) for mode in ("write","read")]'
 	./build/test_app_lifecycle
