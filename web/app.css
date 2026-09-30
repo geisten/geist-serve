@@ -962,8 +962,11 @@ body.manager-page main { max-width:1180px }
 /* The activity lane shares the model-name row (#49): a fixed-height slot
  * there costs no extra height, and the transcript never jumps when activity
  * starts. 28px targets: pointer UI, WCAG 2.2 minimum is 24px. */
-.chat-heading { align-items:center }
-.chat-heading>div:first-child { min-width:0 }
+.chat-heading { align-items:center; height:38px; box-sizing:border-box }
+.chat-heading>div:first-child { min-width:0; overflow:hidden }
+/* One line: a wrapping name would grow the row when the lane fills (Linux fonts). */
+.chat-heading .runtime-model { min-width:0 }
+#runtime-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0 }
 .activity-slot { flex:0 1 auto; min-width:0; height:28px; min-height:28px }
 #activity-lane { display:flex; align-items:center; gap:8px; min-height:28px }
 #open-activity { display:flex; align-items:center; gap:7px; min-width:0; min-height:28px; padding:3px 4px; text-align:left; font-size:11px; font-weight:400 }

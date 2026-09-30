@@ -153,6 +153,10 @@ async function checkActivityUX(assert, tick) {
     // #49: the conversation gets the height. Activity shares the model-name row, each
     // processor choice is one line, and the chrome above the transcript stays within budget.
     assert($('activity-lane').closest('.chat-heading'),'activity lane shares the model-name row');
+    {const heading=document.querySelector('.chat-heading'),h0=heading.getBoundingClientRect().height,name=$('runtime-name').textContent;
+     $('runtime-name').textContent='A model with a very long name '.repeat(8);
+     assert(Math.abs(heading.getBoundingClientRect().height-h0)<=0.5,'a long model name cannot grow the model-name row');
+     $('runtime-name').textContent=name;}
     assert([...document.querySelectorAll('.execution-choice label')].every(l=>l.getBoundingClientRect().height<=34),'each processor choice is a single line');
     if (innerHeight>=600) assert($('transcript').getBoundingClientRect().top-document.querySelector('.runtime-panel').getBoundingClientRect().top<=124,`chat chrome within budget: ${$('transcript').getBoundingClientRect().top-document.querySelector('.runtime-panel').getBoundingClientRect().top}px`);
     const labelNode=$('activity-label').firstChild;renderActivity();assert($('activity-label').firstChild===labelNode,'unchanged stage does not repeat the live announcement');
