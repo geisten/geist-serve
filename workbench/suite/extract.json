@@ -1,0 +1,571 @@
+{
+ "id": "extract",
+ "version": "1.0.0",
+ "prompt": {
+  "en": "Extract the requested fields from the user's text as exactly one JSON object and nothing else: no code fence, no explanation.\nWrite dates as YYYY-MM-DD, times as HH:MM in 24-hour format, and numbers as JSON numbers without units. Use null for a field the text does not mention.\n\nFor a table reservation use the keys: name, people, date, time.\nFor an invoice use the keys: invoice, company, amount, due.",
+  "de": "Extract the requested fields from the user's text as exactly one JSON object and nothing else: no code fence, no explanation.\nWrite dates as YYYY-MM-DD, times as HH:MM in 24-hour format, and numbers as JSON numbers without units. Use null for a field the text does not mention.\n\nFor a table reservation use the keys: name, people, date, time.\nFor an invoice use the keys: invoice, company, amount, due."
+ },
+ "max_tokens": 96,
+ "cases": [
+  {
+   "id": "extract-en-00",
+   "language": "en",
+   "input": "Hello, this is Anna Weber. Please reserve a table for 4 people on March 14, 2027 at 7:30 pm.",
+   "expected": {
+    "name": "Anna Weber",
+    "people": 4,
+    "date": "2027-03-14",
+    "time": "19:30"
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-en-01",
+   "language": "en",
+   "input": "Hello, this is Lukas Brandt. Please reserve a table for two people on May 2, 2027 at 12:00 pm.",
+   "expected": {
+    "name": "Lukas Brandt",
+    "people": 2,
+    "date": "2027-05-02",
+    "time": "12:00"
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-en-02",
+   "language": "en",
+   "input": "Hello, this is Sofia Romano. Please reserve a table for 6 people on September 21, 2027 at 6:45 pm.",
+   "expected": {
+    "name": "Sofia Romano",
+    "people": 6,
+    "date": "2027-09-21",
+    "time": "18:45"
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-en-03",
+   "language": "en",
+   "input": "Hello, this is Tom Fischer. Please reserve a table for three people on November 9, 2027 at 8:15 pm.",
+   "expected": {
+    "name": "Tom Fischer",
+    "people": 3,
+    "date": "2027-11-09",
+    "time": "20:15"
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-en-04",
+   "language": "en",
+   "input": "Hello, this is Mia Hoffmann. Please reserve a table for 8 people on June 30, 2027 at 1:00 pm.",
+   "expected": {
+    "name": "Mia Hoffmann",
+    "people": 8,
+    "date": "2027-06-30",
+    "time": "13:00"
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-en-05",
+   "language": "en",
+   "input": "Hello, this is Jonas Keller. Please reserve a table for two people on January 17, 2027, the time is still open.",
+   "expected": {
+    "name": "Jonas Keller",
+    "people": 2,
+    "date": "2027-01-17",
+    "time": null
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-en-06",
+   "language": "en",
+   "input": "Hello, this is Lea Wagner. Please reserve a table for 5 people on July 4, 2027 at 7:00 pm.",
+   "expected": {
+    "name": "Lea Wagner",
+    "people": 5,
+    "date": "2027-07-04",
+    "time": "19:00"
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-en-07",
+   "language": "en",
+   "input": "Hello, this is Paul Schmid. Please reserve a table for four people on December 12, 2027 at 5:30 pm.",
+   "expected": {
+    "name": "Paul Schmid",
+    "people": 4,
+    "date": "2027-12-12",
+    "time": "17:30"
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-en-08",
+   "language": "en",
+   "input": "Hello, this is Emma Becker. Please reserve a table for 3 people on August 25, 2027 at 9:00 pm.",
+   "expected": {
+    "name": "Emma Becker",
+    "people": 3,
+    "date": "2027-08-25",
+    "time": "21:00"
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-en-09",
+   "language": "en",
+   "input": "Hello, this is Noah Wolf. Please reserve a table for six people on October 1, 2027, the time is still open.",
+   "expected": {
+    "name": "Noah Wolf",
+    "people": 6,
+    "date": "2027-10-01",
+    "time": null
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-en-10",
+   "language": "en",
+   "input": "Invoice R-1043 from Nordwind GmbH for 1,249.50 euros is due on April 15, 2027.",
+   "expected": {
+    "invoice": "R-1043",
+    "company": "Nordwind GmbH",
+    "amount": 1249.5,
+    "due": "2027-04-15"
+   },
+   "tags": [
+    "invoice"
+   ]
+  },
+  {
+   "id": "extract-en-11",
+   "language": "en",
+   "input": "Invoice INV-2207 from Bergmann & Söhne for 89.00 euros is due on February 3, 2027.",
+   "expected": {
+    "invoice": "INV-2207",
+    "company": "Bergmann & Söhne",
+    "amount": 89.0,
+    "due": "2027-02-03"
+   },
+   "tags": [
+    "invoice"
+   ]
+  },
+  {
+   "id": "extract-en-12",
+   "language": "en",
+   "input": "Invoice R-7781 from Kestrel Software for 15,000.00 euros is due on February 28, 2027.",
+   "expected": {
+    "invoice": "R-7781",
+    "company": "Kestrel Software",
+    "amount": 15000.0,
+    "due": "2027-02-28"
+   },
+   "tags": [
+    "invoice"
+   ]
+  },
+  {
+   "id": "extract-en-13",
+   "language": "en",
+   "input": "Invoice A-0091 from Lindwurm Bäckerei for 42.80 euros is due on September 9, 2027.",
+   "expected": {
+    "invoice": "A-0091",
+    "company": "Lindwurm Bäckerei",
+    "amount": 42.8,
+    "due": "2027-09-09"
+   },
+   "tags": [
+    "invoice"
+   ]
+  },
+  {
+   "id": "extract-en-14",
+   "language": "en",
+   "input": "Invoice INV-3300 from Atlas Logistik for 640.25 euros has no due date yet.",
+   "expected": {
+    "invoice": "INV-3300",
+    "company": "Atlas Logistik",
+    "amount": 640.25,
+    "due": null
+   },
+   "tags": [
+    "invoice"
+   ]
+  },
+  {
+   "id": "extract-en-15",
+   "language": "en",
+   "input": "Invoice R-5512 from Sonnenhof KG for 3,120.00 euros is due on December 31, 2027.",
+   "expected": {
+    "invoice": "R-5512",
+    "company": "Sonnenhof KG",
+    "amount": 3120.0,
+    "due": "2027-12-31"
+   },
+   "tags": [
+    "invoice"
+   ]
+  },
+  {
+   "id": "extract-en-16",
+   "language": "en",
+   "input": "Invoice B-1200 from Mühlbach Elektro for 76.40 euros is due on June 18, 2027.",
+   "expected": {
+    "invoice": "B-1200",
+    "company": "Mühlbach Elektro",
+    "amount": 76.4,
+    "due": "2027-06-18"
+   },
+   "tags": [
+    "invoice"
+   ]
+  },
+  {
+   "id": "extract-en-17",
+   "language": "en",
+   "input": "Invoice R-9001 from Falk & Partner for 980.00 euros is due on March 7, 2027.",
+   "expected": {
+    "invoice": "R-9001",
+    "company": "Falk & Partner",
+    "amount": 980.0,
+    "due": "2027-03-07"
+   },
+   "tags": [
+    "invoice"
+   ]
+  },
+  {
+   "id": "extract-en-18",
+   "language": "en",
+   "input": "Invoice INV-4410 from Blau Druck for 215.90 euros is due on October 22, 2027.",
+   "expected": {
+    "invoice": "INV-4410",
+    "company": "Blau Druck",
+    "amount": 215.9,
+    "due": "2027-10-22"
+   },
+   "tags": [
+    "invoice"
+   ]
+  },
+  {
+   "id": "extract-en-19",
+   "language": "en",
+   "input": "Invoice A-3305 from Grünwerk AG for 5,400.00 euros has no due date yet.",
+   "expected": {
+    "invoice": "A-3305",
+    "company": "Grünwerk AG",
+    "amount": 5400.0,
+    "due": null
+   },
+   "tags": [
+    "invoice"
+   ]
+  },
+  {
+   "id": "extract-de-00",
+   "language": "de",
+   "input": "Hallo, hier ist Anna Weber. Bitte reservieren Sie einen Tisch für 4 Personen am 14. März 2027 um 19:30 Uhr.",
+   "expected": {
+    "name": "Anna Weber",
+    "people": 4,
+    "date": "2027-03-14",
+    "time": "19:30"
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-de-01",
+   "language": "de",
+   "input": "Hallo, hier ist Lukas Brandt. Bitte reservieren Sie einen Tisch für zwei Personen am 2. Mai 2027 um 12:00 Uhr.",
+   "expected": {
+    "name": "Lukas Brandt",
+    "people": 2,
+    "date": "2027-05-02",
+    "time": "12:00"
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-de-02",
+   "language": "de",
+   "input": "Hallo, hier ist Sofia Romano. Bitte reservieren Sie einen Tisch für 6 Personen am 21. September 2027 um 18:45 Uhr.",
+   "expected": {
+    "name": "Sofia Romano",
+    "people": 6,
+    "date": "2027-09-21",
+    "time": "18:45"
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-de-03",
+   "language": "de",
+   "input": "Hallo, hier ist Tom Fischer. Bitte reservieren Sie einen Tisch für drei Personen am 9. November 2027 um 20:15 Uhr.",
+   "expected": {
+    "name": "Tom Fischer",
+    "people": 3,
+    "date": "2027-11-09",
+    "time": "20:15"
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-de-04",
+   "language": "de",
+   "input": "Hallo, hier ist Mia Hoffmann. Bitte reservieren Sie einen Tisch für 8 Personen am 30. Juni 2027 um 13:00 Uhr.",
+   "expected": {
+    "name": "Mia Hoffmann",
+    "people": 8,
+    "date": "2027-06-30",
+    "time": "13:00"
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-de-05",
+   "language": "de",
+   "input": "Hallo, hier ist Jonas Keller. Bitte reservieren Sie einen Tisch für zwei Personen am 17. Januar 2027, die Uhrzeit ist noch offen.",
+   "expected": {
+    "name": "Jonas Keller",
+    "people": 2,
+    "date": "2027-01-17",
+    "time": null
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-de-06",
+   "language": "de",
+   "input": "Hallo, hier ist Lea Wagner. Bitte reservieren Sie einen Tisch für 5 Personen am 4. Juli 2027 um 19:00 Uhr.",
+   "expected": {
+    "name": "Lea Wagner",
+    "people": 5,
+    "date": "2027-07-04",
+    "time": "19:00"
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-de-07",
+   "language": "de",
+   "input": "Hallo, hier ist Paul Schmid. Bitte reservieren Sie einen Tisch für vier Personen am 12. Dezember 2027 um 17:30 Uhr.",
+   "expected": {
+    "name": "Paul Schmid",
+    "people": 4,
+    "date": "2027-12-12",
+    "time": "17:30"
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-de-08",
+   "language": "de",
+   "input": "Hallo, hier ist Emma Becker. Bitte reservieren Sie einen Tisch für 3 Personen am 25. August 2027 um 21:00 Uhr.",
+   "expected": {
+    "name": "Emma Becker",
+    "people": 3,
+    "date": "2027-08-25",
+    "time": "21:00"
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-de-09",
+   "language": "de",
+   "input": "Hallo, hier ist Noah Wolf. Bitte reservieren Sie einen Tisch für sechs Personen am 1. Oktober 2027, die Uhrzeit ist noch offen.",
+   "expected": {
+    "name": "Noah Wolf",
+    "people": 6,
+    "date": "2027-10-01",
+    "time": null
+   },
+   "tags": [
+    "booking"
+   ]
+  },
+  {
+   "id": "extract-de-10",
+   "language": "de",
+   "input": "Die Rechnung R-1043 von Nordwind GmbH über 1.249,50 Euro ist am 15. April 2027 fällig.",
+   "expected": {
+    "invoice": "R-1043",
+    "company": "Nordwind GmbH",
+    "amount": 1249.5,
+    "due": "2027-04-15"
+   },
+   "tags": [
+    "invoice"
+   ]
+  },
+  {
+   "id": "extract-de-11",
+   "language": "de",
+   "input": "Die Rechnung INV-2207 von Bergmann & Söhne über 89,00 Euro ist am 3. Februar 2027 fällig.",
+   "expected": {
+    "invoice": "INV-2207",
+    "company": "Bergmann & Söhne",
+    "amount": 89.0,
+    "due": "2027-02-03"
+   },
+   "tags": [
+    "invoice"
+   ]
+  },
+  {
+   "id": "extract-de-12",
+   "language": "de",
+   "input": "Die Rechnung R-7781 von Kestrel Software über 15.000,00 Euro ist am 28. Februar 2027 fällig.",
+   "expected": {
+    "invoice": "R-7781",
+    "company": "Kestrel Software",
+    "amount": 15000.0,
+    "due": "2027-02-28"
+   },
+   "tags": [
+    "invoice"
+   ]
+  },
+  {
+   "id": "extract-de-13",
+   "language": "de",
+   "input": "Die Rechnung A-0091 von Lindwurm Bäckerei über 42,80 Euro ist am 9. September 2027 fällig.",
+   "expected": {
+    "invoice": "A-0091",
+    "company": "Lindwurm Bäckerei",
+    "amount": 42.8,
+    "due": "2027-09-09"
+   },
+   "tags": [
+    "invoice"
+   ]
+  },
+  {
+   "id": "extract-de-14",
+   "language": "de",
+   "input": "Die Rechnung INV-3300 von Atlas Logistik über 640,25 Euro hat noch kein Fälligkeitsdatum.",
+   "expected": {
+    "invoice": "INV-3300",
+    "company": "Atlas Logistik",
+    "amount": 640.25,
+    "due": null
+   },
+   "tags": [
+    "invoice"
+   ]
+  },
+  {
+   "id": "extract-de-15",
+   "language": "de",
+   "input": "Die Rechnung R-5512 von Sonnenhof KG über 3.120,00 Euro ist am 31. Dezember 2027 fällig.",
+   "expected": {
+    "invoice": "R-5512",
+    "company": "Sonnenhof KG",
+    "amount": 3120.0,
+    "due": "2027-12-31"
+   },
+   "tags": [
+    "invoice"
+   ]
+  },
+  {
+   "id": "extract-de-16",
+   "language": "de",
+   "input": "Die Rechnung B-1200 von Mühlbach Elektro über 76,40 Euro ist am 18. Juni 2027 fällig.",
+   "expected": {
+    "invoice": "B-1200",
+    "company": "Mühlbach Elektro",
+    "amount": 76.4,
+    "due": "2027-06-18"
+   },
+   "tags": [
+    "invoice"
+   ]
+  },
+  {
+   "id": "extract-de-17",
+   "language": "de",
+   "input": "Die Rechnung R-9001 von Falk & Partner über 980,00 Euro ist am 7. März 2027 fällig.",
+   "expected": {
+    "invoice": "R-9001",
+    "company": "Falk & Partner",
+    "amount": 980.0,
+    "due": "2027-03-07"
+   },
+   "tags": [
+    "invoice"
+   ]
+  },
+  {
+   "id": "extract-de-18",
+   "language": "de",
+   "input": "Die Rechnung INV-4410 von Blau Druck über 215,90 Euro ist am 22. Oktober 2027 fällig.",
+   "expected": {
+    "invoice": "INV-4410",
+    "company": "Blau Druck",
+    "amount": 215.9,
+    "due": "2027-10-22"
+   },
+   "tags": [
+    "invoice"
+   ]
+  },
+  {
+   "id": "extract-de-19",
+   "language": "de",
+   "input": "Die Rechnung A-3305 von Grünwerk AG über 5.400,00 Euro hat noch kein Fälligkeitsdatum.",
+   "expected": {
+    "invoice": "A-3305",
+    "company": "Grünwerk AG",
+    "amount": 5400.0,
+    "due": null
+   },
+   "tags": [
+    "invoice"
+   ]
+  }
+ ]
+}
