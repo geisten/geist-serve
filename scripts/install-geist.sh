@@ -10,8 +10,10 @@
 
 GEIST_RELEASES=https://github.com/geisten/geist-serve/releases
 # Ed25519 key that signs geist-manifest (docs/INSTALL-LINUX.md, "Signing").
-# Empty until the release signing key exists: installation then refuses.
-GEIST_MANIFEST_PUBKEY=''
+# Empty would make installation refuse; rotation: same section.
+GEIST_MANIFEST_PUBKEY='-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEATOqns8uqh+mBxILUi21Mq67Rcx3Mq3t0ZvLKKtwR+jg=
+-----END PUBLIC KEY-----'
 
 E_USAGE=2 E_HOST=10 E_PREREQ=11 E_VERIFY=12 E_OWNER=13 E_BUSY=14 E_SETUP=15 E_LOCAL=16
 
