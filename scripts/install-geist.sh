@@ -15,7 +15,7 @@ GEIST_MANIFEST_PUBKEY='-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEATOqns8uqh+mBxILUi21Mq67Rcx3Mq3t0ZvLKKtwR+jg=
 -----END PUBLIC KEY-----'
 
-E_USAGE=2 E_HOST=10 E_PREREQ=11 E_VERIFY=12 E_OWNER=13 E_BUSY=14 E_SETUP=15 E_LOCAL=16
+E_USAGE=2 E_HOST=10 E_PREREQ=11 E_VERIFY=12 E_OWNER=13 E_BUSY=14 E_SETUP=15 E_LOCAL=16 E_MODEL=17
 
 usage() {
     cat <<'EOF'
@@ -25,6 +25,9 @@ Install the Geist model runtime for this user (no root needed).
 
   --version X.Y.Z   install exactly this release (default: newest stable)
   --no-start        install, but do not start the Geist service
+  --model recommended
+                    then set up the model Geist recommends for this computer
+                    (asks first; with --yes it downloads without asking)
   --dry-run         check, download and verify only; change nothing
   --uninstall       remove the installed runtime (models and settings stay)
   --yes             no prompts (never implies root, deletion or overwriting)
@@ -32,7 +35,8 @@ Install the Geist model runtime for this user (no root needed).
 
 Exit codes: 0 ok, 2 usage, 10 unsupported host, 11 missing prerequisite,
 12 download or verification failed, 13 another installation owns the
-files, 14 Geist is busy, 15 start failed, 16 local file system problem.
+files, 14 Geist is busy, 15 start failed, 16 local file system problem,
+17 installed, but the model setup did not finish (run: geist setup).
 EOF
 }
 
@@ -51,7 +55,7 @@ cleanup() {
 }
 
 parse_args() {
-    want_version='' no_start=0 dry_run=0 uninstall=0
+    want_version='' no_start=0 dry_run=0 uninstall=0 model='' yes=0
     while [ $# -gt 0 ]; do
         case $1 in
             --help | -h) usage; exit 0 ;;
@@ -63,8 +67,13 @@ parse_args() {
             --no-start) no_start=1 ;;
             --dry-run) dry_run=1 ;;
             --uninstall) uninstall=1 ;;
-            --yes) ;;
-            --desktop | --model) fail $E_USAGE "$1 is not available yet (see geisten/geist-serve#46)" ;;
+            --yes) yes=1 ;;
+            --model)
+                [ "${2:-}" = recommended ] || fail $E_USAGE "--model takes: recommended"
+                model=recommended
+                shift
+                ;;
+            --desktop) fail $E_USAGE "$1 is not available yet (see geisten/geist-serve#46)" ;;
             *) fail $E_USAGE "unknown option: $1 (see --help)" ;;
         esac
         shift
@@ -75,8 +84,9 @@ parse_args() {
         esac
         [ "$(printf '%s' "$want_version" | tr -cd . | wc -c)" -eq 2 ] || fail $E_USAGE "--version needs X.Y.Z"
     fi
-    [ $uninstall -eq 1 ] && { [ -n "$want_version" ] || [ $dry_run -eq 1 ]; } &&
+    [ $uninstall -eq 1 ] && { [ -n "$want_version" ] || [ $dry_run -eq 1 ] || [ -n "$model" ]; } &&
         fail $E_USAGE "--uninstall takes no other options"
+    [ -n "$model" ] && [ $no_start -eq 1 ] && fail $E_USAGE "--model needs the service: drop --no-start"
     return 0
 }
 
@@ -348,6 +358,20 @@ start_service() {
     fail $E_SETUP "the new version did not start; the previous installation is active again"
 }
 
+# The first model (#46). `geist setup` asks on /dev/tty and follows the
+# service's own recommendation; this script never picks a model itself.
+setup_model() {
+    if [ -n "$model" ]; then
+        if [ $yes -eq 1 ]; then "$launcher" setup --yes; else "$launcher" setup; fi ||
+            fail $E_MODEL "Geist is installed, but the model setup did not finish. Resume with: $cmd setup"
+    # A subshell: a failed redirection on a special builtin would end this shell (POSIX).
+    elif [ $fresh -eq 1 ] && (true </dev/tty) 2>/dev/null; then
+        "$launcher" setup || say "Geist is installed; the model setup did not finish. Resume with: $cmd setup"
+    else
+        say "Choose and load a model:   $cmd setup"
+    fi
+}
+
 do_uninstall() {
     [ -f "$runtime/receipt" ] || fail $E_OWNER "no installer receipt in $runtime: nothing to uninstall"
     if "$runtime/current/geist" status >"$runtime/.status" 2>/dev/null; then
@@ -376,6 +400,8 @@ main() {
         exit 0
     fi
     check_ownership
+    fresh=0
+    [ -f "$runtime/receipt" ] || fresh=1
     take_lock
     stage=$(mktemp -d "$runtime/.stage.XXXXXX") || fail $E_LOCAL "cannot create a staging directory"
     chmod 700 "$stage"
@@ -414,7 +440,7 @@ main() {
     esac
     [ $no_start -eq 1 ] && say "Start it with:   $cmd start"
     say "Open the model manager:   $cmd open"
-    say "Terminal chat after choosing a model:   $cmd chat"
+    [ $no_start -eq 1 ] || setup_model
     exit 0
 }
 
