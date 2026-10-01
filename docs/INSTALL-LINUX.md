@@ -8,12 +8,37 @@ route; the installer refuses to shadow them.
 ```sh
 curl -fsSL https://geisten.net/install.sh | sh
 sh install-geist.sh --version 0.6.0 --no-start
+sh install-geist.sh --model recommended --yes      # unattended, with the first model
 sh install-geist.sh --uninstall
 ```
 
-Options: `--version X.Y.Z`, `--no-start`, `--dry-run`, `--uninstall` (alone),
-`--yes`, `--help`. `--desktop` and `--model` are reserved and exit 2 until the
-desktop route and `geist setup` exist.
+Options: `--version X.Y.Z`, `--no-start`, `--model recommended` (not with
+`--no-start`), `--dry-run`, `--uninstall` (alone), `--yes`, `--help`.
+`--desktop` is reserved and exits 2 until the desktop route exists.
+
+## First model
+
+The installer never chooses a model itself. `geist setup` asks the running
+service for its recommendation for this computer, shows name and download
+size, and asks once on the terminal (`/dev/tty`, because stdin is the script
+under `curl | sh`). After a yes, the service downloads, verifies and loads the
+model through `/app/setup`, which refuses if the recommendation changed in the
+meantime. `geist setup` then sends one real generation through `/v1` and
+reports installed, model ready and test passed separately.
+
+| Run | Model step |
+|-----|------------|
+| fresh install with a terminal | `geist setup` asks; no means no download |
+| no terminal (CI, pipes, SSH without TTY), or an update | none; prints `geist setup` as the next command |
+| `--model recommended` | `geist setup`, which asks |
+| `--model recommended --yes` | `geist setup --yes`: downloads without asking |
+
+A terminal yes also records the model's preview consent, like the model button
+in the app. `--yes` does not: the app still asks before its first task with
+that model. If the model step fails, the installation stays and the exit code
+is 17 for `--model`, or 0 with a resume hint after the interactive offer.
+Interrupting `geist setup` leaves the download running in the service; run it
+again to follow or resume.
 
 ## Layout
 
@@ -29,7 +54,9 @@ Only the active and the previous version are kept. Uninstall stops the service,
 removes the launcher and the runtime directory, and keeps `~/.local/share/geist`
 (models, keys, settings). The installer only touches files its receipt owns: a
 foreign `~/.local/bin/geist`, an APT install, or a runtime directory without a
-receipt ends with exit 13 and no change.
+receipt ends with exit 13 and no change. The rootless `geist` starts its own
+`geist-app` as the user; only the packaged CLI in `/usr/lib/geist` uses the
+packaged systemd user unit, so a later APT install cannot capture it.
 
 ## Release assets
 
@@ -95,6 +122,7 @@ the old one. An installer only trusts the key it was downloaded with.
 | 14 | Geist or another installer is busy (previous version restored) |
 | 15 | start failed (previous version restored) |
 | 16 | local file system problem |
+| 17 | installed, but the `--model` setup did not finish (`geist setup` resumes) |
 
 ## Tests
 

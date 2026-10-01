@@ -89,7 +89,10 @@ static bool systemd_home(void) {
                       sizeof standard,
                       "%s/.local/share/geist",
                       getenv("HOME") ? getenv("HOME") : "");
+    /* Only the packaged CLI owns the packaged unit: a rootless installation
+     * (#46) must never route to a different, package-owned service. */
     return n > 0 && n < (int) sizeof standard && !getenv("GEIST_HOME") && !strcmp(home, standard) &&
+           !strcmp(directory, "/usr/lib/geist") &&
            access("/usr/lib/systemd/user/geist.service", R_OK) == 0;
 #endif
 }
@@ -296,8 +299,164 @@ static bool executable_directory(void) {
     *slash = 0;
     return true;
 }
+/* Status fields for setup; strings are malloc'd, NULL when absent. */
+struct setup_state {
+    char  *id, *reason, *active, *job, *phase, *message, *name;
+    bool   eligible, ready, loading, installed;
+    double received, bytes;
+};
+static void setup_state_free(struct setup_state *s) {
+    free(s->id), free(s->reason), free(s->active), free(s->job), free(s->phase), free(s->message),
+            free(s->name);
+    *s = (struct setup_state) {0};
+}
+/* Reads /app/status. The model fields describe `want`, or the recommendation. */
+static bool setup_state_read(struct setup_state *s, const char *want) {
+    setup_state_free(s);
+    struct json *j = calloc(1, sizeof *j);
+    if (!j || request("/app/status", nullptr, 5) != 200 || json_parse(j, strlen(reply), reply) < 0) {
+        free(j);
+        return false;
+    }
+    int rec     = json_get(j, 0, "recommendation");
+    s->id       = json_strdup(j, json_get(j, rec, "id"));
+    s->reason   = json_strdup(j, json_get(j, rec, "reason"));
+    s->eligible = json_bool(j, json_get(j, rec, "eligible"), false);
+    s->active   = json_strdup(j, json_get(j, 0, "active_id"));
+    s->job      = json_strdup(j, json_get(j, 0, "job_model"));
+    s->phase    = json_strdup(j, json_get(j, 0, "phase"));
+    s->message  = json_strdup(j, json_get(j, 0, "message"));
+    s->ready    = json_bool(j, json_get(j, 0, "ready"), false);
+    s->loading  = json_bool(j, json_get(j, 0, "loading"), false);
+    s->received = json_num(j, json_get(j, 0, "received"), 0);
+    const char *id     = want ? want : s->id;
+    int         models = json_get(j, 0, "models");
+    for (int i = models + 1; models >= 0 && id && i < j->n; i++) {
+        if (j->tok[i].parent != models)
+            continue;
+        char *model = json_strdup(j, json_get(j, i, "id"));
+        if (model && !strcmp(model, id)) {
+            s->name      = json_strdup(j, json_get(j, i, "name"));
+            s->bytes     = json_num(j, json_get(j, i, "bytes"), 0);
+            s->installed = json_bool(j, json_get(j, i, "installed"), false);
+        }
+        free(model);
+    }
+    free(j);
+    return true;
+}
+/* One confirmation on the controlling terminal: stdin may be the installer script. */
+static bool confirm(const char *question) {
+    int tty = open("/dev/tty", O_RDWR | O_CLOEXEC);
+    if (tty < 0)
+        return false;
+    char answer[16] = "";
+    dprintf(tty, "%s [y/N] ", question);
+    ssize_t n = read(tty, answer, sizeof answer - 1);
+    close(tty);
+    answer[n > 0 ? n : 0] = 0;
+    return answer[0] == 'y' || answer[0] == 'Y' || answer[0] == 'j' || answer[0] == 'J';
+}
+/* `geist setup [--yes]` (#46): the first model for a fresh installation.
+ * The service chooses the model (/app/setup refuses a stale choice); this
+ * only asks, follows progress and runs one short real generation. */
+static int setup(bool yes) {
+    if (!start())
+        return start_error;
+    struct setup_state s = {0};
+    if (!setup_state_read(&s, nullptr)) {
+        fputs("Geist is not responding.\n", stderr);
+        return 1;
+    }
+    char id[128] = "", name[128] = "";
+    if (s.ready && s.active && *s.active) {
+        snprintf(id, sizeof id, "%s", s.active);
+        printf("A model is already loaded: %s\n", id);
+    } else if (!s.eligible || !s.id || !*s.id || !s.name) {
+        fprintf(stderr, "No model fits this computer: %s\n", s.reason ? s.reason : "unknown reason");
+        setup_state_free(&s);
+        return 4;
+    } else {
+        snprintf(id, sizeof id, "%s", s.id);
+        snprintf(name, sizeof name, "%s", s.name);
+        char question[512];
+        if (s.installed)
+            snprintf(question, sizeof question, "Load %s (already downloaded)?", name);
+        else
+            snprintf(question, sizeof question, "Download %.1f GB and load %s?", s.bytes / 1e9, name);
+        printf("Recommended model: %s. %s\n", name, s.reason ? s.reason : "");
+        if (!yes && !confirm(question)) {
+            printf("No model set up. Later, run: geist setup\n");
+            setup_state_free(&s);
+            return 0;
+        }
+        char              body[256];
+        struct app_buffer b = {.data = body, .cap = sizeof body};
+        app_put(&b, "{\"id\":");
+        app_quote(&b, id);
+        app_put(&b, ",\"experimental\":true}");
+        /* An answer typed at the terminal is the same deliberate choice as the
+         * app's model button; --yes is not, so it leaves preview consent alone. */
+        if (!yes && request("/app/preview", body, 5) != 200)
+            fprintf(stderr, "Cannot record the model choice: %s\n", reply);
+        long code = request("/app/setup", body, 10);
+        if (code != 200 && code != 202) {
+            fprintf(stderr, "Setup refused: %s\n", reply);
+            setup_state_free(&s);
+            return 1;
+        }
+        /* The service downloads, verifies and loads. Ctrl-C leaves that
+         * running; a later `geist setup` resumes the download. */
+        char   phase[128] = "";
+        int    shown = -1, idle = 0;
+        bool   started = false;
+        for (;;) {
+            if (!setup_state_read(&s, id)) {
+                fputs("Lost the connection to Geist during setup. Run geist setup again.\n", stderr);
+                setup_state_free(&s);
+                return 1;
+            }
+            if (s.ready && s.active && !strcmp(s.active, id))
+                break;
+            bool working = s.loading || (s.job && !strcmp(s.job, id));
+            started |= working;
+            if (!working && (started || ++idle > 150)) {
+                fprintf(stderr, "Setup stopped: %s\n", s.message && *s.message ? s.message : "no details");
+                setup_state_free(&s);
+                return 1;
+            }
+            if (s.phase && *s.phase && strcmp(phase, s.phase)) {
+                snprintf(phase, sizeof phase, "%s", s.phase);
+                printf("%s\n", phase);
+            }
+            int percent = s.bytes > 0 ? (int) (100 * s.received / s.bytes) / 10 * 10 : -1;
+            if (s.job && *s.job && percent > shown && percent < 100 && s.received > 0) {
+                printf("  %d%%\n", percent);
+                shown = percent;
+            }
+            fflush(stdout);
+            for (int i = 0; i < 2; i++)
+                pause_short();
+        }
+        printf("Model ready: %s\n", name);
+    }
+    setup_state_free(&s);
+    char              body[512];
+    struct app_buffer b = {.data = body, .cap = sizeof body};
+    app_put(&b, "{\"model\":");
+    app_quote(&b, id);
+    app_put(&b, ",\"messages\":[{\"role\":\"user\",\"content\":\"Say hello in one sentence.\"}],"
+                "\"max_tokens\":64}");
+    if (request("/v1/chat/completions", body, 180) != 200) {
+        fprintf(stderr, "Test failed: %s\nThe model stays loaded; retry with: geist test\n", reply);
+        return 1;
+    }
+    puts("Test passed: the model answered through the local API.\n"
+         "Next: geist chat \"Hello\" | geist config continue | geist config opencode");
+    return 0;
+}
 static void usage(void) {
-    puts("geist start | stop | restart | status | models | open\n"
+    puts("geist start | stop | restart | status | models | open | setup [--yes]\n"
          "geist download MODEL | use MODEL | chat TEXT | test | test-agent\n"
          "geist connection | config continue | config opencode\n"
          "Connection/config output contains your private local API key.\n"
@@ -324,6 +483,13 @@ static int run(int argc, char **argv) {
             return 0;
         }
         return start() ? 0 : start_error;
+    }
+    if (!strcmp(cmd, "setup")) {
+        if (argc > 3 || (argc == 3 && strcmp(argv[2], "--yes"))) {
+            usage();
+            return 2;
+        }
+        return setup(argc == 3);
     }
     if (!strcmp(cmd, "start") || !strcmp(cmd, "open")) {
         if (!start())

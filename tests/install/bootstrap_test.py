@@ -22,11 +22,17 @@ ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT/'scripts/install-geist.sh'
 PLATFORM = {'x86_64': 'linux-x86_64', 'aarch64': 'linux-aarch64'}.get(platform.machine())
 FAKE_GEIST = r'''
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 int main(int argc, char **argv) {
-    const char *rc = getenv("FAKE_START_RC");
+    const char *log = getenv("FAKE_LOG");
+    FILE *f = log ? fopen(log, "a") : NULL;
+    for (int i = 1; f && i < argc; i++) fprintf(f, "%s%s", argv[i], i + 1 < argc ? " " : "\n");
+    if (f) fclose(f);
+    const char *rc = getenv("FAKE_START_RC"), *setup = getenv("FAKE_SETUP_RC");
     if (argc > 1 && !strcmp(argv[1], "start") && rc) return atoi(rc);
+    if (argc > 1 && !strcmp(argv[1], "setup") && setup) return atoi(setup);
     return 0;
 }
 '''
@@ -99,7 +105,9 @@ class BootstrapTests(unittest.TestCase):
         if pubkey:
             e['GEIST_INSTALL_TEST_PUBKEY'] = str(self.t/'key.pub')
         e.update(env or {})
-        return subprocess.run(['sh', str(script), *args], env=e, capture_output=True, text=True, timeout=120)
+        # A new session has no controlling terminal, like CI and `curl | sh` without a TTY.
+        return subprocess.run(['sh', str(script), *args], env=e, capture_output=True, text=True, timeout=120,
+                              start_new_session=True)
 
     def receipt(self):
         return dict(line.split(' ', 1) for line in (self.runtime/'receipt').read_text().splitlines())
@@ -207,6 +215,27 @@ class BootstrapTests(unittest.TestCase):
                 partial.write_bytes(text[:cut])
                 self.run_installer(release, '--no-start', script=partial)
                 self.assertNothingInstalled()
+
+    def test_first_model_setup(self):
+        r, log = self.release.make('1.0.0'), self.case/'calls'
+        # Fresh, no terminal, no --model: never sets up a model, only says how.
+        p = self.run_installer(r, env={'FAKE_LOG': str(log)})
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertNotIn('setup', log.read_text())
+        self.assertIn('setup', p.stdout)
+        # Explicit and unattended: geist setup --yes.
+        log.unlink()
+        self.assertEqual(self.run_installer(r, '--model', 'recommended', '--yes', env={'FAKE_LOG': str(log)}).returncode, 0)
+        self.assertIn('setup --yes', log.read_text())
+        # A failed model setup keeps the installation and says how to resume.
+        p = self.run_installer(r, '--model', 'recommended', '--yes', env={'FAKE_SETUP_RC': '1'})
+        self.assertEqual(p.returncode, 17, p.stderr)
+        self.assertIn(f"Resume with: '{self.launcher}' setup", p.stderr)  # full path: not on PATH here
+        self.assertEqual(self.receipt()['version'], '1.0.0')
+        self.assertTrue(self.launcher.is_symlink())
+        for args in (['--model', 'best'], ['--model'], ['--model', 'recommended', '--no-start'], ['--uninstall', '--model', 'recommended']):
+            with self.subTest(args):
+                self.assertEqual(self.run_installer(r, *args).returncode, 2)
 
     def test_dry_run_then_uninstall_keeps_data(self):
         r = self.release.make('1.0.0')
