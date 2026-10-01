@@ -1,0 +1,505 @@
+{
+ "id": "context",
+ "version": "1.0.0",
+ "prompt": {
+  "en": "Answer the question using only the given text, as briefly as possible. If the text does not contain the answer, reply exactly: NOT IN TEXT",
+  "de": "Beantworte die Frage nur mit dem gegebenen Text, so kurz wie möglich. Wenn der Text die Antwort nicht enthält, antworte genau: NICHT IM TEXT"
+ },
+ "max_tokens": 48,
+ "cases": [
+  {
+   "id": "context-en-00",
+   "language": "en",
+   "input": "Text:\nThe Lindwurm bakery in Hollfeld opens at 6:30 on weekdays and at 8:00 on Saturdays and is closed on Sundays. Marta Keller founded it in 2009. Its best seller is a rye bread called Hollfelder Laib, which costs 4.20 euros.\n\nQuestion: When does the bakery open on Saturdays?",
+   "expected": {
+    "required": [
+     "8|08"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-en-01",
+   "language": "en",
+   "input": "Text:\nThe Lindwurm bakery in Hollfeld opens at 6:30 on weekdays and at 8:00 on Saturdays and is closed on Sundays. Marta Keller founded it in 2009. Its best seller is a rye bread called Hollfelder Laib, which costs 4.20 euros.\n\nQuestion: Who founded the bakery?",
+   "expected": {
+    "required": [
+     "Keller"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-en-02",
+   "language": "en",
+   "input": "Text:\nThe Lindwurm bakery in Hollfeld opens at 6:30 on weekdays and at 8:00 on Saturdays and is closed on Sundays. Marta Keller founded it in 2009. Its best seller is a rye bread called Hollfelder Laib, which costs 4.20 euros.\n\nQuestion: How much does the Hollfelder Laib cost?",
+   "expected": {
+    "required": [
+     "4.20"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-en-03",
+   "language": "en",
+   "input": "Text:\nThe Lindwurm bakery in Hollfeld opens at 6:30 on weekdays and at 8:00 on Saturdays and is closed on Sundays. Marta Keller founded it in 2009. Its best seller is a rye bread called Hollfelder Laib, which costs 4.20 euros.\n\nQuestion: How many employees does the bakery have?",
+   "expected": {
+    "absent": true
+   },
+   "tags": [
+    "not-in-text"
+   ]
+  },
+  {
+   "id": "context-en-04",
+   "language": "en",
+   "input": "Text:\nThe Lindwurm bakery in Hollfeld opens at 6:30 on weekdays and at 8:00 on Saturdays and is closed on Sundays. Marta Keller founded it in 2009. Its best seller is a rye bread called Hollfelder Laib, which costs 4.20 euros.\n\nQuestion: Does the bakery sell coffee?",
+   "expected": {
+    "absent": true
+   },
+   "tags": [
+    "not-in-text"
+   ]
+  },
+  {
+   "id": "context-en-05",
+   "language": "en",
+   "input": "Text:\nProject Kestrel started in April 2025 with a budget of 180,000 euros. The team has seven members and is led by Jonas Brandt. The first prototype was delivered to the customer Nordwind GmbH in September.\n\nQuestion: What is the budget of Project Kestrel?",
+   "expected": {
+    "required": [
+     "180|180000"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-en-06",
+   "language": "en",
+   "input": "Text:\nProject Kestrel started in April 2025 with a budget of 180,000 euros. The team has seven members and is led by Jonas Brandt. The first prototype was delivered to the customer Nordwind GmbH in September.\n\nQuestion: Who leads the team?",
+   "expected": {
+    "required": [
+     "Brandt"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-en-07",
+   "language": "en",
+   "input": "Text:\nProject Kestrel started in April 2025 with a budget of 180,000 euros. The team has seven members and is led by Jonas Brandt. The first prototype was delivered to the customer Nordwind GmbH in September.\n\nQuestion: Which customer received the first prototype?",
+   "expected": {
+    "required": [
+     "Nordwind"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-en-08",
+   "language": "en",
+   "input": "Text:\nProject Kestrel started in April 2025 with a budget of 180,000 euros. The team has seven members and is led by Jonas Brandt. The first prototype was delivered to the customer Nordwind GmbH in September.\n\nQuestion: When will the project end?",
+   "expected": {
+    "absent": true
+   },
+   "tags": [
+    "not-in-text"
+   ]
+  },
+  {
+   "id": "context-en-09",
+   "language": "en",
+   "input": "Text:\nProject Kestrel started in April 2025 with a budget of 180,000 euros. The team has seven members and is led by Jonas Brandt. The first prototype was delivered to the customer Nordwind GmbH in September.\n\nQuestion: Which programming language does the team use?",
+   "expected": {
+    "absent": true
+   },
+   "tags": [
+    "not-in-text"
+   ]
+  },
+  {
+   "id": "context-en-10",
+   "language": "en",
+   "input": "Text:\nThe river ferry at Kleinmühl runs every 20 minutes between 7:00 and 19:00. A single trip costs 2 euros for adults; children under 12 travel free. Bicycles are allowed on board, cars are not.\n\nQuestion: How often does the ferry run?",
+   "expected": {
+    "required": [
+     "20"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-en-11",
+   "language": "en",
+   "input": "Text:\nThe river ferry at Kleinmühl runs every 20 minutes between 7:00 and 19:00. A single trip costs 2 euros for adults; children under 12 travel free. Bicycles are allowed on board, cars are not.\n\nQuestion: Up to which age do children travel free?",
+   "expected": {
+    "required": [
+     "12"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-en-12",
+   "language": "en",
+   "input": "Text:\nThe river ferry at Kleinmühl runs every 20 minutes between 7:00 and 19:00. A single trip costs 2 euros for adults; children under 12 travel free. Bicycles are allowed on board, cars are not.\n\nQuestion: Are cars allowed on the ferry?",
+   "expected": {
+    "required": [
+     "no|not"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-en-13",
+   "language": "en",
+   "input": "Text:\nThe river ferry at Kleinmühl runs every 20 minutes between 7:00 and 19:00. A single trip costs 2 euros for adults; children under 12 travel free. Bicycles are allowed on board, cars are not.\n\nQuestion: How long does one crossing take?",
+   "expected": {
+    "absent": true
+   },
+   "tags": [
+    "not-in-text"
+   ]
+  },
+  {
+   "id": "context-en-14",
+   "language": "en",
+   "input": "Text:\nThe river ferry at Kleinmühl runs every 20 minutes between 7:00 and 19:00. A single trip costs 2 euros for adults; children under 12 travel free. Bicycles are allowed on board, cars are not.\n\nQuestion: Who operates the ferry?",
+   "expected": {
+    "absent": true
+   },
+   "tags": [
+    "not-in-text"
+   ]
+  },
+  {
+   "id": "context-en-15",
+   "language": "en",
+   "input": "Text:\nIn March, Dr. Selin Aydin moved her practice to Gartenstraße 14. Appointments can be booked by phone on Mondays and Thursdays. New patients must bring their insurance card and a list of their medication.\n\nQuestion: What is the new address of the practice?",
+   "expected": {
+    "required": [
+     "Gartenstraße 14"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-en-16",
+   "language": "en",
+   "input": "Text:\nIn March, Dr. Selin Aydin moved her practice to Gartenstraße 14. Appointments can be booked by phone on Mondays and Thursdays. New patients must bring their insurance card and a list of their medication.\n\nQuestion: On which days can appointments be booked?",
+   "expected": {
+    "required": [
+     "Monday|Mondays",
+     "Thursday|Thursdays"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-en-17",
+   "language": "en",
+   "input": "Text:\nIn March, Dr. Selin Aydin moved her practice to Gartenstraße 14. Appointments can be booked by phone on Mondays and Thursdays. New patients must bring their insurance card and a list of their medication.\n\nQuestion: In which month did the practice move?",
+   "expected": {
+    "required": [
+     "March"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-en-18",
+   "language": "en",
+   "input": "Text:\nIn March, Dr. Selin Aydin moved her practice to Gartenstraße 14. Appointments can be booked by phone on Mondays and Thursdays. New patients must bring their insurance card and a list of their medication.\n\nQuestion: What is the practice's phone number?",
+   "expected": {
+    "absent": true
+   },
+   "tags": [
+    "not-in-text"
+   ]
+  },
+  {
+   "id": "context-en-19",
+   "language": "en",
+   "input": "Text:\nIn March, Dr. Selin Aydin moved her practice to Gartenstraße 14. Appointments can be booked by phone on Mondays and Thursdays. New patients must bring their insurance card and a list of their medication.\n\nQuestion: Which medical specialty does Dr. Aydin have?",
+   "expected": {
+    "absent": true
+   },
+   "tags": [
+    "not-in-text"
+   ]
+  },
+  {
+   "id": "context-de-00",
+   "language": "de",
+   "input": "Text:\nDie Bäckerei Lindwurm in Hollfeld öffnet werktags um 6:30 Uhr und samstags um 8:00 Uhr, sonntags ist sie geschlossen. Marta Keller hat sie 2009 gegründet. Ihr meistverkauftes Brot ist ein Roggenbrot namens Hollfelder Laib, das 4,20 Euro kostet.\n\nFrage: Wann öffnet die Bäckerei samstags?",
+   "expected": {
+    "required": [
+     "8|08"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-de-01",
+   "language": "de",
+   "input": "Text:\nDie Bäckerei Lindwurm in Hollfeld öffnet werktags um 6:30 Uhr und samstags um 8:00 Uhr, sonntags ist sie geschlossen. Marta Keller hat sie 2009 gegründet. Ihr meistverkauftes Brot ist ein Roggenbrot namens Hollfelder Laib, das 4,20 Euro kostet.\n\nFrage: Wer hat die Bäckerei gegründet?",
+   "expected": {
+    "required": [
+     "Keller"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-de-02",
+   "language": "de",
+   "input": "Text:\nDie Bäckerei Lindwurm in Hollfeld öffnet werktags um 6:30 Uhr und samstags um 8:00 Uhr, sonntags ist sie geschlossen. Marta Keller hat sie 2009 gegründet. Ihr meistverkauftes Brot ist ein Roggenbrot namens Hollfelder Laib, das 4,20 Euro kostet.\n\nFrage: Was kostet der Hollfelder Laib?",
+   "expected": {
+    "required": [
+     "4,20"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-de-03",
+   "language": "de",
+   "input": "Text:\nDie Bäckerei Lindwurm in Hollfeld öffnet werktags um 6:30 Uhr und samstags um 8:00 Uhr, sonntags ist sie geschlossen. Marta Keller hat sie 2009 gegründet. Ihr meistverkauftes Brot ist ein Roggenbrot namens Hollfelder Laib, das 4,20 Euro kostet.\n\nFrage: Wie viele Angestellte hat die Bäckerei?",
+   "expected": {
+    "absent": true
+   },
+   "tags": [
+    "not-in-text"
+   ]
+  },
+  {
+   "id": "context-de-04",
+   "language": "de",
+   "input": "Text:\nDie Bäckerei Lindwurm in Hollfeld öffnet werktags um 6:30 Uhr und samstags um 8:00 Uhr, sonntags ist sie geschlossen. Marta Keller hat sie 2009 gegründet. Ihr meistverkauftes Brot ist ein Roggenbrot namens Hollfelder Laib, das 4,20 Euro kostet.\n\nFrage: Verkauft die Bäckerei Kaffee?",
+   "expected": {
+    "absent": true
+   },
+   "tags": [
+    "not-in-text"
+   ]
+  },
+  {
+   "id": "context-de-05",
+   "language": "de",
+   "input": "Text:\nDas Projekt Kestrel begann im April 2025 mit einem Budget von 180.000 Euro. Das Team hat sieben Mitglieder und wird von Jonas Brandt geleitet. Der erste Prototyp wurde im September an den Kunden Nordwind GmbH geliefert.\n\nFrage: Wie hoch ist das Budget von Projekt Kestrel?",
+   "expected": {
+    "required": [
+     "180|180000"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-de-06",
+   "language": "de",
+   "input": "Text:\nDas Projekt Kestrel begann im April 2025 mit einem Budget von 180.000 Euro. Das Team hat sieben Mitglieder und wird von Jonas Brandt geleitet. Der erste Prototyp wurde im September an den Kunden Nordwind GmbH geliefert.\n\nFrage: Wer leitet das Team?",
+   "expected": {
+    "required": [
+     "Brandt"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-de-07",
+   "language": "de",
+   "input": "Text:\nDas Projekt Kestrel begann im April 2025 mit einem Budget von 180.000 Euro. Das Team hat sieben Mitglieder und wird von Jonas Brandt geleitet. Der erste Prototyp wurde im September an den Kunden Nordwind GmbH geliefert.\n\nFrage: Welcher Kunde hat den ersten Prototyp erhalten?",
+   "expected": {
+    "required": [
+     "Nordwind"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-de-08",
+   "language": "de",
+   "input": "Text:\nDas Projekt Kestrel begann im April 2025 mit einem Budget von 180.000 Euro. Das Team hat sieben Mitglieder und wird von Jonas Brandt geleitet. Der erste Prototyp wurde im September an den Kunden Nordwind GmbH geliefert.\n\nFrage: Wann endet das Projekt?",
+   "expected": {
+    "absent": true
+   },
+   "tags": [
+    "not-in-text"
+   ]
+  },
+  {
+   "id": "context-de-09",
+   "language": "de",
+   "input": "Text:\nDas Projekt Kestrel begann im April 2025 mit einem Budget von 180.000 Euro. Das Team hat sieben Mitglieder und wird von Jonas Brandt geleitet. Der erste Prototyp wurde im September an den Kunden Nordwind GmbH geliefert.\n\nFrage: Welche Programmiersprache nutzt das Team?",
+   "expected": {
+    "absent": true
+   },
+   "tags": [
+    "not-in-text"
+   ]
+  },
+  {
+   "id": "context-de-10",
+   "language": "de",
+   "input": "Text:\nDie Flussfähre in Kleinmühl fährt zwischen 7:00 und 19:00 Uhr alle 20 Minuten. Eine Einzelfahrt kostet für Erwachsene 2 Euro; Kinder unter 12 fahren kostenlos. Fahrräder sind an Bord erlaubt, Autos nicht.\n\nFrage: Wie oft fährt die Fähre?",
+   "expected": {
+    "required": [
+     "20"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-de-11",
+   "language": "de",
+   "input": "Text:\nDie Flussfähre in Kleinmühl fährt zwischen 7:00 und 19:00 Uhr alle 20 Minuten. Eine Einzelfahrt kostet für Erwachsene 2 Euro; Kinder unter 12 fahren kostenlos. Fahrräder sind an Bord erlaubt, Autos nicht.\n\nFrage: Bis zu welchem Alter fahren Kinder kostenlos?",
+   "expected": {
+    "required": [
+     "12"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-de-12",
+   "language": "de",
+   "input": "Text:\nDie Flussfähre in Kleinmühl fährt zwischen 7:00 und 19:00 Uhr alle 20 Minuten. Eine Einzelfahrt kostet für Erwachsene 2 Euro; Kinder unter 12 fahren kostenlos. Fahrräder sind an Bord erlaubt, Autos nicht.\n\nFrage: Sind Autos auf der Fähre erlaubt?",
+   "expected": {
+    "required": [
+     "nein|nicht"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-de-13",
+   "language": "de",
+   "input": "Text:\nDie Flussfähre in Kleinmühl fährt zwischen 7:00 und 19:00 Uhr alle 20 Minuten. Eine Einzelfahrt kostet für Erwachsene 2 Euro; Kinder unter 12 fahren kostenlos. Fahrräder sind an Bord erlaubt, Autos nicht.\n\nFrage: Wie lange dauert eine Überfahrt?",
+   "expected": {
+    "absent": true
+   },
+   "tags": [
+    "not-in-text"
+   ]
+  },
+  {
+   "id": "context-de-14",
+   "language": "de",
+   "input": "Text:\nDie Flussfähre in Kleinmühl fährt zwischen 7:00 und 19:00 Uhr alle 20 Minuten. Eine Einzelfahrt kostet für Erwachsene 2 Euro; Kinder unter 12 fahren kostenlos. Fahrräder sind an Bord erlaubt, Autos nicht.\n\nFrage: Wer betreibt die Fähre?",
+   "expected": {
+    "absent": true
+   },
+   "tags": [
+    "not-in-text"
+   ]
+  },
+  {
+   "id": "context-de-15",
+   "language": "de",
+   "input": "Text:\nIm März ist Dr. Selin Aydin mit ihrer Praxis in die Gartenstraße 14 umgezogen. Termine kann man montags und donnerstags telefonisch vereinbaren. Neue Patienten müssen ihre Versichertenkarte und eine Liste ihrer Medikamente mitbringen.\n\nFrage: Wie lautet die neue Adresse der Praxis?",
+   "expected": {
+    "required": [
+     "Gartenstraße 14"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-de-16",
+   "language": "de",
+   "input": "Text:\nIm März ist Dr. Selin Aydin mit ihrer Praxis in die Gartenstraße 14 umgezogen. Termine kann man montags und donnerstags telefonisch vereinbaren. Neue Patienten müssen ihre Versichertenkarte und eine Liste ihrer Medikamente mitbringen.\n\nFrage: An welchen Tagen kann man Termine vereinbaren?",
+   "expected": {
+    "required": [
+     "montag|montags",
+     "donnerstag|donnerstags"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-de-17",
+   "language": "de",
+   "input": "Text:\nIm März ist Dr. Selin Aydin mit ihrer Praxis in die Gartenstraße 14 umgezogen. Termine kann man montags und donnerstags telefonisch vereinbaren. Neue Patienten müssen ihre Versichertenkarte und eine Liste ihrer Medikamente mitbringen.\n\nFrage: In welchem Monat ist die Praxis umgezogen?",
+   "expected": {
+    "required": [
+     "März"
+    ]
+   },
+   "tags": [
+    "answerable"
+   ]
+  },
+  {
+   "id": "context-de-18",
+   "language": "de",
+   "input": "Text:\nIm März ist Dr. Selin Aydin mit ihrer Praxis in die Gartenstraße 14 umgezogen. Termine kann man montags und donnerstags telefonisch vereinbaren. Neue Patienten müssen ihre Versichertenkarte und eine Liste ihrer Medikamente mitbringen.\n\nFrage: Wie lautet die Telefonnummer der Praxis?",
+   "expected": {
+    "absent": true
+   },
+   "tags": [
+    "not-in-text"
+   ]
+  },
+  {
+   "id": "context-de-19",
+   "language": "de",
+   "input": "Text:\nIm März ist Dr. Selin Aydin mit ihrer Praxis in die Gartenstraße 14 umgezogen. Termine kann man montags und donnerstags telefonisch vereinbaren. Neue Patienten müssen ihre Versichertenkarte und eine Liste ihrer Medikamente mitbringen.\n\nFrage: Welche Fachrichtung hat Dr. Aydin?",
+   "expected": {
+    "absent": true
+   },
+   "tags": [
+    "not-in-text"
+   ]
+  }
+ ],
+ "marker": {
+  "en": "NOT IN TEXT",
+  "de": "NICHT IM TEXT"
+ }
+}

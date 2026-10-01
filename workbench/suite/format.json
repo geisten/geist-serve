@@ -1,0 +1,511 @@
+{
+ "id": "format",
+ "version": "1.0.0",
+ "prompt": {
+  "en": "Follow the formatting instructions in the user message exactly.",
+  "de": "Follow the formatting instructions in the user message exactly."
+ },
+ "max_tokens": 160,
+ "cases": [
+  {
+   "id": "format-en-00",
+   "language": "en",
+   "input": "List exactly 3 benefits of walking as bullet points that start with \"- \". Write nothing else.",
+   "expected": {
+    "check": "bullets",
+    "count": 3
+   },
+   "tags": [
+    "bullets"
+   ]
+  },
+  {
+   "id": "format-en-01",
+   "language": "en",
+   "input": "Return only a JSON object with exactly the keys \"title\" and \"summary\". Topic: benefits of walking.",
+   "expected": {
+    "check": "json_keys",
+    "keys": [
+     "summary",
+     "title"
+    ]
+   },
+   "tags": [
+    "json_keys"
+   ]
+  },
+  {
+   "id": "format-en-02",
+   "language": "en",
+   "input": "Explain benefits of walking in at most 12 words.",
+   "expected": {
+    "check": "max_words",
+    "words": 12
+   },
+   "tags": [
+    "max_words"
+   ]
+  },
+  {
+   "id": "format-en-03",
+   "language": "en",
+   "input": "Give one example of benefits of walking in a single line written only in capital letters.",
+   "expected": {
+    "check": "one_line_upper"
+   },
+   "tags": [
+    "one_line_upper"
+   ]
+  },
+  {
+   "id": "format-en-04",
+   "language": "en",
+   "input": "List exactly 4 uses of a Raspberry Pi as bullet points that start with \"- \". Write nothing else.",
+   "expected": {
+    "check": "bullets",
+    "count": 4
+   },
+   "tags": [
+    "bullets"
+   ]
+  },
+  {
+   "id": "format-en-05",
+   "language": "en",
+   "input": "Return only a JSON object with exactly the keys \"title\" and \"summary\". Topic: uses of a Raspberry Pi.",
+   "expected": {
+    "check": "json_keys",
+    "keys": [
+     "summary",
+     "title"
+    ]
+   },
+   "tags": [
+    "json_keys"
+   ]
+  },
+  {
+   "id": "format-en-06",
+   "language": "en",
+   "input": "Explain uses of a Raspberry Pi in at most 15 words.",
+   "expected": {
+    "check": "max_words",
+    "words": 15
+   },
+   "tags": [
+    "max_words"
+   ]
+  },
+  {
+   "id": "format-en-07",
+   "language": "en",
+   "input": "Give one example of uses of a Raspberry Pi in a single line written only in capital letters.",
+   "expected": {
+    "check": "one_line_upper"
+   },
+   "tags": [
+    "one_line_upper"
+   ]
+  },
+  {
+   "id": "format-en-08",
+   "language": "en",
+   "input": "List exactly 5 tips for saving energy at home as bullet points that start with \"- \". Write nothing else.",
+   "expected": {
+    "check": "bullets",
+    "count": 5
+   },
+   "tags": [
+    "bullets"
+   ]
+  },
+  {
+   "id": "format-en-09",
+   "language": "en",
+   "input": "Return only a JSON object with exactly the keys \"title\" and \"summary\". Topic: tips for saving energy at home.",
+   "expected": {
+    "check": "json_keys",
+    "keys": [
+     "summary",
+     "title"
+    ]
+   },
+   "tags": [
+    "json_keys"
+   ]
+  },
+  {
+   "id": "format-en-10",
+   "language": "en",
+   "input": "Explain tips for saving energy at home in at most 20 words.",
+   "expected": {
+    "check": "max_words",
+    "words": 20
+   },
+   "tags": [
+    "max_words"
+   ]
+  },
+  {
+   "id": "format-en-11",
+   "language": "en",
+   "input": "Give one example of tips for saving energy at home in a single line written only in capital letters.",
+   "expected": {
+    "check": "one_line_upper"
+   },
+   "tags": [
+    "one_line_upper"
+   ]
+  },
+  {
+   "id": "format-en-12",
+   "language": "en",
+   "input": "List exactly 3 reasons to learn a language as bullet points that start with \"- \". Write nothing else.",
+   "expected": {
+    "check": "bullets",
+    "count": 3
+   },
+   "tags": [
+    "bullets"
+   ]
+  },
+  {
+   "id": "format-en-13",
+   "language": "en",
+   "input": "Return only a JSON object with exactly the keys \"title\" and \"summary\". Topic: reasons to learn a language.",
+   "expected": {
+    "check": "json_keys",
+    "keys": [
+     "summary",
+     "title"
+    ]
+   },
+   "tags": [
+    "json_keys"
+   ]
+  },
+  {
+   "id": "format-en-14",
+   "language": "en",
+   "input": "Explain reasons to learn a language in at most 12 words.",
+   "expected": {
+    "check": "max_words",
+    "words": 12
+   },
+   "tags": [
+    "max_words"
+   ]
+  },
+  {
+   "id": "format-en-15",
+   "language": "en",
+   "input": "Give one example of reasons to learn a language in a single line written only in capital letters.",
+   "expected": {
+    "check": "one_line_upper"
+   },
+   "tags": [
+    "one_line_upper"
+   ]
+  },
+  {
+   "id": "format-en-16",
+   "language": "en",
+   "input": "List exactly 4 things to pack for a hike as bullet points that start with \"- \". Write nothing else.",
+   "expected": {
+    "check": "bullets",
+    "count": 4
+   },
+   "tags": [
+    "bullets"
+   ]
+  },
+  {
+   "id": "format-en-17",
+   "language": "en",
+   "input": "Return only a JSON object with exactly the keys \"title\" and \"summary\". Topic: things to pack for a hike.",
+   "expected": {
+    "check": "json_keys",
+    "keys": [
+     "summary",
+     "title"
+    ]
+   },
+   "tags": [
+    "json_keys"
+   ]
+  },
+  {
+   "id": "format-en-18",
+   "language": "en",
+   "input": "Explain things to pack for a hike in at most 15 words.",
+   "expected": {
+    "check": "max_words",
+    "words": 15
+   },
+   "tags": [
+    "max_words"
+   ]
+  },
+  {
+   "id": "format-en-19",
+   "language": "en",
+   "input": "Give one example of things to pack for a hike in a single line written only in capital letters.",
+   "expected": {
+    "check": "one_line_upper"
+   },
+   "tags": [
+    "one_line_upper"
+   ]
+  },
+  {
+   "id": "format-de-00",
+   "language": "de",
+   "input": "Nenne genau 3 Vorteile des Spazierengehens als Stichpunkte, die mit \"- \" beginnen. Schreibe sonst nichts.",
+   "expected": {
+    "check": "bullets",
+    "count": 3
+   },
+   "tags": [
+    "bullets"
+   ]
+  },
+  {
+   "id": "format-de-01",
+   "language": "de",
+   "input": "Gib nur ein JSON-Objekt mit genau den Schlüsseln \"title\" und \"summary\" aus. Thema: Vorteile des Spazierengehens.",
+   "expected": {
+    "check": "json_keys",
+    "keys": [
+     "summary",
+     "title"
+    ]
+   },
+   "tags": [
+    "json_keys"
+   ]
+  },
+  {
+   "id": "format-de-02",
+   "language": "de",
+   "input": "Erkläre Vorteile des Spazierengehens in höchstens 12 Wörtern.",
+   "expected": {
+    "check": "max_words",
+    "words": 12
+   },
+   "tags": [
+    "max_words"
+   ]
+  },
+  {
+   "id": "format-de-03",
+   "language": "de",
+   "input": "Nenne ein Beispiel für Vorteile des Spazierengehens in einer einzigen Zeile, nur in Großbuchstaben.",
+   "expected": {
+    "check": "one_line_upper"
+   },
+   "tags": [
+    "one_line_upper"
+   ]
+  },
+  {
+   "id": "format-de-04",
+   "language": "de",
+   "input": "Nenne genau 4 Einsatzmöglichkeiten eines Raspberry Pi als Stichpunkte, die mit \"- \" beginnen. Schreibe sonst nichts.",
+   "expected": {
+    "check": "bullets",
+    "count": 4
+   },
+   "tags": [
+    "bullets"
+   ]
+  },
+  {
+   "id": "format-de-05",
+   "language": "de",
+   "input": "Gib nur ein JSON-Objekt mit genau den Schlüsseln \"title\" und \"summary\" aus. Thema: Einsatzmöglichkeiten eines Raspberry Pi.",
+   "expected": {
+    "check": "json_keys",
+    "keys": [
+     "summary",
+     "title"
+    ]
+   },
+   "tags": [
+    "json_keys"
+   ]
+  },
+  {
+   "id": "format-de-06",
+   "language": "de",
+   "input": "Erkläre Einsatzmöglichkeiten eines Raspberry Pi in höchstens 15 Wörtern.",
+   "expected": {
+    "check": "max_words",
+    "words": 15
+   },
+   "tags": [
+    "max_words"
+   ]
+  },
+  {
+   "id": "format-de-07",
+   "language": "de",
+   "input": "Nenne ein Beispiel für Einsatzmöglichkeiten eines Raspberry Pi in einer einzigen Zeile, nur in Großbuchstaben.",
+   "expected": {
+    "check": "one_line_upper"
+   },
+   "tags": [
+    "one_line_upper"
+   ]
+  },
+  {
+   "id": "format-de-08",
+   "language": "de",
+   "input": "Nenne genau 5 Tipps zum Energiesparen zu Hause als Stichpunkte, die mit \"- \" beginnen. Schreibe sonst nichts.",
+   "expected": {
+    "check": "bullets",
+    "count": 5
+   },
+   "tags": [
+    "bullets"
+   ]
+  },
+  {
+   "id": "format-de-09",
+   "language": "de",
+   "input": "Gib nur ein JSON-Objekt mit genau den Schlüsseln \"title\" und \"summary\" aus. Thema: Tipps zum Energiesparen zu Hause.",
+   "expected": {
+    "check": "json_keys",
+    "keys": [
+     "summary",
+     "title"
+    ]
+   },
+   "tags": [
+    "json_keys"
+   ]
+  },
+  {
+   "id": "format-de-10",
+   "language": "de",
+   "input": "Erkläre Tipps zum Energiesparen zu Hause in höchstens 20 Wörtern.",
+   "expected": {
+    "check": "max_words",
+    "words": 20
+   },
+   "tags": [
+    "max_words"
+   ]
+  },
+  {
+   "id": "format-de-11",
+   "language": "de",
+   "input": "Nenne ein Beispiel für Tipps zum Energiesparen zu Hause in einer einzigen Zeile, nur in Großbuchstaben.",
+   "expected": {
+    "check": "one_line_upper"
+   },
+   "tags": [
+    "one_line_upper"
+   ]
+  },
+  {
+   "id": "format-de-12",
+   "language": "de",
+   "input": "Nenne genau 3 Gründe, eine Sprache zu lernen als Stichpunkte, die mit \"- \" beginnen. Schreibe sonst nichts.",
+   "expected": {
+    "check": "bullets",
+    "count": 3
+   },
+   "tags": [
+    "bullets"
+   ]
+  },
+  {
+   "id": "format-de-13",
+   "language": "de",
+   "input": "Gib nur ein JSON-Objekt mit genau den Schlüsseln \"title\" und \"summary\" aus. Thema: Gründe, eine Sprache zu lernen.",
+   "expected": {
+    "check": "json_keys",
+    "keys": [
+     "summary",
+     "title"
+    ]
+   },
+   "tags": [
+    "json_keys"
+   ]
+  },
+  {
+   "id": "format-de-14",
+   "language": "de",
+   "input": "Erkläre Gründe, eine Sprache zu lernen in höchstens 12 Wörtern.",
+   "expected": {
+    "check": "max_words",
+    "words": 12
+   },
+   "tags": [
+    "max_words"
+   ]
+  },
+  {
+   "id": "format-de-15",
+   "language": "de",
+   "input": "Nenne ein Beispiel für Gründe, eine Sprache zu lernen in einer einzigen Zeile, nur in Großbuchstaben.",
+   "expected": {
+    "check": "one_line_upper"
+   },
+   "tags": [
+    "one_line_upper"
+   ]
+  },
+  {
+   "id": "format-de-16",
+   "language": "de",
+   "input": "Nenne genau 4 Dinge, die man für eine Wanderung einpackt als Stichpunkte, die mit \"- \" beginnen. Schreibe sonst nichts.",
+   "expected": {
+    "check": "bullets",
+    "count": 4
+   },
+   "tags": [
+    "bullets"
+   ]
+  },
+  {
+   "id": "format-de-17",
+   "language": "de",
+   "input": "Gib nur ein JSON-Objekt mit genau den Schlüsseln \"title\" und \"summary\" aus. Thema: Dinge, die man für eine Wanderung einpackt.",
+   "expected": {
+    "check": "json_keys",
+    "keys": [
+     "summary",
+     "title"
+    ]
+   },
+   "tags": [
+    "json_keys"
+   ]
+  },
+  {
+   "id": "format-de-18",
+   "language": "de",
+   "input": "Erkläre Dinge, die man für eine Wanderung einpackt in höchstens 15 Wörtern.",
+   "expected": {
+    "check": "max_words",
+    "words": 15
+   },
+   "tags": [
+    "max_words"
+   ]
+  },
+  {
+   "id": "format-de-19",
+   "language": "de",
+   "input": "Nenne ein Beispiel für Dinge, die man für eine Wanderung einpackt in einer einzigen Zeile, nur in Großbuchstaben.",
+   "expected": {
+    "check": "one_line_upper"
+   },
+   "tags": [
+    "one_line_upper"
+   ]
+  }
+ ]
+}
