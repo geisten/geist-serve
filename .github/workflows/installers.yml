@@ -39,6 +39,15 @@ jobs:
             --mount "type=bind,source=$PWD/build/package,target=/out" \
             alpine:3.23@sha256:85fe1e81d6758c208f3e1eed4338a1997e19d4be002d4dd32d3100c9a8c010a0 \
             sh /source/scripts/build-linux-candidate.sh '${{ matrix.arch }}'
+      # Before any DEB is installed: the bootstrap refuses to shadow a package.
+      - name: Portable archive and rootless bootstrap install, real inference (#46)
+        run: |
+          set -o pipefail
+          platform=${{ matrix.arch == 'amd64' && 'linux-x86_64' || 'linux-aarch64' }}
+          BIN_DIR=build/package VERSION="$VERSION" sh scripts/package-app.sh "$platform"
+          mv "build/geist-$VERSION-$platform.tar.gz" build/package/
+          sh tests/install/bootstrap_acceptance.sh build/package "$VERSION" \
+            "$PWD/geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf" 2>&1 | tee build/package/bootstrap-acceptance.log
       - name: Installed package, real inference and lifecycle
         run: |
           set -o pipefail
@@ -77,6 +86,7 @@ jobs:
           path: |
             build/package/*.deb
             build/package/*.deb.sha256
+            build/package/geist-*-linux-*.tar.gz
             build/package/*-commit.txt
             build/package/app-build-packages.txt
             build/package/*acceptance.log

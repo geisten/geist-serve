@@ -14,9 +14,15 @@ def assemble(directory: Path, version: str):
     binaries = [f'geist-serve-{p}{suffix}' for p in platforms for suffix in ('', '-geistd')]
     packages = [f'geist_{version}_{arch}.deb' for arch in ('amd64', 'arm64')]
     packages.append(f'geist-desktop_{version}_all.deb')
-    payload = sorted(binaries+packages+['geist-serve.socket','geist-serve.service','geist-serve.default','geist-serve.cdx.json'])
-    expected = set(payload)
     actual = {p.name for p in directory.iterdir()}
+    # The rootless Linux installer (#46) ships only when the release is signed:
+    # all of its assets or none, never an unsigned manifest.
+    installer = [f'geist-{version}-{p}.tar.gz' for p in platforms[:2]]
+    installer += ['geist-manifest', 'geist-manifest.sig', 'install-geist.sh']
+    if not actual & set(installer):
+        installer = []
+    payload = sorted(binaries+packages+installer+['geist-serve.socket','geist-serve.service','geist-serve.default','geist-serve.cdx.json'])
+    expected = set(payload)
     if actual != expected:
         raise ValueError(f'Release payload mismatch: missing={sorted(expected-actual)}, unexpected={sorted(actual-expected)}')
     lines = {}
