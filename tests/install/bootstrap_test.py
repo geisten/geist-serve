@@ -168,10 +168,10 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(self.run_installer(self.release.make('2.0.0'), '--version', '1.9.0', '--no-start').returncode, 12)
         self.assertNothingInstalled()
 
-    def test_missing_production_key_refuses(self):
+    def test_pinned_production_key_rejects_other_signers(self):
         p = self.run_installer(self.release.make('1.0.0'), '--no-start', pubkey=False)
         self.assertEqual(p.returncode, 12)
-        self.assertIn('no release signing key', p.stderr)
+        self.assertIn('manifest signature is not valid', p.stderr)
         self.assertNothingInstalled()
 
     def test_foreign_launcher_and_unowned_runtime_are_left_alone(self):
