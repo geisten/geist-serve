@@ -76,7 +76,7 @@ member list, the ELF machine of each binary, the inner `SHA256SUMS`, and that
 bytes, checked with `openssl pkeyutl -verify -rawin` (OpenSSL 3 or newer). The
 private key lives only in the `release` environment secret
 `GEIST_MANIFEST_SIGNING_KEY` (PEM); its public key is pinned in
-`GEIST_MANIFEST_PUBKEY` in `scripts/install-geist.sh`. While that constant is
+`GEIST_MANIFEST_PUBKEY` in `scripts/install-geist.sh`. If that constant is
 empty, every install refuses with exit 12.
 
 Rotating the key: add the new public key to the installer, release, then drop

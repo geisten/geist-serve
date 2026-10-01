@@ -125,6 +125,9 @@ jobs:
             key=$(mktemp); trap 'rm -f "$key"' EXIT
             printf '%s\n' "$GEIST_MANIFEST_SIGNING_KEY" >"$key"
             sh scripts/sign-manifest.sh dist/geist-manifest "$key"
+            # the secret must match the key pinned in the installer it ships with
+            pinned=$(sed -n "/^GEIST_MANIFEST_PUBKEY='/,/-----END/p" scripts/install-geist.sh | tr -d "'" | sed 's/^GEIST_MANIFEST_PUBKEY=//')
+            [ "$(openssl pkey -in "$key" -pubout)" = "$pinned" ] || { echo "::error::GEIST_MANIFEST_SIGNING_KEY does not match GEIST_MANIFEST_PUBKEY"; exit 1; }
           else
             echo "::notice::GEIST_MANIFEST_SIGNING_KEY is not set: no rootless Linux installer assets (#46)"
           fi
