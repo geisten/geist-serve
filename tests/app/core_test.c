@@ -84,6 +84,10 @@ int main(void) {
     assert(app_assess_device(&h, gemma, true, 0, true, 3).fit == APP_RECOMMENDED);
     assert(app_assess_device(&h, gemma, true, 3, true, 7.99).fit == APP_CONDITIONAL);
     assert(app_assess_device(&h, gemma, true, 3, true, 8).fit == APP_RECOMMENDED);
+    /* A measured model never reads "not measured"; an unmeasured one still does. */
+    assert(!strstr(app_assess_device(&h, gemma, true, 0, true, 45).reason, "not measured"));
+    assert(!strstr(app_assess_device(&h, gemma, true, 20, false, 0).reason, "not measured"));
+    assert(strstr(app_assess_device(&h, gemma, true, 0, true, 0).reason, "not measured"));
     assert(app_assess_device(&h, gemma, true, 8, true, 0).fit == APP_RECOMMENDED);
     assert(app_assess_device(&h, gemma, true, 3, false, 45).fit == APP_CONDITIONAL);
     assert(app_assess_device(&h, gemma, true, 0, false, 0).fit == APP_RECOMMENDED);
