@@ -132,10 +132,10 @@ app_assess(const struct app_hardware *h, const struct app_model *m, bool install
         a.reason = "Available RAM is tight now. Close other apps before loading this model.";
     } else if (h->device == APP_PI5 && strcmp(m->id, "bitnet-2b") == 0) {
         a.fit    = APP_RECOMMENDED;
-        a.reason = "Fits the Pi 5 memory profile and has a published speed reference.";
+        a.reason = "Fits Pi 5 memory. A reference Pi 5 measured about 18 tokens/s.";
     } else if (h->device == APP_APPLE_SILICON && h->cores >= 4) {
         a.fit    = APP_RECOMMENDED;
-        a.reason = "Fits the Apple Silicon hardware and RAM profile; speed is an estimate.";
+        a.reason = "Fits this Mac's memory. Speed not measured yet.";
     }
     return a;
 }

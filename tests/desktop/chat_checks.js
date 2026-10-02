@@ -433,7 +433,7 @@ async function checkActivityUX(assert, tick) {
       assert(!row(q4).querySelector('.variant-active').hidden && row(q8).querySelector('.variant-active').hidden, 'active is separate from suitability and download state');
       assert(action(q4).getAttribute('aria-label').includes('Q4_0') && action(q8).getAttribute('aria-label').includes('Q8_0'), 'action labels identify the exact variant');
       assert($('runtime-name').textContent === 'Qwen3.8 27B · Q4_0', 'loaded header identifies actual quantization');
-      assert(!row(q8).querySelector('.variant-warning').hidden && row(q8).querySelector('.variant-warning').textContent.startsWith(t('Available RAM is tight')) && row(q8).querySelector('.variant-warning').textContent.includes(t(`Needs ${vf.models.find(m=>m.id==='qwen38-27b-q8').ram_gib} GB memory`)), 'warning reason and RAM need are visible without hover');
+      assert(!row(q8).querySelector('.variant-warning').hidden && row(q8).querySelector('.variant-warning').textContent.startsWith(t('Available RAM is tight')) && row(q8).querySelector('.variant-warning').textContent.includes(t(`${vf.models.find(m=>m.id==='qwen38-27b-q8').ram_gib} GiB RAM recommended`)), 'warning reason and RAM need are visible without hover');
       assert(row(q8).querySelector('.variant-size').textContent.endsWith(bytes(q8.bytes).replace(' ','\u00a0')), 'each variant exposes its own download size');
       for (const lang of ['de','en']) {
         $('ui-language').value=lang; $('ui-language').dispatchEvent(new Event('change')); await tick();
@@ -572,7 +572,7 @@ async function checkActivityUX(assert, tick) {
     const beforeExecutionAPI = api;
     const executionIdle = async () => { for (let i=0;i<100 && (requesting || polling);i++) await tick(); assert(!requesting,'execution action settles'); };
     try {
-      executionFixture.execution = {mode:'auto',active:'cpu',backend:'cpu_neon',gpu_backend:'metal',recommended:'gpu',gpu_available:true,basis:'hardware',notice:'',reason:'GPU is suggested for this larger model. This is a hardware default, not a measured speed comparison.'};
+      executionFixture.execution = {mode:'auto',active:'cpu',backend:'cpu_neon',gpu_backend:'metal',recommended:'gpu',gpu_available:true,basis:'hardware',notice:'',reason:'GPU is the default for models of 1 GiB and larger; not a measured comparison.'};
       api = async (path, body, signal) => {
         if (path === '/app/status') return new Response(JSON.stringify(executionFixture));
         if (path === '/app/execution') {
@@ -610,7 +610,7 @@ async function checkActivityUX(assert, tick) {
       openMeasurements();await tick();
       const cpu = document.querySelector('[name="execution"][value="cpu"]'), gpu=document.querySelector('[name="execution"][value="gpu"]');
       assert(document.querySelector('[name="execution"]:checked').value==='auto' && !gpu.closest('label').querySelector('.recommended-mark').hidden, 'recommendation and selected mode remain distinct');
-      assert(gpu.closest('label').querySelector('.recommended-mark').getAttribute('aria-label')===t('Recommended processor') && document.querySelector('.recommended-legend'),'#52: the star has a name and a visible legend');
+      assert(gpu.closest('label').querySelector('.recommended-mark').getAttribute('aria-label')===t('Default processor') && document.querySelector('.recommended-legend'),'#52: the star has a name and a visible legend');
       assert(cpu.closest('label').classList.contains('is-active') && !gpu.closest('label').classList.contains('is-active'), 'Auto exposes the actual processor inside its option');
       assert(cpu.getAttribute('aria-label').includes(t('Active processor')) && gpu.closest('label').querySelector('.processor-backend').textContent==='Metal', 'active processor is accessible and GPU backend is an option sublabel');
       assert($('execution-current').classList.contains('sr-only'), 'no duplicate visible processor label outside the choices');
@@ -688,7 +688,13 @@ async function checkActivityUX(assert, tick) {
      assert(!$('model-prompt-hint').hidden && $('model-prompt-hint').textContent.includes(pickModel.group_name||pickModel.name),'#51: the empty state names the recommended model');
      assert(!$('model-legend').hidden && $('model-legend').textContent.includes(t('Fits this computer')),'#51: the icon legend is visible on first launch');
      assert(cards.get(pickModel.id).querySelector('.model-name').textContent===t(plainVariant(pickModel)) && cards.get(pickModel.id).querySelector('.variant-size').textContent.includes(variantLabel(pickModel)),'#51: plain label first, technical label second');
-     assert(cards.get(tight.id).querySelector('.variant-warning').textContent.includes(t('Needs 16 GB memory')),'#51: RAM needs in plain words');
+     assert(cards.get(tight.id).querySelector('.variant-warning').textContent.includes(t('16 GiB RAM recommended')),'#51/#80: RAM guidance as a recommendation, in GiB');
+     // #80: no unverified quality claim anywhere in the model list; the weight format instead, and one honest note.
+     const listText=$('model-chooser').textContent;
+     assert(!/high quality|hohe qualität|balanced|ausgewogen|very compact|sehr kompakt/i.test(listText),'#80: no quality ranking derived from the quantization');
+     assert(['8-bit','4-bit','Ternary (native)'].map(x=>t(x)).includes(cards.get(pickModel.id).querySelector('.model-name').textContent),'#80: the row names the weight format');
+     assert(!$('quality-note').hidden && $('quality-note').textContent===t('Answer quality not tested yet. Check answers.'),'#80: the list says that answer quality is not tested');
+     assert(tags[0].textContent===t('Suggested start') && $('model-prompt-hint').textContent.includes(t('Suggested start').split(' ')[0]),'#80: a suggested start, not a quality recommendation');
      const badges=cards.get(pickModel.id).querySelector('.model-badges'); badges.focus();
      assert(badges.classList.contains('show-meaning') && getComputedStyle(badges,'::after').content.includes(t('Fits this computer')),'#51: focusing the icons shows their meaning');badges.blur();
      render(base);

@@ -98,7 +98,7 @@ bool gpu_supported(const struct app_model *model) {
     return app.backend.gpu_available && model && (model->backends & bit);
 }
 bool recommend_gpu(const struct app_model *model) {
-    /* A hardware default, not a claim of measured performance. */
+    /* A size default (file >= 1 GiB), not a claim of measured performance. */
     return gpu_supported(model) && model->bytes >= APP_GIB;
 }
 

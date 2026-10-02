@@ -237,10 +237,9 @@ void status_response(int fd, struct app_arena *arena) {
     app_quote(&b,
               !gpu ? "GPU is not supported by this model and packaged engine."
               : recommend_gpu(execution_model)
-                      ? "GPU is suggested for this larger model. This is a hardware default, not a "
-                        "measured speed comparison."
-                      : "CPU is suggested for this small model. This is a hardware default, not a "
-                        "measured speed comparison.");
+                      ? "GPU is the default for models of 1 GiB and larger; not a measured "
+                        "comparison."
+                      : "CPU is the default for models under 1 GiB; not a measured comparison.");
     app_put(&b, ",\"notice\":");
     app_quote(&b, app.backend.notice);
     double execution_rate = 0;
