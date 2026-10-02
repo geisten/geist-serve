@@ -51,6 +51,7 @@ const german = {
   'Performance could not be saved. Values remain available until quitting.': 'Messwerte konnten nicht gespeichert werden. Sie bleiben bis zum Beenden verfügbar.',
   'Switching processor…': 'Prozessor wird gewechselt…',
   'Not measured yet': 'Noch nicht gemessen',
+  'No CPU reply yet': 'Noch keine CPU-Antwort', 'No GPU reply yet': 'Noch keine GPU-Antwort',
   'Last completed reply per processor': 'Letzte abgeschlossene Antwort je Prozessor',
   'Model RAM · after reply': 'Modell-RAM · nach Antwort',
   'Measured': 'Gemessen',

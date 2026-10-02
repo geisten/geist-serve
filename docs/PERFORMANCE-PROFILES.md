@@ -53,8 +53,18 @@ Within a series, input buckets are ≤512 / 513–2048 / >2048 and output bucket
 <32 / 32–127 / 128–511 / ≥512. Cold-first-reply, actual prefix-cache reuse, known
 overlapping model download and controlled/ordinary source are separate groups.
 An overlap that starts and finishes inside a request is still captured. Other
-applications' contention is not measured. The newest eligible group is shown;
-an absent CPU/GPU counterpart stays blank. No borrowing from another group.
+applications' contention is not measured.
+
+Each processor shows its own newest ordinary group (#81): a reply on CPU never
+hides GPU samples, or the other way round. `cpu_group` and `gpu_group` describe
+them, and the workload line describes the active processor's. CPU and GPU can
+therefore come from different workloads, for example a cold first reply after
+switching next to warm replies. They are observations, not a comparison. Replies
+that overlapped a download are left out of the profile and never count as the
+"last reply" behind slow/below-target warnings. A finished comparison is the one
+comparable view: until the next ordinary reply, both processors show only that
+run. The newest reply's engine build anchors the view; other builds are
+historical. A processor without a reply says so ("No CPU reply yet").
 
 The last 30 successful nonempty observations in that group supply the median and
 linearly interpolated 25th/75th percentiles. These are descriptive statistics, not
@@ -127,6 +137,8 @@ existing XDG data directory. `--home` also relocates this entire store.
   `legacy_last_reply`. Their original identity is preserved, unknown engine/config
   remains archived, and source files remain untouched. Deterministic IDs avoid
   duplication; a deletion tombstone prevents legacy values from returning.
+  They are diagnostics only: listed in recent observations and the export, never
+  part of medians, warnings or setup (no comparable workload or engine is known).
 
 ## API and verification
 

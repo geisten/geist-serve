@@ -41,8 +41,6 @@ void execution_response(int fd, const char *text) {
             snprintf(path, sizeof path, "%s", app.child.chosen);
             snprintf(id, sizeof id, "%s", app.child.active_id);
             app.backend.notice[0] = 0;
-            if (model)
-                memset(&app.prefs.measurements[model - app_models], 0, sizeof app.prefs.measurements[0]);
             if (!start_child_mode(path, id, mode)) {
                 code  = 500;
                 error = "Cannot change execution. Restoring CPU.";
@@ -110,7 +108,6 @@ void import_catalog(int fd, const char *text) {
     if (code == 200) {
         app_catalog_apply(candidate);
         candidate = nullptr;
-        memset(app.prefs.measurements, 0, sizeof app.prefs.measurements);
         restore_preview_preferences();
         restore_measurements();
         if (!app_model_find(app.prefs.selected))
@@ -410,10 +407,7 @@ void status_response(int fd, struct app_arena *arena) {
         app_printf(&b, ",\"preview_accepted\":%s", app.prefs.preview_accepted[i] ? "true" : "false");
         app_put(&b, ",\"performance\":");
         app_quote(&b, a.performance);
-        app_printf(&b,
-                   ",\"measured_tps\":%.3f,\"measured_tokens\":%u}",
-                   app.prefs.measurements[i].tps,
-                   app.prefs.measurements[i].tokens);
+        app_put(&b, "}");
     }
     char artifact[65] = "";
     if (execution_model)

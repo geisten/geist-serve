@@ -122,7 +122,7 @@ def main():
             p=profile(app);assert p['invalid']==1 and p['cpu']['count']==5,p
             assert (p['cpu']['rate'],p['cpu']['q25'],p['cpu']['q75'])==(30,20,40),p
             assert p['cpu']['first_answer']==3 and p['cpu']['first_answer_count']==3,p
-            assert p['gpu'] is None,'Must not borrow another workload to fill GPU'
+            assert p['gpu'] is None,'An older engine build never fills the current GPU profile'
             request(app);app.wait(lambda s:s['performance_profile']['persisted']>=10)
         finally:app.close()
         app=start()
@@ -132,6 +132,23 @@ def main():
             assert next(r for r in restored if r['id']=='schema-1')['schema']==1
             assert 'engine' not in next(r for r in restored if r['id']=='schema-1')
             assert next(r for r in restored if r['id']=='other-engine')['engine']['geistlib']['revision']=='b'*40
+        finally:app.close()
+        # #81, as reported: warm GPU replies, then a switch and the first (cold) CPU reply,
+        # then a reply that overlapped a download. Each processor keeps its own workload;
+        # the download overlap neither hides samples nor becomes the "last reply".
+        timing = lambda r, rate, **kw: {**base, **kw, 'output': 64, 'generation_ns': 64 / rate * 1e9, 'total_ns': 10e9}
+        scenario = [timing(base, 80, id=f'gpu-warm-{i}', backend='metal', cold=False) for i in range(3)]
+        scenario += [timing(base, 18, id='cpu-cold', cold=True), timing(base, 5, id='cpu-download', contention=True)]
+        journal.write_text(''.join(json.dumps(r) + '\n' for r in scenario))
+        (home/'performance/observations.1.jsonl').unlink(missing_ok=True)
+        (home/'performance/profiles.json').unlink(missing_ok=True)
+        app = start()
+        try:
+            p = profile(app)
+            assert p['gpu']['count'] == 3 and p['gpu']['rate'] == 80, p
+            assert p['cpu']['count'] == 1 and p['cpu']['rate'] == 18, p
+            assert p['cpu_group']['cold'] and not p['gpu_group']['cold'], p
+            assert abs(app.status()['execution']['performance']['rate'] - 18) < .001, 'download overlap is not the last reply'
         finally:app.close()
         # Legacy import survives restart, stays archived, and deletion never reimports.
         legacy=home/f'performance-{base["artifact"]}-{base["backend"]}'

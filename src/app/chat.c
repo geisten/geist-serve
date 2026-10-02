@@ -263,11 +263,7 @@ void generate(int fd, struct request *r, struct app_arena *arena) {
                 "This task/model/language is experimental. Enable experimental use explicitly.");
         return;
     }
-    bool benchmark   = json_bool(json, json_get(json, 0, "benchmark"), false);
-    int  model_index = -1;
-    for (size_t i = 0; i < app_model_count; ++i)
-        if (strcmp(app.child.active_id, app_models[i].id) == 0)
-            model_index = i;
+    bool benchmark = json_bool(json, json_get(json, 0, "benchmark"), false);
     app.child.generating = true;
     struct perf_record observation;
     observation_begin(&observation,
@@ -346,15 +342,6 @@ void generate(int fd, struct request *r, struct app_arena *arena) {
         bool delivered = send_bytes(fd, final, (size_t) n);
         if (!delivered)
             rc = 498;
-        if (delivered && model_index >= 0) {
-            pthread_mutex_lock(&app.mutex);
-            if (!stats.no_answer && stats.tokens >= 16 && stats.generation_ns > 1e6) {
-                app.prefs.measurements[model_index].tps    = stats.tokens / (stats.generation_ns / 1e9);
-                app.prefs.measurements[model_index].tokens = (unsigned) stats.tokens;
-            }
-
-            pthread_mutex_unlock(&app.mutex);
-        }
     }
     observation_end(&observation,
                     proxy.disconnected ? 498 : rc,
