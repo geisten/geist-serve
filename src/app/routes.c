@@ -46,7 +46,7 @@ void connections(int fd, bool models) {
         app_printf(&b, "{\"base_url\":\"http://127.0.0.1:%u/v1\",\"api_key\":", app.port);
         app_quote(&b, app.token);
         app_put(&b, ",\"model\":");
-        app_quote(&b, app.child.active_id);
+        app_quote(&b, app.child.pid > 0 ? app.child.active_id : "");
         app_printf(&b,
                    ",\"ready\":%s,\"daemon_pid\":%ld,\"context_tokens\":4096,\"max_output_tokens\":"
                    "4095,\"chat\":true,\"tools\":false,\"quality\":\"unverified\"}",
@@ -294,6 +294,7 @@ void handle(int fd, struct app_arena *arena) {
         stop_child();
         app.child.active[0]    = 0;
         app.child.active_id[0] = 0;
+        app.message[0] = app.backend.notice[0] = 0; /* nothing they describe remains (#82) */
         pthread_mutex_unlock(&app.mutex);
         response(fd, 200, "application/json", "{}", 2);
         return;
@@ -409,7 +410,9 @@ void handle(int fd, struct app_arena *arena) {
         if (safe) {
             if (!strcmp(app.child.active_id, model->id)) {
                 app.child.active_id[0] = app.child.active[0] = 0;
+                app.backend.notice[0] = 0;
             }
+            app.message[0] = 0; /* e.g. "Partial downloads can be resumed" for this file (#82) */
         }
         pthread_mutex_unlock(&app.mutex);
         if (safe)
@@ -467,7 +470,12 @@ void handle(int fd, struct app_arena *arena) {
         return;
     }
     bool activate = !download || app.child.pid <= 0;
-    bool ok = (!activate || save_selection(model->id)) && begin_job(model, download, activate);
+    /* With a model running, the choice is saved only once the new one has
+     * started (jobs.c): a failed or cancelled switch keeps the working model
+     * for the next launch (#82). Without one, a cancelled download stays a
+     * resumable choice. */
+    bool ok = (!activate || app.child.pid > 0 || save_selection(model->id)) &&
+              begin_job(model, download, activate);
     pthread_mutex_unlock(&app.mutex);
     if (ok)
         response(fd, 202, "application/json", "{}", 2);

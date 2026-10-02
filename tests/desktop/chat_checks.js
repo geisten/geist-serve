@@ -877,6 +877,34 @@ $$
       assert($('history-cpu-rate').textContent === t('No CPU reply yet') && $('history-gpu-rate').textContent === t('Historical'), '#81: missing CPU reply named, Vulkan history recognised');
       render(saved);
     }
+    { // #82: status and notices stay true during a switch, after a reply and after a lost connection.
+      const saved = state, other = state.models.find(m => m.id !== state.active_id);
+      render({...saved, job_model: other.id, phase: 'verifying', background_download: false, busy: true, inference_busy: true});
+      assert(cards.get(saved.active_id).querySelector('.variant-active').hidden && $('runtime-state').getAttribute('aria-label') === t('Getting ready…'), '#82: the old model is not "Active"/"ready" while another is prepared');
+      assert($('connection-disabled-text').textContent === t('The model is switching. Wait until it is ready.'), '#82: Connect explains the switch');
+      render(saved);
+      controller = {}; render({...saved, message: 'Download complete.'}); controller = null;
+      render({...saved, message: 'Download complete.'});
+      assert($('notice').textContent === t('Download complete.'), '#82: a notice that arrived during a reply is shown afterwards');
+      message('Service unavailable. Reopen Geist to reconnect.', false); lastServerMessage = '';
+      render({...saved, message: ''});
+      assert($('notice').textContent === '', '#82: the first successful poll clears "Service unavailable"');
+      render({...saved, ready: false, loading: false, active_id: '', execution: {...saved.execution, notice: 'GPU stopped or failed to load. Restored CPU.'}});
+      assert($('execution-notice').hidden, '#82: no fallback notice without a model');
+      render(saved);
+    }
+    { // #82: a follow-up names the conversation's model, so the server's guard catches a model switch.
+      const saved = state, original = api, keep = [conversation, conversationModel, [...$('result').children], $('result').hidden, $('chat-empty').hidden, $('prompt').value]; let sent = null;
+      conversation = [{role: 'user', content: 'Hi'}, {role: 'assistant', content: 'Hello'}]; conversationModel = 'previous-model';
+      api = async (path, body, signal) => {
+        if (path !== '/app/generate') return original(path, body, signal);
+        sent = body; throw new Error('The loaded model changed. Clear the chat to continue with the new model.');
+      };
+      try { await run('A follow-up question'); } finally { api = original; }
+      assert(sent && sent.model === 'previous-model' && sent.messages.length === 3, '#82: the conversation is not sent silently to a different model');
+      [conversation, conversationModel] = keep; $('result').replaceChildren(...keep[2]); $('result').hidden = keep[3]; $('chat-empty').hidden = keep[4]; $('prompt').value = keep[5];
+      render(saved);
+    }
     assert(document.querySelector('.profile-table caption') && document.querySelectorAll('.profile-table th[scope="row"]').length===12, 'profile uses a semantic comparison table');
     assert(!$('measurement-note') && !$('speed'), 'old nested measurements removed');
     assert($('history-enabled').closest('#settings-page') && $('history-export').closest('#settings-page'), 'collection and export belong to settings');
