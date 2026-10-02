@@ -95,8 +95,8 @@ Replace the nested Measurements section with one compact comparison table. Rows:
 
 | Row | Meaning |
 | --- | --- |
-| Typical speed | Median within the selected compatible workload group |
-| Usual range | 25th–75th percentiles of those observed speeds; not a confidence interval |
+| Median speed | Median within the selected compatible workload group |
+| Middle 50% | 25th–75th percentiles of those observed speeds, from 5 replies; not a confidence interval |
 | First text | Median service-observed time until the first visible text |
 | Total time | Time to complete the same sample group; output size stays visible |
 | Output tokens | Typical count and the selected output-length group |

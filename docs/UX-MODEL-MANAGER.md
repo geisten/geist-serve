@@ -36,8 +36,12 @@ fewer clicks.
 
 - Download absent, paused, transferring, validating and verified use different
   symbols. Accessible names and tooltips carry meaning beyond color.
-- Selected processor: light raised segment. Recommended processor: explicit
-  small label. The active backend is shown separately, including Metal.
+- Selected processor: light raised segment. Default processor (by model file
+  size, not measured): explicit small label.
+- Model rows name the weight format (8-bit, 4-bit, Ternary (native)) and never
+  rank answer quality: no task/model pair has quality evidence yet (#80). The
+  list says so in one line. The platform default is a "Suggested start", a
+  compatibility and memory choice, not a quality recommendation. The active backend is shown separately, including Metal.
 - Busy: switching/import disabled and also rejected by the service.
 - GPU failure: restore CPU once; retain diagnostics and display the fallback.
 - Invalid import: retain current models and explain rejection in Settings.

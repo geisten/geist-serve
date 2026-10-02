@@ -118,9 +118,11 @@ function allowed(model, task = selectedTask) {
 const bytes = n => n < 1e9 ? `${formatNumber(n / 1e6)} MB` : `${formatNumber(n / 1e9, 2)} GB`;
 const gib = n => `${formatNumber(n / 2 ** 30, 1)} GiB`;
 
-const variantLabel = model => ({Q4_0:'4 bit · Q4_0', Q8_0:'8 bit · Q8_0', PQ2_0:`${t('Ternary')} · PQ2_0`, I2_S:`${t('Ternary')} · I2_S`}[model?.quantization] || model?.quantization || t('Default'));
-// #51: the variant's primary line is plain language; the technical label is secondary.
-const plainVariant = model => ({Q8_0:'High quality', Q4_0:'Balanced', Q4_K_M:'Balanced', I2_S:'Very compact', PQ2_0:'Very compact'})[model?.quantization] || 'Default';
+const variantLabel = model => model?.quantization || t('Local model');
+// #51/#80: the primary line names the weight format in plain words. It says
+// nothing about answer quality: that is not tested (status quality "unverified").
+// I2_S and PQ2_0 are the models' native ternary weights, not a reduced copy.
+const plainVariant = model => ({Q8_0:'8-bit', Q4_0:'4-bit', Q4_K_M:'4-bit', I2_S:'Ternary (native)', PQ2_0:'Ternary (native)'})[model?.quantization] || 'Local model';
 const hostName = () => window.geistDesktop === 'mac' ? 'Mac' : 'computer';
 // The platform default or fallback, until the user has chosen: exactly one card.
 const recommendedModel = snapshot => {
@@ -190,7 +192,7 @@ function renderPerformance() {
   for (const mode of ['cpu', 'gpu']) {
     const sample = compatible ? profile[mode] : null;
     for (const id of ['rate','typical']) $(`history-${mode}-${id}`).textContent = knownNumber(sample?.rate) ? rateText(sample.rate) : t('Not measured yet');
-    $(`history-${mode}-range`).textContent = sample?.count > 1 ? `${formatNumber(sample.q25,1)}–${formatNumber(sample.q75,1)} ${t('tok/s')}` : '—';
+    $(`history-${mode}-range`).textContent = sample?.count >= 5 ? `${formatNumber(sample.q25,1)}–${formatNumber(sample.q75,1)} ${t('tok/s')}` : '—';
     $(`summary-${mode}-first`).textContent = `◷ ${timeText(sample?.first_answer)}`;
     const availability = mode==='gpu' && !state?.execution?.gpu_available ? 'Not available' : profile?.recent?.some(r=>r.historical && (mode==='gpu' ? r.backend==='metal' : r.backend?.startsWith('cpu'))) ? 'Historical' : 'Not measured yet';
     $(`summary-${mode}-count`).textContent = sample ? `n=${sample.count}` : 'n=—';
@@ -479,13 +481,13 @@ function modelCard(model) {
   card.querySelector('.variant-size').textContent = [variantLabel(model), model.bytes ? bytes(model.bytes).replace(' ', '\u00a0') : ''].filter(Boolean).join(' · ');
   const recommendedTag = card.querySelector('.variant-recommended');
   recommendedTag.hidden = recommendedModel(state)?.id !== model.id || active;
-  recommendedTag.textContent = t(`Recommended for this ${hostName()}`);
+  recommendedTag.textContent = t('Suggested start');
   card.querySelector('.variant-active').textContent = t('Active');
   card.querySelector('.variant-active').hidden = !active;
   const warning = card.querySelector('.variant-warning');
   warning.hidden = !model.resource_fit;
   warning.textContent = model.resource_fit ? t(shortFitReasons[model.reason] || model.reason || 'Limited on this computer') +
-    (ramReasons.has(model.reason) && model.ram_gib ? ` · ${t(`Needs ${model.ram_gib} GB memory`)}` : '') : '';
+    (ramReasons.has(model.reason) && model.ram_gib ? ` · ${t(`${model.ram_gib} GiB RAM recommended`)}` : '') : '';
   warning.title = model.resource_fit ? t(model.reason || 'Limited on this computer') : '';
   const download = renderRing(card.querySelector('.model-ring'), model);
   // The button's complete name exposes status; a duplicate nested progress role
@@ -537,7 +539,7 @@ function render(next) {
   $('model-prompt').textContent = t(working ? 'Getting ready…' : 'Choose a model to begin.');
   const suggestion = working ? null : recommendedModel(next);
   $('model-prompt-hint').hidden = !suggestion;
-  if (suggestion) $('model-prompt-hint').textContent = t(`We recommend ${modelLabel(suggestion)} (${bytes(suggestion.bytes)}) for this ${hostName()}.`);
+  if (suggestion) $('model-prompt-hint').textContent = t(`Suggested start for this ${hostName()}: ${modelLabel(suggestion)} (${bytes(suggestion.bytes)}). It fits the memory; answer quality is not tested yet.`);
   $('model-legend').hidden = !!next.active_id;
   if (usable && previouslyHidden && !$('workspace').hidden && !$('models-page').hidden &&
       (document.activeElement === document.body || document.activeElement.closest('.model-pick'))) $('prompt').focus({preventScroll:true});
@@ -940,8 +942,8 @@ function renderExecution() {
     label.classList.toggle('is-loading', pending);
     if (mark) {
       mark.hidden = input.value !== execution?.recommended;
-      mark.title = t('Recommended processor');
-      mark.setAttribute('aria-label', t('Recommended processor'));
+      mark.title = t('Default processor');
+      mark.setAttribute('aria-label', t('Default processor'));
     }
     const backend = input.value === 'gpu' ? backendName(execution?.gpu_backend || (execution?.active === 'gpu' ? execution?.backend : '')) : '';
     const detail = label.querySelector('.processor-backend');
