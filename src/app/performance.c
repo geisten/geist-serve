@@ -531,6 +531,15 @@ void perf_import(struct perf_record *r) {
     pthread_mutex_unlock(&p.mutex);
     perf_submit(r);
 }
+bool perf_measured(const char *artifact) {
+    bool found = false;
+    pthread_mutex_lock(&p.mutex);
+    for (size_t i = 0; i < p.count && !found; i++)
+        found = !strcmp(p.records[i].artifact, artifact) && !strcmp(p.records[i].outcome, "completed") &&
+                p.records[i].output > 0 && p.records[i].generation_ns > 0;
+    pthread_mutex_unlock(&p.mutex);
+    return found;
+}
 void perf_last(const char         *artifact,
                const char         *series,
                const char         *backend,

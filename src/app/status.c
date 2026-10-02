@@ -379,6 +379,13 @@ void status_response(int fd, struct app_arena *arena) {
                                                     app.prefs.history[i][0].rate,
                                                     gpu_supported(m),
                                                     app.prefs.history[i][1].rate);
+        /* Current figures exclude other engine builds and pre-0.5 values (#81).
+         * If only those exist, say the model was measured, but earlier. */
+        if (!strcmp(a.reason, "Fits this Mac's memory. Speed not measured yet.") && perf_measured(m->sha256))
+            a.reason = "Fits this Mac's memory. Speed measured with an earlier Geist version.";
+        else if (!strcmp(a.reason, "No known resource restriction. Speed has not been measured on this device.") &&
+                 perf_measured(m->sha256))
+            a.reason = "No known resource restriction. Speed measured with an earlier Geist version.";
         if (i)
             app_put(&b, ",");
         app_put(&b, "{\"id\":");

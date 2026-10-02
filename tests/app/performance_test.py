@@ -100,6 +100,10 @@ def main():
         try:
             p=profile(app);assert p['retained']>=15 and p['cpu'] is None and p['gpu'] is None
             assert all(r['historical'] for r in p['recent'])
+            # Only an older engine build measured it: say so, never "not measured".
+            reason=next(m for m in app.status()['models'] if m['id']==model['id'])['reason']
+            assert 'not measured' not in reason and 'not been measured' not in reason, reason
+            assert 'measured' not in reason or reason.endswith('earlier Geist version.'), reason
         finally:app.close()
         wrapper.write_text(original)
         journal=home/'performance/observations.jsonl'

@@ -323,6 +323,8 @@ Object.assign(german, {
   "Fits this Mac's memory. Speed not measured yet.": 'Passt in den Speicher dieses Macs. Geschwindigkeit noch nicht gemessen.',
   "Fits this Mac's memory. Speed measured on this Mac.": 'Passt in den Speicher dieses Macs. Geschwindigkeit auf diesem Mac gemessen.',
   'No known resource restriction. Speed measured on this device.': 'Keine bekannte Ressourcengrenze. Geschwindigkeit auf diesem Gerät gemessen.',
+  "Fits this Mac's memory. Speed measured with an earlier Geist version.": 'Passt in den Speicher dieses Macs. Geschwindigkeit mit einer früheren Geist-Version gemessen.',
+  'No known resource restriction. Speed measured with an earlier Geist version.': 'Keine bekannte Ressourcengrenze. Geschwindigkeit mit einer früheren Geist-Version gemessen.',
   "Measured below the app's interactive target of 8 tokens/s. Still usable for patient tasks.": 'Gemessene Geschwindigkeit unter dem Zielwert von 8 Token/s. Für Aufgaben mit Wartezeit weiterhin nutzbar.',
   "Memory fits and measured speed meets the app's interactive target of 8 tokens/s.": 'Speicher passt, gemessene Geschwindigkeit erreicht den Zielwert von 8 Token/s.',
   'Measured on this device in this app session; workload and temperature affect speed.': 'In dieser Sitzung auf diesem Gerät gemessen; Aufgabe und Temperatur beeinflussen die Geschwindigkeit.',
