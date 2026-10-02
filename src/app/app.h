@@ -95,7 +95,7 @@ struct app_job {
 struct app_compare {
     pthread_t thread;
     bool      running, joinable;
-    char      phase[24], result[24];
+    char      phase[24], result[24], user_mode[8];
     unsigned  step;
 };
 

@@ -464,6 +464,10 @@ bool start_child_mode(const char *path, const char *id, const char *mode) {
     bool ok = start_child_mode_impl(path, id, mode);
     if (!ok) {
         stop_child();
+        /* Some failures (temp dir, socket, log, memory) have no specific text:
+         * never leave the user without a notice after the old model stopped (#83). */
+        if (!app.message[0])
+            snprintf(app.message, sizeof app.message, "Cannot start the model process. See server.log in the app data folder.");
         (void) archive_load_failure();
         (void) activity_end(&app.activity.load, "failed", 502, monotonic_ms());
     }

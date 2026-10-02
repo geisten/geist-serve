@@ -59,6 +59,10 @@ static bool download_model(const struct app_model *m, const char *part, char *wh
         snprintf(why, cap, "Invalid partial download. Remove the .part file and retry.");
         return false;
     }
+    /* A resume continues from what is saved, not from 0% (#83). */
+    pthread_mutex_lock(&app.mutex);
+    app.job.received = (uint64_t) st.st_size;
+    pthread_mutex_unlock(&app.mutex);
     FILE *file = fdopen(fd, "r+b");
     if (!file) {
         close(fd);

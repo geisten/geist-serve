@@ -56,6 +56,8 @@ static void *comparison_main(void *unused) {
     snprintf(path, sizeof path, "%s", app.child.chosen);
     snprintf(id, sizeof id, "%s", app.child.active_id);
     snprintf(previous, sizeof previous, "%s", app.backend.mode);
+    /* Status keeps showing the user's choice while the run switches CPU/GPU (#83). */
+    snprintf(app.compare.user_mode, sizeof app.compare.user_mode, "%s", previous);
     gpu = gpu_supported(app_model_find(id));
     snprintf(run, sizeof run, "compare-v1-%ld-%.0f", (long) getpid(), monotonic_ms());
     pthread_mutex_unlock(&app.mutex);
