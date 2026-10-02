@@ -173,6 +173,13 @@ struct app_assessment app_assess_device(const struct app_hardware *h,
         a.fit = APP_CONDITIONAL;
         a.reason = "Last replies were below 8 tokens/s on every available processor. Slower tasks remain possible.";
     }
+    /* Never say "not measured" when this model has a measured speed here (#84
+     * regression): the reason is shown next to the model in the list. */
+    bool measured = (isfinite(cpu_rate) && cpu_rate > 0) || (isfinite(gpu_rate) && gpu_rate > 0);
+    if (measured && !strcmp(a.reason, "Fits this Mac's memory. Speed not measured yet."))
+        a.reason = "Fits this Mac's memory. Speed measured on this Mac.";
+    else if (measured && !strcmp(a.reason, "No known resource restriction. Speed has not been measured on this device."))
+        a.reason = "No known resource restriction. Speed measured on this device.";
     return a;
 }
 

@@ -321,6 +321,8 @@ Object.assign(german, {
   'Available RAM is tight now. Close other apps before loading this model.': 'Der verfügbare RAM ist knapp. Schließe andere Programme vor dem Laden.',
   'Fits Pi 5 memory. A reference Pi 5 measured about 18 tokens/s.': 'Passt in den Pi-5-Speicher. Ein Referenz-Pi-5 erreichte etwa 18 Token/s.',
   "Fits this Mac's memory. Speed not measured yet.": 'Passt in den Speicher dieses Macs. Geschwindigkeit noch nicht gemessen.',
+  "Fits this Mac's memory. Speed measured on this Mac.": 'Passt in den Speicher dieses Macs. Geschwindigkeit auf diesem Mac gemessen.',
+  'No known resource restriction. Speed measured on this device.': 'Keine bekannte Ressourcengrenze. Geschwindigkeit auf diesem Gerät gemessen.',
   "Measured below the app's interactive target of 8 tokens/s. Still usable for patient tasks.": 'Gemessene Geschwindigkeit unter dem Zielwert von 8 Token/s. Für Aufgaben mit Wartezeit weiterhin nutzbar.',
   "Memory fits and measured speed meets the app's interactive target of 8 tokens/s.": 'Speicher passt, gemessene Geschwindigkeit erreicht den Zielwert von 8 Token/s.',
   'Measured on this device in this app session; workload and temperature affect speed.': 'In dieser Sitzung auf diesem Gerät gemessen; Aufgabe und Temperatur beeinflussen die Geschwindigkeit.',
