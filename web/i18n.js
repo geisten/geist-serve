@@ -340,7 +340,11 @@ Object.assign(german, {
   "This test does not fit the model’s context. Shorten your draft or use Clear chat to start again. No earlier messages have been removed.": "Dieser Test passt nicht mehr in den Kontext des Modells. Kürze deinen Entwurf oder beginne mit „Chat löschen“ erneut. Frühere Nachrichten wurden nicht entfernt.",
   "Clear this conversation and draft? They are not saved.": "Gespräch und Entwurf löschen? Sie werden nicht gespeichert.",
   "Test cleared.": "Test geleert.",
-  "The loaded model changed. Check the model and send again.": "Das geladene Modell hat sich geändert. Prüfe es und sende erneut."
+  "The loaded model changed. Clear the chat to continue with the new model.": "Das geladene Modell hat sich geändert. Leere den Chat, um mit dem neuen Modell weiterzumachen.",
+  "Loading stopped.": "Laden gestoppt.",
+  "Loading the model into memory…": "Modell wird in den Arbeitsspeicher geladen…",
+  "Download or verification cancelled. Partial downloads can be resumed.": "Download oder Prüfung abgebrochen. Teildownloads können fortgesetzt werden.",
+  "The model is switching. Wait until it is ready.": "Das Modell wird gewechselt. Warte, bis es bereit ist."
 });
 Object.assign(german, {
   'System language': 'Systemsprache', 'Navigation': 'Navigation', 'Geist home': 'Geist Startseite',

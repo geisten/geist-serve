@@ -16,7 +16,7 @@ let tasks = [], selectedTask = null;
 let qualityRecords = [];
 let connectionTesting = false;
 // Page memory only. Never store prompts, answers or conversation in browser storage.
-let conversation = [], followLatest = true;
+let conversation = [], conversationModel = '', followLatest = true;
 let lastReply = null, replyPending = false;
 let workspaceModel = null, pendingExecution = null;
 let activityInstance='', activitySnapshot=null, activityAt=0, requestAfter=0, activeTurn=null, cancellingActivity=false, activityReturn=null;
@@ -290,6 +290,9 @@ function message(text, local = true) { uiText($('notice'), text); localMessage =
 // conservative boundary when talking to a service without the new status fields.
 function inferenceBusy() { return state?.inference_busy ?? state?.busy; }
 function runtimeRequest() { return requesting && !downloadRequest; }
+// #82: another model is being prepared while the old one still answers status as ready.
+// The server reports inference_busy while an activation job owns the runtime, not for a background download.
+const switching = s => !!s?.active_id && !!s.job_model && s.job_model !== s.active_id && s.inference_busy === true && !s.background_download;
 function buttonStates() {
   renderPerformance();
   renderExecution();
@@ -302,6 +305,7 @@ function buttonStates() {
   else uiText($('connection-model'), 'No model loaded yet');
   // #59: say why the buttons are disabled, one cause at a time.
   const connectionReason = !state ? 'Service unavailable. Reopen Geist to reconnect.'
+    : switching(state) ? 'The model is switching. Wait until it is ready.'
     : !state.ready ? 'Load a model first to copy or test the connection.'
     : $('test-connection').disabled && !connectionTesting ? 'Wait until the current answer finishes to test the connection.' : '';
   $('connection-disabled').hidden = !connectionReason;
@@ -318,11 +322,11 @@ function buttonStates() {
   $('stop').hidden = !controller;
   document.body.classList.toggle('generating', !!controller);
   const loading = executionLoading();
-  const runtimeStatus = t(loading ? (pendingExecution !== null ? 'Switching processor…' : 'Loading model') : controller ? 'Generating locally…' : state?.ready ? 'Model ready' : 'No model loaded');
+  const runtimeStatus = t(loading ? (pendingExecution !== null ? 'Switching processor…' : 'Loading model') : controller ? 'Generating locally…' : switching(state) ? 'Getting ready…' : state?.ready ? 'Model ready' : 'No model loaded');
   $('runtime-state').setAttribute('aria-label', runtimeStatus); $('runtime-state').title = runtimeStatus;
   $('runtime-state').classList.toggle('inactive', !state?.ready);
   $('runtime-state').classList.toggle('loading', loading);
-  $('runtime-name').textContent = modelLabel(state?.models.find(model => model.id === (state.active_id || state.job_model)));
+  $('runtime-name').textContent = modelLabel(state?.models.find(model => model.id === (switching(state) ? state.job_model : state.active_id || state.job_model)));
   renderActivity();
   $('language-choice').disabled = !!controller;
 }
@@ -475,7 +479,7 @@ function modelCard(model) {
     card.querySelector('.remove').addEventListener('click', () => removeModel(model.id));
     cards.set(model.id, card);
   }
-  const active = state.active_id === model.id && state.ready && !state.loading;
+  const active = state.active_id === model.id && state.ready && !state.loading && !switching(state);
   const pending = pendingModel === model.id;
   const preparing = state.job_model === model.id && (!!state.phase || state.loading);
   const paused = canPause(model);
@@ -559,8 +563,12 @@ function render(next) {
     shownActive = next.active_id;
     document.querySelector(`.model[data-id="${CSS.escape(next.active_id)}"]`)?.scrollIntoView({block: 'nearest'});
   }
-  if (!controller && !requesting && (!localMessage || next.message !== lastServerMessage)) message(working ? '' : next.message || '', false);
-  lastServerMessage = next.message;
+  // #82: remember a server notice only once it is shown, so one that arrives
+  // during a reply or a request still appears afterwards.
+  if (!controller && !requesting && (!localMessage || next.message !== lastServerMessage)) {
+    message(working ? '' : next.message || '', false);
+    lastServerMessage = working ? '' : next.message;
+  }
   buttonStates(); chatLayout();
 }
 
@@ -568,7 +576,8 @@ async function poll() {
   if (polling || stopped) return;
   polling = true;
   try { const next = await (await api('/app/status')).json(); if (!stopped) render(next); }
-  catch (error) { if (!stopped) { message('Service unavailable. Reopen Geist to reconnect.'); state = null; buttonStates(); } }
+  // Not a local message: the first successful poll replaces it (#82).
+  catch (error) { if (!stopped) { message('Service unavailable. Reopen Geist to reconnect.', false); lastServerMessage = ''; state = null; buttonStates(); } }
   finally { polling = false; }
 }
 
@@ -614,7 +623,8 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
   const experimental = previewAccepted(state.models.find(m => m.id === state.active_id));
   const messages = [...conversation, {role: 'user', content: prompt}];
   const payload = {prompt, benchmark, language: $('language-choice').value, experimental, task: 'freeform', task_version: task.version,
-    ...(!benchmark ? {model: state.active_id, messages} : {})};
+    // #82: a conversation belongs to its model; after a switch the server's guard asks to clear it.
+    ...(!benchmark ? {model: conversation.length ? conversationModel : state.active_id, messages} : {})};
   if (!benchmark && (messages.length > 63 || new TextEncoder().encode(JSON.stringify(payload)).length > 32768)) {
     message('This test is full. Use Clear chat to start again. The existing text has been kept.'); return;
   }
@@ -691,7 +701,7 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
     if (turn) {
       // Partial answers are visible and explicitly marked, so follow-ups can
       // refer to them. Failed requests without text never enter model context.
-      if (output.trim()) conversation = [...messages, {role: 'assistant', content: output}];
+      if (output.trim()) { if (!conversation.length) conversationModel = payload.model; conversation = [...messages, {role: 'assistant', content: output}]; }
       else if (!preserveDraft && !$('prompt').value) { $('prompt').value = prompt; resizeComposer(); }
       turn.copy.disabled = !output.trim();
       scrollLatest();
@@ -718,7 +728,7 @@ $('prompt').addEventListener('compositionend', () => { delete $('prompt').datase
 $('new-chat').addEventListener('click', () => {
   if (controller) return;
   if ((conversation.length || $('result').children.length || $('prompt').value) && !confirm(t('Clear this conversation and draft? They are not saved.'))) return;
-  conversation = []; lastReply = null; pendingMarkdown.clear(); $('result').replaceChildren(); $('result').hidden = true; $('chat-empty').hidden = false;
+  conversation = []; conversationModel = ''; lastReply = null; pendingMarkdown.clear(); $('result').replaceChildren(); $('result').hidden = true; $('chat-empty').hidden = false;
   $('prompt').value = ''; $('chat-help').open = false; closeMeasurements(); message(''); uiText($('chat-announcement'), 'Chat cleared.');
   resizeComposer(); buttonStates(); followLatest = true; $('latest').hidden = true; $('transcript').scrollTop = 0; $('prompt').focus();
 });
@@ -963,7 +973,7 @@ function renderExecution() {
   if ($('execution-current').textContent !== status) $('execution-current').textContent = status;
   $('execution-current').title = t('Active processor');
   $('execution-notice').textContent = t(execution?.notice || '');
-  $('execution-notice').hidden = !execution?.notice;
+  $('execution-notice').hidden = !execution?.notice || !(state?.ready || state?.loading); /* #82 */
   const measured = execution?.performance;
   const slow = !!active && measured?.below_target === true && knownNumber(measured.rate) && measured.rate > 0 && knownNumber(measured.target_tps);
   const warning = $('execution-performance');

@@ -243,7 +243,7 @@ void generate(int fd, struct request *r, struct app_arena *arena) {
     if (conversation && strcmp(chat.model, app.child.active_id)) {
         pthread_mutex_unlock(&app.mutex);
         free(prompt);
-        error_response(fd, 409, "The loaded model changed. Check the model and send again.");
+        error_response(fd, 409, "The loaded model changed. Clear the chat to continue with the new model.");
         return;
     }
     struct app_hardware hardware;

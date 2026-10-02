@@ -168,6 +168,7 @@ void poll_child(void) {
     if (atomic_load(&load_cancelled) && !app.child.ready) {
         activity_change(&app.activity.load, ACT_STOPPING);
         stop_child();
+        snprintf(app.message, sizeof app.message, "Loading stopped."); /* not "Loading…" forever (#82) */
         (void) archive_load_failure();
         (void) activity_end(&app.activity.load, "cancelled", 499, monotonic_ms());
         return;

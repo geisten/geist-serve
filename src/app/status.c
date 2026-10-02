@@ -34,7 +34,8 @@ void execution_response(int fd, const char *text) {
                 error = "Cannot save execution preference.";
             } else {
                 snprintf(app.backend.mode, sizeof app.backend.mode, "%s", mode);
-                code = 200;
+                app.backend.notice[0] = 0; /* an explicit choice supersedes a fallback notice (#82) */
+                code                  = 200;
             }
         } else {
             char path[APP_PATH_CAP], id[64];
@@ -338,10 +339,12 @@ void status_response(int fd, struct app_arena *arena) {
     app_put(&b, "\"memory\":");
     app_memory_json(&b, &live_memory, live_rss, -1, live_rss >= 0 ? 1 : 0);
     app_put(&b, ",");
+    /* Without a model process there is no active model, even after a crash or a
+     * cancelled load: never present a dead model as the connection model (#82). */
     app_put(&b, "\"runtime\":\"geistd\",\"active\":");
-    app_quote(&b, app.child.active);
+    app_quote(&b, app.child.pid > 0 ? app.child.active : "");
     app_put(&b, ",\"active_id\":");
-    app_quote(&b, app.child.active_id);
+    app_quote(&b, app.child.pid > 0 ? app.child.active_id : "");
     app_put(&b, ",\"message\":");
     app_quote(&b, app.message);
     app_put(&b, ",\"phase\":");

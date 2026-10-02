@@ -53,6 +53,7 @@ test-app: build/test_app_memory_journal build/test_app_memory build/test_app_lif
 	python3 tests/app/remove_test.py
 	python3 tests/app/setup_test.py
 	python3 tests/app/setup_cli_test.py
+	python3 tests/app/state_test.py
 	python3 tests/app/compat_test.py
 	python3 tests/app/chat_test.py
 	python3 tests/app/cli_test.py
