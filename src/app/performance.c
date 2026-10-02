@@ -539,8 +539,10 @@ void perf_last(const char         *artifact,
     pthread_mutex_lock(&p.mutex);
     for (size_t i = 0; i < p.count; i++) {
         const struct perf_record *r = &p.records[i];
-        if (eligible(r) && !strcmp(r->artifact, artifact) && !strcmp(r->series, series) &&
-            !strcmp(r->backend, backend))
+        /* "Last reply" feeds slow/below-target warnings and setup: ordinary
+         * use only, never a reply that overlapped a download or a comparison (#81). */
+        if (eligible(r) && !r->contention && strcmp(r->source, "controlled_test") &&
+            !strcmp(r->artifact, artifact) && !strcmp(r->series, series) && !strcmp(r->backend, backend))
             *out = *r;
     }
     pthread_mutex_unlock(&p.mutex);
@@ -556,6 +558,21 @@ static double percentile(double *values, size_t n, double q) {
     double pos = (n - 1) * q;
     size_t i   = (size_t) pos;
     return values[i] + (values[i + (i + 1 < n)] - values[i]) * (pos - i);
+}
+static void group_json(struct app_buffer *b, const struct perf_record *g) {
+    if (!g->id[0]) {
+        app_put(b, "null");
+        return;
+    }
+    app_printf(b,
+               "{\"input\":%u,\"output\":%u,\"cached\":%s,\"cold\":%s,\"contention\":%s,"
+               "\"controlled\":%s}",
+               g->input <= 512 ? 0 : g->input <= 2048 ? 1 : 2,
+               g->output < 32 ? 0 : g->output < 128 ? 1 : g->output < 512 ? 2 : 3,
+               g->reused ? "true" : "false",
+               g->cold ? "true" : "false",
+               g->contention ? "true" : "false",
+               !strcmp(g->source, "controlled_test") ? "true" : "false");
 }
 static void aggregate(struct app_buffer *b, const struct perf_record *rs, size_t n) {
     if (!n) {
@@ -631,45 +648,50 @@ void perf_view(struct app_buffer *b,
                p.queued,
                PERF_RECORDS);
     app_quote(b, artifact);
+    /* Each processor's median comes from its own newest ordinary workload (#81):
+     * a reply on one processor must never hide the other's samples. Replies that
+     * overlapped a download are left out. A finished comparison is the one view
+     * where both processors share a run and a workload, so it is shown as such
+     * until the next ordinary reply. */
+    struct perf_record ref[2] = {0};
+    bool               decided = false, comparison = false;
+    char               run[sizeof group.run] = "";
     for (size_t i = p.count; i > 0; i--) {
         const struct perf_record *r = &p.records[i - 1];
         if (strcmp(r->artifact, artifact))
             continue;
         if (nr < 12)
             recent[nr++] = *r;
-        if (strcmp(r->series, series) || !eligible(r))
+        if (strcmp(r->series, series) || !eligible(r) || r->contention)
             continue;
-        if (!group.id[0])
-            group = *r;
+        bool controlled = !strcmp(r->source, "controlled_test");
+        if (!decided) {
+            decided    = true;
+            comparison = controlled;
+            snprintf(run, sizeof run, "%s", r->run);
+            group = *r; /* the engine in use now: older builds are historical */
+        }
+        if (comparison ? !controlled || strcmp(r->run, run) : controlled)
+            continue;
         if (memcmp(&r->engine, &group.engine, sizeof r->engine))
             continue;
-        if (perf_group(r) != perf_group(&group))
-            continue;
-        if (!strcmp(r->source, "controlled_test") && strcmp(r->run, group.run))
-            continue;
         unsigned slot = !strcmp(r->backend, cpu) ? 0 : !strcmp(r->backend, gpu) ? 1 : 2;
-        if (slot < 2 && n[slot] < 30)
+        if (slot == 2)
+            continue;
+        if (!ref[slot].id[0])
+            ref[slot] = *r;
+        if (perf_group(r) != perf_group(&ref[slot]))
+            continue;
+        if (n[slot] < 30)
             samples[slot * 30 + n[slot]++] = *r;
     }
     pthread_mutex_unlock(&p.mutex);
     app_put(b, ",\"group\":");
-    if (!group.id[0])
-        app_put(b, "null");
-    else
-        app_printf(b,
-                   "{\"input\":%u,\"output\":%u,\"cached\":%s,\"cold\":%s,\"contention\":%s,"
-                   "\"controlled\":%s}",
-                   group.input <= 512    ? 0
-                   : group.input <= 2048 ? 1
-                                         : 2,
-                   group.output < 32    ? 0
-                   : group.output < 128 ? 1
-                   : group.output < 512 ? 2
-                                        : 3,
-                   group.reused ? "true" : "false",
-                   group.cold ? "true" : "false",
-                   group.contention ? "true" : "false",
-                   !strcmp(group.source, "controlled_test") ? "true" : "false");
+    group_json(b, &group);
+    app_put(b, ",\"cpu_group\":");
+    group_json(b, &ref[0]);
+    app_put(b, ",\"gpu_group\":");
+    group_json(b, &ref[1]);
     app_put(b, ",\"cpu\":");
     aggregate(b, samples, n[0]);
     app_put(b, ",\"gpu\":");

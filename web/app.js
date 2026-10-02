@@ -191,10 +191,12 @@ function renderPerformance() {
   const compatible = profile && profile.artifact === model?.sha256;
   for (const mode of ['cpu', 'gpu']) {
     const sample = compatible ? profile[mode] : null;
-    for (const id of ['rate','typical']) $(`history-${mode}-${id}`).textContent = knownNumber(sample?.rate) ? rateText(sample.rate) : t('Not measured yet');
+    // #81: the GPU backend by its reported name (Metal or Vulkan), never a hard-coded one.
+    const own = r => mode === 'gpu' ? r.backend === state?.execution?.gpu_backend : r.backend?.startsWith('cpu');
+    const availability = mode==='gpu' && !state?.execution?.gpu_available ? 'Not available' : profile?.recent?.some(r=>r.historical && own(r)) ? 'Historical' : mode === 'gpu' ? 'No GPU reply yet' : 'No CPU reply yet';
+    for (const id of ['rate','typical']) $(`history-${mode}-${id}`).textContent = knownNumber(sample?.rate) ? rateText(sample.rate) : t(availability);
     $(`history-${mode}-range`).textContent = sample?.count >= 5 ? `${formatNumber(sample.q25,1)}–${formatNumber(sample.q75,1)} ${t('tok/s')}` : '—';
     $(`summary-${mode}-first`).textContent = `◷ ${timeText(sample?.first_answer)}`;
-    const availability = mode==='gpu' && !state?.execution?.gpu_available ? 'Not available' : profile?.recent?.some(r=>r.historical && (mode==='gpu' ? r.backend==='metal' : r.backend?.startsWith('cpu'))) ? 'Historical' : 'Not measured yet';
     $(`summary-${mode}-count`).textContent = sample ? `n=${sample.count}` : 'n=—';
     $(`summary-${mode}-count`).title = t(sample ? sample.count<5 ? 'First observations' : 'Observed' : availability);
     $(`summary-${mode}-count`).setAttribute('aria-label', `${$(`summary-${mode}-count`).title} · ${sample?.count || 0}`);
@@ -209,14 +211,15 @@ function renderPerformance() {
     $(`history-${mode}-gpu-memory`).textContent = knownNumber(sample?.gpu_allocated_bytes) ? `${gib(sample.gpu_allocated_bytes)} · n=${sample.gpu_known_count}` : '—';
     $(`history-${mode}-gpu-peak`).textContent = knownNumber(sample?.gpu_sampled_peak) ? gib(sample.gpu_sampled_peak) : '—';
     $(`history-${mode}-count`).textContent = sample ? `${sample.count} · ${t(sample.count < 5 ? 'First observations' : 'Typical')}` : '—';
-    $(`profile-${mode}-confidence`).textContent = sample ? `${sample.count} · ${t(sample.count < 5 ? 'First observations' : 'Typical')}` : t('Not measured yet');
+    $(`profile-${mode}-confidence`).textContent = sample ? `${sample.count} · ${t(sample.count < 5 ? 'First observations' : 'Typical')}` : t(availability);
     $(`history-${mode}-time`).textContent = sample?.recorded_at ? new Intl.DateTimeFormat(interfaceLanguage, {dateStyle:'short',timeStyle:'short'}).format(new Date(sample.recorded_at * 1000)) : '—';
-    $(`history-${mode}`).title = `${mode.toUpperCase()}: ${t(sample ? sample.count < 5 ? 'First observations' : 'Typical' : 'Not measured yet')} · ${sample?.count || 0}`;
+    $(`history-${mode}`).title = `${mode.toUpperCase()}: ${t(sample ? sample.count < 5 ? 'First observations' : 'Typical' : availability)} · ${sample?.count || 0}`;
   }
   // The engine that produced these measurements, else the one installed now (#55).
   const engineLine = engineText((compatible ? profile[state?.execution?.active]?.engine : null) || state?.engine);
   $('profile-engine').textContent = engineLine; $('profile-engine').hidden = !engineLine;
-  const group = compatible ? profile.group : null;
+  // #81: each processor has its own workload; describe the one of the active processor.
+  const group = compatible ? profile[`${state?.execution?.active}_group`] || profile.group : null;
   $('profile-collection').textContent = t(profile?.enabled ? 'Collection enabled' : 'Collection disabled');
   $('profile-group').textContent = group ? [t('Latest workload'), `${t('Input')}: ${['≤512','513–2048','>2048'][group.input]}`, `${t('Output')}: ${['<32','32–127','128–511','≥512'][group.output]}`, t('tokens'), t(group.cached ? 'Cache reused' : 'No cache reuse'), t(group.cold ? 'First reply after load' : 'Warm'), group.contention ? t('Download overlap') : '', group.controlled ? t('Controlled comparison') : t('Ordinary use')].filter(Boolean).join(' · ') : t('Not measured yet');
   $('profile-confidence').textContent = t('First observations: fewer than 5 replies. No automatic processor changes.');

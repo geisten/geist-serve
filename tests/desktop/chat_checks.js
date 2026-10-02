@@ -870,6 +870,13 @@ $$
     assert(rateText(32.5) === '32.5 tok/s' && $('new-chat').title === 'Clear chat', 'switching back restores English');
     window.chatChecksStage = 'metrics';
     assert($('history-cpu-rate').closest('.execution-choice') && $('history-gpu-rate').closest('.execution-choice'), 'typical speed belongs to each processor choice');
+    { // #81: a processor without a reply says so; the GPU backend is matched by its reported name, Vulkan too.
+      const saved = state, model = state.models.find(m => m.id === state.active_id) || state.models[0];
+      render({...state, execution:{...state.execution, gpu_available:true, gpu_backend:'vulkan'},
+        performance_profile:{...(state.performance_profile||{}), artifact:model.sha256, cpu:null, gpu:null, recent:[{id:'v',backend:'vulkan',source:'app',outcome:'completed',engine:null,timestamp:Date.now()/1000-3600,generation_ns:1e9,input:20,output:40,warmup:false,contention:false,historical:true}]}});
+      assert($('history-cpu-rate').textContent === t('No CPU reply yet') && $('history-gpu-rate').textContent === t('Historical'), '#81: missing CPU reply named, Vulkan history recognised');
+      render(saved);
+    }
     assert(document.querySelector('.profile-table caption') && document.querySelectorAll('.profile-table th[scope="row"]').length===12, 'profile uses a semantic comparison table');
     assert(!$('measurement-note') && !$('speed'), 'old nested measurements removed');
     assert($('history-enabled').closest('#settings-page') && $('history-export').closest('#settings-page'), 'collection and export belong to settings');

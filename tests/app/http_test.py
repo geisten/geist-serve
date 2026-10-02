@@ -222,9 +222,9 @@ def main():
                 event = json.loads(body.splitlines()[-1])
                 assert code == 200 and 16 <= event["eval_count"] <= 64, body
                 card = next(m for m in app.status()["models"] if m["id"] == "smollm2-360m")
-                assert card["measured_tokens"] == event["eval_count"]
+                # #81: no unlabelled per-model speed; the profile carries it per processor.
+                assert "measured_tps" not in card and "measured_tokens" not in card
                 expected = event["eval_count"] / (event["eval_duration"] / 1e9)
-                assert abs(card["measured_tps"] - expected) < .001
                 state=app.wait(lambda s:not s['busy'])
                 # Device suitability no longer carries processor-specific speed prose.
                 assert abs(state['execution']['performance']['rate'] - expected) < .001

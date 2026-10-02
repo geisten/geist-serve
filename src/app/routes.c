@@ -410,8 +410,6 @@ void handle(int fd, struct app_arena *arena) {
             if (!strcmp(app.child.active_id, model->id)) {
                 app.child.active_id[0] = app.child.active[0] = 0;
             }
-            app.prefs.measurements[model - app_models].tps    = 0;
-            app.prefs.measurements[model - app_models].tokens = 0;
         }
         pthread_mutex_unlock(&app.mutex);
         if (safe)
