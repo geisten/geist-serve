@@ -219,7 +219,8 @@ void status_response(int fd, struct app_arena *arena) {
     app_quote(&b, app.error.backend);
     app_printf(&b, ",\"code\":%d}", app.error.code);
     app_put(&b, ",\"execution\":{\"mode\":");
-    app_quote(&b, app.backend.mode[0] ? app.backend.mode : "auto");
+    const char *mode = app.compare.running && app.compare.user_mode[0] ? app.compare.user_mode : app.backend.mode;
+    app_quote(&b, mode[0] ? mode : "auto");
     app_put(&b, ",\"active\":");
     app_quote(&b, app.child.ready ? (!strcmp(app.backend.active, app.backend.cpu) ? "cpu" : "gpu") : "");
     app_put(&b, ",\"backend\":");

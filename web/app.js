@@ -17,7 +17,7 @@ let qualityRecords = [];
 let connectionTesting = false;
 // Page memory only. Never store prompts, answers or conversation in browser storage.
 let conversation = [], conversationModel = '', followLatest = true;
-let lastReply = null, replyPending = false;
+let lastReply = null, replyPending = false, cancellingModel = null, resultModel = '';
 let workspaceModel = null, pendingExecution = null;
 let activityInstance='', activitySnapshot=null, activityAt=0, requestAfter=0, activeTurn=null, cancellingActivity=false, activityReturn=null;
 const activitySequences = new Map();
@@ -177,6 +177,8 @@ function renderMemory() {
 }
 function renderPerformance() {
   if (lastReply && lastReply.model !== modelIdentity()) lastReply = null;
+  // #83: a connection-test result describes one model; drop it when the model changes.
+  if (resultModel !== (state?.active_id || '')) { resultModel = state?.active_id || ''; uiText($('connection-result'), ''); }
   const h=state?.hardware, r=state?.resources;
   const cpu=!executionLoading() && state?.ready && r?.scope==='geistd' && knownNumber(r.cpu_percent) ? r.cpu_percent : null;
   renderMemory();
@@ -457,8 +459,9 @@ function canPause(model) {
   return state?.job_model === model.id && state.phase === 'downloading' && !state.loading;
 }
 function modelActionDisabled(model) {
-  if (stopped || requesting) return true;
+  if (stopped || requesting || cancellingModel === model.id) return true;
   if (canPause(model)) return false;
+  if (state.comparison?.running) return true; /* the service refuses model actions during a comparison (#83) */
   if (state.loading || state.phase || model.resource_fit === 2) return true;
   if (state.ready && state.active_id === model.id && allowed(model)) return true;
   // A missing, different artifact can download during a resident answer.
@@ -501,13 +504,13 @@ function modelCard(model) {
   // is unnecessary to screen readers. Numeric ring attributes remain inspectable.
   card.querySelector('.model-ring').setAttribute('aria-hidden', 'true');
   card.querySelector('.model-ring').title = t(download.text);
-  const status = pending ? 'Getting ready…' : preparing && state.loading ? 'Loading model' : download.text;
+  const status = cancellingModel === model.id ? 'Cancelling…' : pending ? 'Getting ready…' : preparing && state.loading ? 'Loading model' : download.text;
   card.querySelector('.download-state').textContent = t(status);
   card.querySelector('.download-state').hidden = !pending && !preparing && (download.stage === 'missing' || download.stage === 'downloaded');
   renderModelBadges(card.querySelector('.model-badges'), model);
   const detail = card.querySelector('.transfer-detail');
   detail.hidden = !preparing || state.loading;
-  detail.textContent = paused ? downloadEstimate(model.id, state.received || 0, model.bytes || 0) : preparing ? t('Checking download…') : '';
+  detail.textContent = paused ? downloadEstimate(model.id, state.received || 0, model.bytes || 0) : preparing ? t(state.phase === 'verifying' ? 'Checking model…' : 'Getting ready…') : '';
   const button = card.querySelector('.model-pick');
   const action = paused ? 'Pause download' : active && allowed(model) ? 'Active' : model.installed ? 'Start model' : model.partial ? 'Resume download' : state.ready ? 'Download model' : 'Download and start';
   button.title = model.resource_fit === 2 ? `${modelLabel(model)} · ${t(model.reason || 'Unavailable on this computer')}` : `${t(action)}: ${modelLabel(model)}`;
@@ -526,6 +529,7 @@ function visibleModels() {
 }
 let shownActive = ''; // last active model scrolled into view (#50)
 function render(next) {
+  if (cancellingModel && next.job_model !== cancellingModel) cancellingModel = null; // the paused job has ended (#83)
   const modelChanged = state && (state.active_id !== next.active_id || state.active !== next.active);
   state = next;
   stateReceivedAt=performance.now();
@@ -589,7 +593,7 @@ async function choose(id) {
   if (!pause && !model.installed && !model.partial && model.bytes > 1e9 &&
       !confirm(t(`Download ${modelLabel(model)} (${bytes(model.bytes)})? You can pause or remove it later.`))) return;
   downloadRequest = !!state.ready && state.active_id !== id && (pause || !model.installed);
-  requesting = true; pendingModel = id; buttonStates(); visibleModels().forEach(modelCard); message('', false);
+  requesting = true; pendingModel = pause ? null : id; if (pause) cancellingModel = id; buttonStates(); visibleModels().forEach(modelCard); message('', false);
   try {
     if (pause) {
       await api('/app/cancel', {});
@@ -773,7 +777,7 @@ $('history-clear').addEventListener('click', async () => {
 $('history-export').addEventListener('click', async () => {
   try {
     const result = await (await api('/app/performance/export',{})).json();
-    $('history-result').textContent = `${t('Export saved')}: ${result.path}`;
+    uiText($('history-result'), `Export saved: ${result.path}`); /* re-translates on a language change (#83) */
   } catch(error) { uiText($('history-result'),error.message); }
 });
 document.querySelector('.brand').addEventListener('click', event => { event.preventDefault(); showPage('models-page'); });
@@ -969,7 +973,7 @@ function renderExecution() {
     label.title = `${description}. ${t(input.value === 'auto' ? 'Uses the recommended processor. Changing execution reloads the model without downloading it again.' : execution?.reason || 'Load a model first.')}`;
   }
   $('execution-description').textContent = t(execution?.reason || 'Load a model first.');
-  const status = loading ? t('Switching processor…') : active ? `${active.toUpperCase()}${active === 'gpu' ? ` · ${backendName(execution.backend)}` : ''}` : t('No model loaded');
+  const status = loading ? t(pendingExecution !== null ? 'Switching processor…' : 'Loading model') : active ? `${active.toUpperCase()}${active === 'gpu' ? ` · ${backendName(execution.backend)}` : ''}` : t('No model loaded');
   if ($('execution-current').textContent !== status) $('execution-current').textContent = status;
   $('execution-current').title = t('Active processor');
   $('execution-notice').textContent = t(execution?.notice || '');

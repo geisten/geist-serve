@@ -893,6 +893,21 @@ $$
       assert($('execution-notice').hidden, '#82: no fallback notice without a model');
       render(saved);
     }
+    { // #83: model actions are locked during a comparison; a pause says "Cancelling…" until the job ends.
+      const saved = state, idle = saved.models.find(m => !m.installed && m.id !== saved.active_id && m.resource_fit !== 2);
+      assert(idle, '#83: the fixture offers a model to download');
+      {
+        render({...saved, comparison: {...(saved.comparison || {}), running: true}});
+        assert(cards.get(idle.id).querySelector('.model-pick').disabled, '#83: no download or start during a comparison');
+        render(saved);
+        cancellingModel = idle.id;
+        render({...saved, job_model: idle.id, phase: 'downloading', background_download: true, received: 1});
+        assert(cards.get(idle.id).querySelector('.download-state').textContent === t('Cancelling…') && cards.get(idle.id).querySelector('.model-pick').disabled, '#83: a pause is shown once and cannot be sent twice');
+        render({...saved, job_model: '', phase: ''});
+        assert(cancellingModel === null, '#83: the pause state ends with the job');
+      }
+      render(saved);
+    }
     { // #82: a follow-up names the conversation's model, so the server's guard catches a model switch.
       const saved = state, original = api, keep = [conversation, conversationModel, [...$('result').children], $('result').hidden, $('chat-empty').hidden, $('prompt').value]; let sent = null;
       conversation = [{role: 'user', content: 'Hi'}, {role: 'assistant', content: 'Hello'}]; conversationModel = 'previous-model';

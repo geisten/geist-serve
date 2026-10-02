@@ -83,6 +83,7 @@ def main():
             assert profile(app)['cpu']['count']==3 and profile(app)['gpu']['count']==3
             gate.touch();assert app.request('/app/performance/compare',{'confirm':True})[0]==202
             app.wait(lambda s:s['comparison']['phase']=='warmup')
+            assert app.status()['execution']['mode']==before,"#83: the user's processor choice is shown during a comparison"
             assert app.request('/app/execution',{'mode':'gpu'})[0]==409
             assert app.request('/app/performance/cancel',{})[0]==200
             state=app.wait(lambda s:not s['comparison']['running'],timeout=30);gate.unlink()
