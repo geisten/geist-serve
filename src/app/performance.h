@@ -30,6 +30,8 @@ void  perf_view(struct app_buffer *b,
                 const char        *series,
                 const char        *cpu,
                 const char        *gpu);
+/* Any completed reply for this artifact, from any engine build or Geist version. */
+bool  perf_measured(const char *artifact);
 void  perf_last(const char         *artifact,
                 const char         *series,
                 const char         *backend,
