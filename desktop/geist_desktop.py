@@ -69,7 +69,7 @@ class Desktop(Gtk.Application):
 
     def activate_window(self, _):
         if self.window is None:
-            self.window = Gtk.ApplicationWindow(application=self, title='Geist', default_width=780, default_height=620)
+            self.window = Gtk.ApplicationWindow(application=self, title='Geisten', default_width=780, default_height=620)
             self.window.set_size_request(540, 500)
             self.stack = Gtk.Stack()
             self.window.set_child(self.stack)
@@ -156,7 +156,7 @@ class Desktop(Gtk.Application):
             if error_code == 42:
                 self.status.set_text(self.text('An older service is running. Finish your work, then run geist restart in Terminal.', 'Ein älterer Dienst läuft. Beende deine Arbeit und führe im Terminal geist restart aus.'))
             elif error_code == 43:
-                self.status.set_text(self.text('Finish the current task, then reconnect to update Geist.', 'Beende die laufende Aufgabe und verbinde dich erneut, um Geist zu aktualisieren.'))
+                self.status.set_text(self.text('Finish the current task, then reconnect to update Geisten.', 'Beende die laufende Aufgabe und verbinde dich erneut, um Geisten zu aktualisieren.'))
             elif error_code == 44:
                 self.status.set_text(self.text('A newer service is running. Open the newest installed app.', 'Ein neuerer Dienst läuft. Öffne die neueste installierte App.'))
             self.stack.set_visible_child_name('status')

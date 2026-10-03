@@ -146,7 +146,7 @@ int main(int argc, char **argv) {
         return 1;
     int lock = open(lockpath, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600);
     if (lock < 0 || flock(lock, LOCK_EX | LOCK_NB) != 0) {
-        fprintf(stderr, "Geist is already running for this data folder.\n");
+        fprintf(stderr, "Geisten is already running for this data folder.\n");
         return 1;
     }
     if (access(app.paths.server, X_OK) != 0) {

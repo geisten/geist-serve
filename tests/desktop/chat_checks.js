@@ -225,7 +225,7 @@ async function checkActivityUX(assert, tick) {
     for (const locale of ['en-US', 'fr-FR', 'debug', '', undefined]) assert(resolveLanguage('system', locale) === 'en', `English fallback: ${locale}`);
     assert(resolveLanguage('en', 'de-DE') === 'en' && resolveLanguage('de', 'en-US') === 'de', 'manual preference overrides OS');
     assert(resolveLanguage('invalid', 'de-DE') === 'de', 'invalid preference returns to system');
-    const international = new Set(['Geist', 'geist', 'English', 'Deutsch', 'Home Assistant', 'Terminal', 'VS Code · Continue', '—', '— tok/s', '— RAM']);
+    const international = new Set(['Geisten', 'geist', 'English', 'Deutsch', 'Home Assistant', 'Terminal', 'VS Code · Continue', '—', '— tok/s', '— RAM']);
     const sources = [...staticTexts.map(([, text]) => text.trim()), ...staticAttributes.map(([, , text]) => text)];
     const missing = [...new Set(sources.filter(text => !international.has(text) && !Object.hasOwn(german, text)))];
     assert(!missing.length, `Missing German interface translations: ${missing.join(' | ')}`);
@@ -533,7 +533,7 @@ async function checkActivityUX(assert, tick) {
        assert(!$('connection-disabled').hidden && $('connection-disabled-text').dataset.uiText==='Load a model first to copy or test the connection.' && !$('connection-choose').hidden && $('connection-model').classList.contains('is-empty') && getComputedStyle($('connection-model')).fontFamily!==getComputedStyle($('connection-endpoint')).fontFamily,'no model: hint in body font, reason and a way to Models');
        assert($('copy-connection').getAttribute('aria-describedby')==='connection-disabled' && $('test-connection').getAttribute('aria-describedby')==='connection-disabled','disabled reason is announced with the buttons');
        state=null;buttonStates();
-       assert($('connection-disabled-text').dataset.uiText==='Service unavailable. Reopen Geist to reconnect.' && $('connection-choose').hidden,'service down has its own reason');
+       assert($('connection-disabled-text').dataset.uiText==='Service unavailable. Reopen Geisten to reconnect.' && $('connection-choose').hidden,'service down has its own reason');
        state=saved;buttonStates();}
       if (window.geistDesktop==='mac') assert(!/Ubuntu/.test(connectionHelp.terminal) && /geist-cli/.test(connectionHelp.terminal),'Mac terminal hint names only the Mac command line tool');
       key();await tick();backgroundEmit({response:'A second answer during checksum verification.'});await tick();
@@ -886,7 +886,7 @@ $$
       controller = {}; render({...saved, message: 'Download complete.'}); controller = null;
       render({...saved, message: 'Download complete.'});
       assert($('notice').textContent === t('Download complete.'), '#82: a notice that arrived during a reply is shown afterwards');
-      message('Service unavailable. Reopen Geist to reconnect.', false); lastServerMessage = '';
+      message('Service unavailable. Reopen Geisten to reconnect.', false); lastServerMessage = '';
       render({...saved, message: ''});
       assert($('notice').textContent === '', '#82: the first successful poll clears "Service unavailable"');
       render({...saved, ready: false, loading: false, active_id: '', execution: {...saved.execution, notice: 'GPU stopped or failed to load. Restored CPU.'}});
@@ -898,9 +898,9 @@ $$
       const withModel = patch => ({...saved, models: saved.models.map(m => m.id === id ? {...m, resource_fit: 0, ...patch} : m)});
       render(withModel({reason, speed: {cpu: 13.2, gpu: 30.4}, earlier: null}));
       assert(cards.get(id).querySelector('.model-fit').title.endsWith(`${t("Fits this Mac's memory.")} CPU ${formatNumber(13)} t/s · GPU ${formatNumber(30)} t/s`), '#90: measured numbers instead of "measured"');
-      render(withModel({reason: "Fits this Mac's memory. Speed measured with an earlier Geist version.", speed: {cpu: null, gpu: null}, earlier: {engine: '0.10.2', cpu: 12.6, gpu: 29.5}}));
+      render(withModel({reason: "Fits this Mac's memory. Speed measured with an earlier Geisten version.", speed: {cpu: null, gpu: null}, earlier: {engine: '0.10.2', cpu: 12.6, gpu: 29.5}}));
       const title = cards.get(id).querySelector('.model-fit').title;
-      assert(title.includes(`${t('Geist engine')} 0.10 · CPU ${formatNumber(13)} t/s · GPU ${formatNumber(30)} t/s`) && title.endsWith(t('Not measured with this version yet.')), '#90: earlier numbers with their engine, this version unmeasured');
+      assert(title.includes(`${t('Geisten engine')} 0.10 · CPU ${formatNumber(13)} t/s · GPU ${formatNumber(30)} t/s`) && title.endsWith(t('Not measured with this version yet.')), '#90: earlier numbers with their engine, this version unmeasured');
       render(saved);
     }
     { // #83: model actions are locked during a comparison; a pause says "Cancelling…" until the job ends.

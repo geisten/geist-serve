@@ -1,4 +1,4 @@
-# Install Geist and connect your tools
+# Install Geisten and connect your tools
 
 These are development candidates, not a published release or Apple-approved
 distribution. The desktop manager, terminal and compatible editor share one
@@ -6,7 +6,7 @@ loaded geistd. No model is included; click a suggested model on first use.
 
 ## macOS (Apple Silicon, macOS 14+)
 
-Drag Geist.app from the DMG to Applications and open it. Geist opens its own
+Drag Geist.app from the DMG to Applications and open it. Geisten opens its own
 desktop window. Click a model name or its download icon to download and start it.
 An installed model starts directly; progress, pause and resume stay in its row.
 A platform check suggests one model, including a smaller fallback when needed.
@@ -43,12 +43,12 @@ For a desktop, download both the matching `geist_VERSION_ARCH.deb` and
 sudo apt install ./geist_VERSION_ARCH.deb ./geist-desktop_VERSION_all.deb
 ```
 
-Open Geist from the application menu, or run `geist-desktop`. This opens a GTK
+Open Geisten from the application menu, or run `geist-desktop`. This opens a GTK
 window with the system WebKit renderer; no browser tab is opened. `geist open`
 also uses the desktop app when installed.
 
 The Ubuntu 24.04 desktop package installs a scoped AppArmor profile permitting
-WebKit sandbox user namespaces for the Geist desktop process tree. It leaves
+WebKit sandbox user namespaces for the Geisten desktop process tree. It leaves
 global namespace policy unchanged; the host profile does not add filesystem
 or network confinement. Package updates reload the profile; removal unloads it.
 
@@ -98,7 +98,7 @@ modified by package scripts.
 Before uninstalling Ubuntu, run `systemctl --user disable --now geist.service`
 and `geist stop`, then `sudo apt remove geist-desktop geist`. Models remain in the user data
 folder even after package purge. Delete that folder separately only if desired.
-On Mac, disable Start at Login, stop Geist, quit the desktop app, then move
+On Mac, disable Start at Login, stop Geisten, quit the desktop app, then move
 Geist.app to Trash. Cached models remain in `~/Library/Application Support/Geist`.
 Quit/stop before replacing a Mac development bundle, then open the replacement.
 
@@ -148,7 +148,7 @@ ad-hoc signatures are not an Apple notarization result.
 Install the newer `geist` and matching `geist-desktop` packages with APT. Their
 package names and installation paths stay the same across minor versions, so
 APT replaces the prior files. Models and the local API key stay in your user
-data directory. Close the previous window and reopen Geist after installation.
+data directory. Close the previous window and reopen Geisten after installation.
 
 From 0.5.3, starting a newer client replaces an older versioned service only
 when it is idle. A running download, model load or response blocks the handoff;

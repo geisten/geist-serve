@@ -11,8 +11,8 @@ mkdir -p "$destination"
 # BIN_DIR: where the three executables are (release CI: the static musl build).
 bin=${BIN_DIR:-.}
 cp "$bin/geist" "$bin/geist-app" "$bin/geistd" "$destination/"
-cp scripts/start-geist.sh "$destination/Start Geist.sh"
-chmod 755 "$destination/Start Geist.sh" "$destination/geist" "$destination/geist-app" "$destination/geistd"
+cp scripts/start-geist.sh "$destination/Start Geisten.sh"
+chmod 755 "$destination/Start Geisten.sh" "$destination/geist" "$destination/geist-app" "$destination/geistd"
 cp web/vendor/marked-LICENSE "$destination/marked-LICENSE"
 cp web/vendor/katex-LICENSE "$destination/katex-LICENSE"
 cp LICENSE "$destination/LICENSE"

@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory(prefix='geist-editor-') as home:
     results={}
     try:
         app.wait(lambda s:s['ready'],timeout=60)
-        for kind,name,args in [('opencode','opencode',['run','--pure','--print-logs','--log-level','DEBUG','--agent','geist-chat','--format','json','--title','Geist connection test','Say hello in one short sentence.']),
+        for kind,name,args in [('opencode','opencode',['run','--pure','--print-logs','--log-level','DEBUG','--agent','geist-chat','--format','json','--title','Geisten connection test','Say hello in one short sentence.']),
                                ('continue','cn',['--config',str(workspace/'config.yaml'),'--exclude','*','-p','--format','json','Say hello in one short sentence.'])]:
             if kind not in os.environ.get('GEIST_EDITOR_CLIENTS','opencode,continue').split(','): continue
             content=subprocess.check_output([str(ROOT/'geist'),'config',kind],env=env,text=True)

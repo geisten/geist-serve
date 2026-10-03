@@ -196,7 +196,7 @@ only reads/filters numeric summaries. geistlib should expose engine counters whe
 needed; it should not own profile files, retention, UX labels or recommendations.
 Do not make private engine calls or introduce this product policy into geistlib.
 
-Proposed storage beneath the existing private Geist data directory:
+Proposed storage beneath the existing private Geisten data directory:
 
 ```
 performance/

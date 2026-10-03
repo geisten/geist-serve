@@ -92,13 +92,13 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
         assert evaluate(desktop.view, "document.getElementById('task-title').textContent") == 'Kurz testen'
         evaluate(desktop.view, "showPage('test-page'); document.getElementById('prompt').value='Keep my input'; document.getElementById('ui-language').value='en'; document.getElementById('ui-language').dispatchEvent(new Event('change')); true")
         assert evaluate(desktop.view, "document.getElementById('prompt').value") == 'Keep my input'
-        evaluate(desktop.view, "window.copyDone=false; copyText('Geist desktop clipboard test').then(() => window.copyDone=true); true")
+        evaluate(desktop.view, "window.copyDone=false; copyText('Geisten desktop clipboard test').then(() => window.copyDone=true); true")
         wait_js(desktop.view, 'window.copyDone')
         clipboard = []
         def copied(source, result, _): clipboard.append(source.read_text_finish(result))
         desktop.view.get_clipboard().read_text_async(None, copied, None)
         spin(lambda: clipboard)
-        assert clipboard == ['Geist desktop clipboard test']
+        assert clipboard == ['Geisten desktop clipboard test']
         assert d.local_url('http://127.0.0.1:42/#test', 'http://127.0.0.1:42/')
         for uri in ('http://127.0.0.1:43/', 'http://localhost:42/', 'file:///etc/passwd', 'https://github.com/geisten/anything'):
             assert not d.local_url(uri, 'http://127.0.0.1:42/')

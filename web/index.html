@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Geist</title><link rel="stylesheet" href="/app.css">
+<title>Geisten</title><link rel="stylesheet" href="/app.css">
 <script src="/i18n.js" defer></script><script src="/marked.js" defer></script><script src="/katex.js" defer></script><script src="/markdown.js" defer></script><script src="/app.js" defer></script>
 </head>
 <body class="manager-page">
 <a class="skip" href="#main">Skip to content</a>
-<header><a class="brand" href="#" aria-label="Geist home">geist</a>
+<header><a class="brand" href="#" aria-label="Geisten home">geist</a>
 <nav aria-label="Navigation">
 <button data-page="models-page" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 1v4m6-4v4M9 19v4m6-4v4M1 9h4m-4 6h4m14-6h4m-4 6h4"/></svg><span>Models</span></button>
 <button id="open-tools" data-page="connect-page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 13 4-4m-7 6-1 1a4 4 0 0 0 6 6l4-4m1-9 1-1a4 4 0 0 0-6-6L8 6"/></svg><span>Connect</span></button>
@@ -53,7 +53,7 @@
     <div class="composer-area">
       <button id="latest" class="text-button" type="button" hidden>↓ Latest message</button>
       <form id="task-form"><label class="sr-only" for="prompt">Your input</label>
-        <textarea id="prompt" rows="1" placeholder="Message Geist…" aria-describedby="composer-hint"></textarea>
+        <textarea id="prompt" rows="1" placeholder="Message Geisten…" aria-describedby="composer-hint"></textarea>
         <div class="actions"><details id="chat-help"><summary aria-label="What can I ask?" title="What can I ask?"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.01"/></svg></summary><div class="help-content"><p>Just describe what you need. No mode to choose.</p><ul><li>Rewrite this email in a friendlier tone: …</li><li>Summarize this text in three points: …</li><li>Suggest three ideas for …</li></ul><p>Answers support Markdown. Copy keeps the original formatting. Web addresses can be copied; external images are not loaded.</p><p>This conversation stays in this window. Clear chat, reloading or quitting clears it. Check answers before using them.</p></div></details><button id="new-chat" class="text-button" type="button" aria-label="Clear chat" title="Clear chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button><span class="spacer"></span><button id="stop" class="icon-button" type="button" aria-label="Stop response" title="Stop response" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button><button id="run" class="primary icon-button" type="submit" disabled aria-label="Send message" title="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button></div>
       </form>
       <p id="composer-hint" class="hint">↵ Send · ⇧↵ New line</p>

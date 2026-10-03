@@ -11,7 +11,7 @@ python3 workbench/bench.py report build/bench/2026-10-01        # --json for mac
 ```
 
 Candidates are catalog ids (`models/catalog.json`) whose files are already
-downloaded in Geist (`--model-dir`, default: the Geist home's `models/`).
+downloaded in Geisten (`--model-dir`, default: the Geisten home's `models/`).
 Downloading stays an explicit action in the app.
 
 ## Tasks
@@ -33,7 +33,7 @@ problem. For `context`, the report counts unanswerable questions answered
 **without the marker**. Read those replies: some are invented answers, others
 are refusals in other words. A script cannot reliably tell the two apart.
 
-The suite tests models, not the Geist UI. Each case is one request to
+The suite tests models, not the Geisten UI. Each case is one request to
 `/v1/chat/completions` with the task's system prompt, the case as the user
 message, temperature 0, and the task's output limit. There is no retry and no
 repair: JSON inside a code fence fails.
@@ -45,7 +45,7 @@ checkout, with a temporary HOME on the same file system as the models (the
 model file is hard-linked, not copied) and selected by catalog id. The app
 verifies the file against the catalog sha256 before loading, exactly as for a
 download, and knows which backends the model supports. Candidates run one
-after another; at most one model is resident at a time. Close a running Geist
+after another; at most one model is resident at a time. Close a running Geisten
 with a large model first if memory is tight: the benchmark does not yet
 coordinate with the shared service.
 

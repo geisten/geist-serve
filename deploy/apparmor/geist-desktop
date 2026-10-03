@@ -1,4 +1,4 @@
-# Permit WebKit sandbox namespaces only for the Geist desktop process tree.
+# Permit WebKit sandbox namespaces only for the Geisten desktop process tree.
 # This does not impose full filesystem or network confinement on the host.
 abi <abi/4.0>,
 include <tunables/global>

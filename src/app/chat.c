@@ -484,7 +484,7 @@ void completions(int fd, const struct request *r, struct app_arena *arena) {
     if (atomic_load(&closing) || !app.child.ready || app.compare.running ||
         (app.job.running && app.job.activate)) {
         pthread_mutex_unlock(&app.mutex);
-        api_error(fd, 503, "Select and load a model in Geist first.");
+        api_error(fd, 503, "Select and load a model in Geisten first.");
         return;
     }
     if (strcmp(chat.model, app.child.active_id)) {
