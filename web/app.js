@@ -1104,7 +1104,7 @@ function renderActivity() {
   if (activeTurn && !activeTurn.answerSeen && running && a===activitySnapshot?.request) uiText(activeTurn.status,label);
   const longCPU=running&&!stale&&elapsed>=15&&a.backend?.startsWith('cpu');
   $('activity-cpu-hint').hidden=!longCPU;
-  if (longCPU) uiText($('activity-cpu-hint'),'Large models can take time on CPU.');
+  if (longCPU) { uiText($('activity-cpu-hint'),'Large models can take time on CPU.'); $('activity-cpu-hint').title=$('activity-cpu-hint').textContent; }
   if (!$('activity-dialog').open) return;
   // #53: nothing to report is one sentence, not a table of dashes; the footnote only
   // explains a live operation; "Ready" is never shown next to a stopped runtime.
