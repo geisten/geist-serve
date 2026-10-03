@@ -930,6 +930,28 @@ $$
       [conversation, conversationModel] = keep; $('result').replaceChildren(...keep[2]); $('result').hidden = keep[3]; $('chat-empty').hidden = keep[4]; $('prompt').value = keep[5];
       render(saved);
     }
+    { // #93: a live status before the answer; the thinking is collapsed plain text, outside the answer.
+      const saved = state, original = api, keep = [conversation, conversationModel, [...$('result').children], $('result').hidden, $('chat-empty').hidden, $('prompt').value];
+      let push = null, finish = null;
+      api = async (path, body, signal) => path !== '/app/generate' ? original(path, body, signal)
+        : new Response(new ReadableStream({start(c) { push = item => c.enqueue(new TextEncoder().encode(JSON.stringify(item) + '\n')); finish = () => c.close(); }}));
+      conversation = []; conversationModel = '';
+      const finished = run('Think first, please');
+      for (let i = 0; i < 100 && !push; i++) await tick();
+      const status = () => $('result').lastElementChild.querySelector('.message-status').textContent;
+      push({phase: 'prefill', tokens: 1240}); for (let i = 0; i < 5; i++) await tick();
+      assert(status().startsWith(t('Reading your input')) && status().includes(formatNumber(1240)), '#93: the input read is shown with its size');
+      push({phase: 'preparing', tokens: 0}); push({thinking: '<b>plan</b> step one. '}); push({phase: 'preparing', tokens: 12}); push({thinking: 'step two.'});
+      for (let i = 0; i < 5; i++) await tick();
+      assert(status().startsWith(t('Thinking')) && status().includes(`12 ${t('tokens')}`), '#93: thinking shows time and tokens');
+      const details = $('result').lastElementChild.querySelector('details.thinking');
+      assert(details && !details.open && details.querySelector('.thinking-text').textContent === '<b>plan</b> step one. step two.' && !details.querySelector('b'), '#93: the thinking is collapsed plain text');
+      push({response: 'The answer.'}); push({done: true, eval_count: 20, eval_duration: 1e9}); finish(); await finished;
+      assert(status() === '' && conversation.at(-1).content === 'The answer.' && $('output').markdownSource === 'The answer.', '#93: the thinking is not in the answer, its copy or the conversation');
+      api = original;
+      [conversation, conversationModel] = keep; $('result').replaceChildren(...keep[2]); $('result').hidden = keep[3]; $('chat-empty').hidden = keep[4]; $('prompt').value = keep[5];
+      render(saved);
+    }
     assert(document.querySelector('.profile-table caption') && document.querySelectorAll('.profile-table th[scope="row"]').length===12, 'profile uses a semantic comparison table');
     assert(!$('measurement-note') && !$('speed'), 'old nested measurements removed');
     assert($('history-enabled').closest('#settings-page') && $('history-export').closest('#settings-page'), 'collection and export belong to settings');
@@ -977,7 +999,7 @@ $$
     assert(!Object.hasOwn(calls[1], 'max_tokens'), 'app uses the remaining context rather than a 1024-token cap');
     input('Another question'); key(); await tick();
     emit({phase:'preparing'}); await tick();
-    assert($('result').textContent.includes(t('Preparing answer…')), 'preparation status shown without hidden content');
+    assert($('result').lastElementChild.querySelector('.message-status').textContent.startsWith(t('Thinking')) && !$('result').querySelector('details.thinking'), '#93: thinking status shown; no disclosure without thinking text');
     emit({heartbeat:true}); emit({response:'More detail.'}); finish(false); await idle();
     fail = true; input('Follow-up that does not fit'); key(); await idle();
     assert(conversation.length === 6 && $('prompt').value === 'Follow-up that does not fit', 'rejected request retains draft and previous context');

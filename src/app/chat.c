@@ -3,8 +3,8 @@
 
 struct proxy {
     int                   fd;
-    bool                  started, disconnected, expired, preparing;
-    double                start, first, first_answer, heartbeat;
+    bool                  started, disconnected, expired, preparing, app, reading;
+    double                start, first, first_answer, heartbeat, progress, phase_since;
     struct app_utf8       utf8;
     struct app_output     output;
     struct app_run_stats *stats;
@@ -12,8 +12,12 @@ struct proxy {
     bool (*keepalive)(void *);
     void    *target;
     char     phase[24];
-    uint64_t operation, generation, pieces;
+    uint64_t operation, generation, pieces, thought;
 };
+static bool proxy_head(struct proxy *p);
+static bool proxy_event(struct proxy *p, const char *json) {
+    return proxy_head(p) && send_bytes(p->fd, json, strlen(json));
+}
 static bool proxy_cancel(void *opaque) {
     struct proxy *p = opaque;
     char          one;
@@ -33,6 +37,19 @@ static bool proxy_cancel(void *opaque) {
                              activity_request_stage(p->phase),
                              monotonic_ms());
         pthread_mutex_unlock(&app.mutex);
+        p->phase_since = monotonic_ms();
+    }
+    /* #93: a long input read is announced, once and only after a second: the
+     * event commits the HTTP status, so a quick failure keeps its 4xx/5xx. */
+    if (p->app && !p->reading && !strcmp(p->phase, "prefill") && monotonic_ms() - p->phase_since >= 1000) {
+        p->reading = true;
+        char event[96];
+        snprintf(event, sizeof event, "{\"phase\":\"prefill\",\"tokens\":%llu}\n",
+                 (unsigned long long) p->stats->prompt_tokens);
+        if (!proxy_event(p, event)) {
+            p->disconnected = true;
+            return true;
+        }
     }
     if (p->keepalive && monotonic_ms() - (p->heartbeat ? p->heartbeat : p->start) >= 10000) {
         p->heartbeat = monotonic_ms();
@@ -43,18 +60,31 @@ static bool proxy_cancel(void *opaque) {
     }
     return false;
 }
+static bool proxy_head(struct proxy *p) {
+    if (p->started)
+        return true;
+    const char *head = "HTTP/1.1 200 OK\r\nContent-Type: application/x-ndjson\r\n"
+                       "Cache-Control: no-store\r\nConnection: close\r\n"
+                       "X-Content-Type-Options: nosniff\r\n\r\n";
+    p->started = send_bytes(p->fd, head, strlen(head));
+    return p->started;
+}
+/* #93: the app's optional thinking view. Session-only; never in history or logs. */
+static bool proxy_thinking(void *opaque, const char *text) {
+    struct proxy     *p = opaque;
+    char              data[4096];
+    struct app_buffer b = {.data = data, .cap = sizeof data};
+    app_put(&b, "{\"thinking\":");
+    app_quote(&b, text);
+    app_put(&b, "}\n");
+    return !b.failed && proxy_event(p, data);
+}
 static bool proxy_send(void *opaque, const char *text) {
     struct proxy *p = opaque;
     if (text[strspn(text, " \t\r\n")] && !p->first_answer)
         p->first_answer = monotonic_ms() - p->start;
-    if (!p->started) {
-        const char *head = "HTTP/1.1 200 OK\r\nContent-Type: application/x-ndjson\r\n"
-                           "Cache-Control: no-store\r\nConnection: close\r\n"
-                           "X-Content-Type-Options: nosniff\r\n\r\n";
-        if (!send_bytes(p->fd, head, strlen(head)))
-            return false;
-        p->started = true;
-    }
+    if (!proxy_head(p))
+        return false;
     char              data[16384];
     struct app_buffer b = {.data = data, .cap = sizeof data};
     app_put(&b, "{\"response\":");
@@ -95,6 +125,16 @@ static bool proxy_decode(struct proxy *p, const char *piece) {
     if (ok && p->output.reasoning && !p->preparing && p->keepalive) {
         ok           = p->keepalive(p->target);
         p->preparing = true;
+    }
+    /* #93: while the model thinks, the app gets the token count about once a second. */
+    if (ok && p->app && p->output.state == OUTPUT_REASONING && *decoded) {
+        ++p->thought;
+        if (monotonic_ms() - p->progress >= 1000) {
+            p->progress = monotonic_ms();
+            char event[80];
+            snprintf(event, sizeof event, "{\"phase\":\"preparing\",\"tokens\":%llu}\n", (unsigned long long) p->thought);
+            ok = proxy_event(p, event);
+        }
     }
     return ok;
 }
@@ -278,9 +318,11 @@ void generate(int fd, struct request *r, struct app_arena *arena) {
                                   .start     = monotonic_ms(),
                                   .stats     = &stats,
                                   .send      = proxy_send,
-                                  .keepalive = proxy_keepalive};
+                                  .keepalive = proxy_keepalive,
+                                  .app       = true};
     proxy.target               = &proxy;
     proxy_init(&proxy);
+    app_output_thinking(&proxy.output, proxy_thinking);
     pthread_mutex_unlock(&app.mutex);
     char error[256];
     int  rc = conversation ? app_daemon_chat(app.child.socket_path,

@@ -104,6 +104,19 @@ function addTurn(prompt) {
   $('result').append(user, answer); scrollLatest(true);
   return {output, status, actions, copy, metrics};
 }
+// #93: the model's thinking, as plain text in a collapsed disclosure. Session-only:
+// never part of the answer, its copy or the conversation sent back to the model.
+function appendThinking(turn, text) {
+  if (!turn.thinking) {
+    const details = document.createElement('details'); details.className = 'thinking';
+    const summary = document.createElement('summary'); uiText(summary, 'Show thinking');
+    const body = document.createElement('div'); body.className = 'thinking-text';
+    turn.thinking = document.createTextNode(''); body.append(turn.thinking);
+    details.append(summary, body); turn.output.before(details);
+  }
+  if (turn.thinking.length + text.length <= 131072) turn.thinking.appendData(text);
+}
+const clock = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 function qualityFor(model, task = selectedTask) {
   if (state?.execution?.active === 'gpu') return undefined;
   return qualityRecords.find(r => r.model_sha256 === model?.sha256 && r.task === task?.id &&
@@ -657,15 +670,33 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
   uiText($('chat-announcement'), 'Sending…');
   const start = performance.now(); let first = null, done = false, reader, completion = null;
   let output = '', pending = '', limited = false, paintTimer = null;
+  // #93: what happens before the answer: reading the input, then thinking (tokens, time, rate).
+  let inputTokens = 0, thinkingStart = null, thoughtTokens = 0, ticker = null;
+  function preparing() {
+    if (!turn || first !== null) return;
+    if (thinkingStart === null) { turn.status.textContent = inputTokens ? `${t('Reading your input')} · ${formatNumber(inputTokens)} ${t('tokens')}…` : `${t('Reading your input')}…`; return; }
+    const seconds = (performance.now() - thinkingStart) / 1000;
+    const rate = seconds >= 1 && thoughtTokens ? ` · ${formatNumber(thoughtTokens / seconds, 1)} t/s` : '';
+    turn.status.textContent = `${t('Thinking')} · ${clock(seconds)} · ${formatNumber(thoughtTokens)} ${t('tokens')}${rate}`;
+  }
   function paint() { paintTimer = null; if (turn) updateMarkdown(target, output); else target.textContent = output; }
   function event(line) {
     if (!line.trim()) return;
     const item = JSON.parse(line);
     if (item.error) throw new Error(typeof item.error === 'string' ? item.error : 'The model returned an error.');
-    if (item.phase === 'preparing' && first === null && turn) uiText(turn.status, 'Preparing answer…');
+    if ((item.phase === 'tokenize' || item.phase === 'prefill') && first === null && turn) {
+      if (Number.isSafeInteger(item.tokens) && item.tokens > 0) inputTokens = item.tokens;
+      preparing();
+    }
+    if (item.phase === 'preparing' && first === null && turn) {
+      if (thinkingStart === null) { thinkingStart = performance.now(); uiText($('chat-announcement'), 'Thinking…'); ticker = setInterval(preparing, 1000); }
+      if (Number.isSafeInteger(item.tokens)) thoughtTokens = item.tokens;
+      preparing();
+    }
+    if (typeof item.thinking === 'string' && turn) appendThinking(turn, item.thinking);
     if (item.response) {
       if (turn) turn.answerSeen=true;
-      if (first === null) { first = (performance.now() - start) / 1000; if (turn) turn.status.textContent = ''; }
+      if (first === null) { first = (performance.now() - start) / 1000; clearInterval(ticker); if (turn) turn.status.textContent = ''; }
       if (output.length + item.response.length > 131072) throw new Error('Output exceeded the display memory limit.');
       output += item.response;
       if (paintTimer === null) paintTimer = setTimeout(paint, 60);
@@ -714,6 +745,7 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
     if (turn) uiText(turn.status, status); else message(status);
     uiText($('chat-announcement'), status);
   } finally {
+    clearInterval(ticker);
     clearTimeout(paintTimer); paint();
     if (reader) { try { await reader.cancel(); } catch { /* connection already closed */ } }
     if (turn) {

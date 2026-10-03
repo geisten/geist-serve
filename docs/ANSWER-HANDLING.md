@@ -6,8 +6,15 @@ only a fixed delimiter buffer. App NDJSON, streaming editor SSE and nonstreaming
 JSON contain the visible answer. Markdown HTML remains escaped. This is protocol
 handling, not a security boundary against malicious or ambiguous model output.
 
-The app displays **Preparing answer…** while awaiting an answer. Hidden reasoning
-never enters copy, accessible answer text or follow-up messages. A missing close
+While awaiting an answer the app shows what happens (#93): **Reading your
+input · N tokens…** when input processing takes longer than a second (the event
+commits the HTTP status, so a quick failure keeps its error code), then
+**Thinking · m:ss · N tokens · X t/s**, from `{"phase":"preparing","tokens":N}`
+about once a second. The reasoning text reaches the app endpoint only as
+`{"thinking":"…"}` events, without markers, and is shown as plain text in a
+collapsed **Show thinking** disclosure. The editor API (`/v1`) never receives it.
+Reasoning never enters copy, accessible answer text, follow-up messages, logs,
+measurement records or exports; it is session-only and Clear chat removes it. A missing close
 marker or reasoning-only completion produces an explicit no-answer result and a
 retry. A partial answer survives cancellation with an interruption label. A retry
 never inserts an empty assistant message. The current renderer does not pre-open

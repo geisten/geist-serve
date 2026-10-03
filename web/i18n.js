@@ -326,6 +326,7 @@ Object.assign(german, {
   "Fits this Mac's memory.": 'Passt in den Speicher dieses Macs.', 'No known resource restriction.': 'Keine bekannte Ressourcengrenze.',
   'Geist engine': 'Geist-Engine', 'earlier build': 'früherer Build', 'Earlier version': 'Frühere Version',
   'Not measured with this version yet.': 'Mit dieser Version noch nicht gemessen.',
+  'Reading your input': 'Eingabe wird gelesen', 'Thinking': 'Denkt nach', 'Thinking…': 'Denkt nach…', 'Show thinking': 'Denkprozess anzeigen',
   "Fits this Mac's memory. Speed measured with an earlier Geist version.": 'Passt in den Speicher dieses Macs. Geschwindigkeit mit einer früheren Geist-Version gemessen.',
   'No known resource restriction. Speed measured with an earlier Geist version.': 'Keine bekannte Ressourcengrenze. Geschwindigkeit mit einer früheren Geist-Version gemessen.',
   "Measured below the app's interactive target of 8 tokens/s. Still usable for patient tasks.": 'Gemessene Geschwindigkeit unter dem Zielwert von 8 Token/s. Für Aufgaben mit Wartezeit weiterhin nutzbar.',
