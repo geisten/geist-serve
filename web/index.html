@@ -18,7 +18,7 @@
   <h1 id="models-title" class="sr-only">Models &amp; quick test</h1>
   <aside class="model-sidebar" aria-label="Model manager" tabindex="0">
   <div class="model-overview">
-    <section id="model-chooser" aria-labelledby="available-title"><h2 id="available-title" class="sr-only">Available models</h2><p id="model-legend" class="hint model-legend" hidden></p><p id="best-choice" class="best-choice" hidden></p><div id="models" aria-label="Available models"></div><p id="quality-note" class="hint">Answer quality not tested yet. Check answers.</p></section>
+    <section id="model-chooser" aria-labelledby="available-title"><h2 id="available-title" class="sr-only">Available models</h2><p id="model-legend" class="hint model-legend" hidden></p><div class="best-row"><p id="best-choice" class="best-choice" hidden></p><button id="open-compare" class="text-button icon-button" type="button" data-ui-label="Compare models" data-ui-title="Compare models" aria-label="Compare models" title="Compare models"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><circle cx="9" cy="14" r="1.5"/><circle cx="14" cy="9" r="1.5"/><circle cx="18" cy="15" r="1.5"/><path d="M7 4h7v7" stroke-dasharray="2 2"/></svg></button></div><div id="models" aria-label="Available models"></div><p id="quality-note" class="hint">Answer quality not tested yet. Check answers.</p></section>
   </div>
 
 </aside>
@@ -131,4 +131,20 @@
 <p id="activity-hint"></p><div id="activity-details"><dl id="activity-summary" class="activity-summary"></dl>
 <h3>Phases</h3><ol id="activity-phases"></ol></div>
 <p id="activity-engine" class="hint"></p><p id="activity-footnote" class="hint" hidden>Progress is estimated. Large models can pause for a while during loading.</p>
+</div></dialog>
+<dialog id="compare-dialog" class="measurement-sheet" aria-labelledby="compare-title">
+<div class="sheet-heading"><h2 id="compare-title">Compare models</h2><button id="close-compare" type="button" aria-label="Close" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
+<div class="performance-content" tabindex="0" role="region" aria-labelledby="compare-title">
+<figure class="compare-figure"><svg id="compare-chart" viewBox="0 0 340 230" role="img" aria-labelledby="compare-caption"></svg><figcaption id="compare-caption" class="hint">Correct answers in the reference test and seconds per typical answer on this computer. The shaded area is good enough and fast enough. The table below has the same values.</figcaption></figure>
+<table id="compare-table" class="compare-table"><thead><tr><th scope="col"><span class="sr-only">Verdict</span></th><th scope="col">Model</th><th scope="col">CPU</th><th scope="col">GPU</th><th scope="col">Correct</th></tr></thead><tbody></tbody></table>
+<h3>Thresholds</h3>
+<div class="compare-settings">
+<label><span>Task</span><select id="verdict-intent"><option value="chat">Questions &amp; chat (all tasks)</option><option value="context">Questions about your own texts</option><option value="classify">Sorting</option><option value="extract">Extracting data</option><option value="format">Following a format</option></select></label>
+<label><span>Fast enough up to (s)</span><input id="verdict-fast" type="number" min="1" max="3600" step="1" inputmode="numeric"></label>
+<label><span>Usable up to (s)</span><input id="verdict-usable" type="number" min="1" max="3600" step="1" inputmode="numeric"></label>
+<label><span>Reliable from (% correct)</span><input id="verdict-reliable" type="number" min="50" max="100" step="1" inputmode="numeric"></label>
+<button id="verdict-reset" class="text-button" type="button">Restore defaults</button>
+</div>
+<p id="verdict-result" class="hint" role="status"></p>
+<p class="hint">Defaults: 10 s fast enough, 30 s usable, 90 % correct. A typical answer is about 150 words. Run your own test cases with workbench/bench.py (docs/MINI-BENCHMARK.md).</p>
 </div></dialog></body></html>

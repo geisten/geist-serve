@@ -230,6 +230,10 @@ int main(int argc, char **argv) {
     (void) read_preference("answer-language", app.prefs.answer_language, sizeof app.prefs.answer_language);
     if (strcmp(app.prefs.answer_language, "en") && strcmp(app.prefs.answer_language, "de"))
         app.prefs.answer_language[0] = 0;
+    char verdict[128];
+    strcpy(app.prefs.intent, "chat");
+    if (read_preference("verdict-settings", verdict, sizeof verdict))
+        (void) verdict_settings_parse(verdict, &app.prefs.limits, app.prefs.intent);
     restore_preview_preferences();
     migrate_measurements();
     restore_measurements();

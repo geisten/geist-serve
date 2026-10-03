@@ -148,9 +148,16 @@ static const char *quality(struct app_catalog *c, const struct json *j, int obje
             return nullptr;
         memcpy(name, j->src + j->tok[i].start, n);
         name[n] = 0;
+        unsigned before[2] = {m->quality_passed, m->quality_total};
         if (!component(name, false) || !keys(j, i + 1, language_keys) || !counts(j, i + 1, "de", m) ||
             !counts(j, i + 1, "en", m))
             return nullptr;
+        static const char *const tasks[] = APP_QUALITY_TASKS;
+        for (unsigned k = 0; k < 4; k++)
+            if (!strcmp(name, tasks[k])) {
+                m->quality_task[k][0] = m->quality_passed - before[0];
+                m->quality_task[k][1] = m->quality_total - before[1];
+            }
     }
     size_t n = (size_t) (j->tok[object].end - j->tok[object].start);
     if (n + 1 > sizeof c->strings - c->used)

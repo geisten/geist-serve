@@ -81,7 +81,17 @@ with tempfile.TemporaryDirectory(prefix='geist-catalog-') as temporary:
             assert v['value'] in ('good','usable','not_recommended','unknown') and v['value']!='good', v
             assert (v['passed'] is None)==(m['quality_evidence'] is None)
         assert {m['id']:m['verdict']['reason'] for m in snapshot['models']}['another-small-model']=='unreliable'  # 57/80 in the fixture
-        assert snapshot['best_choice'] is None and snapshot['limits']=={'fast_s':10,'usable_s':30,'reliable':0.9}
+        assert snapshot['best_choice'] is None and snapshot['limits']=={'fast_s':10,'usable_s':30,'reliable':0.9,'intent':'chat'}
+        # Thresholds and intent per computer: validated, saved, applied at once, and reset.
+        for bad in [{'fast_s':0,'usable_s':30,'reliable':.9,'intent':'chat'},{'fast_s':20,'usable_s':10,'reliable':.9,'intent':'chat'},
+                    {'fast_s':10,'usable_s':30,'reliable':.4,'intent':'chat'},{'fast_s':10,'usable_s':30,'reliable':.9,'intent':'poems'},
+                    {'fast_s':10,'usable_s':30,'reliable':.9,'intent':'chat 1'},{'fast_s':10,'usable_s':30,'reliable':.9}]:
+            assert app.request('/app/verdict-settings',bad)[0]==400,bad
+        assert app.request('/app/verdict-settings',{'fast_s':5,'usable_s':20,'reliable':.5,'intent':'context'})[0]==200
+        snapshot=app.status();mine={m['id']:m['verdict'] for m in snapshot['models']}['another-small-model']
+        assert snapshot['limits']=={'fast_s':5,'usable_s':20,'reliable':0.5,'intent':'context'} and (mine['passed'],mine['total'],mine['reason'])==(38,40,'speed_unknown'),mine
+        assert (home/'verdict-settings').read_text()=='5 20 0.5 context'
+        assert app.request('/app/verdict-settings',{'reset':True})[0]==200 and app.status()['limits']['intent']=='chat'
         assert app.request('/app/catalog',good)[0]==409
         assert json.loads((home/'catalog.json').read_text())==good
         assert (home/'catalog.json').stat().st_mode & 0o777 == 0o600

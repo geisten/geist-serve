@@ -42,12 +42,15 @@ struct app_model {
     const char *reasoning_format; /* optional validated output protocol, not model-name inference */
     const char *quality;          /* optional validated reference benchmark JSON (#102) */
     unsigned    quality_passed, quality_total; /* its sums over tasks and languages */
+    unsigned    quality_task[4][2]; /* passed, total per APP_QUALITY_TASKS entry (#103 intent) */
 };
 extern struct app_model app_models[APP_MODEL_COUNT];
 extern size_t           app_model_count;
 extern unsigned         app_catalog_revision;
 extern const char      *app_catalog_json;
 extern const char      *app_quality_suite; /* current mini benchmark suite id */
+/* The mini benchmark tasks an intent can name; "chat" means all of them. */
+#define APP_QUALITY_TASKS {"classify", "extract", "format", "context"}
 struct app_catalog;
 struct app_catalog     *app_catalog_parse(const char *text, char error[static 256]);
 const struct app_model *app_catalog_find(const struct app_catalog *catalog, const char *id);

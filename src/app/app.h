@@ -126,6 +126,7 @@ struct app_prefs {
     struct processor_measurement history[APP_MODEL_COUNT][2];
     struct processor_measurement speed[APP_MODEL_COUNT][2]; /* history, or a newer speed measurement */
     struct app_limits            limits; /* #103: verdict thresholds for this computer */
+    char                         intent[16]; /* "chat" (all tasks) or one APP_QUALITY_TASKS entry */
 };
 
 /* All mutable app state, guarded by app.mutex. The sub-structs group fields
@@ -215,6 +216,8 @@ bool start_child(const char *path, const char *id);
 
 /* prefs.c — preferences on disk, per-model measurements and their pre-0.5 migration, the selected model */
 bool read_preference(const char *name, char *out, size_t cap);
+/* #103: "<fast_s> <usable_s> <reliable> <intent>", e.g. "10 30 0.9 chat"; false if out of range. */
+bool verdict_settings_parse(const char *text, struct app_limits *limits, char intent[static 16]);
 bool save_preference(const char *name, const char *value);
 void restore_measurements(void);
 void migrate_measurements(void);
