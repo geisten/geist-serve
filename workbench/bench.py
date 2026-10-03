@@ -32,7 +32,10 @@ TASKS = ('classify', 'extract', 'format', 'context')
 RSS_POLL_S = 1.0
 # Models that think before answering (<think>…</think>) get this many extra tokens on
 # top of each task's answer limit: the limit is for the answer, not the thinking (#102).
-REASONING_BUDGET = 1024
+# The app's chat gives them the rest of the 4096-token context; 3072 + the largest
+# answer limit (160) + the longest prompt (~300) stays inside it. 1024 cut Qwen3.5 0.8B
+# off mid-thought in 113 of 160 cases.
+REASONING_BUDGET = 3072
 
 
 def sha256(path):
