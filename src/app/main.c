@@ -3,7 +3,7 @@
 
 volatile sig_atomic_t interrupted;
 atomic_bool closing, cancelled, compare_cancelled, request_cancelled, load_cancelled;
-struct app_state app = {.mutex = PTHREAD_MUTEX_INITIALIZER, .drained = PTHREAD_COND_INITIALIZER};
+struct app_state app = {.mutex = PTHREAD_MUTEX_INITIALIZER, .drained = PTHREAD_COND_INITIALIZER, .prefs.limits = APP_LIMITS_DEFAULT};
 
 struct worker {
     int fd;

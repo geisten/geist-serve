@@ -345,6 +345,52 @@ static bool setup_state_read(struct setup_state *s, const char *want) {
     free(j);
     return true;
 }
+/* `geisten models` (#103): one line per model with its verdict; JSON is `geisten status`. */
+static int print_models(void) {
+    struct json *j = calloc(1, sizeof *j);
+    if (!j || json_parse(j, strlen(reply), reply) < 0) {
+        free(j);
+        fputs("geisten is not responding.\n", stderr);
+        return 1;
+    }
+    static const char *const values[]  = {"good", "usable", "not_recommended", "unknown"};
+    static const char *const symbols[] = {"✓", "◐", "✗", "?"};
+    int                      models    = json_get(j, 0, "models");
+    for (int i = models + 1; models >= 0 && i < j->n; i++) {
+        if (j->tok[i].parent != models)
+            continue;
+        int   verdict = json_get(j, i, "verdict");
+        char *id = json_strdup(j, json_get(j, i, "id")), *value = json_strdup(j, json_get(j, verdict, "value")),
+             *processor = json_strdup(j, json_get(j, verdict, "processor"));
+        const char *symbol = "?";
+        for (int k = 0; k < 4; k++)
+            if (value && !strcmp(value, values[k]))
+                symbol = symbols[k];
+        double passed = json_num(j, json_get(j, verdict, "passed"), -1),
+               total  = json_num(j, json_get(j, verdict, "total"), 0);
+        double seconds = processor ? json_num(j, json_get(j, json_get(j, verdict, "seconds"), processor), -1) : -1;
+        char   quality[32] = "not tested", speed[48] = "not measured";
+        if (passed >= 0 && total > 0)
+            snprintf(quality, sizeof quality, "%.0f/%.0f correct", passed, total);
+        if (seconds >= 0)
+            snprintf(speed, sizeof speed, "~%.0f s per answer (%s)", seconds < 1 ? 1 : seconds, processor);
+        printf("%s %-18s %-10s %-16s %s\n",
+               symbol,
+               id ? id : "?",
+               json_bool(j, json_get(j, i, "installed"), false) ? "installed" : "-",
+               quality,
+               speed);
+        free(id), free(value), free(processor);
+    }
+    char *best = json_strdup(j, json_get(j, json_get(j, 0, "best_choice"), "id"));
+    if (best)
+        printf("\nBest choice here: %s\n", best);
+    puts("\n✓ good choice  ◐ usable, with limits  ✗ not recommended here  ? not measured yet\n"
+         "JSON with reasons: geisten status");
+    free(best);
+    free(j);
+    return 0;
+}
 /* One confirmation on the controlling terminal: stdin may be the installer script. */
 static bool confirm(const char *question) {
     int tty = open("/dev/tty", O_RDWR | O_CLOEXEC);
@@ -520,10 +566,12 @@ static int run(int argc, char **argv) {
         fputs("geisten is not running. Start the app or run: geisten start\n", stderr);
         return 1;
     }
-    if (!strcmp(cmd, "status") || !strcmp(cmd, "models")) {
+    if (!strcmp(cmd, "status")) {
         puts(reply);
         return 0;
     }
+    if (!strcmp(cmd, "models"))
+        return print_models();
     if (!strcmp(cmd, "download") || !strcmp(cmd, "use")) {
         if (argc != 3) {
             usage();

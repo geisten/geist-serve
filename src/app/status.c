@@ -372,6 +372,11 @@ void status_response(int fd, struct app_arena *arena) {
                        ? "true"
                        : "false",
                app.job.running && !app.job.activate ? "true" : "false");
+    /* #103: the installed model with the best verdict, then pass rate, then speed. */
+    const struct app_model *best = nullptr;
+    struct app_judgement    best_judgement = {APP_VERDICT_UNKNOWN, ""};
+    double                  best_rate = -1, best_seconds = -1;
+    const char             *best_processor = nullptr;
     for (size_t i = 0; i < app_model_count; ++i) {
         const struct app_model *m         = &app_models[i];
         bool                    installed = inventory[i].installed;
@@ -449,12 +454,72 @@ void status_response(int fd, struct app_arena *arena) {
             app_put(&b, "}");
         } else
             app_put(&b, "null");
+        /* #103: verdict for "good enough and fast enough here". Resource fit
+         * without the speed hint; speed enters as seconds per typical answer. */
+        double seconds[2] = {app_answer_seconds(app.prefs.history[i][0].rate, app.prefs.history[i][0].first),
+                             gpu_supported(m) ? app_answer_seconds(app.prefs.history[i][1].rate,
+                                                                   app.prefs.history[i][1].first)
+                                              : -1};
+        int    fastest    = seconds[1] >= 0 && (seconds[0] < 0 || seconds[1] < seconds[0]) ? 1
+                            : seconds[0] >= 0                                               ? 0
+                                                                                            : -1;
+        struct app_judgement j = app_judge(app_assess(&adjusted, m, installed).fit,
+                                           fastest < 0 ? -1 : seconds[fastest],
+                                           m->quality_passed,
+                                           m->quality_total,
+                                           app.prefs.limits);
+        const char *processor = fastest < 0 ? nullptr : fastest ? "gpu" : "cpu";
+        app_put(&b, ",\"verdict\":{\"value\":");
+        app_quote(&b, app_verdict_name(j.verdict));
+        app_put(&b, ",\"reason\":");
+        app_quote(&b, j.reason);
+        app_put(&b, ",\"processor\":");
+        if (processor)
+            app_quote(&b, processor);
+        else
+            app_put(&b, "null");
+        app_put(&b, ",\"seconds\":{\"cpu\":");
+        numeric_rate(&b, seconds[0]);
+        app_put(&b, ",\"gpu\":");
+        numeric_rate(&b, seconds[1]);
+        app_put(&b, "},\"passed\":");
+        if (m->quality_total)
+            app_printf(&b, "%u,\"total\":%u}", m->quality_passed, m->quality_total);
+        else
+            app_put(&b, "null,\"total\":null}");
         app_put(&b, "}");
+        double rate = m->quality_total ? (double) m->quality_passed / m->quality_total : -1;
+        double time = fastest < 0 ? -1 : seconds[fastest];
+        if (installed &&
+            (!best || j.verdict < best_judgement.verdict ||
+             (j.verdict == best_judgement.verdict &&
+              (rate > best_rate || (rate == best_rate && time >= 0 && (best_seconds < 0 || time < best_seconds)))))) {
+            best = m, best_judgement = j, best_rate = rate, best_seconds = time, best_processor = processor;
+        }
     }
+    app_put(&b, "],\"best_choice\":");
+    if (best) {
+        app_put(&b, "{\"id\":");
+        app_quote(&b, best->id);
+        app_put(&b, ",\"verdict\":");
+        app_quote(&b, app_verdict_name(best_judgement.verdict));
+        app_put(&b, ",\"processor\":");
+        if (best_processor)
+            app_quote(&b, best_processor);
+        else
+            app_put(&b, "null");
+        app_put(&b, "}");
+    } else
+        app_put(&b, "null");
+    app_printf(&b,
+               ",\"limits\":{\"fast_s\":%g,\"usable_s\":%g,\"reliable\":%g}",
+               app.prefs.limits.fast_s,
+               app.prefs.limits.usable_s,
+               app.prefs.limits.reliable);
     char artifact[65] = "";
     if (execution_model)
         snprintf(artifact, sizeof artifact, "%s", execution_model->sha256);
-    app_put(&b, "],\"performance_profile\":");
+    app_put(&b, ",\"performance_profile\":");
     pthread_mutex_unlock(&app.mutex);
     perf_view(&b, artifact, app.prefs.profile_series, app.backend.cpu, app.backend.gpu);
     app_put(&b, "}");

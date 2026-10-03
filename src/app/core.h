@@ -41,6 +41,7 @@ struct app_model {
             *quantization;        /* display grouping, never artifact identity */
     const char *reasoning_format; /* optional validated output protocol, not model-name inference */
     const char *quality;          /* optional validated reference benchmark JSON (#102) */
+    unsigned    quality_passed, quality_total; /* its sums over tasks and languages */
 };
 extern struct app_model app_models[APP_MODEL_COUNT];
 extern size_t           app_model_count;

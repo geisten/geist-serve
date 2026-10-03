@@ -432,9 +432,37 @@ function qualityText(model) {
     ...Object.entries(q.tasks).map(([k, v]) => `${t(benchmarkTasks[k] || k)} ${v.de[0] + v.en[0]}/${v.de[1] + v.en[1]}`),
     ...(q.suite === state?.quality_suite ? [] : [t('older test version')])].join(' · ');
 }
+// #103 layer 1: one verdict per model. Symbols first; the words are the tooltip
+// and the accessible name, in plain language (no t/s, no weight format).
+const verdictSymbols = {good:'✓', usable:'◐', not_recommended:'✗', unknown:'?'};
+const verdictNames = {good:'Good choice', usable:'Usable, with limits', not_recommended:'Not recommended here', unknown:'Not measured yet'};
+const plainModel = model => `${model.group_name || model.name} (${t(plainVariant(model))})`;
+function verdictReason(model) {
+  const v = model.verdict, time = v.processor ? v.seconds[v.processor] : null;
+  const speed = time === null ? null : t(`about ${Math.max(1, Math.round(time))} s per answer on the ${v.processor === 'gpu' ? 'graphics chip' : 'processor'}`);
+  const correct = v.total ? `${v.passed}/${v.total} ${t('correct')}` : null;
+  return {good: [speed, correct], slow: [speed, correct], too_slow: [speed], tight_memory: [t('Memory is tight on this computer'), speed],
+    unavailable: [t(model.reason || 'Unavailable on this computer')], unreliable: [correct && `${t('Reference test')}: ${correct}`],
+    quality_unknown: [t('Answer quality not tested yet')], speed_unknown: [t('Speed on this computer not measured yet'), correct]}[v.reason] || [];
+}
+function verdictText(model) {
+  if (!model?.verdict) return '';
+  return [t(verdictNames[model.verdict.value]), ...verdictReason(model)].filter(Boolean).join(' · ');
+}
+function renderBestChoice(snapshot) {
+  const best = snapshot.best_choice, model = best && snapshot.models.find(m => m.id === best.id);
+  $('best-choice').hidden = !model;
+  if (!model) return;
+  const reason = verdictReason(model).filter(Boolean).join(' · ');
+  $('best-choice').dataset.verdict = best.verdict;
+  $('best-choice').textContent = best.verdict === 'good'
+    ? `${verdictSymbols.good} ${t('Best for you')}: ${plainModel(model)}${reason ? ` · ${reason}` : ''}`
+    : `${t('No installed model is a good choice yet.')} ${t('Best option')}: ${plainModel(model)} · ${verdictText(model)}`;
+}
 function renderModelLegend() {
   const icon = path => `<svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg>`;
-  $('model-legend').innerHTML = `<span>${icon(fitIcons[0])}<span data-ui-text="Fits this computer"></span></span><span>${icon(capabilityIcons.chat.path)}<span data-ui-text="Text chat"></span></span><span>${icon(qualityIcon)}<span data-ui-text="Correct answers in the reference test"></span></span>`;
+  $('model-legend').innerHTML = `<span>${icon(fitIcons[0])}<span data-ui-text="Fits this computer"></span></span><span>${icon(capabilityIcons.chat.path)}<span data-ui-text="Text chat"></span></span><span>${icon(qualityIcon)}<span data-ui-text="Correct answers in the reference test"></span></span>` +
+    Object.entries(verdictSymbols).map(([key, symbol]) => `<span><span class="model-verdict" data-verdict="${key}" aria-hidden="true">${symbol}</span><span data-ui-text="${verdictNames[key]}"></span></span>`).join('');
   $('model-legend').querySelectorAll('[data-ui-text]').forEach(e => { e.textContent = t(e.dataset.uiText); });
 }
 function renderModelBadges(element, model) {
@@ -523,7 +551,7 @@ function modelCard(model) {
   if (!card) {
     card = document.createElement('article'); card.className = 'model'; card.dataset.id = model.id; card.setAttribute('role', 'listitem');
     // One button covers the name and download state. Information and removal are siblings.
-    card.innerHTML = '<button class="model-pick" type="button"><span class="model-ring"></span><span class="model-info"><span class="model-name"></span><span class="variant-recommended" hidden></span><span class="variant-size"></span><span class="variant-active"></span><span class="download-state"></span></span></button><span class="model-badges" role="img" tabindex="0"></span><span class="variant-warning"></span><span class="transfer-detail"></span><button class="remove text-button icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button>';
+    card.innerHTML = '<button class="model-pick" type="button"><span class="model-ring"></span><span class="model-info"><span class="model-verdict" aria-hidden="true"></span><span class="model-name"></span><span class="variant-recommended" hidden></span><span class="variant-size"></span><span class="variant-active"></span><span class="download-state"></span></span></button><span class="model-badges" role="img" tabindex="0"></span><span class="variant-warning"></span><span class="transfer-detail"></span><button class="remove text-button icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button>';
     card.querySelector('.model-pick').addEventListener('click', event => { if (event.detail < 2) choose(model.id); });
     card.querySelector('.model-pick').addEventListener('keydown', event => {
       if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
@@ -537,6 +565,10 @@ function modelCard(model) {
   const paused = canPause(model);
   card.className = `model${active ? ' active' : ''}${preparing || pending ? ' preparing' : ''}${model.resource_fit === 2 ? ' unavailable' : ''}`;
   card.querySelector('.model-name').textContent = t(plainVariant(model));
+  const verdict = card.querySelector('.model-verdict');
+  verdict.dataset.verdict = model.verdict?.value || 'unknown';
+  verdict.textContent = verdictSymbols[verdict.dataset.verdict];
+  verdict.title = verdictText(model);
   card.querySelector('.variant-size').textContent = [variantLabel(model), model.bytes ? bytes(model.bytes).replace(' ', '\u00a0') : ''].filter(Boolean).join(' · ');
   const recommendedTag = card.querySelector('.variant-recommended');
   recommendedTag.hidden = recommendedModel(state)?.id !== model.id || active;
@@ -563,7 +595,7 @@ function modelCard(model) {
   const button = card.querySelector('.model-pick');
   const action = paused ? 'Pause download' : active && allowed(model) ? 'Active' : model.installed ? 'Start model' : model.partial ? 'Resume download' : state.ready ? 'Download model' : 'Download and start';
   button.title = model.resource_fit === 2 ? `${modelLabel(model)} · ${t(model.reason || 'Unavailable on this computer')}` : `${t(action)}: ${modelLabel(model)}`;
-  button.setAttribute('aria-label', `${t(action)}: ${modelLabel(model)} · ${t(status)}${model.resource_fit ? ` · ${t(model.reason || 'Limited on this computer')}` : ''}`);
+  button.setAttribute('aria-label', `${t(action)}: ${modelLabel(model)} · ${verdictText(model)} · ${t(status)}${model.resource_fit ? ` · ${t(model.reason || 'Limited on this computer')}` : ''}`);
   button.disabled = modelActionDisabled(model);
   const remove = card.querySelector('.remove');
   remove.title = `${t('Remove download')}: ${modelLabel(model)}`;
@@ -602,6 +634,7 @@ function render(next) {
   const counts = qualityCounts(suggestion);
   if (suggestion) $('model-prompt-hint').textContent = t(`Suggested start for this ${hostName()}: ${modelLabel(suggestion)} (${bytes(suggestion.bytes)}). It fits the memory; ${counts ? `reference test: ${counts.passed}/${counts.total} correct` : 'answer quality is not tested yet'}.`);
   $('model-legend').hidden = !!next.active_id;
+  renderBestChoice(next);
   if (usable && previouslyHidden && !$('workspace').hidden && !$('models-page').hidden &&
       (document.activeElement === document.body || document.activeElement.closest('.model-pick'))) $('prompt').focus({preventScroll:true});
   $('disk-space').textContent = t(next.hardware.disk_known ? `${bytes(next.hardware.disk)} disk space available` : 'Disk space could not be read');

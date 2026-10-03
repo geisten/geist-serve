@@ -64,3 +64,46 @@ The metric row shows the last successful CPU and GPU generation rates together.
 Expanded details compare service-observed first text, total time, output tokens,
 post-reply process RAM and timestamp. These are independent replies, not a fair
 benchmark or a new automatic recommendation. No fastest badge is inferred.
+
+## Verdicts: good enough and fast enough on this computer (#103)
+
+Every model gets one verdict, shown as a symbol; the words are its tooltip and
+accessible name. A verdict never blocks a model: ✗ explains, it does not
+disable "Start model".
+
+| Symbol | Verdict (`verdict.value`) | When |
+|---|---|---|
+| ✓ | `good` | reference test ≥ 90 % correct, typical answer ≤ 10 s, memory fits |
+| ◐ | `usable` | as ✓, but the answer takes 10–30 s (`slow`) or memory is tight (`tight_memory`) |
+| ✗ | `not_recommended` | does not fit this computer (`unavailable`), < 90 % correct (`unreliable`) or > 30 s per answer (`too_slow`) |
+| ? | `unknown` | no reference test (`quality_unknown`) or no speed measurement here (`speed_unknown`) |
+
+Known problems come first: a model that is measured as unreliable is ✗ even
+before its speed is known. Missing data is never "good".
+
+**Thresholds and why.**
+- *10 s* for a typical answer is about the limit at which people still wait
+  attentively for a reply.
+- *30 s* is where a reply becomes a task that people come back to later.
+- *90 %* correct means that, on average, at most one answer in ten needs to be
+  checked and corrected.
+- The defaults are in `APP_LIMITS_DEFAULT` (`src/app/tasks.h`). `/app/status`
+  reports the current values as `limits`.
+
+**Typical answer.** About 150 words, which is 200 tokens:
+`first token time + 200 / output rate`, from the last ordinary reply on each
+processor with this engine build. The faster processor counts.
+
+**Quality.** All tasks and both languages of the reference test (#102). The
+current intent is *Questions & chat*.
+
+**Status shape (per model).**
+```json
+"verdict": {"value": "good", "reason": "good", "processor": "gpu",
+            "seconds": {"cpu": 9.6, "gpu": 3.2}, "passed": 146, "total": 160}
+```
+Missing values are `null`. At top level:
+- `best_choice` is `{id, verdict, processor}` for the installed model with the
+  best verdict, then the highest pass rate, then the fastest answer; `null`
+  when no model is installed.
+- `limits` reports the thresholds in use.
