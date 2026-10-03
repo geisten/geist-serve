@@ -6,7 +6,7 @@ version=${VERSION:?Set a numeric VERSION, e.g. 0.3.0}
 arch=${1:?usage: package-deb.sh amd64|arm64}
 printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo 'Expected X.Y.Z version' >&2; exit 2; }
 case "$arch" in amd64|arm64) ;; *) exit 2;; esac
-for binary in geist geist-app geistd; do
+for binary in geisten geist-app geistd; do
     test -x "$binary"
     file "$binary" | grep -Eq 'statically linked|static-pie linked' || { echo "$binary must be a static Linux executable" >&2; exit 1; }
     case "$arch" in amd64) file "$binary" | grep -q 'x86-64';; arm64) file "$binary" | grep -q 'aarch64';; esac
@@ -16,8 +16,9 @@ stage=$(mktemp -d build/deb-stage.XXXXXX)
 trap 'rm -rf "$stage"' EXIT HUP INT TERM
 mkdir -p "$stage/DEBIAN" "$stage/usr/lib/geist" "$stage/usr/bin" \
     "$stage/usr/lib/systemd/user" "$stage/usr/share/applications" "$stage/usr/share/doc/geist"
-install -m 755 geist geist-app geistd "$stage/usr/lib/geist/"
-ln -s ../lib/geist/geist "$stage/usr/bin/geist"
+install -m 755 geisten geist-app geistd "$stage/usr/lib/geist/"
+ln -s ../lib/geist/geisten "$stage/usr/bin/geisten"
+ln -s ../lib/geist/geisten "$stage/usr/bin/geist" # the pre-#92 command name, kept as an alias
 install -m 644 deploy/systemd/geist.service "$stage/usr/lib/systemd/user/"
 install -m 644 web/vendor/marked-LICENSE "$stage/usr/share/doc/geist/marked-LICENSE"
 install -m 644 web/vendor/katex-LICENSE "$stage/usr/share/doc/geist/katex-LICENSE"
@@ -40,9 +41,9 @@ cat > "$stage/DEBIAN/postinst" <<'EOF'
 #!/bin/sh
 set -eu
 # Never impersonate desktop users or start an inference workload as root.
-echo 'Start the service with: geist start. Install geist-desktop for the graphical app.'
+echo 'Start the service with: geisten start. Install geist-desktop for the graphical app.'
 echo 'Enable login startup with: systemctl --user enable geist.service'
-echo 'After an upgrade, run: systemctl --user daemon-reload && geist restart'
+echo 'After an upgrade, run: systemctl --user daemon-reload && geisten restart'
 EOF
 chmod 755 "$stage/DEBIAN/postinst"
 cat > "$stage/DEBIAN/prerm" <<'EOF'

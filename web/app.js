@@ -834,8 +834,8 @@ window.addEventListener('beforeunload', () => controller?.abort());
 const terminalHelp = window.geistDesktop === 'mac'
   ? `Paste the copied curl command into your terminal to try the loaded model. The command line tool is at ${window.geistCLIPath || '/Applications/Geist.app/Contents/MacOS/geist-cli'}.`
   : window.geistDesktop === 'linux'
-  ? 'Paste the copied curl command into your terminal to try the loaded model. You can also run geist test and geist chat.'
-  : 'Paste the copied curl command into your terminal to try the loaded model. Ubuntu also installs geist test and geist chat. On Mac, the CLI is bundled at /Applications/Geist.app/Contents/MacOS/geist-cli.';
+  ? 'Paste the copied curl command into your terminal to try the loaded model. You can also run geisten test and geisten chat.'
+  : 'Paste the copied curl command into your terminal to try the loaded model. Ubuntu also installs geisten test and geisten chat. On Mac, the CLI is bundled at /Applications/Geist.app/Contents/MacOS/geist-cli.';
 const connectionHelp = {
   terminal: terminalHelp,
   continue: 'In Continue, open your local config.yaml and add the model from this configuration. JSON is valid YAML. Select Geisten and use Chat mode. Preserve your existing configuration.',

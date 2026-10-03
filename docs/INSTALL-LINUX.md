@@ -1,6 +1,6 @@
 # Rootless Linux install (#46)
 
-`scripts/install-geist.sh` installs the shared Geisten runtime (`geist`,
+`scripts/install-geist.sh` installs the shared Geisten runtime (`geisten`,
 `geist-app`, `geistd`) for the current user on 64-bit Linux, without root and
 without a package manager. The Ubuntu DEBs (docs/INSTALL.md) stay the system-wide
 route; the installer refuses to shadow them.
@@ -18,26 +18,26 @@ Options: `--version X.Y.Z`, `--no-start`, `--model recommended` (not with
 
 ## First model
 
-The installer never chooses a model itself. `geist setup` asks the running
+The installer never chooses a model itself. `geisten setup` asks the running
 service for its recommendation for this computer, shows name and download
 size, and asks once on the terminal (`/dev/tty`, because stdin is the script
 under `curl | sh`). After a yes, the service downloads, verifies and loads the
 model through `/app/setup`, which refuses if the recommendation changed in the
-meantime. `geist setup` then sends one real generation through `/v1` and
+meantime. `geisten setup` then sends one real generation through `/v1` and
 reports installed, model ready and test passed separately.
 
 | Run | Model step |
 |-----|------------|
-| fresh install with a terminal | `geist setup` asks; no means no download |
-| no terminal (CI, pipes, SSH without TTY), or an update | none; prints `geist setup` as the next command |
-| `--model recommended` | `geist setup`, which asks |
-| `--model recommended --yes` | `geist setup --yes`: downloads without asking |
+| fresh install with a terminal | `geisten setup` asks; no means no download |
+| no terminal (CI, pipes, SSH without TTY), or an update | none; prints `geisten setup` as the next command |
+| `--model recommended` | `geisten setup`, which asks |
+| `--model recommended --yes` | `geisten setup --yes`: downloads without asking |
 
 A terminal yes also records the model's preview consent, like the model button
 in the app. `--yes` does not: the app still asks before its first task with
 that model. If the model step fails, the installation stays and the exit code
 is 17 for `--model`, or 0 with a resume hint after the interactive offer.
-Interrupting `geist setup` leaves the download running in the service; run it
+Interrupting `geisten setup` leaves the download running in the service; run it
 again to follow or resume.
 
 ## Layout
@@ -48,13 +48,14 @@ again to follow or resume.
 | `~/.local/share/geist-runtime/current` | symlink `versions/<v>`, swapped atomically (`mv -T`) |
 | `~/.local/share/geist-runtime/receipt` | `receipt 1`, `version`, `platform`, `source`, `engine`, `launcher`, `previous` |
 | `~/.local/share/geist-runtime/.lock/` | pid of the running installer; stale locks are taken over |
-| `~/.local/bin/geist` | launcher symlink to `current/geist` |
+| `~/.local/bin/geisten` | launcher symlink to `current/geisten` |
+| `~/.local/bin/geist` | the same, under the earlier command name (#92) |
 
 Only the active and the previous version are kept. Uninstall stops the service,
 removes the launcher and the runtime directory, and keeps `~/.local/share/geist`
 (models, keys, settings). The installer only touches files its receipt owns: a
-foreign `~/.local/bin/geist`, an APT install, or a runtime directory without a
-receipt ends with exit 13 and no change. The rootless `geist` starts its own
+foreign `~/.local/bin/geisten` or `~/.local/bin/geist`, an APT install, or a runtime directory without a
+receipt ends with exit 13 and no change. The rootless `geisten` starts its own
 `geist-app` as the user; only the packaged CLI in `/usr/lib/geist` uses the
 packaged systemd user unit, so a later APT install cannot capture it.
 
@@ -89,7 +90,7 @@ f16c, fma, movbe) and `linux-aarch64` needs armv8.2-a with dotprod and fp16;
 the installer checks the CPU flags before downloading. The installer parses the
 manifest line by line and never evaluates it.
 
-An archive holds exactly `geist-<v>-<platform>/` with `geist`, `geist-app`,
+An archive holds exactly `geist-<v>-<platform>/` with `geisten`, `geist-app`,
 `geistd`, `SHA256SUMS` and the packaged extras (licenses, `README.md`,
 `ENGINE.json`, `BUILD-PACKAGES.txt`, `Start Geisten.sh`): regular files
 and directories only, at most 16 members, at most 512 MiB unpacked. Before
@@ -122,7 +123,7 @@ the old one. An installer only trusts the key it was downloaded with.
 | 14 | Geisten or another installer is busy (previous version restored) |
 | 15 | start failed (previous version restored) |
 | 16 | local file system problem |
-| 17 | installed, but the `--model` setup did not finish (`geist setup` resumes) |
+| 17 | installed, but the `--model` setup did not finish (`geisten setup` resumes) |
 
 ## Tests
 

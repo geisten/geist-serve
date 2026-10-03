@@ -10,7 +10,10 @@ import tempfile
 import time
 from http_test import App, ROOT
 
-binary=Path(os.environ.get('GEIST_CLI_TEST_BINARY',ROOT/'geist'))
+binary=Path(os.environ.get('GEIST_CLI_TEST_BINARY',ROOT/'geisten'))
+# #92: geist is the earlier name of the same program and keeps working.
+alias=subprocess.run([str(ROOT/'geist'),'--help'],capture_output=True,text=True,timeout=10)
+assert alias.returncode==0 and 'geisten start' in alias.stdout and 'earlier name' in alias.stdout,alias
 model=os.environ.get('GEIST_TEST_MODEL')
 with tempfile.TemporaryDirectory(prefix='geist-cli-') as home:
     app=App(home,model=model)

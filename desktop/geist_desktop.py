@@ -41,7 +41,7 @@ def resolve_language(preference, system):
 
 
 class Desktop(Gtk.Application):
-    def __init__(self, cli='/usr/bin/geist', application_id='com.geisten.Geist', preferences=None):
+    def __init__(self, cli='/usr/bin/geisten', application_id='com.geisten.Geist', preferences=None):
         super().__init__(application_id=application_id, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
         self.cli = str(cli)
         self.preferences = Path(preferences or Path(GLib.get_user_config_dir()) / 'geist' / 'interface.json')
@@ -154,7 +154,7 @@ class Desktop(Gtk.Application):
             self.loaded = None
             self.status.set_text(self.text('Service unavailable. Check whether another program uses port 8766, then retry.', 'Dienst nicht erreichbar. Prüfe, ob ein anderes Programm Port 8766 belegt, und versuche es erneut.'))
             if error_code == 42:
-                self.status.set_text(self.text('An older service is running. Finish your work, then run geist restart in Terminal.', 'Ein älterer Dienst läuft. Beende deine Arbeit und führe im Terminal geist restart aus.'))
+                self.status.set_text(self.text('An older service is running. Finish your work, then run geisten restart in Terminal.', 'Ein älterer Dienst läuft. Beende deine Arbeit und führe im Terminal geisten restart aus.'))
             elif error_code == 43:
                 self.status.set_text(self.text('Finish the current task, then reconnect to update Geisten.', 'Beende die laufende Aufgabe und verbinde dich erneut, um Geisten zu aktualisieren.'))
             elif error_code == 44:

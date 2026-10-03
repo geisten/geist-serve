@@ -1,5 +1,5 @@
 #!/bin/sh
-# install-geist.sh — install the shared Geisten runtime (geist, geist-app, geistd)
+# install-geist.sh — install the shared Geisten runtime (geisten, geist-app, geistd)
 # for the current Linux user, without root. Contract: docs/INSTALL-LINUX.md.
 #
 #   curl -fsSL https://geisten.net/install.sh | sh
@@ -36,7 +36,7 @@ Install the Geisten model runtime for this user (no root needed).
 Exit codes: 0 ok, 2 usage, 10 unsupported host, 11 missing prerequisite,
 12 download or verification failed, 13 another installation owns the
 files, 14 Geisten is busy, 15 start failed, 16 local file system problem,
-17 installed, but the model setup did not finish (run: geist setup).
+17 installed, but the model setup did not finish (run: geisten setup).
 EOF
 }
 
@@ -133,19 +133,22 @@ preflight() {
     [ -n "${HOME:-}" ] && [ -d "$HOME" ] && [ -w "$HOME" ] || fail $E_LOCAL "HOME must be a writable directory"
     runtime=${XDG_DATA_HOME:-$HOME/.local/share}/geist-runtime
     bindir=$HOME/.local/bin
-    launcher=$bindir/geist
+    launcher=$bindir/geisten
+    alias=$bindir/geist # the pre-#92 command name
 }
 
 # One owner per machine user: never shadow the Ubuntu package, never touch a
 # foreign file at our launcher path.
 check_ownership() {
-    if [ -e /usr/lib/geist/geist ] || [ -L /usr/bin/geist ]; then
+    if [ -e /usr/lib/geist/geist ] || [ -e /usr/lib/geist/geisten ] || [ -L /usr/bin/geist ] || [ -L /usr/bin/geisten ]; then
         fail $E_OWNER "Geisten is installed from the Ubuntu package; update it with apt, or remove it first (sudo apt remove geist)"
     fi
-    if [ -e "$launcher" ] || [ -L "$launcher" ]; then
-        [ -L "$launcher" ] && [ "$(readlink "$launcher")" = "$runtime/current/geist" ] ||
-            fail $E_OWNER "$launcher exists and was not installed by this installer; move it away first"
-    fi
+    for link in "$launcher" "$alias"; do
+        if [ -e "$link" ] || [ -L "$link" ]; then
+            [ -L "$link" ] && [ "$(readlink "$link")" = "$runtime/current/geisten" ] ||
+                fail $E_OWNER "$link exists and was not installed by this installer; move it away first"
+        fi
+    done
     if [ -e "$runtime" ] && [ ! -f "$runtime/receipt" ]; then
         for entry in "$runtime"/* "$runtime"/.[!.]*; do
             [ -e "$entry" ] || [ -L "$entry" ] || continue
@@ -240,7 +243,7 @@ parse_manifest() {
 # Only these regular files, in one top directory; nothing else may extract.
 allowed_member() {
     case $1 in
-        "$top/" | "$top/geist" | "$top/geist-app" | "$top/geistd" | "$top/Start Geisten.sh" | \
+        "$top/" | "$top/geisten" | "$top/geist-app" | "$top/geistd" | "$top/Start Geisten.sh" | \
             "$top/LICENSE" | "$top/marked-LICENSE" | "$top/katex-LICENSE" | "$top/ENGINE.json" | \
             "$top/README.md" | "$top/SHA256SUMS" | "$top/BUILD-PACKAGES.txt") return 0 ;;
     esac
@@ -267,17 +270,17 @@ verify_archive() {
     tar -xzf "$a" -C "$stage/x" --no-same-owner --no-same-permissions 2>/dev/null ||
         fail $E_VERIFY "archive could not be extracted"
     payload=$stage/x/$top
-    for bin in geist geist-app geistd; do
+    for bin in geisten geist-app geistd; do
         [ -f "$payload/$bin" ] && [ ! -L "$payload/$bin" ] || fail $E_VERIFY "archive lacks $bin"
         [ "$(od -An -tx1 -j18 -N2 "$payload/$bin" | tr -s ' ' | sed 's/^ //')" = "$elf_machine" ] ||
             fail $E_VERIFY "$bin is not built for $platform"
         chmod 755 "$payload/$bin"
     done
     (cd "$payload" && sha256sum -c --quiet SHA256SUMS >/dev/null 2>&1) || fail $E_VERIFY "payload checksums do not match"
-    "$payload/geist" --help >/dev/null 2>&1
+    "$payload/geisten" --help >/dev/null 2>&1
     rc=$?
     [ $rc -eq 132 ] && fail $E_HOST "this CPU cannot run the Geisten engine (illegal instruction)"
-    [ $rc -eq 0 ] || fail $E_VERIFY "the downloaded geist does not run here (exit $rc)"
+    [ $rc -eq 0 ] || fail $E_VERIFY "the downloaded geisten does not run here (exit $rc)"
 }
 
 write_receipt() {
@@ -320,11 +323,14 @@ activate() {
         mv -T "$payload" "$dest" || fail $E_LOCAL "cannot install into $dest"
     fi
     point_current_at "$version"
-    if [ ! -L "$launcher" ]; then
-        if ! { ln -s "$runtime/current/geist" "$launcher.new" && mv -Tf "$launcher.new" "$launcher"; }; then
-            fail $E_LOCAL "cannot create $launcher"
+    # geisten, and geist as the alias for the earlier name (#92).
+    for link in "$launcher" "$alias"; do
+        if [ ! -L "$link" ]; then
+            if ! { ln -s "$runtime/current/geisten" "$link.new" && mv -Tf "$link.new" "$link"; }; then
+                fail $E_LOCAL "cannot create $link"
+            fi
         fi
-    fi
+    done
     # A same-version rerun keeps the recorded rollback version.
     if [ "$previous" = "$version" ]; then
         previous=$(receipt_value previous) || previous=''
@@ -358,7 +364,7 @@ start_service() {
     fail $E_SETUP "the new version did not start; the previous installation is active again"
 }
 
-# The first model (#46). `geist setup` asks on /dev/tty and follows the
+# The first model (#46). `geisten setup` asks on /dev/tty and follows the
 # service's own recommendation; this script never picks a model itself.
 setup_model() {
     if [ -n "$model" ]; then
@@ -374,15 +380,17 @@ setup_model() {
 
 do_uninstall() {
     [ -f "$runtime/receipt" ] || fail $E_OWNER "no installer receipt in $runtime: nothing to uninstall"
-    if "$runtime/current/geist" status >"$runtime/.status" 2>/dev/null; then
+    if "$runtime/current/geisten" status >"$runtime/.status" 2>/dev/null; then
         if grep -q '"busy":true\|"loading":true' "$runtime/.status"; then
             rm -f "$runtime/.status"
             fail $E_BUSY "Geisten is busy; run --uninstall again when it is idle"
         fi
-        "$runtime/current/geist" stop >/dev/null 2>&1 || fail $E_BUSY "Geisten could not be stopped"
+        "$runtime/current/geisten" stop >/dev/null 2>&1 || fail $E_BUSY "Geisten could not be stopped"
     fi
     rm -f "$runtime/.status"
-    [ -L "$launcher" ] && [ "$(readlink "$launcher")" = "$runtime/current/geist" ] && rm -f "$launcher"
+    for link in "$launcher" "$alias"; do
+        [ -L "$link" ] && [ "$(readlink "$link")" = "$runtime/current/geisten" ] && rm -f "$link"
+    done
     rm -rf "$runtime"
     say "Geisten runtime removed. Models and settings stay in ${XDG_DATA_HOME:-$HOME/.local/share}/geist."
 }
@@ -434,7 +442,7 @@ main() {
     cleanup
     say "Geisten $version is installed."
     case ":$PATH:" in
-        *":$bindir:"*) cmd=geist ;;
+        *":$bindir:"*) cmd=geisten ;;
         *) cmd="'$launcher'"
            say "Note: $bindir is not on your PATH. Use the full path below, or add it to PATH in your shell profile." ;;
     esac

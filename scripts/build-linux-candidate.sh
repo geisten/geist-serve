@@ -22,4 +22,4 @@ fi
 make -f App.mk app APP_CC=gcc APP_LDLIBS="$(pkg-config --static --libs libcurl openssl) -lpthread -static"
 apk info -v > build/app-build-packages.txt
 VERSION=${VERSION:-0.3.0} sh scripts/package-deb.sh "$arch"
-cp geist geist-app geistd build/*.deb build/*.deb.sha256 build/app-build-packages.txt /out/
+cp geisten geist-app geistd build/*.deb build/*.deb.sha256 build/app-build-packages.txt /out/

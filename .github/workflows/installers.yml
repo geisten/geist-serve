@@ -63,7 +63,7 @@ jobs:
           sudo apt-get install -y "$PWD/build/package/geist_${VERSION}_${{ matrix.arch }}.deb" "$PWD/build/geist-desktop_${VERSION}_all.deb"
           desktop-file-validate /usr/share/applications/geist.desktop
           sudo aa-status | grep -F geist-desktop
-          cp /usr/lib/geist/geist /usr/lib/geist/geist-app /usr/lib/geist/geistd .
+          cp /usr/lib/geist/geisten /usr/lib/geist/geist-app /usr/lib/geist/geistd . && ln -sf geisten geist
       - name: Actual GTK and WebKit desktop interaction
         run: |
           set -o pipefail
