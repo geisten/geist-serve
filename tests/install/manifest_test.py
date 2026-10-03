@@ -28,11 +28,11 @@ class ManifestTests(unittest.TestCase):
             self.assertIn((self.root/f'geist_1.2.3_{arch}.deb.sha256').read_text().strip(),entries)
 
     def test_installer_assets_are_all_or_none(self):
-        installer=['geist-1.2.3-linux-x86_64.tar.gz','geist-1.2.3-linux-aarch64.tar.gz','geist-manifest','geist-manifest.sig','install-geist.sh']
+        installer=['geisten-1.2.3-linux-x86_64.tar.gz','geisten-1.2.3-linux-aarch64.tar.gz','geisten-manifest','geisten-manifest.sig','install-geisten.sh']
         for name in installer: (self.root/name).write_text(name)
         self.assertEqual(set(manifest.assemble(self.root,'1.2.3')),set(self.assets+installer))
-        (self.root/'geist-manifest.sig').unlink(); (self.root/'SHA256SUMS').unlink()
-        with self.assertRaisesRegex(ValueError,'geist-manifest.sig'): manifest.assemble(self.root,'1.2.3')
+        (self.root/'geisten-manifest.sig').unlink(); (self.root/'SHA256SUMS').unlink()
+        with self.assertRaisesRegex(ValueError,'geisten-manifest.sig'): manifest.assemble(self.root,'1.2.3')
 
     def test_missing_platform_package_fails_without_manifest(self):
         (self.root/'geist_1.2.3_arm64.deb').unlink()

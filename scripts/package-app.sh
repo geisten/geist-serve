@@ -6,7 +6,7 @@ platform=${1:?usage: package-app.sh linux-aarch64|linux-x86_64|macos-arm64}
 case "$platform" in linux-aarch64|linux-x86_64|macos-arm64) ;; *) exit 2;; esac
 version=${VERSION:-dev}
 case "$version" in *[!A-Za-z0-9._-]*) exit 2;; esac
-destination="build/geist-$version-$platform"
+destination="build/geisten-$version-$platform"
 mkdir -p "$destination"
 # BIN_DIR: where the three executables are (release CI: the static musl build).
 bin=${BIN_DIR:-.}

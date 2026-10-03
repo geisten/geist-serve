@@ -1,15 +1,15 @@
 #!/bin/sh
-# install-geist.sh — install the shared geisten runtime (geisten, geist-app, geistd)
+# install-geisten.sh — install the shared geisten runtime (geisten, geist-app, geistd)
 # for the current Linux user, without root. Contract: docs/INSTALL-LINUX.md.
 #
 #   curl -fsSL https://geisten.net/install.sh | sh
-#   sh install-geist.sh --help
+#   sh install-geisten.sh --help
 #
 # Everything runs from main() on the last line, so a truncated download only
 # defines functions and changes nothing.
 
 GEIST_RELEASES=https://github.com/geisten/geist-serve/releases
-# Ed25519 key that signs geist-manifest (docs/INSTALL-LINUX.md, "Signing").
+# Ed25519 key that signs geisten-manifest (docs/INSTALL-LINUX.md, "Signing").
 # Empty would make installation refuse; rotation: same section.
 GEIST_MANIFEST_PUBKEY='-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEATOqns8uqh+mBxILUi21Mq67Rcx3Mq3t0ZvLKKtwR+jg=
@@ -21,7 +21,7 @@ usage() {
     cat <<'EOF'
 Install the geisten model runtime for this user (no root needed).
 
-  sh install-geist.sh [options]
+  sh install-geisten.sh [options]
 
   --version X.Y.Z   install exactly this release (default: newest stable)
   --no-start        install, but do not start the geisten service
@@ -131,7 +131,7 @@ preflight() {
     esac
     mv -T --help >/dev/null 2>&1 || fail $E_PREREQ "GNU coreutils mv (with -T) is needed"
     [ -n "${HOME:-}" ] && [ -d "$HOME" ] && [ -w "$HOME" ] || fail $E_LOCAL "HOME must be a writable directory"
-    runtime=${XDG_DATA_HOME:-$HOME/.local/share}/geist-runtime
+    runtime=${XDG_DATA_HOME:-$HOME/.local/share}/geisten-runtime
     bindir=$HOME/.local/bin
     launcher=$bindir/geisten
     alias=$bindir/geist # the pre-#92 command name
@@ -209,8 +209,8 @@ parse_manifest() {
         # shellcheck disable=SC2086 # split the line into fields; globbing is off (set -f)
         set -- $line
         case $n in
-            1) [ "$line" = "geist-manifest 1" ] || fail $E_VERIFY "unknown manifest format" ;;
-            2) [ "$line" = "product geist" ] || fail $E_VERIFY "manifest is not for geisten" ;;
+            1) [ "$line" = "geisten-manifest 1" ] || fail $E_VERIFY "unknown manifest format" ;;
+            2) [ "$line" = "product geisten" ] || fail $E_VERIFY "manifest is not for geisten" ;;
             3) [ $# -eq 2 ] && [ "$1" = version ] || fail $E_VERIFY "bad manifest version line"
                version=$2 ;;
             4) [ $# -eq 2 ] && [ "$1" = channel ] || fail $E_VERIFY "bad manifest channel line"
@@ -233,7 +233,7 @@ parse_manifest() {
     [ "$channel" = stable ] || fail $E_VERIFY "manifest channel is $channel, not stable"
     [ -z "$want_version" ] || [ "$version" = "$want_version" ] || fail $E_VERIFY "manifest is for $version, not $want_version"
     [ $count -eq 1 ] || fail $E_VERIFY "manifest has $count archives for $platform"
-    [ "$archive" = "geist-$version-$platform.tar.gz" ] || fail $E_VERIFY "unexpected archive name $archive"
+    [ "$archive" = "geisten-$version-$platform.tar.gz" ] || fail $E_VERIFY "unexpected archive name $archive"
     case $size in *[!0-9]* | '') fail $E_VERIFY "bad archive size" ;; esac
     case $digest in *[!0-9a-f]* | '') fail $E_VERIFY "bad archive digest" ;; esac
     [ ${#digest} -eq 64 ] || fail $E_VERIFY "bad archive digest"
@@ -254,7 +254,7 @@ verify_archive() {
     a=$stage/archive.tar.gz
     [ "$(wc -c <"$a")" -eq "$size" ] || fail $E_VERIFY "archive size differs from the manifest"
     [ "$(sha256sum "$a" | cut -d' ' -f1)" = "$digest" ] || fail $E_VERIFY "archive checksum differs from the manifest"
-    top=geist-$version-$platform
+    top=geisten-$version-$platform
     tar -tzf "$a" >"$stage/names" 2>/dev/null || fail $E_VERIFY "archive is not a readable tar.gz"
     [ "$(wc -l <"$stage/names")" -le 16 ] || fail $E_VERIFY "archive has too many members"
     [ "$(sort "$stage/names" | uniq -d | wc -l)" -eq 0 ] || fail $E_VERIFY "archive has duplicate members"
@@ -421,8 +421,8 @@ main() {
         base=$GEIST_RELEASES/latest/download
     fi
     say "Checking the release…"
-    fetch "$base/geist-manifest" "$stage/manifest" 8192
-    fetch "$base/geist-manifest.sig" "$stage/manifest.sig" 512
+    fetch "$base/geisten-manifest" "$stage/manifest" 8192
+    fetch "$base/geisten-manifest.sig" "$stage/manifest.sig" 512
     verify_manifest
     parse_manifest
     say "Downloading geisten $version for $platform…"
