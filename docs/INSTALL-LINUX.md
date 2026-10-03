@@ -1,6 +1,6 @@
 # Rootless Linux install (#46)
 
-`scripts/install-geist.sh` installs the shared Geisten runtime (`geisten`,
+`scripts/install-geist.sh` installs the shared geisten runtime (`geisten`,
 `geist-app`, `geistd`) for the current user on 64-bit Linux, without root and
 without a package manager. The Ubuntu DEBs (docs/INSTALL.md) stay the system-wide
 route; the installer refuses to shadow them.
@@ -52,7 +52,7 @@ again to follow or resume.
 | `~/.local/bin/geist` | the same, under the earlier command name (#92) |
 
 Only the active and the previous version are kept. Uninstall stops the service,
-removes the launcher and the runtime directory, and keeps `~/.local/share/geist`
+removes the launcher and the runtime directory, and keeps `~/.local/share/geisten`
 (models, keys, settings). The installer only touches files its receipt owns: a
 foreign `~/.local/bin/geisten` or `~/.local/bin/geist`, an APT install, or a runtime directory without a
 receipt ends with exit 13 and no change. The rootless `geisten` starts its own
@@ -92,7 +92,7 @@ manifest line by line and never evaluates it.
 
 An archive holds exactly `geist-<v>-<platform>/` with `geisten`, `geist-app`,
 `geistd`, `SHA256SUMS` and the packaged extras (licenses, `README.md`,
-`ENGINE.json`, `BUILD-PACKAGES.txt`, `Start Geisten.sh`): regular files
+`ENGINE.json`, `BUILD-PACKAGES.txt`, `Start geisten.sh`): regular files
 and directories only, at most 16 members, at most 512 MiB unpacked. Before
 activation the installer checks size and SHA-256 against the manifest, the
 member list, the ELF machine of each binary, the inner `SHA256SUMS`, and that
@@ -120,7 +120,7 @@ the old one. An installer only trusts the key it was downloaded with.
 | 11 | missing prerequisite (curl, OpenSSL 3, `mv -T`, …) |
 | 12 | download or verification failed |
 | 13 | another installation owns the files |
-| 14 | Geisten or another installer is busy (previous version restored) |
+| 14 | geisten or another installer is busy (previous version restored) |
 | 15 | start failed (previous version restored) |
 | 16 | local file system problem |
 | 17 | installed, but the `--model` setup did not finish (`geisten setup` resumes) |

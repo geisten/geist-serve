@@ -29,7 +29,7 @@ cat > "$stage/DEBIAN/control" <<EOF
 Package: geist
 Version: $version
 Architecture: $arch
-Maintainer: Geisten <geisten@users.noreply.github.com>
+Maintainer: geisten <geisten@users.noreply.github.com>
 Section: utils
 Priority: optional
 Depends: ca-certificates

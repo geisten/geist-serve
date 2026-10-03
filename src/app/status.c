@@ -391,10 +391,10 @@ void status_response(int fd, struct app_arena *arena) {
         bool                current = app.prefs.history[i][0].rate > 0 || app.prefs.history[i][1].rate > 0;
         bool before = !current && perf_earlier(m->sha256, app.prefs.profile_series, &earlier);
         if (!strcmp(a.reason, "Fits this Mac's memory. Speed not measured yet.") && before)
-            a.reason = "Fits this Mac's memory. Speed measured with an earlier Geisten version.";
+            a.reason = "Fits this Mac's memory. Speed measured with an earlier geisten version.";
         else if (!strcmp(a.reason, "No known resource restriction. Speed has not been measured on this device.") &&
                  before)
-            a.reason = "No known resource restriction. Speed measured with an earlier Geisten version.";
+            a.reason = "No known resource restriction. Speed measured with an earlier geisten version.";
         if (i)
             app_put(&b, ",");
         app_put(&b, "{\"id\":");

@@ -251,7 +251,7 @@ class BootstrapTests(unittest.TestCase):
         self.assertIn('Dry run', p.stdout)
         self.assertNothingInstalled()
         self.assertEqual(self.run_installer(r, '--no-start').returncode, 0)
-        data = self.home/'.local/share/geist/models'
+        data = self.home/'.local/share/geisten/models'
         data.mkdir(parents=True)
         (data/'model.gguf').write_text('weights')
         p = self.run_installer(r, '--uninstall')

@@ -5,26 +5,62 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
+/* An earlier service still owns this folder while it holds its app.lock. */
+static bool folder_in_use(const char *folder) {
+    char lock[APP_PATH_CAP];
+    if (snprintf(lock, sizeof lock, "%s/app.lock", folder) >= (int) sizeof lock)
+        return true;
+    int fd = open(lock, O_RDWR | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+    if (fd < 0)
+        return errno != ENOENT;
+    bool held = flock(fd, LOCK_EX | LOCK_NB) != 0;
+    close(fd); /* closing releases a lock we just took */
+    return held;
+}
+
+/* The data folder (#92): GEISTEN_HOME, else the earlier GEIST_HOME, else the
+ * platform folder named geisten. The first default run after the rename moves
+ * the earlier Geist folder there: one rename within the same parent (no copy),
+ * plus a relative symlink at the old path so earlier versions and tools still
+ * find the data. While an earlier service still owns the old folder, it is used
+ * unchanged and moved on a later start. If both exist, the new one is used and
+ * the old one is left alone. */
 bool app_home(char out[static APP_PATH_CAP]) {
-    const char *home = getenv("GEIST_HOME"), *user = getenv("HOME");
-    int         n;
-    if (home)
-        n = snprintf(out, APP_PATH_CAP, "%s", home);
-    else if (!user)
+    const char *home = getenv("GEISTEN_HOME"), *user = getenv("HOME");
+    if (!home)
+        home = getenv("GEIST_HOME");
+    if (home) {
+        int n = snprintf(out, APP_PATH_CAP, "%s", home);
+        return n > 0 && n < APP_PATH_CAP;
+    }
+    if (!user)
         return false;
+    char base[APP_PATH_CAP], old[APP_PATH_CAP];
 #ifdef __APPLE__
-    else
-        n = snprintf(out, APP_PATH_CAP, "%s/Library/Application Support/Geist", user);
+    const char *name = "geisten", *earlier = "Geist";
+    int         n    = snprintf(base, sizeof base, "%s/Library/Application Support", user);
 #else
-    else if (getenv("XDG_DATA_HOME"))
-        n = snprintf(out, APP_PATH_CAP, "%s/geist", getenv("XDG_DATA_HOME"));
-    else
-        n = snprintf(out, APP_PATH_CAP, "%s/.local/share/geist", user);
+    const char *name = "geisten", *earlier = "geist", *data = getenv("XDG_DATA_HOME");
+    int n = data ? snprintf(base, sizeof base, "%s", data) : snprintf(base, sizeof base, "%s/.local/share", user);
 #endif
-    return n > 0 && n < APP_PATH_CAP;
+    if (n <= 0 || n >= (int) sizeof base || snprintf(out, APP_PATH_CAP, "%s/%s", base, name) >= APP_PATH_CAP ||
+        snprintf(old, sizeof old, "%s/%s", base, earlier) >= (int) sizeof old)
+        return false;
+    struct stat s;
+    if (lstat(out, &s) == 0 || errno != ENOENT)
+        return true; /* already moved, or a fresh folder exists */
+    if (lstat(old, &s) != 0 || !S_ISDIR(s.st_mode) || s.st_uid != getuid())
+        return true; /* nothing to move: a fresh installation */
+    if (folder_in_use(old) || rename(old, out) != 0) {
+        snprintf(out, APP_PATH_CAP, "%s", old); /* move on a later start */
+        return true;
+    }
+    (void) symlink(name, old);
+    return true;
 }
 
 static bool path(char out[static APP_PATH_CAP], const char *home, const char *name) {

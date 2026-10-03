@@ -1,12 +1,12 @@
 [Desktop Entry]
 Type=Application
-Name=Geisten
+Name=geisten
 Comment=Choose local models and connect your tools
 Exec=geist-desktop
 Icon=applications-science
 Terminal=false
 Categories=Development;
 Keywords=local;model;privacy;
-Name[de]=Geisten
+Name[de]=geisten
 Comment[de]=Lokale Modelle auswählen und deine Programme verbinden
 StartupWMClass=com.geisten.Geist

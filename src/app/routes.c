@@ -103,7 +103,7 @@ void handle(int fd, struct app_arena *arena) {
     }
     if (!authorized(&r)) {
         if (!strncmp(r.path, "/v1/", 4)) {
-            api_error(fd, 401, "A valid local Geisten API key is required.");
+            api_error(fd, 401, "A valid local geisten API key is required.");
             return;
         }
         error_response(fd, 403, "Open the private app link supplied by the launcher.");
@@ -274,7 +274,7 @@ void handle(int fd, struct app_arena *arena) {
             atomic_store(&closing, true);
         pthread_mutex_unlock(&app.mutex);
         if (busy)
-            error_response(fd, 409, "Finish the current task before updating Geisten.");
+            error_response(fd, 409, "Finish the current task before updating geisten.");
         else
             response(fd, 202, "application/json", "{}", 2);
         return;

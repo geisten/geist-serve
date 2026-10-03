@@ -1,4 +1,4 @@
-# Install Geisten and connect your tools
+# Install geisten and connect your tools
 
 These are development candidates, not a published release or Apple-approved
 distribution. The desktop manager, terminal and compatible editor share one
@@ -6,7 +6,7 @@ loaded geistd. No model is included; click a suggested model on first use.
 
 ## macOS (Apple Silicon, macOS 14+)
 
-Drag Geist.app from the DMG to Applications and open it. Geisten opens its own
+Drag Geist.app from the DMG to Applications and open it. geisten opens its own
 desktop window. Click a model name or its download icon to download and start it.
 An installed model starts directly; progress, pause and resume stay in its row.
 A platform check suggests one model, including a smaller fallback when needed.
@@ -43,12 +43,12 @@ For a desktop, download both the matching `geist_VERSION_ARCH.deb` and
 sudo apt install ./geist_VERSION_ARCH.deb ./geist-desktop_VERSION_all.deb
 ```
 
-Open Geisten from the application menu, or run `geist-desktop`. This opens a GTK
+Open geisten from the application menu, or run `geist-desktop`. This opens a GTK
 window with the system WebKit renderer; no browser tab is opened. `geisten open`
 also uses the desktop app when installed.
 
 The Ubuntu 24.04 desktop package installs a scoped AppArmor profile permitting
-WebKit sandbox user namespaces for the Geisten desktop process tree. It leaves
+WebKit sandbox user namespaces for the geisten desktop process tree. It leaves
 global namespace policy unchanged; the host profile does not add filesystem
 or network confinement. Package updates reload the profile; removal unloads it.
 
@@ -92,14 +92,14 @@ the application window leaves the service available to editors.
 On Ubuntu install both newer DEBs with apt, run `systemctl --user daemon-reload`, then
 `geisten restart`. To recover a failed candidate, install the previous verified
 DEB with apt's explicit downgrade option and restart. Models stay in
-`~/.local/share/geist/models`. Model storage and connection credentials are not
+`~/.local/share/geisten/models`. Model storage and connection credentials are not
 modified by package scripts.
 
 Before uninstalling Ubuntu, run `systemctl --user disable --now geist.service`
 and `geisten stop`, then `sudo apt remove geist-desktop geist`. Models remain in the user data
 folder even after package purge. Delete that folder separately only if desired.
-On Mac, disable Start at Login, stop Geisten, quit the desktop app, then move
-Geist.app to Trash. Cached models remain in `~/Library/Application Support/Geist`.
+On Mac, disable Start at Login, stop geisten, quit the desktop app, then move
+Geist.app to Trash. Cached models remain in `~/Library/Application Support/geisten`.
 Quit/stop before replacing a Mac development bundle, then open the replacement.
 
 No package scripts obtain secrets or remove user models. Public update feeds,
@@ -129,7 +129,7 @@ recovery files. No new release is published by these changes.
 The Mac host uses an ephemeral WKWebView; the Ubuntu host uses an ephemeral
 WebKitGTK NetworkSession. Neither stores browser history or private links to
 disk. Only the chosen interface language is saved. External navigation is
-restricted to user-activated Geisten GitHub links. Clipboard integration can
+restricted to user-activated geisten GitHub links. Clipboard integration can
 write text but cannot read the clipboard or execute commands.
 
 Closing the window preserves the shared service. **Stop model service** asks
@@ -148,7 +148,7 @@ ad-hoc signatures are not an Apple notarization result.
 Install the newer `geist` and matching `geist-desktop` packages with APT. Their
 package names and installation paths stay the same across minor versions, so
 APT replaces the prior files. Models and the local API key stay in your user
-data directory. Close the previous window and reopen Geisten after installation.
+data directory. Close the previous window and reopen geisten after installation.
 
 From 0.5.3, starting a newer client replaces an older versioned service only
 when it is idle. A running download, model load or response blocks the handoff;
