@@ -24,7 +24,8 @@ useradd -m geist-acceptance
 uid=$(id -u geist-acceptance)
 testroot=$(mktemp -d /tmp/geist-installed.XXXXXX)
 cp -R "$source_root/tests" "$testroot/"
-for binary in geist geist-app geistd; do ln -s "/usr/lib/geist/$binary" "$testroot/$binary"; done
+for binary in geisten geist-app geistd; do ln -s "/usr/lib/geist/$binary" "$testroot/$binary"; done
+ln -s /usr/lib/geist/geisten "$testroot/geist" # the alias, as cli_test expects
 chown -R geist-acceptance:geist-acceptance "$testroot"
 if test -n "${GEIST_TEST_MODEL:-}"; then
     # The runner's private checkout/cache need not be traversable by this user.
