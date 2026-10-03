@@ -3,6 +3,7 @@
 
     bench.py run --candidate CATALOG_ID [--candidate …] --backend cpu|gpu --output NEW_DIR
     bench.py report RUN_DIR [--json]
+    bench.py quality RUN_DIR [--write]   (catalog "quality" fields, #102)
 
 Four small tasks (classify, extract, format, context) in German and English,
 scored automatically. See docs/MINI-BENCHMARK.md.
@@ -29,6 +30,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SUITE = Path(__file__).resolve().parent/'suite'
 TASKS = ('classify', 'extract', 'format', 'context')
 RSS_POLL_S = 1.0
+# Models that think before answering (<think>…</think>) get this many extra tokens on
+# top of each task's answer limit: the limit is for the answer, not the thinking (#102).
+REASONING_BUDGET = 1024
 
 
 def sha256(path):
@@ -37,6 +41,11 @@ def sha256(path):
         for chunk in iter(lambda: f.read(1 << 20), b''):
             h.update(chunk)
     return h.hexdigest()
+
+
+def suite_id():
+    """The suite id in the catalog quality field; scripts/embed-models.py computes the same."""
+    return hashlib.sha256(''.join(sha256(SUITE/f'{t}.json') for t in TASKS).encode()).hexdigest()[:12]
 
 
 def load_suite(directory=SUITE):
@@ -252,7 +261,8 @@ def run_candidate(suite, entry, model, backend, out):
                   model=dict(catalog_id=entry['id'], file=entry['file'], sha256=entry['sha256'], bytes=entry['bytes'],
                              quantization=entry.get('quantization'), source=entry['url']),
                   engine=engine_identity(), host=host_identity(),
-                  sampler=dict(endpoint='/v1/chat/completions', temperature=0, generations_per_case=1, retries=0, warmup=1),
+                  sampler=dict(endpoint='/v1/chat/completions', temperature=0, generations_per_case=1, retries=0, warmup=1,
+                               reasoning_budget=REASONING_BUDGET if entry.get('reasoning_format') else 0),
                   started_utc=datetime.now(timezone.utc).isoformat(), errors=[])
     # Same file system as the model, so it can be hard-linked instead of copied.
     with tempfile.TemporaryDirectory(prefix='.geist-bench-', dir=model.parent.parent) as home:
@@ -265,13 +275,14 @@ def run_candidate(suite, entry, model, backend, out):
             record['execution'] = dict(active=status['execution']['active'], backend=status['execution']['backend'])
             poller.start()
             first = suite['classify']
-            app.complete(first['prompt']['en'], first['cases'][0]['input'], first['max_tokens'])  # declared warm-up, not scored
+            budget = record['sampler']['reasoning_budget']
+            app.complete(first['prompt']['en'], first['cases'][0]['input'], first['max_tokens'] + budget)  # declared warm-up, not scored
             with open(out/'results.jsonl', 'x', encoding='utf-8') as raw:
                 for task, spec in suite.items():
                     for case in spec['cases']:
                         row = dict(task=task, id=case['id'], language=case['language'], tags=case['tags'])
                         try:
-                            output, finish, usage, ms = app.complete(spec['prompt'][case['language']], case['input'], spec['max_tokens'])
+                            output, finish, usage, ms = app.complete(spec['prompt'][case['language']], case['input'], spec['max_tokens'] + budget)
                             passed, reason = score(task, case, output, (spec.get('marker') or {}).get(case['language']))
                             row.update(output=output, finish_reason=finish, usage=usage, ms=ms, passed=passed, reason=reason)
                         except (OSError, RuntimeError, ValueError, KeyError) as error:
@@ -374,6 +385,32 @@ def report(args):
           + ('' if len(hosts) == 1 else ' These runs come from different hosts.'))
 
 
+def quality(args):
+    """Catalog evidence from complete, current runs of a committed engine; --write updates models/catalog.json."""
+    directory, suite = Path(args.run), load_suite()
+    fields = {}
+    for d in sorted(p for p in directory.iterdir() if (p/'run.json').is_file()):
+        r, run = summarize(d, suite), json.loads((d/'run.json').read_text())
+        if not r['complete'] or r['stale'] or run['engine']['source_dirty'] or not run['engine']['engine_pin']:
+            raise ValueError(f'{d.name}: incomplete, stale or from an uncommitted engine; not catalog evidence')
+        fields[r['candidate']] = dict(suite=suite_id(), date=run['finished_utc'][:10], engine=run['engine']['engine_pin'][:12],
+                                      evidence=sha256(d/'results.jsonl'),
+                                      tasks={t: {l: [c[l]['passed'], c[l]['total']] for l in ('de', 'en')} for t, c in r['tasks'].items()})
+    if not fields:
+        raise ValueError(f'{directory}: no candidate runs')
+    if not args.write:
+        print(json.dumps(fields, indent=2))
+        return
+    path = ROOT/'models/catalog.json'
+    catalog = json.loads(path.read_text())
+    for model in catalog['models']:
+        if model['id'] in fields:
+            model['quality'] = fields[model['id']]
+    catalog['revision'] += 1
+    path.write_text(json.dumps(catalog, indent=2, ensure_ascii=False) + '\n')
+    print(f'{path}: quality for {", ".join(fields)}; revision {catalog["revision"]}')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest='command', required=True)
@@ -387,9 +424,12 @@ def main():
     p = sub.add_parser('report')
     p.add_argument('run')
     p.add_argument('--json', action='store_true')
+    q = sub.add_parser('quality')
+    q.add_argument('run')
+    q.add_argument('--write', action='store_true')
     args = parser.parse_args()
     try:
-        run(args) if args.command == 'run' else report(args)
+        dict(run=run, report=report, quality=quality)[args.command](args)
     except (ValueError, OSError) as error:
         sys.exit(f'bench: {error}')
 

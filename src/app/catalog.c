@@ -89,6 +89,76 @@ static bool component(const char *s, bool file) {
     size_t n = strlen(s);
     return !file || (n > 5 && !strcmp(s + n - 5, ".gguf"));
 }
+static bool hex(const char *s, size_t n) {
+    if (!s || strlen(s) != n)
+        return false;
+    for (; *s; ++s)
+        if (!(*s >= '0' && *s <= '9') && !(*s >= 'a' && *s <= 'f'))
+            return false;
+    return true;
+}
+/* [passed, total], 0 <= passed <= total. */
+static bool counts(const struct json *j, int object, const char *key) {
+    int      t = json_get(j, object, key);
+    uint64_t v[2];
+    if (t < 0 || j->tok[t].type != JSMN_ARRAY || j->tok[t].size != 2)
+        return false;
+    for (int k = 0; k < 2; ++k) {
+        const jsmntok_t *e = &j->tok[t + 1 + k];
+        if (e->type != JSMN_PRIMITIVE || e->parent != t)
+            return false;
+        const char *s   = j->src + e->start;
+        int         len = e->end - e->start;
+        if (len < 1 || len > 6 || (len > 1 && s[0] == '0'))
+            return false;
+        v[k] = 0;
+        for (int i = 0; i < len; ++i) {
+            if (s[i] < '0' || s[i] > '9')
+                return false;
+            v[k] = v[k] * 10 + (unsigned) (s[i] - '0');
+        }
+    }
+    return v[1] && v[0] <= v[1];
+}
+/* #102: reference benchmark evidence. Validated, then kept as its raw JSON text
+ * (plain strings and digits only), so status can pass it through unchanged. */
+static const char *quality(struct app_catalog *c, const struct json *j, int object) {
+    static const char *const quality_keys[] = {"suite", "date", "engine", "evidence", "tasks", nullptr};
+    static const char *const language_keys[] = {"de", "en", nullptr};
+    if (!keys(j, object, quality_keys) || !hex(string(c, j, object, "suite", 12), 12) ||
+        !hex(string(c, j, object, "evidence", 64), 64) || !component(string(c, j, object, "engine", 48), false))
+        return nullptr;
+    const char *date = string(c, j, object, "date", 10);
+    if (!date || strlen(date) != 10)
+        return nullptr;
+    for (int i = 0; i < 10; ++i)
+        if (i == 4 || i == 7 ? date[i] != '-' : !isdigit((unsigned char) date[i]))
+            return nullptr;
+    int tasks = json_get(j, object, "tasks");
+    if (tasks < 0 || j->tok[tasks].type != JSMN_OBJECT || j->tok[tasks].size < 1 || j->tok[tasks].size > 8)
+        return nullptr;
+    for (int i = tasks + 1; i < j->n && j->tok[i].start < j->tok[tasks].end; ++i) {
+        if (j->tok[i].parent != tasks)
+            continue;
+        char   name[33];
+        size_t n = (size_t) (j->tok[i].end - j->tok[i].start);
+        if (j->tok[i].type != JSMN_STRING || !n || n >= sizeof name)
+            return nullptr;
+        memcpy(name, j->src + j->tok[i].start, n);
+        name[n] = 0;
+        if (!component(name, false) || !keys(j, i + 1, language_keys) || !counts(j, i + 1, "de") ||
+            !counts(j, i + 1, "en"))
+            return nullptr;
+    }
+    size_t n = (size_t) (j->tok[object].end - j->tok[object].start);
+    if (n + 1 > sizeof c->strings - c->used)
+        return nullptr;
+    char *out = c->strings + c->used;
+    memcpy(out, j->src + j->tok[object].start, n);
+    out[n] = 0;
+    c->used += n + 1;
+    return out;
+}
 struct app_catalog *app_catalog_parse(const char *text, char error[static 256]) {
     snprintf(error, 256, "Invalid model catalog. Check schema, entries and unique IDs/files.");
     if (!text || strlen(text) > APP_CATALOG_BYTES)
@@ -112,6 +182,7 @@ struct app_catalog *app_catalog_parse(const char *text, char error[static 256]) 
                                              "group_name",
                                              "quantization",
                                              "reasoning_format",
+                                             "quality",
                                              nullptr};
     uint64_t                 v, schema;
     if (json_parse(j, strlen(text), text) < 0 || !keys(j, 0, root_keys) ||
@@ -141,6 +212,8 @@ struct app_catalog *app_catalog_parse(const char *text, char error[static 256]) 
                 (strcmp(m->reasoning_format, "none") && strcmp(m->reasoning_format, "think_tags")))
                 goto bad;
         }
+        if (json_get(j, i, "quality") >= 0 && !(m->quality = quality(c, j, json_get(j, i, "quality"))))
+            goto bad;
         if (schema == 2) {
             m->group_id     = string(c, j, i, "group_id", 63);
             m->group_name   = string(c, j, i, "group_name", 100);

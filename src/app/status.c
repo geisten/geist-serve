@@ -147,6 +147,8 @@ void status_response(int fd, struct app_arena *arena) {
     app_put(&b, "{\"version\":");
     app_quote(&b, APP_VERSION);
     app_printf(&b, ",\"catalog_revision\":%u", app_catalog_revision);
+    app_put(&b, ",\"quality_suite\":");
+    app_quote(&b, app_quality_suite);
     app_put(&b, ",\"recommendation\":{\"id\":");
     app_quote(&b, recommendation.model ? recommendation.model->id : "");
     app_put(&b, ",\"preferred_id\":");
@@ -420,6 +422,9 @@ void status_response(int fd, struct app_arena *arena) {
                    a.fit,
                    app_task_fit(a.fit, APP_QUALITY_UNVERIFIED));
         app_quote(&b, a.reason);
+        /* #102: reference benchmark counts from the catalog, or null: never a guess. */
+        app_put(&b, ",\"quality_evidence\":");
+        app_put(&b, m->quality ? m->quality : "null");
         /* Only modalities implemented by the bundled service are advertised. */
         app_put(&b,
                 ",\"capabilities\":{\"chat\":true,\"vision\":false,"

@@ -415,26 +415,48 @@ const fitIcons = [
   '<path d="m12 3 10 18H2zM12 9v5m0 3v.01"/>',
   '<circle cx="12" cy="12" r="9"/><path d="m6 6 12 12"/>'
 ];
+// #102: reference benchmark counts from the catalog (bench.py, one reference machine).
+// A symbol with the share of correct answers; the words are in the tooltip.
+const qualityIcon = '<path d="M10 6h10M10 12h10M10 18h10"/><path d="m3 6 1.5 1.5L7 5m-4 7 1.5 1.5L7 11m-4 7 1.5 1.5L7 17"/>';
+const benchmarkTasks = {classify:'Classification', extract:'Data extraction', format:'Following a format', context:'Facts from context'};
+function qualityCounts(model) {
+  const tasks = Object.values(model?.quality_evidence?.tasks || {});
+  const sum = language => tasks.reduce((a, c) => [a[0] + c[language][0], a[1] + c[language][1]], [0, 0]);
+  const de = sum('de'), en = sum('en');
+  return tasks.length ? {de, en, passed: de[0] + en[0], total: de[1] + en[1]} : null;
+}
+function qualityText(model) {
+  const q = model.quality_evidence, c = qualityCounts(model);
+  if (!c) return t('Answer quality not tested yet');
+  return [`${t('Reference test')}: ${c.passed}/${c.total} ${t('correct')} (DE ${c.de.join('/')} · EN ${c.en.join('/')})`,
+    ...Object.entries(q.tasks).map(([k, v]) => `${t(benchmarkTasks[k] || k)} ${v.de[0] + v.en[0]}/${v.de[1] + v.en[1]}`),
+    ...(q.suite === state?.quality_suite ? [] : [t('older test version')])].join(' · ');
+}
 function renderModelLegend() {
   const icon = path => `<svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg>`;
-  $('model-legend').innerHTML = `<span>${icon(fitIcons[0])}<span data-ui-text="Fits this computer"></span></span><span>${icon(capabilityIcons.chat.path)}<span data-ui-text="Text chat"></span></span>`;
+  $('model-legend').innerHTML = `<span>${icon(fitIcons[0])}<span data-ui-text="Fits this computer"></span></span><span>${icon(capabilityIcons.chat.path)}<span data-ui-text="Text chat"></span></span><span>${icon(qualityIcon)}<span data-ui-text="Correct answers in the reference test"></span></span>`;
   $('model-legend').querySelectorAll('[data-ui-text]').forEach(e => { e.textContent = t(e.dataset.uiText); });
 }
 function renderModelBadges(element, model) {
   const fit = [0, 1, 2].includes(model.resource_fit) ? model.resource_fit : 1;
   const label = ['Fits this computer', 'Limited on this computer', 'Unavailable on this computer'][fit];
   const enabled = Object.entries(capabilityIcons).filter(([key]) => model.capabilities?.[key] === true);
-  const signature = `${fit}:${enabled.map(([key]) => key).join(',')}`;
+  const counts = qualityCounts(model);
+  const tested = counts ? model.quality_evidence.suite === state?.quality_suite ? 'current' : 'older' : 'none';
+  const share = counts ? `${Math.round(100 * counts.passed / counts.total)}%` : '';
+  const signature = `${fit}:${enabled.map(([key]) => key).join(',')}:${tested}:${share}`;
   if (element.dataset.icons !== signature) {
     // All markup is local and allowlisted; metadata text is never interpreted as HTML.
-    element.innerHTML = `<span class="model-fit" data-fit="${fit}"><svg viewBox="0 0 24 24" aria-hidden="true">${fitIcons[fit]}</svg></span>` + enabled.map(([key, icon]) => `<span data-capability="${key}"><svg viewBox="0 0 24 24" aria-hidden="true">${icon.path}</svg></span>`).join('');
+    element.innerHTML = `<span class="model-fit" data-fit="${fit}"><svg viewBox="0 0 24 24" aria-hidden="true">${fitIcons[fit]}</svg></span>` + enabled.map(([key, icon]) => `<span data-capability="${key}"><svg viewBox="0 0 24 24" aria-hidden="true">${icon.path}</svg></span>`).join('') +
+      `<span class="model-quality" data-tested="${tested}"><svg viewBox="0 0 24 24" aria-hidden="true">${qualityIcon}</svg>${share}</span>`;
     element.dataset.icons = signature;
   }
   const fitText = `${t(label)}${model.reason ? `: ${fitReason(model)}` : ''}`;
   element.querySelector('.model-fit').title = fitText;
   for (const [key, icon] of enabled) element.querySelector(`[data-capability="${key}"]`).title = t(icon.label);
+  element.querySelector('.model-quality').title = qualityText(model);
   const specification = model.bytes ? t(`${bytes(model.bytes)} download · ${model.ram_gib} GiB RAM guidance`) : t('Local model');
-  const description = [fitText, ...enabled.map(([, icon]) => t(icon.label)), specification].join(' · ');
+  const description = [fitText, ...enabled.map(([, icon]) => t(icon.label)), qualityText(model), specification].join(' · ');
   element.title = description;
   element.setAttribute('aria-label', description);
 }
@@ -577,7 +599,8 @@ function render(next) {
   $('model-prompt').textContent = t(working ? 'Getting ready…' : 'Choose a model to begin.');
   const suggestion = working ? null : recommendedModel(next);
   $('model-prompt-hint').hidden = !suggestion;
-  if (suggestion) $('model-prompt-hint').textContent = t(`Suggested start for this ${hostName()}: ${modelLabel(suggestion)} (${bytes(suggestion.bytes)}). It fits the memory; answer quality is not tested yet.`);
+  const counts = qualityCounts(suggestion);
+  if (suggestion) $('model-prompt-hint').textContent = t(`Suggested start for this ${hostName()}: ${modelLabel(suggestion)} (${bytes(suggestion.bytes)}). It fits the memory; ${counts ? `reference test: ${counts.passed}/${counts.total} correct` : 'answer quality is not tested yet'}.`);
   $('model-legend').hidden = !!next.active_id;
   if (usable && previouslyHidden && !$('workspace').hidden && !$('models-page').hidden &&
       (document.activeElement === document.body || document.activeElement.closest('.model-pick'))) $('prompt').focus({preventScroll:true});

@@ -903,6 +903,23 @@ $$
       assert(title.includes(`${t('geisten engine')} 0.10 · CPU ${formatNumber(13)} t/s · GPU ${formatNumber(30)} t/s`) && title.endsWith(t('Not measured with this version yet.')), '#90: earlier numbers with their engine, this version unmeasured');
       render(saved);
     }
+    { // #102: reference test as a symbol with the share; words in the tooltip; older suites marked.
+      const saved = state, id = saved.models[0].id;
+      const evidence = {suite: 'aaaaaaaaaaaa', date: '2026-10-03', engine: '33db79d7764b', evidence: 'a'.repeat(64), tasks: {classify: {de: [19, 20], en: [18, 20]}, context: {de: [20, 20], en: [15, 20]}}};
+      const withQuality = (q, suite) => ({...saved, quality_suite: suite, models: saved.models.map(m => m.id === id ? {...m, quality_evidence: q} : m)});
+      render(withQuality(evidence, 'aaaaaaaaaaaa'));
+      let badge = cards.get(id).querySelector('.model-quality');
+      assert(badge.dataset.tested === 'current' && badge.textContent === '90%', '#102: the share of correct answers next to the symbol');
+      assert(badge.title === `${t('Reference test')}: 72/80 ${t('correct')} (DE 39/40 · EN 33/40) · ${t('Classification')} 37/40 · ${t('Facts from context')} 35/40`, '#102: counts per language and task in the tooltip');
+      assert(cards.get(id).querySelector('.model-badges').getAttribute('aria-label').includes(badge.title), '#102: the words reach assistive technology');
+      render(withQuality(evidence, 'bbbbbbbbbbbb'));
+      badge = cards.get(id).querySelector('.model-quality');
+      assert(badge.dataset.tested === 'older' && badge.title.endsWith(t('older test version')), '#102: another suite version is an older test, not current');
+      render(withQuality(null, 'aaaaaaaaaaaa'));
+      badge = cards.get(id).querySelector('.model-quality');
+      assert(badge.dataset.tested === 'none' && badge.textContent === '' && badge.title === t('Answer quality not tested yet'), '#102: no evidence, no number');
+      render(saved);
+    }
     { // #83: model actions are locked during a comparison; a pause says "Cancelling…" until the job ends.
       const saved = state, idle = saved.models.find(m => !m.installed && m.id !== saved.active_id && m.resource_fit !== 2);
       assert(idle, '#83: the fixture offers a model to download');

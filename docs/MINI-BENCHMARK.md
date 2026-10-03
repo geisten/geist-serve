@@ -8,7 +8,15 @@ run. It compares models; it does not certify a model for a particular use.
 make && make app
 python3 workbench/bench.py run --candidate gemma4-e2b --candidate qwen3-0.6b --backend gpu --output build/bench/2026-10-01
 python3 workbench/bench.py report build/bench/2026-10-01        # --json for machines
+python3 workbench/bench.py quality build/bench/2026-10-01 --write  # catalog evidence (#102)
 ```
+
+`quality` turns complete runs of a committed engine into the catalog's
+optional `quality` field: passed/total per task and language, the suite id,
+the date, the engine pin and the sha256 of `results.jsonl`. The app shows it
+as the reference test; a result for another suite id is an older test. Answer
+quality hardly depends on the computer, so it is measured once, on a
+reference machine, not on every user's computer.
 
 Candidates are catalog ids (`models/catalog.json`) whose files are already
 downloaded in geisten (`--model-dir`, default: the geisten home's `models/`).

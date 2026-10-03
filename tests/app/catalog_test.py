@@ -25,6 +25,17 @@ with tempfile.TemporaryDirectory(prefix='geist-catalog-') as temporary:
         for key,value in [('id','../escape'),('file','../escape.gguf'),('file','model.sh'),('url','https://evil.example/model.gguf'),('sha256','0'*63),('backends',['metal']),('backends',[]),('unsupported_format','unknown'),('unsupported_format','pq2_0'),('backends',['cpu','cpu']),('backends',['cpu\x00suffix']),('backends',['cpu','metal\x00suffix']),('bytes',-1),('bytes',1.5),('name','bad\nname'),('group_id','../bad'),('group_id','custom'),('group_name',''),('quantization',''),('quantization','Q4/0'),('reasoning_format','guess'),('reasoning_format',None),('reasoning_format','think_tags\x00suffix')]:
             bad=copy.deepcopy(good);bad['models'][0][key]=value;invalid.append(bad)
         bad=copy.deepcopy(good);bad['models'].append(bad['models'][0]);invalid.append(bad)
+        # #102: reference benchmark evidence is optional, but never malformed.
+        evidence={'suite':'0123456789ab','date':'2026-10-03','engine':'33db79d7764b','evidence':'a'*64,'tasks':{'classify':{'de':[19,20],'en':[0,20]},'context':{'de':[20,20],'en':[18,20]}}}
+        good['models'][-1]['quality']=evidence
+        for change in [lambda q:q.update(suite='0123'),lambda q:q.update(suite='0123456789AB'),lambda q:q.update(date='03.10.2026'),lambda q:q.update(engine='a b'),
+                       lambda q:q.update(evidence='a'*63),lambda q:q.update(extra=1),lambda q:q.pop('tasks'),lambda q:q.update(tasks={}),lambda q:q.update(tasks=[]),
+                       lambda q:q['tasks'].update(classify={'de':[21,20],'en':[0,20]}),lambda q:q['tasks'].update(classify={'de':[1,0],'en':[0,20]}),
+                       lambda q:q['tasks'].update(classify={'de':[-1,20],'en':[0,20]}),lambda q:q['tasks'].update(classify={'de':[1.5,20],'en':[0,20]}),
+                       lambda q:q['tasks'].update(classify={'de':[1,20,3],'en':[0,20]}),lambda q:q['tasks'].update(classify={'de':[1,20]}),
+                       lambda q:q['tasks'].update(classify={'de':['1',20],'en':[0,20]}),lambda q:q['tasks'].update({'../x':{'de':[1,20],'en':[0,20]}})]:
+            bad=copy.deepcopy(good);change(bad['models'][-1]['quality']);invalid.append(bad)
+        bad=copy.deepcopy(good);bad['models'][-1]['quality']='146/160';invalid.append(bad)
         for field in ['group_id','group_name','quantization']:
             bad=copy.deepcopy(good);del bad['models'][0][field];invalid.append(bad)
         for field,value in [('group_name','Conflicting name'),('quantization','Q4_0')]:
@@ -60,6 +71,9 @@ with tempfile.TemporaryDirectory(prefix='geist-catalog-') as temporary:
         assert app.request('/app/catalog',good,auth=False)[0]==403
         assert app.request('/app/catalog',good)[0]==200
         assert len(app.status()['models'])==len(good['models'])
+        quality={m['id']:m['quality_evidence'] for m in app.status()['models']}
+        assert quality.pop('another-small-model')==evidence and set(quality.values())=={None}
+        assert len(app.status()['quality_suite'])==12
         assert app.request('/app/catalog',good)[0]==409
         assert json.loads((home/'catalog.json').read_text())==good
         assert (home/'catalog.json').stat().st_mode & 0o777 == 0o600

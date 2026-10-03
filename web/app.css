@@ -806,6 +806,9 @@ body.manager-page main { max-width:1180px }
 .model-badges>span { display:inline-flex }
 .model-badges svg { width:13px; height:13px; stroke-width:1.6 }
 .model-fit[data-fit="1"],.model-fit[data-fit="2"] { color:#96620d }
+.model-quality { gap:2px; font-size:11px; font-variant-numeric:tabular-nums }
+.model-quality[data-tested="none"] { opacity:.45 }
+.model-quality[data-tested="older"] { font-style:italic }
 .ring-download,.ring-pause,.ring-resume { display:none }
 .model-ring[data-stage="missing"] .ring-track { display:none }
 .model-ring[data-stage="missing"] .ring-download { display:block; stroke-width:2; color:var(--muted) }
