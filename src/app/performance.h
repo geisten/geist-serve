@@ -30,8 +30,13 @@ void  perf_view(struct app_buffer *b,
                 const char        *series,
                 const char        *cpu,
                 const char        *gpu);
-/* Any completed reply for this artifact, from any engine build or Geist version. */
-bool  perf_measured(const char *artifact);
+/* Newest completed reply per processor (0 CPU, 1 GPU) for this artifact from
+ * an earlier engine build or Geist version; version is "" when unknown. */
+struct perf_earlier {
+    double rate[2];
+    char   version[64];
+};
+bool  perf_earlier(const char *artifact, const char *series, struct perf_earlier *out);
 void  perf_last(const char         *artifact,
                 const char         *series,
                 const char         *backend,

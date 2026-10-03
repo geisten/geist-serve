@@ -531,12 +531,22 @@ void perf_import(struct perf_record *r) {
     pthread_mutex_unlock(&p.mutex);
     perf_submit(r);
 }
-bool perf_measured(const char *artifact) {
+bool perf_earlier(const char *artifact, const char *series, struct perf_earlier *out) {
+    memset(out, 0, sizeof *out);
     bool found = false;
     pthread_mutex_lock(&p.mutex);
-    for (size_t i = 0; i < p.count && !found; i++)
-        found = !strcmp(p.records[i].artifact, artifact) && !strcmp(p.records[i].outcome, "completed") &&
-                p.records[i].output > 0 && p.records[i].generation_ns > 0;
+    for (size_t i = p.count; i > 0; i--) {
+        const struct perf_record *r = &p.records[i - 1];
+        if (strcmp(r->artifact, artifact) || !strcmp(r->series, series) || strcmp(r->outcome, "completed") ||
+            r->output <= 0 || r->generation_ns <= 0 || r->warmup)
+            continue;
+        unsigned slot = strncmp(r->backend, "cpu", 3) ? 1 : 0;
+        if (!out->rate[slot])
+            out->rate[slot] = r->output / (r->generation_ns / 1e9);
+        if (!found)
+            snprintf(out->version, sizeof out->version, "%s", r->engine.version);
+        found = true;
+    }
     pthread_mutex_unlock(&p.mutex);
     return found;
 }

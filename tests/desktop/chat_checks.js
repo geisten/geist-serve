@@ -893,6 +893,16 @@ $$
       assert($('execution-notice').hidden, '#82: no fallback notice without a model');
       render(saved);
     }
+    { // #90: the fit reason states the measured numbers, or the earlier build's and that this one is unmeasured.
+      const saved = state, id = saved.models[0].id, reason = "Fits this Mac's memory. Speed measured on this Mac.";
+      const withModel = patch => ({...saved, models: saved.models.map(m => m.id === id ? {...m, resource_fit: 0, ...patch} : m)});
+      render(withModel({reason, speed: {cpu: 13.2, gpu: 30.4}, earlier: null}));
+      assert(cards.get(id).querySelector('.model-fit').title.endsWith(`${t("Fits this Mac's memory.")} CPU ${formatNumber(13)} t/s · GPU ${formatNumber(30)} t/s`), '#90: measured numbers instead of "measured"');
+      render(withModel({reason: "Fits this Mac's memory. Speed measured with an earlier Geist version.", speed: {cpu: null, gpu: null}, earlier: {engine: '0.10.2', cpu: 12.6, gpu: 29.5}}));
+      const title = cards.get(id).querySelector('.model-fit').title;
+      assert(title.includes(`${t('Geist engine')} 0.10 · CPU ${formatNumber(13)} t/s · GPU ${formatNumber(30)} t/s`) && title.endsWith(t('Not measured with this version yet.')), '#90: earlier numbers with their engine, this version unmeasured');
+      render(saved);
+    }
     { // #83: model actions are locked during a comparison; a pause says "Cancelling…" until the job ends.
       const saved = state, idle = saved.models.find(m => !m.installed && m.id !== saved.active_id && m.resource_fit !== 2);
       assert(idle, '#83: the fixture offers a model to download');

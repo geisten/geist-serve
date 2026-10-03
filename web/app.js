@@ -143,6 +143,20 @@ const sourceText = source => source ? t(sourceNames[source] || 'Measured by the 
 
 // #55: one wording for the engine line in both dialogs. Unreported provenance
 // (legacy daemon, or none yet) hides the line instead of "Unknown · Unknown".
+// The speed sentence in a fit reason comes from the measured numbers (#90):
+// "CPU 13 t/s · GPU 30 t/s", or the newest values from an earlier build.
+const tps = value => `${formatNumber(value, value < 10 ? 1 : 0)} t/s`;
+const speedParts = s => ['cpu', 'gpu'].filter(k => knownNumber(s?.[k]) && s[k] > 0).map(k => `${k.toUpperCase()} ${tps(s[k])}`);
+function fitReason(model) {
+  const base = ["Fits this Mac's memory.", 'No known resource restriction.'].find(b => model.reason?.startsWith(b));
+  const now = speedParts(model.speed), before = speedParts(model.earlier);
+  if (!base || (!now.length && !before.length)) return t(model.reason || '');
+  if (now.length) return `${t(base)} ${now.join(' · ')}`;
+  const version = model.earlier.engine?.split('.').slice(0, 2).join('.');
+  const sameVersion = version && version === state?.engine?.geistlib?.version?.split('.').slice(0, 2).join('.');
+  const label = version ? `${t('Geist engine')} ${version}${sameVersion ? ` (${t('earlier build')})` : ''}` : t('Earlier version');
+  return `${t(base)} ${label} · ${before.join(' · ')}. ${t('Not measured with this version yet.')}`;
+}
 function engineText(engine) {
   const lib = engine?.geistlib;
   if (!lib?.version) return '';
@@ -403,7 +417,7 @@ function renderModelBadges(element, model) {
     element.innerHTML = `<span class="model-fit" data-fit="${fit}"><svg viewBox="0 0 24 24" aria-hidden="true">${fitIcons[fit]}</svg></span>` + enabled.map(([key, icon]) => `<span data-capability="${key}"><svg viewBox="0 0 24 24" aria-hidden="true">${icon.path}</svg></span>`).join('');
     element.dataset.icons = signature;
   }
-  const fitText = `${t(label)}${model.reason ? `: ${t(model.reason)}` : ''}`;
+  const fitText = `${t(label)}${model.reason ? `: ${fitReason(model)}` : ''}`;
   element.querySelector('.model-fit').title = fitText;
   for (const [key, icon] of enabled) element.querySelector(`[data-capability="${key}"]`).title = t(icon.label);
   const specification = model.bytes ? t(`${bytes(model.bytes)} download · ${model.ram_gib} GiB RAM guidance`) : t('Local model');

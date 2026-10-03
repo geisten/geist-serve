@@ -101,7 +101,9 @@ def main():
             p=profile(app);assert p['retained']>=15 and p['cpu'] is None and p['gpu'] is None
             assert all(r['historical'] for r in p['recent'])
             # Only an older engine build measured it: say so, never "not measured".
-            reason=next(m for m in app.status()['models'] if m['id']==model['id'])['reason']
+            card=next(m for m in app.status()['models'] if m['id']==model['id']);reason=card['reason']
+            # #90: the numbers behind it, the newest from the earlier build, and none for this one.
+            assert card['speed']=={'cpu':None,'gpu':None} and card['earlier']['engine']=='0.11.0' and card['earlier']['cpu']>0,card
             assert 'not measured' not in reason and 'not been measured' not in reason, reason
             assert 'measured' not in reason or reason.endswith('earlier Geist version.'), reason
         finally:app.close()
@@ -154,6 +156,8 @@ def main():
             assert p['cpu']['count'] == 1 and p['cpu']['rate'] == 18, p
             assert p['cpu_group']['cold'] and not p['gpu_group']['cold'], p
             assert abs(app.status()['execution']['performance']['rate'] - 18) < .001, 'download overlap is not the last reply'
+            card = next(m for m in app.status()['models'] if m['id'] == model['id'])
+            assert abs(card['speed']['cpu'] - 18) < .01 and abs(card['speed']['gpu'] - 80) < .01 and card['earlier'] is None, card
         finally:app.close()
         # Legacy import survives restart, stays archived, and deletion never reimports.
         legacy=home/f'performance-{base["artifact"]}-{base["backend"]}'
