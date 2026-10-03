@@ -3,7 +3,7 @@
 abi <abi/4.0>,
 include <tunables/global>
 
-profile geist-desktop /usr/bin/geist-desktop flags=(unconfined) {
+profile geisten-desktop /usr/bin/geisten-desktop flags=(unconfined) {
     userns,
-    include if exists <local/geist-desktop>
+    include if exists <local/geisten-desktop>
 }

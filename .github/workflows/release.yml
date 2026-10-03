@@ -118,7 +118,7 @@ jobs:
         run: |
           cp deploy/systemd/geist-serve.socket deploy/systemd/geist-serve.service deploy/systemd/geist-serve.default dist/
           cp candidates/ubuntu-amd64-candidate/*.deb dist/
-          cp "candidates/ubuntu-arm64-candidate/geist_${PACKAGE_VERSION}_arm64.deb" dist/
+          cp "candidates/ubuntu-arm64-candidate/geisten_${PACKAGE_VERSION}_arm64.deb" dist/
           if [ -n "$GEIST_MANIFEST_SIGNING_KEY" ]; then
             cp candidates/ubuntu-*-candidate/geisten-"$PACKAGE_VERSION"-linux-*.tar.gz scripts/install-geisten.sh dist/
             python3 scripts/installer-manifest.py dist "$PACKAGE_VERSION" "$GITHUB_SHA" "$(sed -n 's/^GEIST_REF *?= *//p' Makefile)"

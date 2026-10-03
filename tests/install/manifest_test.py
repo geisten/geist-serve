@@ -14,7 +14,7 @@ class ManifestTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
-        self.assets=[f'geist-serve-{p}{s}' for p in ['linux-x86_64','linux-aarch64','macos-arm64'] for s in ['', '-geistd']]+['geist-serve.socket','geist-serve.service','geist-serve.default','geist_1.2.3_amd64.deb','geist_1.2.3_arm64.deb','geist-desktop_1.2.3_all.deb','geist-serve.cdx.json']
+        self.assets=[f'geist-serve-{p}{s}' for p in ['linux-x86_64','linux-aarch64','macos-arm64'] for s in ['', '-geistd']]+['geist-serve.socket','geist-serve.service','geist-serve.default','geisten_1.2.3_amd64.deb','geisten_1.2.3_arm64.deb','geisten-desktop_1.2.3_all.deb','geist-serve.cdx.json']
         for name in self.assets: (self.root/name).write_text(name)
 
     def test_all_payloads_and_package_sidecars_verified(self):
@@ -25,7 +25,7 @@ class ManifestTests(unittest.TestCase):
             digest,name=line.split()
             self.assertEqual(digest,hashlib.sha256((self.root/name).read_bytes()).hexdigest())
         for arch in ['amd64','arm64']:
-            self.assertIn((self.root/f'geist_1.2.3_{arch}.deb.sha256').read_text().strip(),entries)
+            self.assertIn((self.root/f'geisten_1.2.3_{arch}.deb.sha256').read_text().strip(),entries)
 
     def test_installer_assets_are_all_or_none(self):
         installer=['geisten-1.2.3-linux-x86_64.tar.gz','geisten-1.2.3-linux-aarch64.tar.gz','geisten-manifest','geisten-manifest.sig','install-geisten.sh']
@@ -35,7 +35,7 @@ class ManifestTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'geisten-manifest.sig'): manifest.assemble(self.root,'1.2.3')
 
     def test_missing_platform_package_fails_without_manifest(self):
-        (self.root/'geist_1.2.3_arm64.deb').unlink()
+        (self.root/'geisten_1.2.3_arm64.deb').unlink()
         with self.assertRaises(ValueError): manifest.assemble(self.root,'1.2.3')
         self.assertFalse((self.root/'SHA256SUMS').exists())
 
