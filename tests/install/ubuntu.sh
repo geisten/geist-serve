@@ -78,11 +78,11 @@ if test -d /run/systemd/system; then
     as_user geisten status >/dev/null
     if test -n "${GEIST_TEST_MODEL:-}"; then
         install -o geist-acceptance -g geist-acceptance -m 600 "$GEIST_TEST_MODEL" \
-            /home/geist-acceptance/.local/share/geist/models/smollm2-360m-instruct-q8_0.gguf
+            /home/geist-acceptance/.local/share/geisten/models/smollm2-360m-instruct-q8_0.gguf
         as_user geist use smollm2-360m >/dev/null
         check_selected_model 'initial selection'
     fi
-    cp /home/geist-acceptance/.local/share/geist/api-key "$testroot/key-before"
+    cp /home/geist-acceptance/.local/share/geisten/api-key "$testroot/key-before"
     before=$(as_user systemctl --user show -p MainPID --value geist.service)
     test "$before" -gt 1
     # Supervisor failure must recover through the installed unit.
@@ -98,15 +98,15 @@ if test -d /run/systemd/system; then
     as_user geist restart
     as_user geisten status >/dev/null
     check_selected_model 'explicit restart'
-    cmp "$testroot/key-before" /home/geist-acceptance/.local/share/geist/api-key
+    cmp "$testroot/key-before" /home/geist-acceptance/.local/share/geisten/api-key
 else
     test "${GEIST_REQUIRE_SYSTEMD:-0}" != 1
     echo 'SKIPPED actual systemd lifecycle: container was not booted with systemd'
-    as_user env GEIST_HOME=/home/geist-acceptance/.local/share/geist geist start
-    as_user env GEIST_HOME=/home/geist-acceptance/.local/share/geist geist stop
+    as_user env GEIST_HOME=/home/geist-acceptance/.local/share/geisten geist start
+    as_user env GEIST_HOME=/home/geist-acceptance/.local/share/geisten geist stop
 fi
-cp /home/geist-acceptance/.local/share/geist/api-key "$testroot/key-before"
-echo 'user data' > /home/geist-acceptance/.local/share/geist/models/keep-me
+cp /home/geist-acceptance/.local/share/geisten/api-key "$testroot/key-before"
+echo 'user data' > /home/geist-acceptance/.local/share/geisten/models/keep-me
 # Build a version-only upgrade from the exact candidate, then roll back to it.
 dpkg-deb -R "$package" "$testroot/upgrade"
 version=$(dpkg-deb -f "$package" Version)
@@ -118,25 +118,25 @@ if test -d /run/systemd/system; then
     as_user geist restart
     check_selected_model 'package upgrade'
 fi
-cmp "$testroot/key-before" /home/geist-acceptance/.local/share/geist/api-key
+cmp "$testroot/key-before" /home/geist-acceptance/.local/share/geisten/api-key
 apt-get install -y -qq --allow-downgrades "$package" >/dev/null
 if test -d /run/systemd/system; then
     as_user systemctl --user daemon-reload
     as_user geist restart
     check_selected_model 'package rollback'
 fi
-cmp "$testroot/key-before" /home/geist-acceptance/.local/share/geist/api-key
-test "$(cat /home/geist-acceptance/.local/share/geist/models/keep-me)" = 'user data'
+cmp "$testroot/key-before" /home/geist-acceptance/.local/share/geisten/api-key
+test "$(cat /home/geist-acceptance/.local/share/geisten/models/keep-me)" = 'user data'
 apt-get remove -y -qq geist >/dev/null
 test ! -e /usr/bin/geist
 if test -d /run/systemd/system; then
     ! as_user systemctl --user is-active --quiet geist.service
     ! as_user systemctl --user is-enabled --quiet geist.service
     if test -n "${GEIST_TEST_MODEL:-}"; then
-        cmp "$GEIST_TEST_MODEL" /home/geist-acceptance/.local/share/geist/models/smollm2-360m-instruct-q8_0.gguf
+        cmp "$GEIST_TEST_MODEL" /home/geist-acceptance/.local/share/geisten/models/smollm2-360m-instruct-q8_0.gguf
     fi
 fi
-test -f /home/geist-acceptance/.local/share/geist/models/keep-me
-test ! -f /home/geist-acceptance/.local/share/geist/connection.json
-cmp "$testroot/key-before" /home/geist-acceptance/.local/share/geist/api-key
+test -f /home/geist-acceptance/.local/share/geisten/models/keep-me
+test ! -f /home/geist-acceptance/.local/share/geisten/connection.json
+cmp "$testroot/key-before" /home/geist-acceptance/.local/share/geisten/api-key
 echo 'PASS: candidate install, CLI/API, upgrade, rollback and removal; user data retained'

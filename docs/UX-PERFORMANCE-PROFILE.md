@@ -196,7 +196,7 @@ only reads/filters numeric summaries. geistlib should expose engine counters whe
 needed; it should not own profile files, retention, UX labels or recommendations.
 Do not make private engine calls or introduce this product policy into geistlib.
 
-Proposed storage beneath the existing private Geisten data directory:
+Proposed storage beneath the existing private geisten data directory:
 
 ```
 performance/
@@ -205,8 +205,8 @@ performance/
   profiles.json           # Derived cache; rebuildable from valid records
 ```
 
-On macOS: `~/Library/Application Support/Geist/performance/`.
-On Linux: `${XDG_DATA_HOME:-~/.local/share}/geist/performance/` (descriptive notation).
+On macOS: `~/Library/Application Support/geisten/performance/`.
+On Linux: `${XDG_DATA_HOME:-~/.local/share}/geisten/performance/` (descriptive notation).
 The override follows the existing application home. The model catalog JSON remains
 separate: catalog data is distribution input; performance history is local output.
 

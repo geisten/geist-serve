@@ -1,4 +1,4 @@
-# Geisten — Runs here. Stays here.
+# geisten — Runs here. Stays here.
 
 Manage a local model and connect your terminal and editor to the same service.
 All catalog models appear directly, with their quantizations grouped below one name.
@@ -14,9 +14,9 @@ Mac release still needs Developer ID signing and notarization.
 
 ## Start on a Mac
 
-Open the Geisten DMG, drag Geisten to Applications, and open its desktop window.
+Open the geisten DMG, drag geisten to Applications, and open its desktop window.
 Click a quantization row or its leading download icon in the complete model list.
-Geisten downloads and verifies that variant. If no model is running, it starts automatically.
+geisten downloads and verifies that variant. If no model is running, it starts automatically.
 Otherwise the current model stays available for chat and editor connections, even
 during checksum verification. Click the completed variant when you want to switch.
 An installed model starts directly. The same row shows progress and
@@ -149,7 +149,7 @@ Closing the window keeps the shared service running. Stopping it requires
 confirmation. Start at Login is optional in the native menu.
 
 Apple Silicon and macOS 14 or later are required by the Mac app.
-Previously downloaded catalog files in the Geisten data folder are reused
+Previously downloaded catalog files in the geisten data folder are reused
 after verification. The former Swift application's selected-model preference
 is not migrated: choose the model once in the model list. The new Connections panel and bundled `geisten` terminal client use the same
 loaded daemon. The older standalone geist-serve server is a separate legacy
@@ -159,9 +159,9 @@ entry point; do not start it to connect an editor to the manager.
 
 Use 64-bit Raspberry Pi OS. Pi 5 with at least 4 GB RAM is the initial target.
 Extract the `geist-…-linux-aarch64.tar.gz` archive. On the desktop, run
-`Start Geisten.sh` from the extracted folder (choose Execute when your file
+`Start geisten.sh` from the extracted folder (choose Execute when your file
 manager asks). It opens your browser. If the file manager opens the script
-as text, run `sh './Start Geisten.sh'` in that folder's terminal.
+as text, run `sh './Start geisten.sh'` in that folder's terminal.
 
 The package contains three static executables: geist, geist-app and geistd. It does not need a compiler,
 Python, a package manager, Docker or an inference service installation.
@@ -172,7 +172,7 @@ For a Pi without a screen, start the script over SSH and leave it running:
 ```sh
 ssh your-user@your-pi
 cd /path/to/extracted/geist-folder
-sh './Start Geisten.sh'
+sh './Start geisten.sh'
 ```
 
 In a second terminal on your Mac, open the encrypted tunnel:
@@ -185,7 +185,7 @@ Open the full private link printed by the Pi in the Mac browser. It includes
 a session key after `#`; opening just the port will not authorize access.
 Keep that link private. The model, device assessment and inference run on
 the Pi. The browser sends the prompt through SSH and displays the answer
-on the Mac. Both terminals can be closed after Quit Geisten. If port 8766 is
+on the Mac. Both terminals can be closed after Quit geisten. If port 8766 is
 occupied, start with `--port 8767` and forward 8767 at both ends instead.
 No direct LAN listener or Internet exposure is needed.
 
@@ -291,8 +291,15 @@ embedded in the C executable and shared by these hosts and the headless Pi brows
   capability, no CORS and a restrictive CSP protect the UI/API boundary.
   Inference uses a mode-0600 Unix socket in a random mode-0700 directory. There is no child TCP port. Same-user native processes remain trusted.
 
-Data lives in `~/Library/Application Support/Geist` on Mac and
-`$XDG_DATA_HOME/geist` (normally `~/.local/share/geist`) on Linux. Files contain
+Data lives in `~/Library/Application Support/geisten` on Mac and
+`$XDG_DATA_HOME/geisten` (normally `~/.local/share/geisten`) on Linux, or in
+`GEISTEN_HOME` (the earlier `GEIST_HOME` still works). The first start after the
+rename (#92) moves the earlier `Geist`/`geist` folder there in one rename and
+leaves a symlink at the old path, so earlier versions still find the data. While
+an earlier service still holds the old folder, it is used unchanged and moved on
+a later start; if both folders exist, the new one is used and the old one is left
+alone. Under the packaged user unit the move is done by `geisten start`, since the
+sandboxed service cannot rename in `~/.local/share`. Files contain
 models, the selected catalog ID, a runtime log, a process lock, a mode-0600 API
 key and mode-0600 connection.json. The connection descriptor is removed on
 shutdown; the API key survives restarts. The app

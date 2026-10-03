@@ -1,5 +1,5 @@
 [Unit]
-Description=Geisten local model service
+Description=geisten local model service
 After=network.target
 
 [Service]
@@ -15,7 +15,9 @@ PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=read-only
 Environment=XDG_DATA_HOME=%h/.local/share
-ReadWritePaths=%h/.local/share/geist
+# geisten's data folder; the earlier geist folder stays writable until it is moved (#92).
+ReadWritePaths=%h/.local/share/geisten
+ReadWritePaths=-%h/.local/share/geist
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 LockPersonality=yes
 

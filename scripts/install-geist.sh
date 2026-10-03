@@ -1,5 +1,5 @@
 #!/bin/sh
-# install-geist.sh — install the shared Geisten runtime (geisten, geist-app, geistd)
+# install-geist.sh — install the shared geisten runtime (geisten, geist-app, geistd)
 # for the current Linux user, without root. Contract: docs/INSTALL-LINUX.md.
 #
 #   curl -fsSL https://geisten.net/install.sh | sh
@@ -19,14 +19,14 @@ E_USAGE=2 E_HOST=10 E_PREREQ=11 E_VERIFY=12 E_OWNER=13 E_BUSY=14 E_SETUP=15 E_LO
 
 usage() {
     cat <<'EOF'
-Install the Geisten model runtime for this user (no root needed).
+Install the geisten model runtime for this user (no root needed).
 
   sh install-geist.sh [options]
 
   --version X.Y.Z   install exactly this release (default: newest stable)
-  --no-start        install, but do not start the Geisten service
+  --no-start        install, but do not start the geisten service
   --model recommended
-                    then set up the model Geisten recommends for this computer
+                    then set up the model geisten recommends for this computer
                     (asks first; with --yes it downloads without asking)
   --dry-run         check, download and verify only; change nothing
   --uninstall       remove the installed runtime (models and settings stay)
@@ -35,7 +35,7 @@ Install the Geisten model runtime for this user (no root needed).
 
 Exit codes: 0 ok, 2 usage, 10 unsupported host, 11 missing prerequisite,
 12 download or verification failed, 13 another installation owns the
-files, 14 Geisten is busy, 15 start failed, 16 local file system problem,
+files, 14 geisten is busy, 15 start failed, 16 local file system problem,
 17 installed, but the model setup did not finish (run: geisten setup).
 EOF
 }
@@ -44,7 +44,7 @@ say() { printf '%s\n' "$*"; }
 fail() {
     code=$1
     shift
-    printf 'geist install: %s\n' "$*" >&2
+    printf 'geisten install: %s\n' "$*" >&2
     cleanup
     exit "$code"
 }
@@ -94,11 +94,11 @@ parse_args() {
 test_mode() { [ -n "${GEIST_INSTALL_TEST_ORIGIN:-}" ]; }
 
 preflight() {
-    [ "$(id -u)" != 0 ] || fail $E_HOST "run this as the user who will use Geisten, not as root"
+    [ "$(id -u)" != 0 ] || fail $E_HOST "run this as the user who will use geisten, not as root"
     case $(uname -s) in
         Linux) ;;
-        Darwin) fail $E_HOST "on macOS, install the Geisten app from its DMG instead" ;;
-        *) fail $E_HOST "unsupported system $(uname -s): Geisten needs 64-bit Linux" ;;
+        Darwin) fail $E_HOST "on macOS, install the geisten app from its DMG instead" ;;
+        *) fail $E_HOST "unsupported system $(uname -s): geisten needs 64-bit Linux" ;;
     esac
     machine=$(uname -m)
     test_mode && [ -n "${GEIST_INSTALL_TEST_ARCH:-}" ] && machine=$GEIST_INSTALL_TEST_ARCH
@@ -141,7 +141,7 @@ preflight() {
 # foreign file at our launcher path.
 check_ownership() {
     if [ -e /usr/lib/geist/geist ] || [ -e /usr/lib/geist/geisten ] || [ -L /usr/bin/geist ] || [ -L /usr/bin/geisten ]; then
-        fail $E_OWNER "Geisten is installed from the Ubuntu package; update it with apt, or remove it first (sudo apt remove geist)"
+        fail $E_OWNER "geisten is installed from the Ubuntu package; update it with apt, or remove it first (sudo apt remove geist)"
     fi
     for link in "$launcher" "$alias"; do
         if [ -e "$link" ] || [ -L "$link" ]; then
@@ -167,7 +167,7 @@ take_lock() {
         case $holder in '' | *[!0-9]*) holder='' ;; esac
         if [ -n "$holder" ] && kill -0 "$holder" 2>/dev/null; then
             lock=''
-            fail $E_BUSY "another Geisten installation is running (pid $holder)"
+            fail $E_BUSY "another geisten installation is running (pid $holder)"
         fi
         rm -rf "$lock"
         mkdir "$lock" || { lock=''; fail $E_LOCAL "cannot take the installer lock"; }
@@ -210,7 +210,7 @@ parse_manifest() {
         set -- $line
         case $n in
             1) [ "$line" = "geist-manifest 1" ] || fail $E_VERIFY "unknown manifest format" ;;
-            2) [ "$line" = "product geist" ] || fail $E_VERIFY "manifest is not for Geisten" ;;
+            2) [ "$line" = "product geist" ] || fail $E_VERIFY "manifest is not for geisten" ;;
             3) [ $# -eq 2 ] && [ "$1" = version ] || fail $E_VERIFY "bad manifest version line"
                version=$2 ;;
             4) [ $# -eq 2 ] && [ "$1" = channel ] || fail $E_VERIFY "bad manifest channel line"
@@ -243,7 +243,7 @@ parse_manifest() {
 # Only these regular files, in one top directory; nothing else may extract.
 allowed_member() {
     case $1 in
-        "$top/" | "$top/geisten" | "$top/geist-app" | "$top/geistd" | "$top/Start Geisten.sh" | \
+        "$top/" | "$top/geisten" | "$top/geist-app" | "$top/geistd" | "$top/Start geisten.sh" | \
             "$top/LICENSE" | "$top/marked-LICENSE" | "$top/katex-LICENSE" | "$top/ENGINE.json" | \
             "$top/README.md" | "$top/SHA256SUMS" | "$top/BUILD-PACKAGES.txt") return 0 ;;
     esac
@@ -279,7 +279,7 @@ verify_archive() {
     (cd "$payload" && sha256sum -c --quiet SHA256SUMS >/dev/null 2>&1) || fail $E_VERIFY "payload checksums do not match"
     "$payload/geisten" --help >/dev/null 2>&1
     rc=$?
-    [ $rc -eq 132 ] && fail $E_HOST "this CPU cannot run the Geisten engine (illegal instruction)"
+    [ $rc -eq 132 ] && fail $E_HOST "this CPU cannot run the geisten engine (illegal instruction)"
     [ $rc -eq 0 ] || fail $E_VERIFY "the downloaded geisten does not run here (exit $rc)"
 }
 
@@ -359,7 +359,7 @@ start_service() {
         version=$previous previous=''
         write_receipt
     fi
-    [ $rc -eq 43 ] && fail $E_BUSY "Geisten is busy; your models are untouched. Run this installer again when it is idle"
+    [ $rc -eq 43 ] && fail $E_BUSY "geisten is busy; your models are untouched. Run this installer again when it is idle"
     cat "$stage/start.log" >&2
     fail $E_SETUP "the new version did not start; the previous installation is active again"
 }
@@ -369,10 +369,10 @@ start_service() {
 setup_model() {
     if [ -n "$model" ]; then
         if [ $yes -eq 1 ]; then "$launcher" setup --yes; else "$launcher" setup; fi ||
-            fail $E_MODEL "Geisten is installed, but the model setup did not finish. Resume with: $cmd setup"
+            fail $E_MODEL "geisten is installed, but the model setup did not finish. Resume with: $cmd setup"
     # A subshell: a failed redirection on a special builtin would end this shell (POSIX).
     elif [ $fresh -eq 1 ] && (true </dev/tty) 2>/dev/null; then
-        "$launcher" setup || say "Geisten is installed; the model setup did not finish. Resume with: $cmd setup"
+        "$launcher" setup || say "geisten is installed; the model setup did not finish. Resume with: $cmd setup"
     else
         say "Choose and load a model:   $cmd setup"
     fi
@@ -383,16 +383,16 @@ do_uninstall() {
     if "$runtime/current/geisten" status >"$runtime/.status" 2>/dev/null; then
         if grep -q '"busy":true\|"loading":true' "$runtime/.status"; then
             rm -f "$runtime/.status"
-            fail $E_BUSY "Geisten is busy; run --uninstall again when it is idle"
+            fail $E_BUSY "geisten is busy; run --uninstall again when it is idle"
         fi
-        "$runtime/current/geisten" stop >/dev/null 2>&1 || fail $E_BUSY "Geisten could not be stopped"
+        "$runtime/current/geisten" stop >/dev/null 2>&1 || fail $E_BUSY "geisten could not be stopped"
     fi
     rm -f "$runtime/.status"
     for link in "$launcher" "$alias"; do
         [ -L "$link" ] && [ "$(readlink "$link")" = "$runtime/current/geisten" ] && rm -f "$link"
     done
     rm -rf "$runtime"
-    say "Geisten runtime removed. Models and settings stay in ${XDG_DATA_HOME:-$HOME/.local/share}/geist."
+    say "geisten runtime removed. Models and settings stay in ${XDG_DATA_HOME:-$HOME/.local/share}/geisten."
 }
 
 main() {
@@ -425,13 +425,13 @@ main() {
     fetch "$base/geist-manifest.sig" "$stage/manifest.sig" 512
     verify_manifest
     parse_manifest
-    say "Downloading Geisten $version for $platform…"
+    say "Downloading geisten $version for $platform…"
     test_mode || base=$GEIST_RELEASES/download/v$version
     fetch "$base/$archive" "$stage/archive.tar.gz" "$size"
     say "Verifying…"
     verify_archive
     if [ $dry_run -eq 1 ]; then
-        say "Dry run: Geisten $version verified; would install into $runtime/versions/$version and link $launcher."
+        say "Dry run: geisten $version verified; would install into $runtime/versions/$version and link $launcher."
         cleanup
         exit 0
     fi
@@ -440,7 +440,7 @@ main() {
     [ $no_start -eq 1 ] || start_service
     prune
     cleanup
-    say "Geisten $version is installed."
+    say "geisten $version is installed."
     case ":$PATH:" in
         *":$bindir:"*) cmd=geisten ;;
         *) cmd="'$launcher'"

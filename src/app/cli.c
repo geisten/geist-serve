@@ -84,14 +84,14 @@ static bool systemd_home(void) {
 #ifdef __APPLE__
     return false;
 #else
-    char standard[APP_PATH_CAP];
-    int  n = snprintf(standard,
-                      sizeof standard,
-                      "%s/.local/share/geist",
-                      getenv("HOME") ? getenv("HOME") : "");
+    char standard[APP_PATH_CAP], earlier[APP_PATH_CAP];
+    const char *user = getenv("HOME") ? getenv("HOME") : "";
+    int  n = snprintf(standard, sizeof standard, "%s/.local/share/geisten", user);
+    int  m = snprintf(earlier, sizeof earlier, "%s/.local/share/geist", user); /* until it is moved (#92) */
     /* Only the packaged CLI owns the packaged unit: a rootless installation
      * (#46) must never route to a different, package-owned service. */
-    return n > 0 && n < (int) sizeof standard && !getenv("GEIST_HOME") && !strcmp(home, standard) &&
+    return n > 0 && n < (int) sizeof standard && m > 0 && m < (int) sizeof earlier && !getenv("GEISTEN_HOME") &&
+           !getenv("GEIST_HOME") && (!strcmp(home, standard) || !strcmp(home, earlier)) &&
            !strcmp(directory, "/usr/lib/geist") &&
            access("/usr/lib/systemd/user/geist.service", R_OK) == 0;
 #endif
@@ -171,7 +171,7 @@ static bool current_service(void) {
         return true;
     if (order == 1) {
         start_error = 44;
-        fputs("A newer Geisten service is running. Open the newest installed app.\n", stderr);
+        fputs("A newer geisten service is running. Open the newest installed app.\n", stderr);
         return false;
     }
     if (order == 2) {
@@ -184,7 +184,7 @@ static bool current_service(void) {
     long code = request("/app/quit-if-idle", "{}", 5);
     if (code != 202) {
         start_error = code == 409 ? 43 : 42;
-        fputs("Finish the current task before updating Geisten; then reopen the app.\n", stderr);
+        fputs("Finish the current task before updating geisten; then reopen the app.\n", stderr);
         return false;
     }
     return wait_stopped();
@@ -230,7 +230,7 @@ static bool start(void) {
             return false;
         if (access(daemon, X_OK) != 0) {
             fprintf(stderr,
-                    "Geisten is incomplete: %s is missing. Reinstall Geisten, or in a source "
+                    "geisten is incomplete: %s is missing. Reinstall geisten, or in a source "
                     "checkout run 'make' first.\n",
                     daemon);
             return false;
@@ -279,7 +279,7 @@ static bool start(void) {
             return true;
         pause_short();
     }
-    fprintf(stderr, "Geisten did not start. Check port 8766 and service permissions.\n");
+    fprintf(stderr, "geisten did not start. Check port 8766 and service permissions.\n");
     return false;
 }
 static bool executable_directory(void) {
@@ -365,7 +365,7 @@ static int setup(bool yes) {
         return start_error;
     struct setup_state s = {0};
     if (!setup_state_read(&s, nullptr)) {
-        fputs("Geisten is not responding.\n", stderr);
+        fputs("geisten is not responding.\n", stderr);
         return 1;
     }
     char id[128] = "", name[128] = "";
@@ -412,7 +412,7 @@ static int setup(bool yes) {
         bool   started = false;
         for (;;) {
             if (!setup_state_read(&s, id)) {
-                fputs("Lost the connection to Geisten during setup. Run geisten setup again.\n", stderr);
+                fputs("Lost the connection to geisten during setup. Run geisten setup again.\n", stderr);
                 setup_state_free(&s);
                 return 1;
             }
@@ -480,7 +480,7 @@ static int run(int argc, char **argv) {
         if (!wait_stopped())
             return 1;
         if (!strcmp(cmd, "stop")) {
-            puts("Geisten stopped. Downloaded models are preserved.");
+            puts("geisten stopped. Downloaded models are preserved.");
             return 0;
         }
         return start() ? 0 : start_error;
@@ -496,7 +496,7 @@ static int run(int argc, char **argv) {
         if (!start())
             return start_error;
         if (!strcmp(cmd, "start")) {
-            puts("Geisten is running.");
+            puts("geisten is running.");
             return 0;
         }
         char url[256];
@@ -517,7 +517,7 @@ static int run(int argc, char **argv) {
         return command(args) == 0 ? 0 : 1;
     }
     if (request("/app/status", nullptr, 5) != 200) {
-        fputs("Geisten is not running. Start the app or run: geisten start\n", stderr);
+        fputs("geisten is not running. Start the app or run: geisten start\n", stderr);
         return 1;
     }
     if (!strcmp(cmd, "status") || !strcmp(cmd, "models")) {
@@ -557,7 +557,7 @@ static int run(int argc, char **argv) {
     free(j);
     if (!model || !*model) {
         free(model);
-        fputs("Choose and load a model in Geisten first.\n", stderr);
+        fputs("Choose and load a model in geisten first.\n", stderr);
         return 1;
     }
     char              body[32768];
@@ -565,9 +565,9 @@ static int run(int argc, char **argv) {
     if (!strcmp(cmd, "config") && argc == 3) {
         if (!strcmp(argv[2], "continue")) {
             app_put(&b,
-                    "{\"name\":\"Geisten "
+                    "{\"name\":\"geisten "
                     "Local\",\"version\":\"1.0.0\",\"schema\":\"v1\",\"models\":[{\"name\":"
-                    "\"Geisten\",\"provider\":\"openai\",\"model\":");
+                    "\"geisten\",\"provider\":\"openai\",\"model\":");
             app_quote(&b, model);
             app_printf(&b, ",\"apiBase\":\"http://127.0.0.1:%u/v1\",\"apiKey\":", port);
             app_quote(&b, token);
@@ -578,13 +578,13 @@ static int run(int argc, char **argv) {
             app_put(&b,
                     "{\"$schema\":\"https://opencode.ai/"
                     "config.json\",\"provider\":{\"geist\":{\"npm\":\"@ai-sdk/"
-                    "openai-compatible\",\"name\":\"Geisten\",\"options\":{");
+                    "openai-compatible\",\"name\":\"geisten\",\"options\":{");
             app_printf(&b, "\"baseURL\":\"http://127.0.0.1:%u/v1\",\"apiKey\":", port);
             app_quote(&b, token);
             app_put(&b, "},\"models\":{");
             app_quote(&b, model);
             app_put(&b,
-                    ":{\"name\":\"Geisten local "
+                    ":{\"name\":\"geisten local "
                     "text\",\"tool_call\":false,\"limit\":{\"context\":4096,\"output\":512}}}}},"
                     "\"model\":");
             char id[256];

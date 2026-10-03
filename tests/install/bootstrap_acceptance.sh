@@ -2,7 +2,7 @@
 # bootstrap_acceptance.sh DIR VERSION MODEL — the real portable archive in DIR
 # through scripts/install-geist.sh (throwaway signing key, local test origin),
 # then real inference, an idempotent rerun and uninstall (#46). Runs as a
-# regular user with no Geisten package installed; CI calls it before the DEB tests.
+# regular user with no geisten package installed; CI calls it before the DEB tests.
 set -eu
 cd "$(dirname "$0")/../.."
 dir=${1:?usage: bootstrap_acceptance.sh DIR VERSION MODEL} version=${2:?} model=${3:?}
@@ -50,5 +50,5 @@ check "same-version rerun keeps the running service and its key" [ "$("$geist" c
 sh scripts/install-geist.sh --uninstall
 check "uninstall removed the launcher" [ ! -e "$geist" ]
 check "uninstall removed the runtime" [ ! -e "$home/.local/share/geist-runtime" ]
-check "service data kept after uninstall" [ -d "$home/.local/share/geist" ]
+check "service data kept after uninstall" [ -d "$home/.local/share/geisten" ]
 echo "bootstrap acceptance: all passed"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""bench.py — Geisten mini benchmark: what can each local model do on this computer?
+"""bench.py — geisten mini benchmark: what can each local model do on this computer?
 
     bench.py run --candidate CATALOG_ID [--candidate …] --backend cpu|gpu --output NEW_DIR
     bench.py report RUN_DIR [--json]
@@ -115,7 +115,7 @@ class App:
 
     The candidate is hard-linked into that HOME and selected by catalog id, so
     the app verifies it against the catalog sha256 and knows its backends,
-    exactly as for a downloaded model. The user's own Geisten home is untouched.
+    exactly as for a downloaded model. The user's own geisten home is untouched.
     """
 
     def __init__(self, entry, model, home):
@@ -214,7 +214,7 @@ def resolve(candidate, model_dir):
         raise ValueError(f'{candidate}: not in models/catalog.json')
     path = Path(model_dir)/entry['file']
     if path.is_symlink() or not path.is_file() or path.stat().st_size != entry['bytes']:
-        raise ValueError(f'{candidate}: {path} is missing or has the wrong size (download it in Geisten first)')
+        raise ValueError(f'{candidate}: {path} is missing or has the wrong size (download it in geisten first)')
     # The private app checks the catalog sha256 before loading (App).
     # ponytail: a full hash on every run; reuse the app's receipt when runs get frequent.
     return entry, path
@@ -355,7 +355,7 @@ def report(args):
         print(json.dumps(results, indent=2, ensure_ascii=False))
         return
     gib = lambda b: '–' if b is None else f'{b / 2**30:.1f}'
-    print('Geisten mini benchmark (passed / cases, de · en)\n')
+    print('geisten mini benchmark (passed / cases, de · en)\n')
     print(f'{"model":<18}{"backend":<10}' + ''.join(f'{t:<14}' for t in TASKS) + f'{"total":<9}{"p50 s":<7}{"p95 s":<7}{"tok/s":<7}{"RSS":<6}GPU GiB')
     for r in results:
         cells = ''.join(f'{c["de"]["passed"]:>2}·{c["en"]["passed"]:<2}/{c["de"]["total"]:<7}' for c in r['tasks'].values())
@@ -381,7 +381,8 @@ def main():
     r.add_argument('--candidate', action='append', required=True)
     r.add_argument('--backend', choices=('cpu', 'gpu'), required=True)
     r.add_argument('--output', required=True)
-    home = Path.home()/('Library/Application Support/Geist' if sys.platform == 'darwin' else '.local/share/geist')
+    base = Path.home()/('Library/Application Support' if sys.platform == 'darwin' else '.local/share')
+    home = next((base/n for n in ('geisten', 'Geist' if sys.platform == 'darwin' else 'geist') if (base/n).is_dir()), base/'geisten')
     r.add_argument('--model-dir', default=os.environ.get('GEIST_HOME', str(home)) + '/models')
     p = sub.add_parser('report')
     p.add_argument('run')

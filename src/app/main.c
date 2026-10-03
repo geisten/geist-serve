@@ -56,25 +56,6 @@ int main(int argc, char **argv) {
     bool        check = false;
     const char *model = nullptr;
     app.port          = 8766;
-    const char *home  = getenv("GEIST_HOME");
-    if (home)
-        snprintf(app.paths.home, sizeof app.paths.home, "%s", home);
-    else {
-        const char *user = getenv("HOME");
-        if (!user) {
-            usage();
-            return 2;
-        }
-#ifdef __APPLE__
-        snprintf(app.paths.home, sizeof app.paths.home, "%s/Library/Application Support/Geist", user);
-#else
-        const char *data = getenv("XDG_DATA_HOME");
-        if (data)
-            snprintf(app.paths.home, sizeof app.paths.home, "%s/geist", data);
-        else
-            snprintf(app.paths.home, sizeof app.paths.home, "%s/.local/share/geist", user);
-#endif
-    }
     char executable[APP_PATH_CAP];
 #ifdef __APPLE__
     uint32_t size = sizeof executable;
@@ -116,6 +97,12 @@ int main(int argc, char **argv) {
             return 2;
         }
     }
+    /* Only the default folder is resolved, and migrated (#92): never as a side
+     * effect of a run with an explicit --home. */
+    if (!app.paths.home[0] && !app_home(app.paths.home)) {
+        usage();
+        return 2;
+    }
     umask(077);
     if (!mkdirs(app.paths.home) || !path_join(app.paths.models, app.paths.home, "models") || !mkdirs(app.paths.models)) {
         perror("geist-app: data folder");
@@ -146,7 +133,7 @@ int main(int argc, char **argv) {
         return 1;
     int lock = open(lockpath, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600);
     if (lock < 0 || flock(lock, LOCK_EX | LOCK_NB) != 0) {
-        fprintf(stderr, "Geisten is already running for this data folder.\n");
+        fprintf(stderr, "geisten is already running for this data folder.\n");
         return 1;
     }
     if (access(app.paths.server, X_OK) != 0) {

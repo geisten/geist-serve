@@ -110,7 +110,7 @@ performance/
   export.jsonl             # only after explicit export
 ```
 
-On Mac the home is `~/Library/Application Support/Geist`; on Linux it follows the
+On Mac the home is `~/Library/Application Support/geisten`; on Linux it follows the
 existing XDG data directory. `--home` also relocates this entire store.
 
 - Directory 0700; files 0600. Symlinks, foreign ownership and hard-linked journal

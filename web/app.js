@@ -81,7 +81,7 @@ function addTurn(prompt) {
   const userText = document.createElement('div'); userText.className = 'message-text'; userText.textContent = prompt;
   user.setAttribute('aria-label', t('You')); user.append(userText);
   const answer = document.createElement('article'); answer.className = 'chat-message assistant';
-  const label = document.createElement('div'); label.className = 'message-label'; label.textContent = `Geisten · ${modelLabel(state.models.find(model => model.id === state.active_id))}`;
+  const label = document.createElement('div'); label.className = 'message-label'; label.textContent = `geisten · ${modelLabel(state.models.find(model => model.id === state.active_id))}`;
   const output = document.createElement('div'); output.id = 'output'; output.className = 'message-text markdown'; output.markdownSource = '';
   const status = document.createElement('p'); status.className = 'message-status'; uiText(status, 'Sending…');
   const actions = document.createElement('div'); actions.className = 'message-actions';
@@ -167,7 +167,7 @@ function fitReason(model) {
   if (now.length) return `${t(base)} ${now.join(' · ')}`;
   const version = model.earlier.engine?.split('.').slice(0, 2).join('.');
   const sameVersion = version && version === state?.engine?.geistlib?.version?.split('.').slice(0, 2).join('.');
-  const label = version ? `${t('Geisten engine')} ${version}${sameVersion ? ` (${t('earlier build')})` : ''}` : t('Earlier version');
+  const label = version ? `${t('geisten engine')} ${version}${sameVersion ? ` (${t('earlier build')})` : ''}` : t('Earlier version');
   return `${t(base)} ${label} · ${before.join(' · ')}. ${t('Not measured with this version yet.')}`;
 }
 function engineText(engine) {
@@ -333,7 +333,7 @@ function buttonStates() {
   if (state?.active_id) $('connection-model').textContent = state.active_id;
   else uiText($('connection-model'), 'No model loaded yet');
   // #59: say why the buttons are disabled, one cause at a time.
-  const connectionReason = !state ? 'Service unavailable. Reopen Geisten to reconnect.'
+  const connectionReason = !state ? 'Service unavailable. Reopen geisten to reconnect.'
     : switching(state) ? 'The model is switching. Wait until it is ready.'
     : !state.ready ? 'Load a model first to copy or test the connection.'
     : $('test-connection').disabled && !connectionTesting ? 'Wait until the current answer finishes to test the connection.' : '';
@@ -608,7 +608,7 @@ async function poll() {
   polling = true;
   try { const next = await (await api('/app/status')).json(); if (!stopped) render(next); }
   // Not a local message: the first successful poll replaces it (#82).
-  catch (error) { if (!stopped) { message('Service unavailable. Reopen Geisten to reconnect.', false); lastServerMessage = ''; state = null; buttonStates(); } }
+  catch (error) { if (!stopped) { message('Service unavailable. Reopen geisten to reconnect.', false); lastServerMessage = ''; state = null; buttonStates(); } }
   finally { polling = false; }
 }
 
@@ -757,7 +757,7 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
       scrollLatest();
     }
     controller = null; activeTurn=null; replyPending = false; buttonStates(); if (state) visibleModels().forEach(modelCard);
-    if (stopped) message('Geisten is stopping. Reopen the app to start it again.');
+    if (stopped) message('geisten is stopping. Reopen the app to start it again.');
     else await poll();
   }
 }
@@ -784,7 +784,7 @@ $('new-chat').addEventListener('click', () => {
 });
 function chooseTask(id) {
   selectedTask = tasks.find(task => task.id === id && !task.url);
-  $('prompt').placeholder = t('Message Geisten…');
+  $('prompt').placeholder = t('Message geisten…');
   buttonStates(); if (state) visibleModels().forEach(modelCard);
 }
 $('language-choice').addEventListener('change', async () => {
@@ -838,7 +838,7 @@ const terminalHelp = window.geistDesktop === 'mac'
   : 'Paste the copied curl command into your terminal to try the loaded model. Ubuntu also installs geisten test and geisten chat. On Mac, the CLI is bundled at /Applications/Geist.app/Contents/MacOS/geist-cli.';
 const connectionHelp = {
   terminal: terminalHelp,
-  continue: 'In Continue, open your local config.yaml and add the model from this configuration. JSON is valid YAML. Select Geisten and use Chat mode. Preserve your existing configuration.',
+  continue: 'In Continue, open your local config.yaml and add the model from this configuration. JSON is valid YAML. Select geisten and use Chat mode. Preserve your existing configuration.',
   opencode: 'Save as opencode.json in a private test folder. Run opencode there and choose geist-chat. This profile disables tools; it does not enable coding-agent workflows.'
 };
 function updateConnectionHelp() { $('connection-help').textContent = t(connectionHelp[$('connection-client').value]); }
@@ -853,8 +853,8 @@ $('copy-connection').addEventListener('click', async () => {
     // The URL in a remote browser is the forwarded origin, not an arbitrary host.
     const base = `${location.origin}/v1`;
     let config;
-    if (kind === 'continue') config = {name: 'Geisten Local', version: '1.0.0', schema: 'v1', models: [{name: 'Geisten', provider: 'openai', model: c.model, apiBase: base, apiKey: c.api_key, roles: ['chat'], capabilities: [], defaultCompletionOptions: {contextLength: 4096, maxTokens: 512}}]};
-    else if (kind === 'opencode') config = {$schema: 'https://opencode.ai/config.json', provider: {geist: {npm: '@ai-sdk/openai-compatible', name: 'Geisten', options: {baseURL: base, apiKey: c.api_key}, models: {[c.model]: {name: 'Geisten local text', tool_call: false, limit: {context: 4096, output: 512}}}}}, model: `geist/${c.model}`, default_agent: 'geist-chat', agent: {'geist-chat': {mode: 'primary', description: 'Local text chat without tools', prompt: 'Answer the user briefly. You cannot access files or execute tools.', permission: {'*': 'deny'}}}};
+    if (kind === 'continue') config = {name: 'geisten Local', version: '1.0.0', schema: 'v1', models: [{name: 'geisten', provider: 'openai', model: c.model, apiBase: base, apiKey: c.api_key, roles: ['chat'], capabilities: [], defaultCompletionOptions: {contextLength: 4096, maxTokens: 512}}]};
+    else if (kind === 'opencode') config = {$schema: 'https://opencode.ai/config.json', provider: {geist: {npm: '@ai-sdk/openai-compatible', name: 'geisten', options: {baseURL: base, apiKey: c.api_key}, models: {[c.model]: {name: 'geisten local text', tool_call: false, limit: {context: 4096, output: 512}}}}}, model: `geist/${c.model}`, default_agent: 'geist-chat', agent: {'geist-chat': {mode: 'primary', description: 'Local text chat without tools', prompt: 'Answer the user briefly. You cannot access files or execute tools.', permission: {'*': 'deny'}}}};
     else {
       const quote = text => `'${text.replaceAll("'", "'\\''")}'`;
       config = `curl ${quote(`${base}/chat/completions`)} -H ${quote(`Authorization: Bearer ${c.api_key}`)} -H 'Content-Type: application/json' --data ${quote(JSON.stringify({model: c.model, messages: [{role: 'user', content: 'Hello'}], max_tokens: 512}))}`;
@@ -876,7 +876,7 @@ renderModelLegend();
 // #51: focusing or clicking a card's icons spells out their meaning (not hover-only).
 $('models').addEventListener('focusin', event => event.target.closest('.model-badges')?.classList.add('show-meaning'));
 $('models').addEventListener('focusout', event => event.target.closest('.model-badges')?.classList.remove('show-meaning'));
-if (!/^[a-f0-9]{64}$/.test(token)) message('Open Geisten using the private link from the app or Pi launcher. The link contains your private local API key.');
+if (!/^[a-f0-9]{64}$/.test(token)) message('Open geisten using the private link from the app or Pi launcher. The link contains your private local API key.');
 else { loadTasks().catch(error => message(error.message)); poll(); timer = setInterval(poll, statusPollInterval); }
 
 function showPage(id) {

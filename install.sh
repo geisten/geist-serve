@@ -1,5 +1,5 @@
 #!/bin/sh
-# Legacy standalone server installer. For the model manager use the Geisten
+# Legacy standalone server installer. For the model manager use the geisten
 # Mac/Ubuntu package described in docs/INSTALL.md.
 # All payloads are verified and staged before replacing any installed file.
 set -eu
