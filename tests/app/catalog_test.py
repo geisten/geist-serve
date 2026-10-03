@@ -72,7 +72,7 @@ with tempfile.TemporaryDirectory(prefix='geist-catalog-') as temporary:
         assert app.request('/app/catalog',good)[0]==200
         assert len(app.status()['models'])==len(good['models'])
         quality={m['id']:m['quality_evidence'] for m in app.status()['models']}
-        assert quality.pop('another-small-model')==evidence and set(quality.values())=={None}
+        assert quality.pop('another-small-model')==evidence and quality=={m['id']:m.get('quality') for m in base['models']}
         assert len(app.status()['quality_suite'])==12
         assert app.request('/app/catalog',good)[0]==409
         assert json.loads((home/'catalog.json').read_text())==good
