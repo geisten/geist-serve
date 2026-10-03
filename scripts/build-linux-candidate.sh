@@ -6,6 +6,7 @@ apk add --no-cache build-base linux-headers git python3 file pkgconf curl-dev cu
 mkdir -p /tmp/geist-build
 cd /tmp/geist-build
 cp -R /source/src /source/clients /source/scripts /source/web /source/models /source/tasks /source/quality /source/tests /source/App.mk /source/LICENSE /source/docs /source/deploy /source/geistlib .
+mkdir -p workbench && cp -R /source/workbench/suite workbench/  # the reference test suite id (#102)
 # These are disposable copies. Host glibc/compiler objects must never be linked
 # into the musl package even when make considers their timestamps current.
 rm -rf geistlib/build geistlib/lib geistlib/bin

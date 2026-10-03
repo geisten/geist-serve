@@ -75,7 +75,9 @@ with tempfile.TemporaryDirectory(prefix='geist-compat-') as home:
             assert codes==[200]*5, f'back-to-back requests: {codes}'
             code,body,_=app.request('/v1/chat/completions',base|{'messages':[{'role':'user','content':' xy'*7000}]})
             assert code==400,(code,body[:300])
-            assert not app.status()['busy']
+            # A failure is answered before the shared model is released (chat.c:
+            # "Failures keep the old order"), so busy may last a moment longer (#68).
+            app.wait(lambda s:not s['busy'],timeout=10)
         old_token,port=app.token,app.port
     finally: app.close()
     assert not (Path(home)/'connection.json').exists()

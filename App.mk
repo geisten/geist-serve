@@ -90,7 +90,7 @@ build/test_app_resources: tests/app/resources_test.c src/app/resources.c src/app
 	@mkdir -p build
 	$(APP_CC) $(APP_CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ tests/app/resources_test.c src/app/resources.c
 
-build/app_models.h: models/catalog.json scripts/embed-models.py
+build/app_models.h: models/catalog.json scripts/embed-models.py $(wildcard workbench/suite/*.json)
 	python3 scripts/embed-models.py
 
 build/test_app_performance: tests/app/performance_test.c src/app/performance.c src/app/performance.h $(APP_SOURCE) src/app/core.h src/json.c

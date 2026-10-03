@@ -40,11 +40,13 @@ struct app_model {
     const char *group_id, *group_name,
             *quantization;        /* display grouping, never artifact identity */
     const char *reasoning_format; /* optional validated output protocol, not model-name inference */
+    const char *quality;          /* optional validated reference benchmark JSON (#102) */
 };
 extern struct app_model app_models[APP_MODEL_COUNT];
 extern size_t           app_model_count;
 extern unsigned         app_catalog_revision;
 extern const char      *app_catalog_json;
+extern const char      *app_quality_suite; /* current mini benchmark suite id */
 struct app_catalog;
 struct app_catalog     *app_catalog_parse(const char *text, char error[static 256]);
 const struct app_model *app_catalog_find(const struct app_catalog *catalog, const char *id);

@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "revision": 5,
+  "revision": 6,
   "models": [
     {
       "id": "bitnet-2b",
@@ -33,7 +33,55 @@
       ],
       "group_id": "smollm2-360m",
       "group_name": "SmolLM2 360M",
-      "quantization": "Q8_0"
+      "quantization": "Q8_0",
+      "quality": {
+        "suite": "e6c9808edde3",
+        "date": "2026-10-03",
+        "engine": "33db79d7764b",
+        "evidence": "784a8d093ac3b58a428febed1af27d42b4f8c5dc5aff94695f3b8481d199f7f7",
+        "tasks": {
+          "classify": {
+            "de": [
+              0,
+              20
+            ],
+            "en": [
+              0,
+              20
+            ]
+          },
+          "extract": {
+            "de": [
+              0,
+              20
+            ],
+            "en": [
+              0,
+              20
+            ]
+          },
+          "format": {
+            "de": [
+              3,
+              20
+            ],
+            "en": [
+              13,
+              20
+            ]
+          },
+          "context": {
+            "de": [
+              5,
+              20
+            ],
+            "en": [
+              10,
+              20
+            ]
+          }
+        }
+      }
     },
     {
       "id": "qwen3-0.6b",
@@ -51,7 +99,55 @@
       "group_id": "qwen3-0.6b",
       "group_name": "Qwen3 0.6B",
       "quantization": "Q8_0",
-      "reasoning_format": "think_tags"
+      "reasoning_format": "think_tags",
+      "quality": {
+        "suite": "e6c9808edde3",
+        "date": "2026-10-03",
+        "engine": "33db79d7764b",
+        "evidence": "4d7cf3d4a3dba36c6b154c62859e0527a2e64d916ce0527b10cc28d06a82b287",
+        "tasks": {
+          "classify": {
+            "de": [
+              3,
+              20
+            ],
+            "en": [
+              3,
+              20
+            ]
+          },
+          "extract": {
+            "de": [
+              13,
+              20
+            ],
+            "en": [
+              14,
+              20
+            ]
+          },
+          "format": {
+            "de": [
+              15,
+              20
+            ],
+            "en": [
+              17,
+              20
+            ]
+          },
+          "context": {
+            "de": [
+              16,
+              20
+            ],
+            "en": [
+              19,
+              20
+            ]
+          }
+        }
+      }
     },
     {
       "id": "qwen35-0.8b",
@@ -69,7 +165,55 @@
       "group_id": "qwen35-0.8b",
       "group_name": "Qwen3.5 0.8B",
       "quantization": "Q8_0",
-      "reasoning_format": "think_tags"
+      "reasoning_format": "think_tags",
+      "quality": {
+        "suite": "e6c9808edde3",
+        "date": "2026-10-03",
+        "engine": "33db79d7764b",
+        "evidence": "82704578f2bc29ef7cbbd3852a7d53e0119c430eaff62fbbf4d7e1aacf982db2",
+        "tasks": {
+          "classify": {
+            "de": [
+              3,
+              20
+            ],
+            "en": [
+              4,
+              20
+            ]
+          },
+          "extract": {
+            "de": [
+              0,
+              20
+            ],
+            "en": [
+              0,
+              20
+            ]
+          },
+          "format": {
+            "de": [
+              0,
+              20
+            ],
+            "en": [
+              4,
+              20
+            ]
+          },
+          "context": {
+            "de": [
+              4,
+              20
+            ],
+            "en": [
+              19,
+              20
+            ]
+          }
+        }
+      }
     },
     {
       "id": "gemma4-e2b",
@@ -86,7 +230,55 @@
       ],
       "group_id": "gemma4-e2b",
       "group_name": "Gemma 4 E2B",
-      "quantization": "Q4_K_M"
+      "quantization": "Q4_K_M",
+      "quality": {
+        "suite": "e6c9808edde3",
+        "date": "2026-10-03",
+        "engine": "33db79d7764b",
+        "evidence": "06c1ffa719bfb967bc5dd4a09042511eee5f0f7ed1694f64ee5fa0b0dfcc3fe1",
+        "tasks": {
+          "classify": {
+            "de": [
+              19,
+              20
+            ],
+            "en": [
+              20,
+              20
+            ]
+          },
+          "extract": {
+            "de": [
+              20,
+              20
+            ],
+            "en": [
+              20,
+              20
+            ]
+          },
+          "format": {
+            "de": [
+              14,
+              20
+            ],
+            "en": [
+              14,
+              20
+            ]
+          },
+          "context": {
+            "de": [
+              20,
+              20
+            ],
+            "en": [
+              19,
+              20
+            ]
+          }
+        }
+      }
     },
     {
       "id": "gemma4-e4b",
@@ -103,7 +295,55 @@
       ],
       "group_id": "gemma4-e4b",
       "group_name": "Gemma 4 E4B",
-      "quantization": "Q4_K_M"
+      "quantization": "Q4_K_M",
+      "quality": {
+        "suite": "e6c9808edde3",
+        "date": "2026-10-03",
+        "engine": "33db79d7764b",
+        "evidence": "c350010ab7d33e6aab311d0c780064803c09c4f9edf90d41ea719953690341aa",
+        "tasks": {
+          "classify": {
+            "de": [
+              18,
+              20
+            ],
+            "en": [
+              19,
+              20
+            ]
+          },
+          "extract": {
+            "de": [
+              20,
+              20
+            ],
+            "en": [
+              20,
+              20
+            ]
+          },
+          "format": {
+            "de": [
+              15,
+              20
+            ],
+            "en": [
+              15,
+              20
+            ]
+          },
+          "context": {
+            "de": [
+              20,
+              20
+            ],
+            "en": [
+              20,
+              20
+            ]
+          }
+        }
+      }
     },
     {
       "id": "bonsai2-27b-pq2",

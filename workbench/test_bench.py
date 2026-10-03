@@ -73,14 +73,15 @@ class ReportTests(unittest.TestCase):
     def make_run(self, root, name, passed=True, change_suite=False):
         suite = bench.load_suite()
         d = root/name
-        d.mkdir()
+        d.mkdir(parents=True)
         rows = [dict(task=t, id=c['id'], language=c['language'], tags=c['tags'], passed=passed, ms=1000.0 + i,
                      reason=None if passed else 'no_marker', usage=dict(completion_tokens=10))
                 for t, s in suite.items() for i, c in enumerate(s['cases'])]
         (d/'results.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in rows))
         hashes = {t: dict(version='1.0.0', sha256='0' * 64 if change_suite else bench.sha256(bench.SUITE/f'{t}.json')) for t in suite}
         run = dict(candidate=name, execution=dict(active='gpu', backend='metal'), host={}, errors=[], suite=hashes,
-                   model=dict(bytes=1, quantization='Q8_0'), prepare_ms=5.0, memory=dict(max_rss_bytes=1 << 30, max_gpu_allocated_bytes=None))
+                   model=dict(bytes=1, quantization='Q8_0'), prepare_ms=5.0, finished_utc='2026-10-03T20:00:00+00:00',
+                   engine=dict(source_dirty=False, engine_pin='33db79d7764b4f6177d944e8ae4fd9f7fadea9be'), memory=dict(max_rss_bytes=1 << 30, max_gpu_allocated_bytes=None))
         (d/'run.json').write_text(json.dumps(run))
 
     def test_summary_and_table(self):
@@ -100,6 +101,30 @@ class ReportTests(unittest.TestCase):
                 bench.report(type('A', (), dict(run=str(root), json=False))())
             self.assertIn('STALE', out.getvalue())
             self.assertIn('good', out.getvalue())
+
+    def test_quality_fields_only_from_clean_runs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.make_run(root/'one', 'good')
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                bench.quality(type('A', (), dict(run=str(root/'one'), write=False))())
+            field = json.loads(out.getvalue())['good']
+            self.assertEqual((field['suite'], field['date'], field['engine']), (bench.suite_id(), '2026-10-03', '33db79d7764b'))
+            self.assertEqual(field['tasks']['classify'], dict(de=[20, 20], en=[20, 20]))
+            self.make_run(root/'two', 'bad', change_suite=True)
+            with self.assertRaises(ValueError):
+                bench.quality(type('A', (), dict(run=str(root/'two'), write=False))())
+
+    def test_catalog_quality_has_its_evidence(self):
+        models = json.loads((bench.ROOT/'models/catalog.json').read_text())['models']
+        for model in (m for m in models if 'quality' in m):
+            q = model['quality']
+            raw = HERE/'evidence'/q['suite']/model['id']/'results.jsonl'
+            self.assertEqual(bench.sha256(raw), q['evidence'], model['id'])
+            if q['suite'] == bench.suite_id():
+                r = bench.summarize(raw.parent, bench.load_suite())
+                self.assertEqual({t: {l: [c[l]['passed'], c[l]['total']] for l in ('de', 'en')} for t, c in r['tasks'].items()}, q['tasks'])
 
     def test_p95_is_nearest_rank(self):
         self.assertEqual(bench.p95(list(range(1, 21))), 19)

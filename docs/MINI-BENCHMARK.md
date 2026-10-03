@@ -8,7 +8,15 @@ run. It compares models; it does not certify a model for a particular use.
 make && make app
 python3 workbench/bench.py run --candidate gemma4-e2b --candidate qwen3-0.6b --backend gpu --output build/bench/2026-10-01
 python3 workbench/bench.py report build/bench/2026-10-01        # --json for machines
+python3 workbench/bench.py quality build/bench/2026-10-01 --write  # catalog evidence (#102)
 ```
+
+`quality` turns complete runs of a committed engine into the catalog's
+optional `quality` field: passed/total per task and language, the suite id,
+the date, the engine pin and the sha256 of `results.jsonl`. The app shows it
+as the reference test; a result for another suite id is an older test. Answer
+quality hardly depends on the computer, so it is measured once, on a
+reference machine, not on every user's computer.
 
 Candidates are catalog ids (`models/catalog.json`) whose files are already
 downloaded in geisten (`--model-dir`, default: the geisten home's `models/`).
@@ -87,3 +95,20 @@ shown as `–`, never as zero.
 `python3 workbench/test_bench.py` (in CI, no model) checks that the builder
 reproduces the frozen suite, the case counts, every scoring rule and the
 report on synthetic runs.
+
+## Reference results in the catalog
+
+Measured 2026-10-03 on an Apple M1 Max (64 GB), Metal, engine pin
+`33db79d7764b`; raw results in `workbench/evidence/<suite id>/`.
+
+| Model | Correct | Note |
+|---|---|---|
+| Gemma 4 E4B · Q4_K_M | 147/160 | |
+| Gemma 4 E2B · Q4_K_M | 146/160 | |
+| Qwen3 0.6B · Q8_0 | 100/160 | reproduced exactly on a second run |
+| Qwen3.5 0.8B · Q8_0 | 34/160 | at temperature 0, 110 cases think through the 3072-token budget without answering |
+| SmolLM2 360M · Q8_0 | 31/160 | |
+
+Not measured: BitNet b1.58 2B (JSON answers stop after the first token,
+#106, so the score would describe the bug, not the model); Bonsai 2 27B and
+Qwen3.8 27B (too large for this round).
