@@ -43,7 +43,6 @@ void  perf_last(const char         *artifact,
                 struct perf_record *out);
 bool  perf_settings(bool enabled, unsigned days);
 bool  perf_clear(void);
-bool  perf_save_export(void);
 char *perf_export(size_t *length); /* Owned bounded JSONL; caller frees. */
 /* Shared definition, independently tested with golden observations. */
 unsigned perf_group(const struct perf_record *r);

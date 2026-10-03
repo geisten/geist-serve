@@ -138,19 +138,6 @@ void handle(int fd, struct app_arena *arena) {
         response(fd, 200, "application/json", "{}", 2);
         return;
     }
-    if (!strcmp(r.path, "/app/performance/export") && !strcmp(r.method, "POST")) {
-        if (perf_save_export()) {
-            char              data[APP_PATH_CAP * 2], path[APP_PATH_CAP];
-            struct app_buffer b = {.data = data, .cap = sizeof data};
-            snprintf(path, sizeof path, "%s/performance/export.jsonl", app.paths.home);
-            app_put(&b, "{\"path\":");
-            app_quote(&b, path);
-            app_put(&b, "}");
-            response(fd, 200, "application/json", data, b.len);
-        } else
-            error_response(fd, 503, "History could not be saved.");
-        return;
-    }
     if (!strcmp(r.path, "/app/performance/export") && !strcmp(r.method, "GET")) {
         size_t length = 0;
         char  *data   = perf_export(&length);
