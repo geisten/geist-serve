@@ -17,8 +17,8 @@ def assemble(directory: Path, version: str):
     actual = {p.name for p in directory.iterdir()}
     # The rootless Linux installer (#46) ships only when the release is signed:
     # all of its assets or none, never an unsigned manifest.
-    installer = [f'geist-{version}-{p}.tar.gz' for p in platforms[:2]]
-    installer += ['geist-manifest', 'geist-manifest.sig', 'install-geist.sh']
+    installer = [f'geisten-{version}-{p}.tar.gz' for p in platforms[:2]]
+    installer += ['geisten-manifest', 'geisten-manifest.sig', 'install-geisten.sh']
     if not actual & set(installer):
         installer = []
     payload = sorted(binaries+packages+installer+['geist-serve.socket','geist-serve.service','geist-serve.default','geist-serve.cdx.json'])

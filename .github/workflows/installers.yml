@@ -45,7 +45,7 @@ jobs:
           set -o pipefail
           platform=${{ matrix.arch == 'amd64' && 'linux-x86_64' || 'linux-aarch64' }}
           BIN_DIR=build/package VERSION="$VERSION" sh scripts/package-app.sh "$platform"
-          mv "build/geist-$VERSION-$platform.tar.gz" build/package/
+          mv "build/geisten-$VERSION-$platform.tar.gz" build/package/
           sh tests/install/bootstrap_acceptance.sh build/package "$VERSION" \
             "$PWD/geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf" 2>&1 | tee build/package/bootstrap-acceptance.log
       - name: Installed package, real inference and lifecycle
@@ -86,7 +86,7 @@ jobs:
           path: |
             build/package/*.deb
             build/package/*.deb.sha256
-            build/package/geist-*-linux-*.tar.gz
+            build/package/geisten-*-linux-*.tar.gz
             build/package/*-commit.txt
             build/package/app-build-packages.txt
             build/package/*acceptance.log

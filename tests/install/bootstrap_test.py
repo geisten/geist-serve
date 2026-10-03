@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""scripts/install-geist.sh against local fixtures (#46). Linux only.
+"""scripts/install-geisten.sh against local fixtures (#46). Linux only.
 
 Each test gets a fresh HOME, a fixture Ed25519 key and a release directory
 served through the installer's explicit test origin. The payload binaries are
@@ -19,7 +19,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT/'scripts/install-geist.sh'
+SCRIPT = ROOT/'scripts/install-geisten.sh'
 PLATFORM = {'x86_64': 'linux-x86_64', 'aarch64': 'linux-aarch64'}.get(platform.machine())
 FAKE_GEIST = r'''
 #include <stdio.h>
@@ -52,7 +52,7 @@ class Release:
         out = self.root/f'v{version}'
         out.mkdir(parents=True, exist_ok=True)
         for plat in ('linux-x86_64', 'linux-aarch64'):
-            top = f'geist-{version}-{plat}'
+            top = f'geisten-{version}-{plat}'
             staging = out/'src'/top
             staging.mkdir(parents=True)
             for b in ('geisten', 'geist-app', 'geistd'):
@@ -68,7 +68,7 @@ class Release:
                     info = tarfile.TarInfo(f'{top}/README.md'); info.type = tarfile.SYMTYPE; info.linkname = '/etc/passwd'
                     tar.addfile(info)
         subprocess.run([sys.executable, ROOT/'scripts/installer-manifest.py', out, version, 'a'*40, 'b'*40], check=True)
-        manifest = out/'geist-manifest'
+        manifest = out/'geisten-manifest'
         text = manifest.read_text().replace('channel stable', f'channel {channel}')
         manifest.write_bytes(text.replace('\n', '\r\n').encode() if crlf else text.encode())
         subprocess.run(['sh', ROOT/'scripts/sign-manifest.sh', manifest, sign_key or self.key], check=True)
@@ -97,7 +97,7 @@ class BootstrapTests(unittest.TestCase):
         self.home = self.case/'home'
         self.home.mkdir()
         self.release = Release(self.case/'releases', self.t/'fake', self.t/'key.pem')
-        self.runtime = self.home/'.local/share/geist-runtime'
+        self.runtime = self.home/'.local/share/geisten-runtime'
         self.launcher = self.home/'.local/bin/geisten'
         self.alias = self.home/'.local/bin/geist'  # the pre-#92 name
 
@@ -153,7 +153,7 @@ class BootstrapTests(unittest.TestCase):
             'untrusted signature': dict(sign_key=self.t/'other.pem'),
             'preview channel': dict(channel='preview'),
             'CRLF manifest': dict(crlf=True),
-            'unexpected member': dict(extra_member='geist-1.0.0-%s/extra' % PLATFORM),
+            'unexpected member': dict(extra_member='geisten-1.0.0-%s/extra' % PLATFORM),
             'traversal member': dict(extra_member='../escape'),
             'link member': dict(link_member=True),
         }
@@ -167,7 +167,7 @@ class BootstrapTests(unittest.TestCase):
 
     def test_tampered_archive_and_wrong_version(self):
         r = self.release.make('1.0.0')
-        archive = r/f'geist-1.0.0-{PLATFORM}.tar.gz'
+        archive = r/f'geisten-1.0.0-{PLATFORM}.tar.gz'
         data = bytearray(archive.read_bytes()); data[-5] ^= 0xff  # same size, other bytes
         archive.write_bytes(bytes(data))
         p = self.run_installer(r, '--no-start')

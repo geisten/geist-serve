@@ -1,15 +1,15 @@
 # Rootless Linux install (#46)
 
-`scripts/install-geist.sh` installs the shared geisten runtime (`geisten`,
+`scripts/install-geisten.sh` installs the shared geisten runtime (`geisten`,
 `geist-app`, `geistd`) for the current user on 64-bit Linux, without root and
 without a package manager. The Ubuntu DEBs (docs/INSTALL.md) stay the system-wide
 route; the installer refuses to shadow them.
 
 ```sh
 curl -fsSL https://geisten.net/install.sh | sh
-sh install-geist.sh --version 0.6.0 --no-start
-sh install-geist.sh --model recommended --yes      # unattended, with the first model
-sh install-geist.sh --uninstall
+sh install-geisten.sh --version 0.6.0 --no-start
+sh install-geisten.sh --model recommended --yes      # unattended, with the first model
+sh install-geisten.sh --uninstall
 ```
 
 Options: `--version X.Y.Z`, `--no-start`, `--model recommended` (not with
@@ -44,10 +44,10 @@ again to follow or resume.
 
 | Path | Content |
 |------|---------|
-| `~/.local/share/geist-runtime/versions/<v>/` | one unpacked release |
-| `~/.local/share/geist-runtime/current` | symlink `versions/<v>`, swapped atomically (`mv -T`) |
-| `~/.local/share/geist-runtime/receipt` | `receipt 1`, `version`, `platform`, `source`, `engine`, `launcher`, `previous` |
-| `~/.local/share/geist-runtime/.lock/` | pid of the running installer; stale locks are taken over |
+| `~/.local/share/geisten-runtime/versions/<v>/` | one unpacked release |
+| `~/.local/share/geisten-runtime/current` | symlink `versions/<v>`, swapped atomically (`mv -T`) |
+| `~/.local/share/geisten-runtime/receipt` | `receipt 1`, `version`, `platform`, `source`, `engine`, `launcher`, `previous` |
+| `~/.local/share/geisten-runtime/.lock/` | pid of the running installer; stale locks are taken over |
 | `~/.local/bin/geisten` | launcher symlink to `current/geisten` |
 | `~/.local/bin/geist` | the same, under the earlier command name (#92) |
 
@@ -63,10 +63,10 @@ packaged systemd user unit, so a later APT install cannot capture it.
 
 | Asset | Made by |
 |-------|---------|
-| `geist-<v>-linux-{x86_64,aarch64}.tar.gz` | `scripts/package-app.sh`, tested by `tests/install/bootstrap_acceptance.sh` in `installers.yml` |
-| `geist-manifest` | `scripts/installer-manifest.py` |
-| `geist-manifest.sig` | `scripts/sign-manifest.sh` |
-| `install-geist.sh` | copied from `scripts/` |
+| `geisten-<v>-linux-{x86_64,aarch64}.tar.gz` | `scripts/package-app.sh`, tested by `tests/install/bootstrap_acceptance.sh` in `installers.yml` |
+| `geisten-manifest` | `scripts/installer-manifest.py` |
+| `geisten-manifest.sig` | `scripts/sign-manifest.sh` |
+| `install-geisten.sh` | copied from `scripts/` |
 
 The release ships all of them or none (`scripts/release-manifest.py`): without
 the signing secret the job prints a notice and publishes no installer.
@@ -76,8 +76,8 @@ the signing secret the job prints a notice and publishes no installer.
 LF-only text, every line required, in this order, nothing else:
 
 ```
-geist-manifest 1
-product geist
+geisten-manifest 1
+product geisten
 version X.Y.Z
 channel stable
 source <40-hex geist-serve commit>
@@ -90,7 +90,7 @@ f16c, fma, movbe) and `linux-aarch64` needs armv8.2-a with dotprod and fp16;
 the installer checks the CPU flags before downloading. The installer parses the
 manifest line by line and never evaluates it.
 
-An archive holds exactly `geist-<v>-<platform>/` with `geisten`, `geist-app`,
+An archive holds exactly `geisten-<v>-<platform>/` with `geisten`, `geist-app`,
 `geistd`, `SHA256SUMS` and the packaged extras (licenses, `README.md`,
 `ENGINE.json`, `BUILD-PACKAGES.txt`, `Start geisten.sh`): regular files
 and directories only, at most 16 members, at most 512 MiB unpacked. Before
@@ -100,11 +100,11 @@ member list, the ELF machine of each binary, the inner `SHA256SUMS`, and that
 
 ## Signing
 
-`geist-manifest.sig` is the base64 Ed25519 signature over the exact manifest
+`geisten-manifest.sig` is the base64 Ed25519 signature over the exact manifest
 bytes, checked with `openssl pkeyutl -verify -rawin` (OpenSSL 3 or newer). The
 private key lives only in the `release` environment secret
 `GEIST_MANIFEST_SIGNING_KEY` (PEM); its public key is pinned in
-`GEIST_MANIFEST_PUBKEY` in `scripts/install-geist.sh`. If that constant is
+`GEIST_MANIFEST_PUBKEY` in `scripts/install-geisten.sh`. If that constant is
 empty, every install refuses with exit 12.
 
 Rotating the key: add the new public key to the installer, release, then drop
