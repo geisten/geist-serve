@@ -13,8 +13,26 @@ sh install-geisten.sh --uninstall
 ```
 
 Options: `--version X.Y.Z`, `--no-start`, `--model recommended` (not with
-`--no-start`), `--dry-run`, `--uninstall` (alone), `--yes`, `--help`.
-`--desktop` is reserved and exits 2 until the desktop route exists.
+`--no-start`), `--desktop`, `--dry-run`, `--uninstall` (alone), `--yes`, `--help`.
+
+## Desktop route (`--desktop`)
+
+On Ubuntu 24.04 (x86_64/ARM64) only, `--desktop` installs the native window
+instead of the rootless runtime: the matching `geisten_<v>_<arch>.deb` and
+`geisten-desktop_<v>_all.deb`, through APT.
+
+- Both packages are authenticated by the signed manifest (`deb`/`desktop`
+  lines: size and SHA-256) before APT sees them; a different file stops with
+  exit 12 and nothing installed.
+- The installer explains what it installs and asks on the terminal before it
+  runs `sudo apt-get install`. `--yes` never authorises sudo; without a
+  terminal it stops (exit 2) and names the packages to install by hand.
+- An existing rootless installation is not crossed over (exit 13): remove it
+  first with `--uninstall` (models and settings stay), then use `--desktop`.
+  An existing APT installation is upgraded by the same command.
+- `--dry-run` downloads and verifies the pair only; `--model recommended` runs
+  `geisten setup` after the install. Open the window from the application menu
+  or with `geisten-desktop`.
 
 ## First model
 
@@ -83,6 +101,8 @@ channel stable
 source <40-hex geist-serve commit>
 engine <geistlib commit | digest | unknown>
 archive <platform> <cpu baseline> <file> <bytes> <sha256>
+deb <amd64|arm64> <file> <bytes> <sha256>       (all three package lines or none)
+desktop all <file> <bytes> <sha256>
 ```
 
 One `archive` line per platform: `linux-x86_64` needs x86-64-v3 (avx2, bmi2,

@@ -25,6 +25,8 @@ Install the geisten model runtime for this user (no root needed).
 
   --version X.Y.Z   install exactly this release (default: newest stable)
   --no-start        install, but do not start the geisten service
+  --desktop         Ubuntu 24.04: install the geisten and geisten-desktop
+                    packages with apt instead (asks before using sudo)
   --model recommended
                     then set up the model geisten recommends for this computer
                     (asks first; with --yes it downloads without asking)
@@ -55,7 +57,7 @@ cleanup() {
 }
 
 parse_args() {
-    want_version='' no_start=0 dry_run=0 uninstall=0 model='' yes=0
+    want_version='' no_start=0 dry_run=0 uninstall=0 model='' yes=0 desktop=0
     while [ $# -gt 0 ]; do
         case $1 in
             --help | -h) usage; exit 0 ;;
@@ -73,7 +75,7 @@ parse_args() {
                 model=recommended
                 shift
                 ;;
-            --desktop) fail $E_USAGE "$1 is not available yet (see geisten/geist-serve#46)" ;;
+            --desktop) desktop=1 ;;
             *) fail $E_USAGE "unknown option: $1 (see --help)" ;;
         esac
         shift
@@ -87,6 +89,7 @@ parse_args() {
     [ $uninstall -eq 1 ] && { [ -n "$want_version" ] || [ $dry_run -eq 1 ] || [ -n "$model" ]; } &&
         fail $E_USAGE "--uninstall takes no other options"
     [ -n "$model" ] && [ $no_start -eq 1 ] && fail $E_USAGE "--model needs the service: drop --no-start"
+    [ $desktop -eq 1 ] && [ $uninstall -eq 1 ] && fail $E_USAGE "remove the desktop packages with: sudo apt remove geisten-desktop geisten"
     return 0
 }
 
@@ -103,8 +106,8 @@ preflight() {
     machine=$(uname -m)
     test_mode && [ -n "${GEIST_INSTALL_TEST_ARCH:-}" ] && machine=$GEIST_INSTALL_TEST_ARCH
     case $machine in
-        x86_64 | amd64) platform=linux-x86_64 elf_machine='3e 00' ;;
-        aarch64 | arm64) platform=linux-aarch64 elf_machine='b7 00' ;;
+        x86_64 | amd64) platform=linux-x86_64 elf_machine='3e 00' debarch=amd64 ;;
+        aarch64 | arm64) platform=linux-aarch64 elf_machine='b7 00' debarch=arm64 ;;
         *) fail $E_HOST "unsupported CPU architecture $machine (x86_64 or aarch64 needed)" ;;
     esac
     [ "$(getconf LONG_BIT 2>/dev/null)" = 64 ] || fail $E_HOST "a 64-bit userland is needed (this one is 32-bit)"
@@ -204,6 +207,7 @@ parse_manifest() {
     [ -z "$(tail -c1 "$m")" ] || fail $E_VERIFY "manifest must end with a newline"
     set -f
     n=0 version='' channel='' source='' engine='' archive='' size='' digest='' count=0
+    deb='' debsize='' debdigest='' debcount=0 desk='' desksize='' deskdigest='' deskcount=0
     while IFS= read -r line; do
         n=$((n + 1))
         # shellcheck disable=SC2086 # split the line into fields; globbing is off (set -f)
@@ -219,10 +223,13 @@ parse_manifest() {
                source=$2 ;;
             6) [ $# -eq 2 ] && [ "$1" = engine ] || fail $E_VERIFY "bad manifest engine line"
                engine=$2 ;;
-            *) [ $# -eq 6 ] && [ "$1" = archive ] || fail $E_VERIFY "unexpected manifest line $n"
-               if [ "$2" = "$platform" ]; then
-                   count=$((count + 1)) archive=$4 size=$5 digest=$6
-               fi ;;
+            *) case "$1:$#" in
+                   archive:6) [ "$2" = "$platform" ] && count=$((count + 1)) archive=$4 size=$5 digest=$6 ;;
+                   deb:5) [ "$2" = "$debarch" ] && debcount=$((debcount + 1)) deb=$3 debsize=$4 debdigest=$5 ;;
+                   desktop:5) [ "$2" = all ] || fail $E_VERIFY "bad desktop line $n"
+                       deskcount=$((deskcount + 1)) desk=$3 desksize=$4 deskdigest=$5 ;;
+                   *) fail $E_VERIFY "unexpected manifest line $n" ;;
+               esac ;;
         esac
     done <"$m"
     set +f
@@ -232,12 +239,23 @@ parse_manifest() {
     [ ${#source} -eq 40 ] || fail $E_VERIFY "bad source revision in manifest"
     [ "$channel" = stable ] || fail $E_VERIFY "manifest channel is $channel, not stable"
     [ -z "$want_version" ] || [ "$version" = "$want_version" ] || fail $E_VERIFY "manifest is for $version, not $want_version"
+    if [ $desktop -eq 1 ]; then
+        [ $debcount -eq 1 ] && [ $deskcount -eq 1 ] || fail $E_VERIFY "the release lists no desktop packages for $debarch"
+        [ "$deb" = "geisten_${version}_$debarch.deb" ] && [ "$desk" = "geisten-desktop_${version}_all.deb" ] ||
+            fail $E_VERIFY "unexpected package names $deb $desk"
+        check_entry "$debsize" "$debdigest" package
+        check_entry "$desksize" "$deskdigest" package
+        return 0
+    fi
     [ $count -eq 1 ] || fail $E_VERIFY "manifest has $count archives for $platform"
     [ "$archive" = "geisten-$version-$platform.tar.gz" ] || fail $E_VERIFY "unexpected archive name $archive"
-    case $size in *[!0-9]* | '') fail $E_VERIFY "bad archive size" ;; esac
-    case $digest in *[!0-9a-f]* | '') fail $E_VERIFY "bad archive digest" ;; esac
-    [ ${#digest} -eq 64 ] || fail $E_VERIFY "bad archive digest"
-    [ "$size" -le 268435456 ] || fail $E_VERIFY "archive larger than 256 MiB"
+    check_entry "$size" "$digest" archive
+}
+check_entry() { # size digest what
+    case $1 in *[!0-9]* | '') fail $E_VERIFY "bad $3 size" ;; esac
+    case $2 in *[!0-9a-f]* | '') fail $E_VERIFY "bad $3 digest" ;; esac
+    [ ${#2} -eq 64 ] || fail $E_VERIFY "bad $3 digest"
+    [ "$1" -le 268435456 ] || fail $E_VERIFY "$3 larger than 256 MiB"
 }
 
 # Only these regular files, in one top directory; nothing else may extract.
@@ -364,6 +382,76 @@ start_service() {
     fail $E_SETUP "the new version did not start; the previous installation is active again"
 }
 
+# The explicit Ubuntu desktop route (#46): the matching geisten/geisten-desktop
+# DEB pair, authenticated by the signed manifest, installed with apt after an
+# explicit yes on the terminal. --yes never authorises sudo.
+desktop_install() {
+    release=/etc/os-release
+    test_mode && [ -n "${GEIST_INSTALL_TEST_OS_RELEASE:-}" ] && release=$GEIST_INSTALL_TEST_OS_RELEASE
+    os_id=$(sed -n 's/^ID=//p' "$release" 2>/dev/null | tr -d '"')
+    os_version=$(sed -n 's/^VERSION_ID=//p' "$release" 2>/dev/null | tr -d '"')
+    [ "$os_id" = ubuntu ] && [ "$os_version" = 24.04 ] ||
+        fail $E_HOST "the desktop route needs Ubuntu 24.04 (this is ${os_id:-unknown} ${os_version:-}); install without --desktop instead"
+    [ -f "$runtime/receipt" ] && fail $E_OWNER "a rootless geisten installation exists in $runtime; remove it first (sh install-geisten.sh --uninstall keeps your models), then use --desktop"
+    for tool in sudo apt-get; do
+        command -v "$tool" >/dev/null 2>&1 || fail $E_PREREQ "missing: $tool"
+    done
+    # A world-readable stage, so apt's unprivileged downloader can read the files.
+    stage=$(mktemp -d "${TMPDIR:-/tmp}/geisten-desktop.XXXXXX") || fail $E_LOCAL "cannot create a staging directory"
+    chmod 755 "$stage"
+    if test_mode; then
+        base=$GEIST_INSTALL_TEST_ORIGIN
+    elif [ -n "$want_version" ]; then
+        base=$GEIST_RELEASES/download/v$want_version
+    else
+        base=$GEIST_RELEASES/latest/download
+    fi
+    say "Checking the release…"
+    fetch "$base/geisten-manifest" "$stage/manifest" 8192
+    fetch "$base/geisten-manifest.sig" "$stage/manifest.sig" 512
+    verify_manifest
+    parse_manifest
+    test_mode || base=$GEIST_RELEASES/download/v$version
+    say "Downloading the geisten $version packages…"
+    fetch "$base/$deb" "$stage/$deb" "$debsize"
+    fetch "$base/$desk" "$stage/$desk" "$desksize"
+    for entry in "$deb $debsize $debdigest" "$desk $desksize $deskdigest"; do
+        set -f
+        # shellcheck disable=SC2086 # name size digest; globbing is off
+        set -- $entry
+        set +f
+        [ "$(wc -c <"$stage/$1")" -eq "$2" ] || fail $E_VERIFY "$1 size differs from the manifest"
+        [ "$(sha256sum "$stage/$1" | cut -d' ' -f1)" = "$3" ] || fail $E_VERIFY "$1 checksum differs from the manifest"
+        chmod 644 "$stage/$1"
+    done
+    if [ $dry_run -eq 1 ]; then
+        say "Dry run: $deb and $desk verified; would install them with: sudo apt-get install"
+        cleanup
+        exit 0
+    fi
+    say "geisten installs two Ubuntu packages with apt, which needs administrator rights (sudo):"
+    say "  $deb: the shared service and the geisten command"
+    say "  $desk: the app window and its AppArmor profile"
+    if test_mode && [ "${GEIST_INSTALL_TEST_CONFIRM:-}" = yes ]; then
+        :
+    elif (true </dev/tty) 2>/dev/null; then
+        printf 'Install them now? [y/N] ' >/dev/tty
+        read -r answer </dev/tty || answer=''
+        case $answer in y | Y | yes | j | J | ja) ;; *) say "Nothing was installed."; cleanup; exit 0 ;; esac
+    else
+        fail $E_USAGE "the desktop route asks before using sudo; run it in a terminal, or install $deb and $desk from $base yourself"
+    fi
+    sudo apt-get install -y "$stage/$deb" "$stage/$desk" || fail $E_SETUP "apt could not install the packages; see its message above"
+    cleanup
+    say "geisten $version is installed with its desktop app."
+    if [ -n "$model" ]; then
+        if [ $yes -eq 1 ]; then geisten setup --yes; else geisten setup; fi ||
+            fail $E_MODEL "geisten is installed, but the model setup did not finish. Resume with: geisten setup"
+    fi
+    say "Open geisten from the application menu, or run: geisten-desktop"
+    exit 0
+}
+
 # The first model (#46). `geisten setup` asks on /dev/tty and follows the
 # service's own recommendation; this script never picks a model itself.
 setup_model() {
@@ -402,6 +490,7 @@ main() {
     trap 'cleanup; exit 143' TERM
     test_mode && say "TEST MODE: fetching from $GEIST_INSTALL_TEST_ORIGIN"
     preflight
+    [ $desktop -eq 1 ] && desktop_install
     if [ $uninstall -eq 1 ]; then
         take_lock
         do_uninstall
