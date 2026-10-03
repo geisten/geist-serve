@@ -806,6 +806,12 @@ body.manager-page main { max-width:1180px }
 .model-badges>span { display:inline-flex }
 .model-badges svg { width:13px; height:13px; stroke-width:1.6 }
 .model-fit[data-fit="1"],.model-fit[data-fit="2"] { color:#96620d }
+.model-verdict { font-weight:600; min-width:1em; text-align:center; cursor:help }
+.model-verdict[data-verdict="good"] { color:#1f7a3a }
+.model-verdict[data-verdict="usable"] { color:#96620d }
+.model-verdict[data-verdict="not_recommended"] { color:#b42318 }
+.model-verdict[data-verdict="unknown"] { color:var(--muted) }
+.best-choice { margin:0 0 10px; font-size:13px }
 .model-quality { gap:2px; font-size:11px; font-variant-numeric:tabular-nums }
 .model-quality[data-tested="none"] { opacity:.45 }
 .model-quality[data-tested="older"] { font-style:italic }

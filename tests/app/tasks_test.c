@@ -13,4 +13,31 @@ int main(void) {
     assert(app_task_fit(APP_RECOMMENDED, APP_QUALITY_PASSED) == APP_RECOMMENDED);
     assert(app_task_fit(APP_CONDITIONAL, APP_QUALITY_PASSED) == APP_CONDITIONAL);
     assert(app_task_fit(APP_UNAVAILABLE, APP_QUALITY_PASSED) == APP_UNAVAILABLE);
+    /* #103: verdicts. Known problems beat missing data; missing data is never "good". */
+    struct app_limits l = APP_LIMITS_DEFAULT;
+    struct {
+        enum app_fit     fit;
+        double           seconds;
+        unsigned         passed, total;
+        enum app_verdict verdict;
+        const char      *reason;
+    } cases[] = {
+            {APP_RECOMMENDED, 3, 146, 160, APP_VERDICT_GOOD, "good"},
+            {APP_RECOMMENDED, 10, 144, 160, APP_VERDICT_GOOD, "good"},           /* both limits inclusive */
+            {APP_RECOMMENDED, 3, 143, 160, APP_VERDICT_NOT_RECOMMENDED, "unreliable"},
+            {APP_RECOMMENDED, 31, 160, 160, APP_VERDICT_NOT_RECOMMENDED, "too_slow"},
+            {APP_RECOMMENDED, 30, 160, 160, APP_VERDICT_USABLE, "slow"},
+            {APP_CONDITIONAL, 3, 160, 160, APP_VERDICT_USABLE, "tight_memory"},
+            {APP_UNAVAILABLE, 3, 160, 160, APP_VERDICT_NOT_RECOMMENDED, "unavailable"},
+            {APP_RECOMMENDED, -1, 160, 160, APP_VERDICT_UNKNOWN, "speed_unknown"},
+            {APP_RECOMMENDED, 3, 0, 0, APP_VERDICT_UNKNOWN, "quality_unknown"},
+            {APP_RECOMMENDED, -1, 31, 160, APP_VERDICT_NOT_RECOMMENDED, "unreliable"}, /* unmeasured, still known bad */
+            {APP_RECOMMENDED, 99, 0, 0, APP_VERDICT_NOT_RECOMMENDED, "too_slow"},
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; i++) {
+        struct app_judgement j = app_judge(cases[i].fit, cases[i].seconds, cases[i].passed, cases[i].total, l);
+        assert(j.verdict == cases[i].verdict && !strcmp(j.reason, cases[i].reason));
+    }
+    assert(app_answer_seconds(0, 1) < 0 && app_answer_seconds(20, 0.5) == 10.5 && app_answer_seconds(40, -1) == 5);
+    assert(!strcmp(app_verdict_name(APP_VERDICT_NOT_RECOMMENDED), "not_recommended"));
 }

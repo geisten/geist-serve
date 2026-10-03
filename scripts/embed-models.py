@@ -14,6 +14,8 @@ for m in catalog['models']:
  fields += [json.dumps(m[k],ensure_ascii=True) for k in ('group_id','group_name','quantization')]
  fields += [json.dumps(m.get('reasoning_format','none'))]
  fields += [json.dumps(json.dumps(m['quality'],separators=(',',':'))) if 'quality' in m else 'nullptr']
+ cells=[c for t in m.get('quality',{}).get('tasks',{}).values() for c in t.values()]
+ fields += [str(sum(c[0] for c in cells)), str(sum(c[1] for c in cells))]
  rows.append('    {'+', '.join(fields)+'},')
 (root/'build').mkdir(exist_ok=True)
 (root/'build/app_models.h').write_text('/* Generated from models/catalog.json. */\nstruct app_model app_models[APP_MODEL_COUNT] = {\n'+'\n'.join(rows)+'\n};\nsize_t app_model_count = '+str(len(rows))+';\nunsigned app_catalog_revision = '+str(catalog['revision'])+';\n')

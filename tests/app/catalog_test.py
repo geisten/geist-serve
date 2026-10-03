@@ -74,6 +74,14 @@ with tempfile.TemporaryDirectory(prefix='geist-catalog-') as temporary:
         quality={m['id']:m['quality_evidence'] for m in app.status()['models']}
         assert quality.pop('another-small-model')==evidence and quality=={m['id']:m.get('quality') for m in base['models']}
         assert len(app.status()['quality_suite'])==12
+        # #103: one verdict per model, never "good" without measured speed and evidence.
+        snapshot=app.status()
+        for m in snapshot['models']:
+            v=m['verdict']
+            assert v['value'] in ('good','usable','not_recommended','unknown') and v['value']!='good', v
+            assert (v['passed'] is None)==(m['quality_evidence'] is None)
+        assert {m['id']:m['verdict']['reason'] for m in snapshot['models']}['another-small-model']=='unreliable'  # 57/80 in the fixture
+        assert snapshot['best_choice'] is None and snapshot['limits']=={'fast_s':10,'usable_s':30,'reliable':0.9}
         assert app.request('/app/catalog',good)[0]==409
         assert json.loads((home/'catalog.json').read_text())==good
         assert (home/'catalog.json').stat().st_mode & 0o777 == 0o600

@@ -920,6 +920,24 @@ $$
       assert(badge.dataset.tested === 'none' && badge.textContent === '' && badge.title === t('Answer quality not tested yet'), '#102: no evidence, no number');
       render(saved);
     }
+    { // #103: one verdict symbol per model, words in the tooltip; one recommendation sentence.
+      const saved = state, first = saved.models[0], second = saved.models.find(m => m.id !== first.id && !cards.get(m.id).querySelector('.model-pick').disabled);
+      assert(second, '#103: the fixture has a selectable model');
+      const verdict = (value, reason, extra = {}) => ({value, reason, processor: null, seconds: {cpu: null, gpu: null}, passed: null, total: null, ...extra});
+      const snapshot = (a, b, best) => ({...saved, best_choice: best, models: saved.models.map(m => m.id === first.id ? {...m, verdict: a} : m.id === second.id ? {...m, verdict: b} : m)});
+      render(snapshot(verdict('good', 'good', {processor: 'gpu', seconds: {cpu: 9.6, gpu: 3.2}, passed: 146, total: 160}), verdict('not_recommended', 'unreliable', {passed: 31, total: 160}), {id: first.id, verdict: 'good', processor: 'gpu'}));
+      const mark = id => cards.get(id).querySelector('.model-verdict');
+      assert(mark(first.id).textContent === '✓' && mark(second.id).textContent === '✗', '#103: symbols, not words');
+      assert(mark(first.id).title === `${t('Good choice')} · ${t('about 3 s per answer on the graphics chip')} · 146/160 ${t('correct')}`, '#103: plain reason with seconds and processor');
+      assert(mark(second.id).title === `${t('Not recommended here')} · ${t('Reference test')}: 31/160 ${t('correct')}`, '#103: the reason names the evidence');
+      assert(!$('best-choice').hidden && $('best-choice').textContent.startsWith(`✓ ${t('Best for you')}: `) && !/t\/s|Q4_K_M|Q8_0/.test($('best-choice').textContent), '#103: recommendation in plain words');
+      assert(cards.get(second.id).querySelector('.model-pick').getAttribute('aria-label').includes(t('Not recommended here')) && !cards.get(second.id).querySelector('.model-pick').disabled, '#103: a ✗ explains and never blocks');
+      render(snapshot(verdict('unknown', 'speed_unknown', {passed: 146, total: 160}), verdict('unknown', 'quality_unknown'), {id: first.id, verdict: 'unknown', processor: null}));
+      assert(mark(first.id).textContent === '?' && $('best-choice').textContent.startsWith(t('No installed model is a good choice yet.')), '#103: no "good" without a measurement');
+      render({...saved, best_choice: null});
+      assert($('best-choice').hidden, '#103: no sentence without an installed model');
+      render(saved);
+    }
     { // #83: model actions are locked during a comparison; a pause says "Cancelling…" until the job ends.
       const saved = state, idle = saved.models.find(m => !m.installed && m.id !== saved.active_id && m.resource_fit !== 2);
       assert(idle, '#83: the fixture offers a model to download');

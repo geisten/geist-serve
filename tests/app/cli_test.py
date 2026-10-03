@@ -27,6 +27,10 @@ with tempfile.TemporaryDirectory(prefix='geist-cli-') as home:
         cli('start')
         before=json.loads(cli('connection'))
         assert before['base_url'].endswith(f':{app.port}/v1')
+        # #103: a readable verdict per model; JSON stays with `status`.
+        listing=cli('models')
+        assert 'gemma4-e2b' in listing and '146/160 correct' in listing and '✓ good choice' in listing, listing
+        assert json.loads(cli('status'))['models'][0]['verdict']['value'] in ('good','usable','not_recommended','unknown')
         if model:
             app.wait(lambda s:s['ready'],timeout=60)
             before=json.loads(cli('connection'))

@@ -124,6 +124,7 @@ struct app_prefs {
     char selected[64], answer_language[3], profile_series[768], measurement_identity[512];
     bool preview_accepted[APP_MODEL_COUNT];
     struct processor_measurement history[APP_MODEL_COUNT][2];
+    struct app_limits            limits; /* #103: verdict thresholds for this computer */
 };
 
 /* All mutable app state, guarded by app.mutex. The sub-structs group fields
