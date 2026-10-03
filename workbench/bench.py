@@ -276,7 +276,10 @@ def run_candidate(suite, entry, model, backend, out):
             poller.start()
             first = suite['classify']
             budget = record['sampler']['reasoning_budget']
-            app.complete(first['prompt']['en'], first['cases'][0]['input'], first['max_tokens'] + budget)  # declared warm-up, not scored
+            try:  # declared warm-up, not scored; a model without an answer here still gets every case
+                app.complete(first['prompt']['en'], first['cases'][0]['input'], first['max_tokens'] + budget)
+            except (OSError, RuntimeError, ValueError, KeyError) as error:
+                record['warmup_error'] = str(error)[:300]
             with open(out/'results.jsonl', 'x', encoding='utf-8') as raw:
                 for task, spec in suite.items():
                     for case in spec['cases']:
