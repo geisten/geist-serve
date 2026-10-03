@@ -36,6 +36,20 @@ def build(dist: Path, version: str, source: str, engine: str, platforms=tuple(PL
         with path.open('rb') as stream:
             digest = hashlib.file_digest(stream, 'sha256').hexdigest()
         lines.append(f'archive {platform} {cpu} {name} {path.stat().st_size} {digest}')
+    # The --desktop route's DEB pair (#46), authenticated like the archives:
+    # all three packages or none.
+    debs = [('deb', arch, f'geisten_{version}_{arch}.deb') for arch in ('amd64', 'arm64')]
+    debs.append(('desktop', 'all', f'geisten-desktop_{version}_all.deb'))
+    present = [(kind, arch, name) for kind, arch, name in debs if (dist/name).exists()]
+    if present and len(present) != len(debs):
+        raise ValueError(f'desktop packages are all or none; missing {sorted(n for _, _, n in debs if not (dist/n).exists())}')
+    for kind, arch, name in present:
+        path = dist/name
+        if path.is_symlink() or not path.is_file() or path.stat().st_size == 0:
+            raise ValueError(f'invalid package {name}')
+        with path.open('rb') as stream:
+            digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+        lines.append(f'{kind} {arch} {name} {path.stat().st_size} {digest}')
     return '\n'.join(lines) + '\n'
 
 

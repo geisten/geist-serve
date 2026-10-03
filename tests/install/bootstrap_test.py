@@ -48,7 +48,7 @@ class Release:
     def __init__(self, root: Path, fake: Path, key: Path):
         self.root, self.fake, self.key = root, fake, key
 
-    def make(self, version, *, extra_member=None, link_member=False, channel='stable', crlf=False, sign_key=None):
+    def make(self, version, *, extra_member=None, link_member=False, channel='stable', crlf=False, sign_key=None, debs=False):
         out = self.root/f'v{version}'
         out.mkdir(parents=True, exist_ok=True)
         for plat in ('linux-x86_64', 'linux-aarch64'):
@@ -67,6 +67,9 @@ class Release:
                 if link_member:
                     info = tarfile.TarInfo(f'{top}/README.md'); info.type = tarfile.SYMTYPE; info.linkname = '/etc/passwd'
                     tar.addfile(info)
+        if debs:  # stand-ins: only their size and checksum are verified here
+            for name in (f'geisten_{version}_amd64.deb', f'geisten_{version}_arm64.deb', f'geisten-desktop_{version}_all.deb'):
+                (out/name).write_bytes(name.encode() * 50)
         subprocess.run([sys.executable, ROOT/'scripts/installer-manifest.py', out, version, 'a'*40, 'b'*40], check=True)
         manifest = out/'geisten-manifest'
         text = manifest.read_text().replace('channel stable', f'channel {channel}')
@@ -86,7 +89,15 @@ class BootstrapTests(unittest.TestCase):
         for name in ('key', 'other'):
             subprocess.run(['openssl', 'genpkey', '-algorithm', 'ed25519', '-out', t/f'{name}.pem'], check=True)
         subprocess.run(['openssl', 'pkey', '-in', t/'key.pem', '-pubout', '-out', t/'key.pub'], check=True)
-        cls.t = t
+        # Recording stand-ins for the --desktop route: nothing is installed for real.
+        fakebin = t/'fakebin'; fakebin.mkdir()
+        (fakebin/'sudo').write_text('#!/bin/sh\necho "sudo $*" >> "$FAKE_LOG"\nexec "$@"\n')
+        (fakebin/'apt-get').write_text('#!/bin/sh\nfor f in "$@"; do case $f in /*) test -r "$f" || exit 99;; esac; done\n'
+                                       'echo "apt-get $*" >> "$FAKE_LOG"\nexit "${FAKE_APT_RC:-0}"\n')
+        for tool in ('sudo', 'apt-get'): (fakebin/tool).chmod(0o755)
+        (t/'ubuntu').write_text('ID=ubuntu\nVERSION_ID="24.04"\n')
+        (t/'debian').write_text('ID=debian\nVERSION_ID="12"\n')
+        cls.t, cls.fakebin = t, fakebin
 
     @classmethod
     def tearDownClass(cls):
@@ -204,7 +215,7 @@ class BootstrapTests(unittest.TestCase):
 
     def test_usage_and_host_errors_before_any_change(self):
         r = self.release.make('1.0.0')
-        for args, code in [(['--bogus'], 2), (['--desktop'], 2), (['--version', '1.2'], 2),
+        for args, code in [(['--bogus'], 2), (['--version', '1.2'], 2),
                            (['--uninstall', '--dry-run'], 2)]:
             with self.subTest(args):
                 self.assertEqual(self.run_installer(r, *args).returncode, code)
@@ -243,6 +254,55 @@ class BootstrapTests(unittest.TestCase):
         for args in (['--model', 'best'], ['--model'], ['--model', 'recommended', '--no-start'], ['--uninstall', '--model', 'recommended']):
             with self.subTest(args):
                 self.assertEqual(self.run_installer(r, *args).returncode, 2)
+
+    def test_desktop_route(self):
+        log = self.case/'calls'
+        base = {'GEIST_INSTALL_TEST_OS_RELEASE': str(self.t/'ubuntu'), 'PATH': f'{self.fakebin}:{os.environ["PATH"]}', 'FAKE_LOG': str(log)}
+        calls = lambda: log.read_text() if log.exists() else ''
+        r = self.release.make('1.0.0', debs=True)
+        arch = 'amd64' if PLATFORM == 'linux-x86_64' else 'arm64'
+        cases = [  # name, args, extra env, exit code
+            ('not Ubuntu 24.04', [], {'GEIST_INSTALL_TEST_OS_RELEASE': str(self.t/'debian')}, 10),
+            ('no terminal to confirm', [], {}, 2),
+            ('--yes is no consent for sudo', ['--yes'], {}, 2),
+            ('dry run', ['--dry-run'], {}, 0),
+            ('with --uninstall', ['--uninstall'], {}, 2),
+        ]
+        for name, args, env, code in cases:
+            with self.subTest(name):
+                p = self.run_installer(r, '--desktop', *args, env=base | env)
+                self.assertEqual(p.returncode, code, (name, p.stdout, p.stderr))
+                self.assertEqual(calls(), '', f'{name}: apt or sudo was called')
+        # Confirmed: exactly the verified matching pair goes to apt, through sudo; no rootless files.
+        p = self.run_installer(r, '--desktop', env=base | {'GEIST_INSTALL_TEST_CONFIRM': 'yes'})
+        self.assertEqual(p.returncode, 0, p.stderr)
+        lines = calls().splitlines()
+        self.assertEqual(len(lines), 2, lines)
+        self.assertTrue(lines[0].startswith('sudo apt-get install -y ') and lines[1].startswith('apt-get install -y '), lines)
+        self.assertIn(f'/geisten_1.0.0_{arch}.deb ', lines[1])
+        self.assertTrue(lines[1].endswith('/geisten-desktop_1.0.0_all.deb'), lines)
+        self.assertFalse(self.runtime.exists() or self.launcher.is_symlink(), 'the desktop route created rootless files')
+        log.unlink()
+        # apt fails: reported, not hidden.
+        p = self.run_installer(r, '--desktop', env=base | {'GEIST_INSTALL_TEST_CONFIRM': 'yes', 'FAKE_APT_RC': '100'})
+        self.assertEqual(p.returncode, 15, p.stderr)
+        log.unlink()
+        # A tampered package (same size) and a release without packages are refused before apt.
+        desk = r/'geisten-desktop_1.0.0_all.deb'
+        data = bytearray(desk.read_bytes()); data[0] ^= 1; desk.write_bytes(bytes(data))
+        p = self.run_installer(r, '--desktop', env=base | {'GEIST_INSTALL_TEST_CONFIRM': 'yes'})
+        self.assertEqual(p.returncode, 12, p.stderr)
+        self.assertIn('checksum differs', p.stderr)
+        p = self.run_installer(self.release.make('2.0.0'), '--desktop', env=base | {'GEIST_INSTALL_TEST_CONFIRM': 'yes'})
+        self.assertEqual(p.returncode, 12, p.stderr)
+        self.assertEqual(calls(), '')
+        # An existing rootless installation is never crossed over automatically.
+        r3 = self.release.make('3.0.0', debs=True)
+        self.assertEqual(self.run_installer(r3, '--no-start').returncode, 0)
+        p = self.run_installer(r3, '--desktop', env=base | {'GEIST_INSTALL_TEST_CONFIRM': 'yes'})
+        self.assertEqual(p.returncode, 13, p.stderr)
+        self.assertIn('--uninstall', p.stderr)
+        self.assertEqual(calls(), '')
 
     def test_dry_run_then_uninstall_keeps_data(self):
         r = self.release.make('1.0.0')

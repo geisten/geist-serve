@@ -27,6 +27,20 @@ class ManifestTests(unittest.TestCase):
         for arch in ['amd64','arm64']:
             self.assertIn((self.root/f'geisten_1.2.3_{arch}.deb.sha256').read_text().strip(),entries)
 
+    def test_installer_manifest_lists_desktop_packages_all_or_none(self):
+        spec2=importlib.util.spec_from_file_location('installer', ROOT/'scripts/installer-manifest.py')
+        installer=importlib.util.module_from_spec(spec2); spec2.loader.exec_module(installer)
+        root=self.root/'installer'; root.mkdir()  # the shared fixture already holds every DEB
+        (root/'geisten-1.2.3-linux-x86_64.tar.gz').write_text('archive')
+        build=lambda: installer.build(root,'1.2.3','a'*40,'b'*40,('linux-x86_64',))
+        self.assertNotIn('\ndeb ',build())  # no packages: no desktop lines
+        names=['geisten_1.2.3_amd64.deb','geisten_1.2.3_arm64.deb','geisten-desktop_1.2.3_all.deb']
+        for name in names: (root/name).write_text(name)
+        lines=build().splitlines()
+        self.assertEqual([l.split()[:3] for l in lines[-3:]],[['deb','amd64',names[0]],['deb','arm64',names[1]],['desktop','all',names[2]]])
+        (root/names[1]).unlink()
+        with self.assertRaisesRegex(ValueError,'all or none'): build()
+
     def test_installer_assets_are_all_or_none(self):
         installer=['geisten-1.2.3-linux-x86_64.tar.gz','geisten-1.2.3-linux-aarch64.tar.gz','geisten-manifest','geisten-manifest.sig','install-geisten.sh']
         for name in installer: (self.root/name).write_text(name)
