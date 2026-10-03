@@ -26,7 +26,7 @@ Priority: optional
 Depends: geist (= $version), apparmor (>= 4.0), python3, python3-gi, gir1.2-gtk-4.0, gir1.2-webkit-6.0
 Replaces: geist (<< 0.4.0)
 Breaks: geist (<< 0.4.0)
-Description: Desktop model manager for the shared Geist service
+Description: Desktop model manager for the shared Geisten service
  Choose models, try tasks and configure editors in a private local app window.
 EOF
 cat > "$stage/DEBIAN/postinst" <<'POSTINST'

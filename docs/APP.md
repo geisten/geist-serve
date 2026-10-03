@@ -1,4 +1,4 @@
-# Geist — Runs here. Stays here.
+# Geisten — Runs here. Stays here.
 
 Manage a local model and connect your terminal and editor to the same service.
 All catalog models appear directly, with their quantizations grouped below one name.
@@ -14,9 +14,9 @@ Mac release still needs Developer ID signing and notarization.
 
 ## Start on a Mac
 
-Open the Geist DMG, drag Geist to Applications, and open its desktop window.
+Open the Geisten DMG, drag Geisten to Applications, and open its desktop window.
 Click a quantization row or its leading download icon in the complete model list.
-Geist downloads and verifies that variant. If no model is running, it starts automatically.
+Geisten downloads and verifies that variant. If no model is running, it starts automatically.
 Otherwise the current model stays available for chat and editor connections, even
 during checksum verification. Click the completed variant when you want to switch.
 An installed model starts directly. The same row shows progress and
@@ -149,7 +149,7 @@ Closing the window keeps the shared service running. Stopping it requires
 confirmation. Start at Login is optional in the native menu.
 
 Apple Silicon and macOS 14 or later are required by the Mac app.
-Previously downloaded catalog files in the Geist data folder are reused
+Previously downloaded catalog files in the Geisten data folder are reused
 after verification. The former Swift application's selected-model preference
 is not migrated: choose the model once in the model list. The new Connections panel and bundled `geist` terminal client use the same
 loaded daemon. The older standalone geist-serve server is a separate legacy
@@ -159,9 +159,9 @@ entry point; do not start it to connect an editor to the manager.
 
 Use 64-bit Raspberry Pi OS. Pi 5 with at least 4 GB RAM is the initial target.
 Extract the `geist-…-linux-aarch64.tar.gz` archive. On the desktop, run
-`Start Geist.sh` from the extracted folder (choose Execute when your file
+`Start Geisten.sh` from the extracted folder (choose Execute when your file
 manager asks). It opens your browser. If the file manager opens the script
-as text, run `sh './Start Geist.sh'` in that folder's terminal.
+as text, run `sh './Start Geisten.sh'` in that folder's terminal.
 
 The package contains three static executables: geist, geist-app and geistd. It does not need a compiler,
 Python, a package manager, Docker or an inference service installation.
@@ -172,7 +172,7 @@ For a Pi without a screen, start the script over SSH and leave it running:
 ```sh
 ssh your-user@your-pi
 cd /path/to/extracted/geist-folder
-sh './Start Geist.sh'
+sh './Start Geisten.sh'
 ```
 
 In a second terminal on your Mac, open the encrypted tunnel:
@@ -185,7 +185,7 @@ Open the full private link printed by the Pi in the Mac browser. It includes
 a session key after `#`; opening just the port will not authorize access.
 Keep that link private. The model, device assessment and inference run on
 the Pi. The browser sends the prompt through SSH and displays the answer
-on the Mac. Both terminals can be closed after Quit Geist. If port 8766 is
+on the Mac. Both terminals can be closed after Quit Geisten. If port 8766 is
 occupied, start with `--port 8767` and forward 8767 at both ends instead.
 No direct LAN listener or Internet exposure is needed.
 

@@ -1,5 +1,5 @@
 [Unit]
-Description=Geist local model service
+Description=Geisten local model service
 After=network.target
 
 [Service]

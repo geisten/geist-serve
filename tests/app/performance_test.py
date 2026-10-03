@@ -105,7 +105,7 @@ def main():
             # #90: the numbers behind it, the newest from the earlier build, and none for this one.
             assert card['speed']=={'cpu':None,'gpu':None} and card['earlier']['engine']=='0.11.0' and card['earlier']['cpu']>0,card
             assert 'not measured' not in reason and 'not been measured' not in reason, reason
-            assert 'measured' not in reason or reason.endswith('earlier Geist version.'), reason
+            assert 'measured' not in reason or reason.endswith('earlier Geisten version.'), reason
         finally:app.close()
         wrapper.write_text(original)
         journal=home/'performance/observations.jsonl'

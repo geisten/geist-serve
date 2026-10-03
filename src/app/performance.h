@@ -31,7 +31,7 @@ void  perf_view(struct app_buffer *b,
                 const char        *cpu,
                 const char        *gpu);
 /* Newest completed reply per processor (0 CPU, 1 GPU) for this artifact from
- * an earlier engine build or Geist version; version is "" when unknown. */
+ * an earlier engine build or Geisten version; version is "" when unknown. */
 struct perf_earlier {
     double rate[2];
     char   version[64];

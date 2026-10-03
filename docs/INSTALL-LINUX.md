@@ -1,6 +1,6 @@
 # Rootless Linux install (#46)
 
-`scripts/install-geist.sh` installs the shared Geist runtime (`geist`,
+`scripts/install-geist.sh` installs the shared Geisten runtime (`geist`,
 `geist-app`, `geistd`) for the current user on 64-bit Linux, without root and
 without a package manager. The Ubuntu DEBs (docs/INSTALL.md) stay the system-wide
 route; the installer refuses to shadow them.
@@ -91,7 +91,7 @@ manifest line by line and never evaluates it.
 
 An archive holds exactly `geist-<v>-<platform>/` with `geist`, `geist-app`,
 `geistd`, `SHA256SUMS` and the packaged extras (licenses, `README.md`,
-`ENGINE.json`, `BUILD-PACKAGES.txt`, `Start Geist.sh`): regular files
+`ENGINE.json`, `BUILD-PACKAGES.txt`, `Start Geisten.sh`): regular files
 and directories only, at most 16 members, at most 512 MiB unpacked. Before
 activation the installer checks size and SHA-256 against the manifest, the
 member list, the ELF machine of each binary, the inner `SHA256SUMS`, and that
@@ -119,7 +119,7 @@ the old one. An installer only trusts the key it was downloaded with.
 | 11 | missing prerequisite (curl, OpenSSL 3, `mv -T`, …) |
 | 12 | download or verification failed |
 | 13 | another installation owns the files |
-| 14 | Geist or another installer is busy (previous version restored) |
+| 14 | Geisten or another installer is busy (previous version restored) |
 | 15 | start failed (previous version restored) |
 | 16 | local file system problem |
 | 17 | installed, but the `--model` setup did not finish (`geist setup` resumes) |

@@ -171,7 +171,7 @@ static bool current_service(void) {
         return true;
     if (order == 1) {
         start_error = 44;
-        fputs("A newer Geist service is running. Open the newest installed app.\n", stderr);
+        fputs("A newer Geisten service is running. Open the newest installed app.\n", stderr);
         return false;
     }
     if (order == 2) {
@@ -184,7 +184,7 @@ static bool current_service(void) {
     long code = request("/app/quit-if-idle", "{}", 5);
     if (code != 202) {
         start_error = code == 409 ? 43 : 42;
-        fputs("Finish the current task before updating Geist; then reopen the app.\n", stderr);
+        fputs("Finish the current task before updating Geisten; then reopen the app.\n", stderr);
         return false;
     }
     return wait_stopped();
@@ -230,7 +230,7 @@ static bool start(void) {
             return false;
         if (access(daemon, X_OK) != 0) {
             fprintf(stderr,
-                    "Geist is incomplete: %s is missing. Reinstall Geist, or in a source "
+                    "Geisten is incomplete: %s is missing. Reinstall Geisten, or in a source "
                     "checkout run 'make' first.\n",
                     daemon);
             return false;
@@ -279,7 +279,7 @@ static bool start(void) {
             return true;
         pause_short();
     }
-    fprintf(stderr, "Geist did not start. Check port 8766 and service permissions.\n");
+    fprintf(stderr, "Geisten did not start. Check port 8766 and service permissions.\n");
     return false;
 }
 static bool executable_directory(void) {
@@ -365,7 +365,7 @@ static int setup(bool yes) {
         return start_error;
     struct setup_state s = {0};
     if (!setup_state_read(&s, nullptr)) {
-        fputs("Geist is not responding.\n", stderr);
+        fputs("Geisten is not responding.\n", stderr);
         return 1;
     }
     char id[128] = "", name[128] = "";
@@ -412,7 +412,7 @@ static int setup(bool yes) {
         bool   started = false;
         for (;;) {
             if (!setup_state_read(&s, id)) {
-                fputs("Lost the connection to Geist during setup. Run geist setup again.\n", stderr);
+                fputs("Lost the connection to Geisten during setup. Run geist setup again.\n", stderr);
                 setup_state_free(&s);
                 return 1;
             }
@@ -479,7 +479,7 @@ static int run(int argc, char **argv) {
         if (!wait_stopped())
             return 1;
         if (!strcmp(cmd, "stop")) {
-            puts("Geist stopped. Downloaded models are preserved.");
+            puts("Geisten stopped. Downloaded models are preserved.");
             return 0;
         }
         return start() ? 0 : start_error;
@@ -495,7 +495,7 @@ static int run(int argc, char **argv) {
         if (!start())
             return start_error;
         if (!strcmp(cmd, "start")) {
-            puts("Geist is running.");
+            puts("Geisten is running.");
             return 0;
         }
         char url[256];
@@ -516,7 +516,7 @@ static int run(int argc, char **argv) {
         return command(args) == 0 ? 0 : 1;
     }
     if (request("/app/status", nullptr, 5) != 200) {
-        fputs("Geist is not running. Start the app or run: geist start\n", stderr);
+        fputs("Geisten is not running. Start the app or run: geist start\n", stderr);
         return 1;
     }
     if (!strcmp(cmd, "status") || !strcmp(cmd, "models")) {
@@ -556,7 +556,7 @@ static int run(int argc, char **argv) {
     free(j);
     if (!model || !*model) {
         free(model);
-        fputs("Choose and load a model in Geist first.\n", stderr);
+        fputs("Choose and load a model in Geisten first.\n", stderr);
         return 1;
     }
     char              body[32768];
@@ -564,9 +564,9 @@ static int run(int argc, char **argv) {
     if (!strcmp(cmd, "config") && argc == 3) {
         if (!strcmp(argv[2], "continue")) {
             app_put(&b,
-                    "{\"name\":\"Geist "
+                    "{\"name\":\"Geisten "
                     "Local\",\"version\":\"1.0.0\",\"schema\":\"v1\",\"models\":[{\"name\":"
-                    "\"Geist\",\"provider\":\"openai\",\"model\":");
+                    "\"Geisten\",\"provider\":\"openai\",\"model\":");
             app_quote(&b, model);
             app_printf(&b, ",\"apiBase\":\"http://127.0.0.1:%u/v1\",\"apiKey\":", port);
             app_quote(&b, token);
@@ -577,13 +577,13 @@ static int run(int argc, char **argv) {
             app_put(&b,
                     "{\"$schema\":\"https://opencode.ai/"
                     "config.json\",\"provider\":{\"geist\":{\"npm\":\"@ai-sdk/"
-                    "openai-compatible\",\"name\":\"Geist\",\"options\":{");
+                    "openai-compatible\",\"name\":\"Geisten\",\"options\":{");
             app_printf(&b, "\"baseURL\":\"http://127.0.0.1:%u/v1\",\"apiKey\":", port);
             app_quote(&b, token);
             app_put(&b, "},\"models\":{");
             app_quote(&b, model);
             app_put(&b,
-                    ":{\"name\":\"Geist local "
+                    ":{\"name\":\"Geisten local "
                     "text\",\"tool_call\":false,\"limit\":{\"context\":4096,\"output\":512}}}}},"
                     "\"model\":");
             char id[256];
