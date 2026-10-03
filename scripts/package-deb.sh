@@ -14,19 +14,24 @@ done
 mkdir -p build
 stage=$(mktemp -d build/deb-stage.XXXXXX)
 trap 'rm -rf "$stage"' EXIT HUP INT TERM
-mkdir -p "$stage/DEBIAN" "$stage/usr/lib/geist" "$stage/usr/bin" \
-    "$stage/usr/lib/systemd/user" "$stage/usr/share/applications" "$stage/usr/share/doc/geist"
-install -m 755 geisten geist-app geistd "$stage/usr/lib/geist/"
-ln -s ../lib/geist/geisten "$stage/usr/bin/geisten"
-ln -s ../lib/geist/geisten "$stage/usr/bin/geist" # the pre-#92 command name, kept as an alias
-install -m 644 deploy/systemd/geist.service "$stage/usr/lib/systemd/user/"
-install -m 644 web/vendor/marked-LICENSE "$stage/usr/share/doc/geist/marked-LICENSE"
-install -m 644 web/vendor/katex-LICENSE "$stage/usr/share/doc/geist/katex-LICENSE"
-install -m 644 LICENSE "$stage/usr/share/doc/geist/copyright"
-python3 scripts/engine-provenance.py package ./geistd --require-clean --output "$stage/usr/share/doc/geist/ENGINE.json"
-install -m 644 docs/INSTALL.md "$stage/usr/share/doc/geist/README.md"
+mkdir -p "$stage/DEBIAN" "$stage/usr/lib/geisten" "$stage/usr/bin" \
+    "$stage/usr/lib/systemd/user" "$stage/usr/share/applications" "$stage/usr/share/doc/geisten"
+install -m 755 geisten geist-app geistd "$stage/usr/lib/geisten/"
+ln -s ../lib/geisten/geisten "$stage/usr/bin/geisten"
+ln -s ../lib/geisten/geisten "$stage/usr/bin/geist" # the pre-#92 command name, kept as an alias
+install -m 644 deploy/systemd/geisten.service "$stage/usr/lib/systemd/user/"
+# An alias: login-start links to the earlier geist.service keep working (#92).
+ln -s geisten.service "$stage/usr/lib/systemd/user/geist.service"
+install -m 644 web/vendor/marked-LICENSE "$stage/usr/share/doc/geisten/marked-LICENSE"
+install -m 644 web/vendor/katex-LICENSE "$stage/usr/share/doc/geisten/katex-LICENSE"
+install -m 644 LICENSE "$stage/usr/share/doc/geisten/copyright"
+python3 scripts/engine-provenance.py package ./geistd --require-clean --output "$stage/usr/share/doc/geisten/ENGINE.json"
+install -m 644 docs/INSTALL.md "$stage/usr/share/doc/geisten/README.md"
 cat > "$stage/DEBIAN/control" <<EOF
-Package: geist
+Package: geisten
+Provides: geist
+Conflicts: geist
+Replaces: geist
 Version: $version
 Architecture: $arch
 Maintainer: geisten <geisten@users.noreply.github.com>
@@ -41,8 +46,9 @@ cat > "$stage/DEBIAN/postinst" <<'EOF'
 #!/bin/sh
 set -eu
 # Never impersonate desktop users or start an inference workload as root.
-echo 'Start the service with: geisten start. Install geist-desktop for the graphical app.'
-echo 'Enable login startup with: systemctl --user enable geist.service'
+echo 'Start the service with: geisten start. Install geisten-desktop for the graphical app.'
+echo 'Enable login startup with: systemctl --user enable geisten.service'
+echo 'Replacing the earlier geist package switches off login startup for logged-in users; enable it again with the command above.'
 echo 'After an upgrade, run: systemctl --user daemon-reload && geisten restart'
 EOF
 chmod 755 "$stage/DEBIAN/postinst"
@@ -60,7 +66,7 @@ case "${1:-}" in remove|deconfigure)
             account=$(getent passwd "$uid" | cut -d: -f1)
             test -n "$account" || continue
             runuser -u "$account" -- env XDG_RUNTIME_DIR="$runtime" DBUS_SESSION_BUS_ADDRESS="unix:path=$runtime/bus" \
-                systemctl --user disable --now geist.service
+                systemctl --user disable --now geisten.service
         done
     fi
     ;;
@@ -68,5 +74,5 @@ esac
 EOF
 chmod 755 "$stage/DEBIAN/prerm"
 (cd "$stage" && find usr -type f -exec md5sum {} + > DEBIAN/md5sums)
-dpkg-deb --root-owner-group --build "$stage" "build/geist_${version}_${arch}.deb"
-(cd build && sha256sum "geist_${version}_${arch}.deb" > "geist_${version}_${arch}.deb.sha256")
+dpkg-deb --root-owner-group --build "$stage" "build/geisten_${version}_${arch}.deb"
+(cd build && sha256sum "geisten_${version}_${arch}.deb" > "geisten_${version}_${arch}.deb.sha256")

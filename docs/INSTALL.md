@@ -34,16 +34,22 @@ is not sufficient. The manager checks CPU capabilities before suggesting or
 loading models. Older CPUs need a separately built compatible engine.
 
 Keep the DEB and its matching `.deb.sha256` file together, then verify with
-`sha256sum -c geist_VERSION_ARCH.deb.sha256` before installation.
+`sha256sum -c geisten_VERSION_ARCH.deb.sha256` before installation.
 
-For a desktop, download both the matching `geist_VERSION_ARCH.deb` and
-`geist-desktop_VERSION_all.deb`, with their SHA-256 sidecars. Install both:
+For a desktop, download both the matching `geisten_VERSION_ARCH.deb` and
+`geisten-desktop_VERSION_all.deb`, with their SHA-256 sidecars. Install both:
 
 ```sh
-sudo apt install ./geist_VERSION_ARCH.deb ./geist-desktop_VERSION_all.deb
+sudo apt install ./geisten_VERSION_ARCH.deb ./geisten-desktop_VERSION_all.deb
 ```
 
-Open geisten from the application menu, or run `geist-desktop`. This opens a GTK
+**From an earlier `geist` package (#92):** the same command replaces `geist` and
+`geist-desktop` in one step; `geist` stays available as a command, and models,
+key and settings move to `~/.local/share/geisten` on the next start. If you had
+enabled login startup and were logged in during the upgrade, enable it again
+with `systemctl --user enable --now geisten.service`.
+
+Open geisten from the application menu, or run `geisten-desktop`. This opens a GTK
 window with the system WebKit renderer; no browser tab is opened. `geisten open`
 also uses the desktop app when installed.
 
@@ -53,15 +59,15 @@ global namespace policy unchanged; the host profile does not add filesystem
 or network confinement. Package updates reload the profile; removal unloads it.
 
 Terminal-only installations need
-only `geist_VERSION_ARCH.deb`, without GTK/WebKit dependencies. A browser/SSH
+only `geisten_VERSION_ARCH.deb`, without GTK/WebKit dependencies. A browser/SSH
 interface remains available on headless systems. Downloads and the
 daemon run as your user, never as root. The optional per-user service uses
-`systemctl --user enable --now geist.service` for login startup.
+`systemctl --user enable --now geisten.service` for login startup.
 
 In a headless login session with a user systemd manager, use `geisten start`,
 `geisten models`, `geisten download MODEL` and `geisten use MODEL`. Check progress with
 `geisten status`. Without a user systemd manager, run
-`/usr/lib/geist/geist-app` in the foreground. For browser access use an SSH
+`/usr/lib/geisten/geist-app` in the foreground. For browser access use an SSH
 tunnel to port 8766 and the private URL; there is no public network listener.
 
 ## Verify and connect
@@ -95,8 +101,8 @@ DEB with apt's explicit downgrade option and restart. Models stay in
 `~/.local/share/geisten/models`. Model storage and connection credentials are not
 modified by package scripts.
 
-Before uninstalling Ubuntu, run `systemctl --user disable --now geist.service`
-and `geisten stop`, then `sudo apt remove geist-desktop geist`. Models remain in the user data
+Before uninstalling Ubuntu, run `systemctl --user disable --now geisten.service`
+and `geisten stop`, then `sudo apt remove geisten-desktop geisten`. Models remain in the user data
 folder even after package purge. Delete that folder separately only if desired.
 On Mac, disable Start at Login, stop geisten, quit the desktop app, then move
 Geist.app to Trash. Cached models remain in `~/Library/Application Support/geisten`.
@@ -145,7 +151,7 @@ ad-hoc signatures are not an Apple notarization result.
 
 ### Updating an existing installation
 
-Install the newer `geist` and matching `geist-desktop` packages with APT. Their
+Install the newer `geisten` and matching `geisten-desktop` packages with APT. Their
 package names and installation paths stay the same across minor versions, so
 APT replaces the prior files. Models and the local API key stay in your user
 data directory. Close the previous window and reopen geisten after installation.

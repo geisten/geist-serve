@@ -56,7 +56,7 @@ removes the launcher and the runtime directory, and keeps `~/.local/share/geiste
 (models, keys, settings). The installer only touches files its receipt owns: a
 foreign `~/.local/bin/geisten` or `~/.local/bin/geist`, an APT install, or a runtime directory without a
 receipt ends with exit 13 and no change. The rootless `geisten` starts its own
-`geist-app` as the user; only the packaged CLI in `/usr/lib/geist` uses the
+`geist-app` as the user; only the packaged CLI in `/usr/lib/geisten` uses the
 packaged systemd user unit, so a later APT install cannot capture it.
 
 ## Release assets

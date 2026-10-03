@@ -92,8 +92,8 @@ static bool systemd_home(void) {
      * (#46) must never route to a different, package-owned service. */
     return n > 0 && n < (int) sizeof standard && m > 0 && m < (int) sizeof earlier && !getenv("GEISTEN_HOME") &&
            !getenv("GEIST_HOME") && (!strcmp(home, standard) || !strcmp(home, earlier)) &&
-           !strcmp(directory, "/usr/lib/geist") &&
-           access("/usr/lib/systemd/user/geist.service", R_OK) == 0;
+           !strcmp(directory, "/usr/lib/geisten") &&
+           access("/usr/lib/systemd/user/geisten.service", R_OK) == 0;
 #endif
 }
 
@@ -115,7 +115,7 @@ static bool wait_stopped(void) {
     /* Discovery removal precedes process exit. Wait for the actual user
      * unit stop job: `start` on a still-active unit otherwise does nothing. */
     if (systemd_home()) {
-        char *args[] = {"systemctl", "--user", "stop", "geist.service", nullptr};
+        char *args[] = {"systemctl", "--user", "stop", "geisten.service", nullptr};
         if (command(args) != 0) {
             fputs("Cannot confirm the user service stopped. Check its journal before "
                   "restarting.\n",
@@ -176,7 +176,7 @@ static bool current_service(void) {
     }
     if (order == 2) {
         start_error = 42;
-        fputs("An older unversioned service is running. Finish your work, then run: geist "
+        fputs("An older unversioned service is running. Finish your work, then run: geisten "
               "restart\n",
               stderr);
         return false;
@@ -211,7 +211,7 @@ static bool start(void) {
             break;
     }
     if (systemd_home()) {
-        char *args[] = {"systemctl", "--user", "start", "geist.service", nullptr};
+        char *args[] = {"systemctl", "--user", "start", "geisten.service", nullptr};
         if (command(args) != 0) {
             fprintf(stderr,
                     "Cannot start the user service. In a headless session, run geist-app in the "
@@ -508,8 +508,8 @@ static int run(int argc, char **argv) {
             printf("Open through your SSH tunnel: %s\n", url);
             return 0;
         }
-        if (access("/usr/bin/geist-desktop", X_OK) == 0) {
-            char *desktop[] = {"/usr/bin/geist-desktop", nullptr};
+        if (access("/usr/bin/geisten-desktop", X_OK) == 0) {
+            char *desktop[] = {"/usr/bin/geisten-desktop", nullptr};
             return command(desktop) == 0 ? 0 : 1;
         }
         char *args[] = {"xdg-open", url, nullptr};

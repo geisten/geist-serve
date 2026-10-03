@@ -8,24 +8,36 @@ source_root=$(realpath "${2:?source checkout}")
 (cd "$(dirname "$package")" && sha256sum -c "$(basename "$package").sha256")
 apt-get update -qq
 apt-get install -y -qq ca-certificates python3 systemd dbus-user-session desktop-file-utils procps >/dev/null
+# #92: an earlier `geist` package (a minimal stand-in with its CLI path) is
+# replaced by geisten in one install; the earlier command keeps working.
+earlier=$(mktemp -d /tmp/geist-earlier.XXXXXX)
+mkdir -p "$earlier/DEBIAN" "$earlier/usr/lib/geist" "$earlier/usr/bin"
+printf '#!/bin/sh\necho earlier\n' > "$earlier/usr/lib/geist/geist" && chmod 755 "$earlier/usr/lib/geist/geist"
+ln -s ../lib/geist/geist "$earlier/usr/bin/geist"
+printf 'Package: geist\nVersion: 0.5.30\nArchitecture: all\nMaintainer: test\nDescription: earlier name\n' > "$earlier/DEBIAN/control"
+dpkg-deb --root-owner-group --build "$earlier" /tmp/geist-earlier.deb >/dev/null
+apt-get install -y -qq /tmp/geist-earlier.deb >/dev/null
 apt-get install -y -qq "$package" >/dev/null
+test "$(dpkg-query -W -f='${db:Status-Status}' geist 2>/dev/null || true)" != installed
+test ! -e /usr/lib/geist/geist
+test "$(readlink /usr/lib/systemd/user/geist.service)" = geisten.service # the alias for earlier login-start links
 python3 - <<'CHECK_ENGINE'
 import json, subprocess
 from pathlib import Path
-manifest=json.loads(Path('/usr/share/doc/geist/ENGINE.json').read_text())
-assert json.loads(subprocess.check_output(['/usr/lib/geist/geistd','--build-info']))==manifest
+manifest=json.loads(Path('/usr/share/doc/geisten/ENGINE.json').read_text())
+assert json.loads(subprocess.check_output(['/usr/lib/geisten/geistd','--build-info']))==manifest
 assert manifest['geistlib']['source_state']=='clean'
 CHECK_ENGINE
-test ! -e /usr/share/applications/geist.desktop # GUI is a separate optional package.
+test ! -e /usr/share/applications/geisten.desktop # GUI is a separate optional package.
 # #92: the CLI is geisten; geist remains an alias to the same program.
 test -x /usr/bin/geisten && test "$(readlink -f /usr/bin/geist)" = "$(readlink -f /usr/bin/geisten)"
-systemd-analyze verify --man=no /usr/lib/systemd/user/geist.service
+systemd-analyze verify --man=no /usr/lib/systemd/user/geisten.service
 useradd -m geist-acceptance
 uid=$(id -u geist-acceptance)
 testroot=$(mktemp -d /tmp/geist-installed.XXXXXX)
 cp -R "$source_root/tests" "$testroot/"
-for binary in geisten geist-app geistd; do ln -s "/usr/lib/geist/$binary" "$testroot/$binary"; done
-ln -s /usr/lib/geist/geisten "$testroot/geist" # the alias, as cli_test expects
+for binary in geisten geist-app geistd; do ln -s "/usr/lib/geisten/$binary" "$testroot/$binary"; done
+ln -s /usr/lib/geisten/geisten "$testroot/geist" # the alias, as cli_test expects
 chown -R geist-acceptance:geist-acceptance "$testroot"
 if test -n "${GEIST_TEST_MODEL:-}"; then
     # The runner's private checkout/cache need not be traversable by this user.
@@ -54,15 +66,15 @@ check_selected_model() {
         sleep 1
     done
     echo "FAIL: selected model did not recover after $1" >&2
-    as_user journalctl --user -u geist.service --no-pager -n 40 >&2
+    as_user journalctl --user -u geisten.service --no-pager -n 40 >&2
     return 1
 }
 diagnose_failure() {
     result=$?
     if test "$result" != 0 && test -d /run/systemd/system; then
         echo "FAIL: installed-service acceptance exited $result" >&2
-        as_user systemctl --user show geist.service -p MainPID -p ActiveState -p SubState -p Result >&2 || true
-        as_user journalctl --user -u geist.service --no-pager -n 60 >&2 || true
+        as_user systemctl --user show geisten.service -p MainPID -p ActiveState -p SubState -p Result >&2 || true
+        as_user journalctl --user -u geisten.service --no-pager -n 60 >&2 || true
     fi
     exit "$result"
 }
@@ -73,29 +85,29 @@ if test -d /run/systemd/system; then
     if test "${GEIST_REQUIRE_SYSTEMD:-0}" = 1; then test -n "${GEIST_TEST_MODEL:-}"; fi
     loginctl enable-linger geist-acceptance
     systemctl start "user@$uid.service"
-    as_user geist start
-    as_user systemctl --user enable geist.service
+    as_user geisten start
+    as_user systemctl --user enable geisten.service
     as_user geisten status >/dev/null
     if test -n "${GEIST_TEST_MODEL:-}"; then
         install -o geist-acceptance -g geist-acceptance -m 600 "$GEIST_TEST_MODEL" \
             /home/geist-acceptance/.local/share/geisten/models/smollm2-360m-instruct-q8_0.gguf
-        as_user geist use smollm2-360m >/dev/null
+        as_user geisten use smollm2-360m >/dev/null
         check_selected_model 'initial selection'
     fi
     cp /home/geist-acceptance/.local/share/geisten/api-key "$testroot/key-before"
-    before=$(as_user systemctl --user show -p MainPID --value geist.service)
+    before=$(as_user systemctl --user show -p MainPID --value geisten.service)
     test "$before" -gt 1
     # Supervisor failure must recover through the installed unit.
     kill -KILL "$before"
     for attempt in $(seq 1 60); do
-        after=$(as_user systemctl --user show -p MainPID --value geist.service)
+        after=$(as_user systemctl --user show -p MainPID --value geisten.service)
         if test "$after" -gt 1 && test "$after" != "$before" && as_user geisten status >/dev/null 2>&1; then break; fi
         sleep 1
     done
     test "$after" -gt 1
     test "$after" != "$before"
     check_selected_model 'supervisor crash'
-    as_user geist restart
+    as_user geisten restart
     as_user geisten status >/dev/null
     check_selected_model 'explicit restart'
     cmp "$testroot/key-before" /home/geist-acceptance/.local/share/geisten/api-key
@@ -115,23 +127,23 @@ dpkg-deb --root-owner-group -b "$testroot/upgrade" "$testroot/upgrade.deb" >/dev
 apt-get install -y -qq "$testroot/upgrade.deb" >/dev/null
 if test -d /run/systemd/system; then
     as_user systemctl --user daemon-reload
-    as_user geist restart
+    as_user geisten restart
     check_selected_model 'package upgrade'
 fi
 cmp "$testroot/key-before" /home/geist-acceptance/.local/share/geisten/api-key
 apt-get install -y -qq --allow-downgrades "$package" >/dev/null
 if test -d /run/systemd/system; then
     as_user systemctl --user daemon-reload
-    as_user geist restart
+    as_user geisten restart
     check_selected_model 'package rollback'
 fi
 cmp "$testroot/key-before" /home/geist-acceptance/.local/share/geisten/api-key
 test "$(cat /home/geist-acceptance/.local/share/geisten/models/keep-me)" = 'user data'
-apt-get remove -y -qq geist >/dev/null
-test ! -e /usr/bin/geist
+apt-get remove -y -qq geisten >/dev/null
+test ! -e /usr/bin/geisten && test ! -e /usr/bin/geist
 if test -d /run/systemd/system; then
-    ! as_user systemctl --user is-active --quiet geist.service
-    ! as_user systemctl --user is-enabled --quiet geist.service
+    ! as_user systemctl --user is-active --quiet geisten.service
+    ! as_user systemctl --user is-enabled --quiet geisten.service
     if test -n "${GEIST_TEST_MODEL:-}"; then
         cmp "$GEIST_TEST_MODEL" /home/geist-acceptance/.local/share/geisten/models/smollm2-360m-instruct-q8_0.gguf
     fi

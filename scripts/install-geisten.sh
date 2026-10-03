@@ -140,8 +140,8 @@ preflight() {
 # One owner per machine user: never shadow the Ubuntu package, never touch a
 # foreign file at our launcher path.
 check_ownership() {
-    if [ -e /usr/lib/geist/geist ] || [ -e /usr/lib/geist/geisten ] || [ -L /usr/bin/geist ] || [ -L /usr/bin/geisten ]; then
-        fail $E_OWNER "geisten is installed from the Ubuntu package; update it with apt, or remove it first (sudo apt remove geist)"
+    if [ -e /usr/lib/geisten/geisten ] || [ -e /usr/lib/geist/geist ] || [ -e /usr/lib/geist/geisten ] || [ -L /usr/bin/geist ] || [ -L /usr/bin/geisten ]; then
+        fail $E_OWNER "geisten is installed from the Ubuntu package; update it with apt, or remove it first (sudo apt remove geisten, or geist for an earlier version)"
     fi
     for link in "$launcher" "$alias"; do
         if [ -e "$link" ] || [ -L "$link" ]; then

@@ -4,11 +4,11 @@ set -eu
 test "${GEIST_INSTALLER_TEST:-}" = 1
 test "$(id -u)" = 0
 package=$(realpath "${1:?desktop candidate DEB}")
-profile=/etc/apparmor.d/geist-desktop
-loaded() { grep -q '^geist-desktop (' /sys/kernel/security/apparmor/profiles; }
+profile=/etc/apparmor.d/geisten-desktop
+loaded() { grep -q '^geisten-desktop (' /sys/kernel/security/apparmor/profiles; }
 loaded
 test "$(stat -c '%U:%G:%a' "$profile")" = root:root:644
-dpkg-query -W -f='${Conffiles}\n' geist-desktop | grep -F "$profile"
+dpkg-query -W -f='${Conffiles}\n' geisten-desktop | grep -F "$profile"
 temporary=$(mktemp -d /tmp/geist-desktop-package.XXXXXX)
 trap 'rm -rf "$temporary"' EXIT HUP INT TERM
 # An administrator's conffile edit must survive reinstall/upgrade/rollback.
@@ -27,16 +27,16 @@ cmp "$profile" "$temporary/expected"
 apt-get install -y -qq --allow-downgrades "$package"
 loaded
 cmp "$profile" "$temporary/expected"
-apt-get remove -y -qq geist-desktop
+apt-get remove -y -qq geisten-desktop
 if loaded; then echo "FAIL: profile remains loaded after removal" >&2; exit 1; fi
-test ! -e /usr/bin/geist-desktop
-test ! -e /usr/share/applications/geist.desktop
+test ! -e /usr/bin/geisten-desktop
+test ! -e /usr/share/applications/geisten.desktop
 cmp "$profile" "$temporary/expected"
 test -x /usr/bin/geisten && test -x /usr/bin/geist
 apt-get install -y -qq "$package"
 loaded
 cmp "$profile" "$temporary/expected"
-apt-get purge -y -qq geist-desktop
+apt-get purge -y -qq geisten-desktop
 if loaded; then echo "FAIL: profile remains loaded after removal" >&2; exit 1; fi
 test ! -e "$profile"
 test -x /usr/bin/geisten && test -x /usr/bin/geist

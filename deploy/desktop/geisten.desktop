@@ -2,7 +2,7 @@
 Type=Application
 Name=geisten
 Comment=Choose local models and connect your tools
-Exec=geist-desktop
+Exec=geisten-desktop
 Icon=applications-science
 Terminal=false
 Categories=Development;
