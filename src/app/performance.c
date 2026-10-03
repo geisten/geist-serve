@@ -553,6 +553,7 @@ bool perf_earlier(const char *artifact, const char *series, struct perf_earlier 
 void perf_last(const char         *artifact,
                const char         *series,
                const char         *backend,
+               bool                controlled,
                struct perf_record *out) {
     memset(out, 0, sizeof *out);
     pthread_mutex_lock(&p.mutex);
@@ -560,7 +561,7 @@ void perf_last(const char         *artifact,
         const struct perf_record *r = &p.records[i];
         /* "Last reply" feeds slow/below-target warnings and setup: ordinary
          * use only, never a reply that overlapped a download or a comparison (#81). */
-        if (eligible(r) && !r->contention && strcmp(r->source, "controlled_test") &&
+        if (eligible(r) && !r->contention && (controlled || strcmp(r->source, "controlled_test")) &&
             !strcmp(r->artifact, artifact) && !strcmp(r->series, series) && !strcmp(r->backend, backend))
             *out = *r;
     }

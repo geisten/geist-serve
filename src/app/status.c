@@ -456,9 +456,9 @@ void status_response(int fd, struct app_arena *arena) {
             app_put(&b, "null");
         /* #103: verdict for "good enough and fast enough here". Resource fit
          * without the speed hint; speed enters as seconds per typical answer. */
-        double seconds[2] = {app_answer_seconds(app.prefs.history[i][0].rate, app.prefs.history[i][0].first),
-                             gpu_supported(m) ? app_answer_seconds(app.prefs.history[i][1].rate,
-                                                                   app.prefs.history[i][1].first)
+        double seconds[2] = {app_answer_seconds(app.prefs.speed[i][0].rate, app.prefs.speed[i][0].first),
+                             gpu_supported(m) ? app_answer_seconds(app.prefs.speed[i][1].rate,
+                                                                   app.prefs.speed[i][1].first)
                                               : -1};
         int    fastest    = seconds[1] >= 0 && (seconds[0] < 0 || seconds[1] < seconds[0]) ? 1
                             : seconds[0] >= 0                                               ? 0

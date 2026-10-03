@@ -107,3 +107,11 @@ Missing values are `null`. At top level:
   best verdict, then the highest pass rate, then the fastest answer; `null`
   when no model is installed.
 - `limits` reports the thresholds in use.
+
+**Measure speed on demand.** An installed model with no speed figure shows a
+stopwatch button. It runs the existing controlled comparison: each processor
+loads once, warms up, then answers three short questions. Another installed
+model is first started the normal, verified way. During the run, the same
+button cancels it, and the card shows the progress. The newest reply,
+ordinary or controlled, is the verdict's speed basis (`speed` in
+`app_prefs`). The slow-reply warning still uses ordinary replies only (#81).
