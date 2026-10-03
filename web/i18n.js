@@ -273,13 +273,13 @@ function translateStatic() {
   for (const [node, original] of staticTexts) if (node.isConnected) node.textContent = original.replace(original.trim(), t(original.trim()));
   for (const [node, attr, original] of staticAttributes) node.setAttribute(attr, t(original));
 }
-async function desktopMessage(action, value) {
+async function desktopMessage(action, value, wait = 5000) {
   if (window.geistDesktop === 'mac') return window.webkit.messageHandlers.desktop.postMessage({action, value});
   if (window.geistDesktop === 'linux') {
     // Linux replies by resolving only this bounded, opaque request identifier.
     return new Promise((resolve, reject) => {
       const id = String(++desktopRequest);
-      const timeout = setTimeout(() => { desktopReplies.delete(id); reject(new Error('Desktop request timed out.')); }, 5000);
+      const timeout = setTimeout(() => { desktopReplies.delete(id); reject(new Error('Desktop request timed out.')); }, wait);
       desktopReplies.set(id, {resolve, reject, timeout});
       window.webkit.messageHandlers.desktop.postMessage(JSON.stringify({id, action, value}));
     });
@@ -290,7 +290,7 @@ const desktopReplies = new Map();
 window.geistDesktopReply = (id, ok) => {
   const pending = desktopReplies.get(id); if (!pending) return;
   clearTimeout(pending.timeout); desktopReplies.delete(id);
-  if (ok) pending.resolve(); else pending.reject(new Error('Desktop request denied.'));
+  if (ok) pending.resolve(ok); else pending.reject(new Error('Desktop request denied.'));
 };
 async function copyText(value) {
   if (window.geistDesktop) await desktopMessage('copy', value);

@@ -8,6 +8,7 @@ import subprocess
 import sys
 import threading
 from urllib.parse import urlsplit
+import urllib.request
 
 import gi
 gi.require_version('Gtk', '4.0')
@@ -211,6 +212,10 @@ class Desktop(Gtk.Application):
             if not isinstance(identifier, str) or not re.fullmatch('[0-9]{1,12}', identifier): return
             action, text = message.get('action'), message.get('value')
             if not isinstance(text, str) or len(text.encode()) > 131072: raise ValueError('Invalid text')
+            if action == 'export':
+                if not re.fullmatch(r'geisten-measurements-[0-9]{4}-[0-9]{2}-[0-9]{2}\.jsonl', text): raise ValueError('Invalid name')
+                self.export(identifier, text)  # replies when the save dialog closes
+                return
             if action == 'copy': self.view.get_clipboard().set(text)
             elif action == 'language' and text in ('system', 'de', 'en'):
                 self.preferences.parent.mkdir(parents=True, exist_ok=True)
@@ -232,9 +237,40 @@ class Desktop(Gtk.Application):
             ok = True
         except (OSError, ValueError, TypeError, AttributeError):
             ok = False
+        self.reply(identifier, ok)
+
+    def reply(self, identifier, ok):
         if not re.fullmatch('[0-9]{1,12}', identifier): return
-        # ID is digits only, never interpolate user text or connection credentials.
-        self.view.evaluate_javascript(f"window.geistDesktopReply('{identifier}', {'true' if ok else 'false'});", -1, None, None, None, None, None)
+        # ID is digits only; a saved path is JSON-encoded. Never interpolate raw text or credentials.
+        value = json.dumps(ok) if isinstance(ok, str) else ('true' if ok else 'false')
+        self.view.evaluate_javascript(f"window.geistDesktopReply('{identifier}', {value});", -1, None, None, None, None, None)
+
+    def export(self, identifier, name):
+        # #101: ask where to save (Downloads preset), then fetch the export from the
+        # local service directly: an export can be far larger than a bridge message.
+        dialog = Gtk.FileDialog(title=self.text('Save measurements', 'Messungen speichern'), initial_name=name)
+        downloads = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD)
+        if downloads: dialog.set_initial_folder(Gio.File.new_for_path(downloads))
+
+        def done(_, result):
+            try:
+                path = dialog.save_finish(result).get_path()
+            except GLib.Error:
+                return self.reply(identifier, 'cancelled')
+            try:
+                endpoint = urlsplit(self.origin)
+                request = urllib.request.Request(f'http://127.0.0.1:{endpoint.port}/app/performance/export',
+                                                 headers={'Authorization': 'Bearer ' + endpoint.fragment})
+                with urllib.request.urlopen(request, timeout=30) as response:
+                    data = response.read(20 * 2**20 + 1)
+                if not path or len(data) > 20 * 2**20: raise ValueError('Cannot save this export')
+                temporary = path + '.part'
+                with open(temporary, 'wb') as target: target.write(data)
+                os.replace(temporary, path)
+                self.reply(identifier, path)
+            except (OSError, ValueError):
+                self.reply(identifier, False)
+        dialog.save(self.window, None, done)
 
 
 if __name__ == '__main__':

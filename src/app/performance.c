@@ -836,17 +836,6 @@ char *perf_export(size_t *length) {
     *length = b.len;
     return data;
 }
-bool perf_save_export(void) {
-    size_t length;
-    char  *data = perf_export(&length);
-    if (!data)
-        return false;
-    pthread_mutex_lock(&p.disk);
-    bool ok = atomic_file("export.jsonl", data, length);
-    pthread_mutex_unlock(&p.disk);
-    free(data);
-    return ok;
-}
 static bool compact_history(void) {
     size_t length;
     char  *data = perf_export(&length);

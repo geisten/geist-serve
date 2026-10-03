@@ -56,9 +56,10 @@ def main():
             assert rows[0]['cold'] and all(not r['cold'] for r in rows[1:])
             assert all(r['rss']>0 and r['peak_rss']>=r['rss'] for r in rows)
             assert 'Say hello' not in json.dumps(rows) and 'Fixture response' not in json.dumps(rows)
-            assert app.request('/app/performance/export',{},auth=False)[0]==403
-            code,body,_=app.request('/app/performance/export',{});assert code==200
-            export=Path(json.loads(body)['path']);assert export.exists() and export.stat().st_mode&0o777==0o600
+            assert app.request('/app/performance/export',auth=False)[0]==403
+            # #101: no export snapshot is written into the data folder any more.
+            assert app.request('/app/performance/export',{})[0] in (404,405)
+            assert not (home/'performance/export.jsonl').exists()
             for days in [0,1,90.5,999]:assert app.request('/app/performance/settings',{'enabled':True,'days':days})[0]==400
             for invalid in [None,'true',1,[]]:assert app.request('/app/performance/settings',{'enabled':invalid,'days':90})[0]==400
             assert app.request('/app/performance/settings',{'enabled':False,'days':30})[0]==200

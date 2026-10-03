@@ -820,11 +820,25 @@ $('history-clear').addEventListener('click', async () => {
   try { await api('/app/performance/clear',{confirm:true}); uiText($('history-result'),'History deleted.'); await poll(); }
   catch(error) { uiText($('history-result'),error.message); }
 });
+// #101: the export goes where the user can find it. The native windows ask
+// where to save (Downloads preset) and fetch the data themselves; a browser
+// downloads it. Nothing is written into the data folder.
 $('history-export').addEventListener('click', async () => {
+  const name = `geisten-measurements-${new Date().toISOString().slice(0, 10)}.jsonl`;
   try {
-    const result = await (await api('/app/performance/export',{})).json();
-    uiText($('history-result'), `Export saved: ${result.path}`); /* re-translates on a language change (#83) */
-  } catch(error) { uiText($('history-result'),error.message); }
+    if (window.geistDesktop) {
+      const saved = await desktopMessage('export', name, 600000);
+      if (saved === 'cancelled') { uiText($('history-result'), ''); return; }
+      uiText($('history-result'), `Export saved: ${typeof saved === 'string' ? saved : name}`);
+    } else {
+      const data = await (await api('/app/performance/export')).blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(data); link.download = name;
+      document.body.append(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(link.href), 60000);
+      uiText($('history-result'), `Export saved: ${name}`);
+    }
+  } catch(error) { uiText($('history-result'), error.message); }
 });
 document.querySelector('.brand').addEventListener('click', event => { event.preventDefault(); showPage('models-page'); });
 document.querySelector('.skip').addEventListener('click', event => { event.preventDefault(); const main = $('main'); main.tabIndex = -1; main.focus(); });

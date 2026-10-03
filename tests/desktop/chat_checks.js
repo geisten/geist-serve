@@ -955,6 +955,17 @@ $$
     assert(document.querySelector('.profile-table caption') && document.querySelectorAll('.profile-table th[scope="row"]').length===12, 'profile uses a semantic comparison table');
     assert(!$('measurement-note') && !$('speed'), 'old nested measurements removed');
     assert($('history-enabled').closest('#settings-page') && $('history-export').closest('#settings-page'), 'collection and export belong to settings');
+    { // #101: the export asks the native window where to save; nothing goes into the data folder.
+      const original = desktopMessage, calls = [];
+      desktopMessage = async (action, value, wait) => { calls.push([action, value, wait]); return calls.length === 1 ? `/home/u/Downloads/${value}` : 'cancelled'; };
+      try {
+        $('history-export').click(); for (let i = 0; i < 20; i++) await tick();
+        assert(calls[0][0] === 'export' && /^geisten-measurements-\d{4}-\d{2}-\d{2}\.jsonl$/.test(calls[0][1]) && calls[0][2] >= 60000, '#101: the window is asked to save, with a dated name and time for the dialog');
+        assert($('history-result').textContent.includes('/home/u/Downloads/geisten-measurements-'), '#101: the saved place is shown');
+        $('history-export').click(); for (let i = 0; i < 20; i++) await tick();
+        assert($('history-result').textContent === '', '#101: a cancelled dialog leaves no message');
+      } finally { desktopMessage = original; }
+    }
 
     const measuredReply = lastReply;
     const savedState = state;
