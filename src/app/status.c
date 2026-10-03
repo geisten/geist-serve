@@ -1,6 +1,12 @@
 /* status.c — status JSON, execution-mode switching, catalog import. */
 #include "app.h"
 
+static void numeric_rate(struct app_buffer *b, double rate) {
+    if (isfinite(rate) && rate > 0)
+        app_printf(b, "%.2f", rate);
+    else
+        app_put(b, "null");
+}
 void execution_response(int fd, const char *text) {
     struct json *j    = calloc(1, sizeof *j);
     char        *mode = nullptr;
@@ -381,10 +387,13 @@ void status_response(int fd, struct app_arena *arena) {
                                                     app.prefs.history[i][1].rate);
         /* Current figures exclude other engine builds and pre-0.5 values (#81).
          * If only those exist, say the model was measured, but earlier. */
-        if (!strcmp(a.reason, "Fits this Mac's memory. Speed not measured yet.") && perf_measured(m->sha256))
+        struct perf_earlier earlier;
+        bool                current = app.prefs.history[i][0].rate > 0 || app.prefs.history[i][1].rate > 0;
+        bool before = !current && perf_earlier(m->sha256, app.prefs.profile_series, &earlier);
+        if (!strcmp(a.reason, "Fits this Mac's memory. Speed not measured yet.") && before)
             a.reason = "Fits this Mac's memory. Speed measured with an earlier Geist version.";
         else if (!strcmp(a.reason, "No known resource restriction. Speed has not been measured on this device.") &&
-                 perf_measured(m->sha256))
+                 before)
             a.reason = "No known resource restriction. Speed measured with an earlier Geist version.";
         if (i)
             app_put(&b, ",");
@@ -418,6 +427,23 @@ void status_response(int fd, struct app_arena *arena) {
         app_printf(&b, ",\"preview_accepted\":%s", app.prefs.preview_accepted[i] ? "true" : "false");
         app_put(&b, ",\"performance\":");
         app_quote(&b, a.performance);
+        /* Numbers behind the speed sentence: the last ordinary reply per processor
+         * with this build, else the newest one from an earlier build. */
+        app_put(&b, ",\"speed\":{\"cpu\":");
+        numeric_rate(&b, app.prefs.history[i][0].rate);
+        app_put(&b, ",\"gpu\":");
+        numeric_rate(&b, app.prefs.history[i][1].rate);
+        app_put(&b, "},\"earlier\":");
+        if (before) {
+            app_put(&b, "{\"engine\":");
+            app_quote(&b, earlier.version);
+            app_put(&b, ",\"cpu\":");
+            numeric_rate(&b, earlier.rate[0]);
+            app_put(&b, ",\"gpu\":");
+            numeric_rate(&b, earlier.rate[1]);
+            app_put(&b, "}");
+        } else
+            app_put(&b, "null");
         app_put(&b, "}");
     }
     char artifact[65] = "";
