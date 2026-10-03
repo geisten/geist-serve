@@ -82,6 +82,11 @@ def main():
             assert len(measured)==8 and sum(r['warmup'] for r in measured)==2
             assert len({r['run'] for r in measured})==1 and len({r['backend'] for r in measured})==2
             assert profile(app)['cpu']['count']==3 and profile(app)['gpu']['count']==3
+            # #103: the controlled run is the verdict's speed basis (ordinary history stays separate).
+            snapshot=app.status();verdict=next(m for m in snapshot['models'] if m['id']==snapshot['active_id'])['verdict']
+            for r in (measured[3],measured[7]):  # the last measured reply per processor (CPU first, then GPU)
+                slot='gpu' if r['backend']==snapshot['execution']['gpu_backend'] else 'cpu'
+                assert abs(verdict['seconds'][slot]-(r['first_ns']/1e9+200/(r['output']/(r['generation_ns']/1e9))))<0.01,(slot,verdict,r)
             gate.touch();assert app.request('/app/performance/compare',{'confirm':True})[0]==202
             app.wait(lambda s:s['comparison']['phase']=='warmup')
             assert app.status()['execution']['mode']==before,"#83: the user's processor choice is shown during a comparison"

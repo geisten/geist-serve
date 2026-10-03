@@ -802,6 +802,12 @@ body.manager-page main { max-width:1180px }
 .model { padding:5px 30px 7px 4px }
 .model .model-pick { min-height:40px; padding:4px; gap:8px }
 .model .remove { top:7px }
+/* #103: measure speed sits left of remove; the stop shape shows a running measurement. */
+.model .measure { position:absolute; top:7px; right:30px; min-width:28px; min-height:32px; padding:5px; color:var(--muted) }
+.model .measure svg { width:15px; height:15px }
+.model .measure:hover:not(:disabled),.model .measure[data-running="true"] { color:var(--accent) }
+.model:has(.measure:not([hidden])) { padding-right:60px }
+.model .measure[data-running="true"] .measure-start,.model .measure:not([data-running="true"]) .measure-stop { display:none }
 .model-badges { display:flex; align-items:center; width:fit-content; max-width:calc(100% - 40px); gap:8px; margin:0 0 0 40px; padding:2px 3px; color:var(--muted); border-radius:4px; cursor:help }
 .model-badges>span { display:inline-flex }
 .model-badges svg { width:13px; height:13px; stroke-width:1.6 }

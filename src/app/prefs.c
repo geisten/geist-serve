@@ -53,21 +53,24 @@ static bool valid_measurement(const struct processor_measurement *m) {
            m->rss <= 1e15 && isfinite(m->recorded) && m->recorded > 0 &&
            m->recorded <= (double) time(nullptr) + 300;
 }
+static struct processor_measurement measurement(const struct perf_record *r) {
+    return r->id[0] ? (struct processor_measurement) {.rate     = r->output / (r->generation_ns / 1e9),
+                                                      .first    = r->first_ns / 1e9,
+                                                      .total    = r->total_ns / 1e9,
+                                                      .tokens   = r->output,
+                                                      .rss      = r->rss > 0 ? r->rss : 0,
+                                                      .recorded = r->timestamp}
+                    : (struct processor_measurement) {0};
+}
 void restore_measurements(void) {
-    memset(app.prefs.history, 0, sizeof app.prefs.history);
     for (size_t i = 0; i < app_model_count; i++)
         for (unsigned slot = 0; slot < 2; slot++) {
             const char        *backend = slot ? app.backend.gpu : app.backend.cpu;
             struct perf_record r;
-            perf_last(app_models[i].sha256, app.prefs.profile_series, backend, &r);
-            if (r.id[0])
-                app.prefs.history[i][slot] =
-                        (struct processor_measurement) {.rate  = r.output / (r.generation_ns / 1e9),
-                                                        .first = r.first_ns / 1e9,
-                                                        .total = r.total_ns / 1e9,
-                                                        .tokens   = r.output,
-                                                        .rss      = r.rss > 0 ? r.rss : 0,
-                                                        .recorded = r.timestamp};
+            perf_last(app_models[i].sha256, app.prefs.profile_series, backend, false, &r);
+            app.prefs.history[i][slot] = measurement(&r);
+            perf_last(app_models[i].sha256, app.prefs.profile_series, backend, true, &r);
+            app.prefs.speed[i][slot] = measurement(&r);
         }
 }
 void migrate_measurements(void) {

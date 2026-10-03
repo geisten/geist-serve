@@ -37,9 +37,12 @@ struct perf_earlier {
     char   version[64];
 };
 bool  perf_earlier(const char *artifact, const char *series, struct perf_earlier *out);
+/* Newest ordinary reply (controlled false), or newest reply including the
+ * controlled speed measurement (true, #103 verdict speed). */
 void  perf_last(const char         *artifact,
                 const char         *series,
                 const char         *backend,
+                bool                controlled,
                 struct perf_record *out);
 bool  perf_settings(bool enabled, unsigned days);
 bool  perf_clear(void);

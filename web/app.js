@@ -14,6 +14,7 @@ let pendingModel = null, languageInitialized = false, customPreviewAccepted = fa
 let stopped = false, timer;
 let tasks = [], selectedTask = null;
 let qualityRecords = [];
+let measuringModel = null; // #103: start this model, then measure its speed
 let connectionTesting = false;
 // Page memory only. Never store prompts, answers or conversation in browser storage.
 let conversation = [], conversationModel = '', followLatest = true;
@@ -551,12 +552,13 @@ function modelCard(model) {
   if (!card) {
     card = document.createElement('article'); card.className = 'model'; card.dataset.id = model.id; card.setAttribute('role', 'listitem');
     // One button covers the name and download state. Information and removal are siblings.
-    card.innerHTML = '<button class="model-pick" type="button"><span class="model-ring"></span><span class="model-info"><span class="model-verdict" aria-hidden="true"></span><span class="model-name"></span><span class="variant-recommended" hidden></span><span class="variant-size"></span><span class="variant-active"></span><span class="download-state"></span></span></button><span class="model-badges" role="img" tabindex="0"></span><span class="variant-warning"></span><span class="transfer-detail"></span><button class="remove text-button icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button>';
+    card.innerHTML = '<button class="model-pick" type="button"><span class="model-ring"></span><span class="model-info"><span class="model-verdict" aria-hidden="true"></span><span class="model-name"></span><span class="variant-recommended" hidden></span><span class="variant-size"></span><span class="variant-active"></span><span class="download-state"></span></span></button><span class="model-badges" role="img" tabindex="0"></span><button class="measure text-button icon-button" type="button" hidden><svg class="measure-start" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg><svg class="measure-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1"/></svg></button><span class="variant-warning"></span><span class="transfer-detail"></span><button class="remove text-button icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button>';
     card.querySelector('.model-pick').addEventListener('click', event => { if (event.detail < 2) choose(model.id); });
     card.querySelector('.model-pick').addEventListener('keydown', event => {
       if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
     });
     card.querySelector('.remove').addEventListener('click', () => removeModel(model.id));
+    card.querySelector('.measure').addEventListener('click', () => measureSpeed(model.id));
     cards.set(model.id, card);
   }
   const active = state.active_id === model.id && state.ready && !state.loading && !switching(state);
@@ -589,6 +591,14 @@ function modelCard(model) {
   card.querySelector('.download-state').textContent = t(status);
   card.querySelector('.download-state').hidden = !pending && !preparing && (download.stage === 'missing' || download.stage === 'downloaded');
   renderModelBadges(card.querySelector('.model-badges'), model);
+  // #103: measure on demand; the same button cancels its own run.
+  const measure = card.querySelector('.measure'), running = !!state.comparison?.running && state.active_id === model.id;
+  measure.hidden = !running && !(model.installed && model.resource_fit !== 2 && model.verdict?.processor === null);
+  measure.disabled = !running && (stopped || requesting || state.loading || !!state.phase || state.busy || !!state.comparison?.running || measuringModel !== null);
+  measure.dataset.running = running;
+  measure.title = t(running ? 'Cancel speed measurement' : 'Measure speed on this computer');
+  measure.setAttribute('aria-label', `${measure.title}: ${modelLabel(model)}`);
+  if (running) { card.querySelector('.download-state').hidden = false; card.querySelector('.download-state').textContent = `${t('Measuring speed')} · ${state.comparison.step}/${state.execution?.gpu_available ? 8 : 4}`; }
   const detail = card.querySelector('.transfer-detail');
   detail.hidden = !preparing || state.loading;
   detail.textContent = paused ? downloadEstimate(model.id, state.received || 0, model.bytes || 0) : preparing ? t(state.phase === 'verifying' ? 'Checking model…' : 'Getting ready…') : '';
@@ -635,6 +645,7 @@ function render(next) {
   if (suggestion) $('model-prompt-hint').textContent = t(`Suggested start for this ${hostName()}: ${modelLabel(suggestion)} (${bytes(suggestion.bytes)}). It fits the memory; ${counts ? `reference test: ${counts.passed}/${counts.total} correct` : 'answer quality is not tested yet'}.`);
   $('model-legend').hidden = !!next.active_id;
   renderBestChoice(next);
+  continueMeasurement(next);
   if (usable && previouslyHidden && !$('workspace').hidden && !$('models-page').hidden &&
       (document.activeElement === document.body || document.activeElement.closest('.model-pick'))) $('prompt').focus({preventScroll:true});
   $('disk-space').textContent = t(next.hardware.disk_known ? `${bytes(next.hardware.disk)} disk space available` : 'Disk space could not be read');
@@ -668,6 +679,21 @@ async function poll() {
   finally { polling = false; }
 }
 
+// #103: the existing controlled comparison, for the chosen model. Another
+// installed model is started the normal (verified) way first; render() starts
+// the measurement once it is ready.
+async function measureSpeed(id) {
+  try {
+    if (state.comparison?.running) { await api('/app/performance/cancel', {}); await poll(); return; }
+    if (state.active_id === id && state.ready) { await api('/app/performance/compare', {confirm: true}); await poll(); return; }
+    measuringModel = id; await choose(id);
+  } catch(error) { measuringModel = null; message(error.message); }
+}
+function continueMeasurement(snapshot) {
+  if (measuringModel === null || pendingModel !== null || snapshot.loading || snapshot.job_model) return;
+  const id = measuringModel; measuringModel = null;
+  if (snapshot.active_id === id && snapshot.ready && !snapshot.busy) measureSpeed(id);
+}
 async function choose(id) {
   const model = visibleModels().find(item => item.id === id);
   if (!model || modelActionDisabled(model)) return;

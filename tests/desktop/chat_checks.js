@@ -938,6 +938,35 @@ $$
       assert($('best-choice').hidden, '#103: no sentence without an installed model');
       render(saved);
     }
+    { // #103: measure speed on demand: the active model directly, another one after starting it; cancel while running.
+      const saved = state, originalApi = api, originalChoose = choose, originalPoll = poll, calls = [];
+      api = async (path, body) => { calls.push(path); return {ok: true, json: async () => ({})}; };
+      poll = async () => {};
+      choose = async id => { calls.push(`choose:${id}`); };
+      const unmeasured = {value: 'unknown', reason: 'speed_unknown', processor: null, seconds: {cpu: null, gpu: null}, passed: 146, total: 160};
+      const [a, b] = saved.models.filter(m => m.resource_fit !== 2).slice(0, 2);
+      const snap = extra => ({...saved, ready: true, loading: false, busy: false, phase: '', job_model: '', active_id: a.id, comparison: {running: false, step: 0, phase: '', result: ''},
+        models: saved.models.map(m => m.id === a.id || m.id === b.id ? {...m, installed: true, verdict: unmeasured} : m), ...extra});
+      try {
+        render(snap());
+        const button = id => cards.get(id).querySelector('.measure');
+        assert(!button(a.id).hidden && !button(a.id).disabled && button(a.id).getAttribute('aria-label').startsWith(t('Measure speed on this computer')), '#103: a symbol button for unmeasured installed models');
+        await measureSpeed(a.id);
+        assert(calls.includes('/app/performance/compare'), '#103: the active model is measured directly');
+        calls.length = 0; await measureSpeed(b.id);
+        assert(calls[0] === `choose:${b.id}` && measuringModel === b.id, '#103: another model is started first');
+        calls.length = 0; render(snap({active_id: b.id}));
+        await new Promise(resolve => setTimeout(resolve, 0));
+        assert(calls.includes('/app/performance/compare') && measuringModel === null, '#103: then measured once it is ready');
+        render(snap({active_id: b.id, comparison: {running: true, step: 3, phase: 'measuring', result: ''}}));
+        assert(button(b.id).dataset.running === 'true' && cards.get(b.id).querySelector('.download-state').textContent === `${t('Measuring speed')} · 3/${saved.execution?.gpu_available ? 8 : 4}`, '#103: progress on the card');
+        assert(button(a.id).disabled, '#103: one measurement at a time');
+        calls.length = 0; await measureSpeed(b.id);
+        assert(calls[0] === '/app/performance/cancel', '#103: the same button cancels');
+        render(snap({models: saved.models.map(m => m.id === a.id ? {...m, installed: true, verdict: {...unmeasured, processor: 'gpu', seconds: {cpu: null, gpu: 3}}} : m)}));
+        assert(cards.get(a.id).querySelector('.measure').hidden, '#103: no button once measured');
+      } finally { api = originalApi; choose = originalChoose; poll = originalPoll; measuringModel = null; render(saved); }
+    }
     { // #83: model actions are locked during a comparison; a pause says "Cancelling…" until the job ends.
       const saved = state, idle = saved.models.find(m => !m.installed && m.id !== saved.active_id && m.resource_fit !== 2);
       assert(idle, '#83: the fixture offers a model to download');
