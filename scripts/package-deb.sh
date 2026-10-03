@@ -6,7 +6,7 @@ version=${VERSION:?Set a numeric VERSION, e.g. 0.3.0}
 arch=${1:?usage: package-deb.sh amd64|arm64}
 printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo 'Expected X.Y.Z version' >&2; exit 2; }
 case "$arch" in amd64|arm64) ;; *) exit 2;; esac
-for binary in geist geist-app geistd; do
+for binary in geisten geist-app geistd; do
     test -x "$binary"
     file "$binary" | grep -Eq 'statically linked|static-pie linked' || { echo "$binary must be a static Linux executable" >&2; exit 1; }
     case "$arch" in amd64) file "$binary" | grep -q 'x86-64';; arm64) file "$binary" | grep -q 'aarch64';; esac
