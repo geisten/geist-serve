@@ -116,6 +116,16 @@ class ReportTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 bench.quality(type('A', (), dict(run=str(root/'two'), write=False))())
 
+    def test_catalog_quality_has_its_evidence(self):
+        models = json.loads((bench.ROOT/'models/catalog.json').read_text())['models']
+        for model in (m for m in models if 'quality' in m):
+            q = model['quality']
+            raw = HERE/'evidence'/q['suite']/model['id']/'results.jsonl'
+            self.assertEqual(bench.sha256(raw), q['evidence'], model['id'])
+            if q['suite'] == bench.suite_id():
+                r = bench.summarize(raw.parent, bench.load_suite())
+                self.assertEqual({t: {l: [c[l]['passed'], c[l]['total']] for l in ('de', 'en')} for t, c in r['tasks'].items()}, q['tasks'])
+
     def test_p95_is_nearest_rank(self):
         self.assertEqual(bench.p95(list(range(1, 21))), 19)
         self.assertEqual(bench.p95([5.0]), 5.0)
