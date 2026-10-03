@@ -1,6 +1,9 @@
 # Hide model reasoning in the product interface
 
-Status: implemented locally in 0.5.25, 29 September 2026. See
+Status: implemented locally in 0.5.25, 29 September 2026. **Revised 3 October
+2026 (#93):** the maintainer decided to show progress and an opt-in, collapsed
+thinking view; see [answer handling](ANSWER-HANDLING.md). The no-disclosure rule
+below is superseded; everything about copy, history and the editor API still holds. See
 [answer handling](ANSWER-HANDLING.md) for the implemented contract and limits.
 The current ChatML renderer does not pre-open reasoning, so no pre-opened profile
 is enabled. Native and packaged acceptance evidence is maintained in the workspace review.

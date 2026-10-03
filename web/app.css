@@ -506,6 +506,10 @@ body.chat-page footer { display:none }
 .message-label { font-size:11px; font-weight:550; color:var(--muted); margin-bottom:9px }
 .message-status { font-size:12px; color:var(--muted); overflow-wrap:anywhere; margin:12px 0 0 }
 .message-status:empty { display:none }
+/* #93: the model's thinking, collapsed by default, plain text, visually secondary. */
+.thinking { margin:0 0 10px; font-size:12px; color:var(--muted) }
+.thinking summary { cursor:pointer; width:max-content }
+.thinking-text { white-space:pre-wrap; overflow-wrap:anywhere; max-height:320px; overflow:auto; margin-top:6px; padding:8px 10px; border-left:2px solid var(--border); }
 .message-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px }
 .message-actions button { min-height:32px; padding:4px 8px; font-size:11px }
 .composer-area { flex:none; padding-top:8px; position:relative }

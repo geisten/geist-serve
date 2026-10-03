@@ -16,8 +16,10 @@ with tempfile.TemporaryDirectory(prefix='geist-reasoning-') as temporary:
     prompt={'model':model['id'],'messages':[{'role':'user','content':'Test'}],'prompt':'Test','experimental':True}
     def events(extra=None):
         code,raw,_=app.request('/app/generate',prompt|(extra or {}));assert code==200,(code,raw)
-        assert b'SECRET' not in raw,raw
-        return [json.loads(x) for x in raw.splitlines()]
+        e=[json.loads(x) for x in raw.splitlines()]
+        # #93: the thinking text reaches the app only as "thinking" events, never as answer text.
+        assert all('SECRET' not in x.get('response','') for x in e) and all(set(x)<={'thinking'} for x in e if 'thinking' in x),raw
+        return e
     try:
         app.wait(lambda s:s['ready'])
         e=events();assert ''.join(x.get('response','') for x in e)=='**Answer** → 🌿'
@@ -25,6 +27,10 @@ with tempfile.TemporaryDirectory(prefix='geist-reasoning-') as temporary:
         assert 0<=e[-1]['first_model_text_ns']<=e[-1]['first_answer_ns']
         assert int((home/'requested-max').read_text())==4083
         assert any(x.get('phase')=='preparing' for x in e)
+        # #93: the thinking arrives in order, without its markers, and reports its token count.
+        assert ''.join(x.get('thinking','') for x in e)=='SECRET' and all('<' not in x.get('thinking','') for x in e),e
+        assert any(x.get('phase')=='preparing' and x.get('tokens',0)>=1 for x in e),e
+        assert not any(x.get('phase')=='prefill' for x in e),'a quick input read is not announced (keeps error codes)'
         for stream in [False,True]:
             code,raw,_=app.request('/v1/chat/completions',prompt|{'stream':stream,'max_tokens':2000,'stream_options':{'include_usage':True}})
             assert code==200 and b'SECRET' not in raw and b'<think>' not in raw,raw
@@ -59,6 +65,7 @@ with tempfile.TemporaryDirectory(prefix='geist-reasoning-') as temporary:
         # Keepalive arrives before input processing completes, without exposing hidden text.
         config(prefill_pause=11)
         e=events();assert any(x.get('phase')=='preparing' for x in e)
+        assert any(x.get('phase')=='prefill' and x.get('tokens',0)>0 for x in e),'#93: a long input read is announced with its size'
         assert next(i for i,x in enumerate(e) if x.get('heartbeat')) < next(i for i,x in enumerate(e) if x.get('phase')=='preparing'), 'prefill heartbeat does not guess preparation'
         config(prefill_pause=11,text='Plain answer')
         e=events();assert any(x.get('heartbeat') for x in e) and not any(x.get('phase')=='preparing' for x in e)
