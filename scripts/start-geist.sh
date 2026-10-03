@@ -3,4 +3,4 @@
 set -eu
 cd "$(dirname "$0")"
 if [ "$#" -gt 0 ]; then exec ./geist-app "$@"; fi
-exec ./geist open
+exec ./geisten open

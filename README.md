@@ -2,7 +2,8 @@
 
 **Runs here. Stays here.** Start with one model suggested for your hardware,
 and use the same `geistd` from the model manager, terminal and editor.
-`geist-app` owns the private inference process; the C23 `geist` client and
+`geist-app` owns the private inference process; the C23 `geisten` client (`geist`
+still works as its earlier name) and
 authenticated `/v1/chat/completions` gateway connect to that same service.
 
 Mac DMG and Ubuntu amd64/arm64 DEB candidates are under development. See
@@ -11,7 +12,7 @@ OpenCode, restart, update and removal. Text chat and agent support are distinct:
 this gateway rejects tool calls explicitly. These are not published releases;
 the Mac candidate has not yet received Apple notarization acceptance.
 
-Build with `make app` after building `geistd`, then run `./geist open`.
+Build with `make app` after building `geistd`, then run `./geisten open`.
 The [app guide](docs/APP.md) explains resource advice and model downloads.
 
 ## Legacy standalone HTTP server

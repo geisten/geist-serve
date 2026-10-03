@@ -55,10 +55,10 @@ class Release:
             top = f'geist-{version}-{plat}'
             staging = out/'src'/top
             staging.mkdir(parents=True)
-            for b in ('geist', 'geist-app', 'geistd'):
+            for b in ('geisten', 'geist-app', 'geistd'):
                 shutil.copy(self.fake, staging/b)
             (staging/'LICENSE').write_text('Apache-2.0\n')
-            (staging/'SHA256SUMS').write_text(''.join(f'{sha256(staging/b)}  {b}\n' for b in ('geist', 'geist-app', 'geistd')))
+            (staging/'SHA256SUMS').write_text(''.join(f'{sha256(staging/b)}  {b}\n' for b in ('geisten', 'geist-app', 'geistd')))
             with tarfile.open(out/f'{top}.tar.gz', 'w:gz') as tar:
                 tar.add(staging, arcname=top)
                 if extra_member:
@@ -98,7 +98,8 @@ class BootstrapTests(unittest.TestCase):
         self.home.mkdir()
         self.release = Release(self.case/'releases', self.t/'fake', self.t/'key.pem')
         self.runtime = self.home/'.local/share/geist-runtime'
-        self.launcher = self.home/'.local/bin/geist'
+        self.launcher = self.home/'.local/bin/geisten'
+        self.alias = self.home/'.local/bin/geist'  # the pre-#92 name
 
     def run_installer(self, origin, *args, env=None, script=SCRIPT, pubkey=True):
         e = {'HOME': str(self.home), 'PATH': os.environ['PATH'], 'GEIST_INSTALL_TEST_ORIGIN': f'file://{origin}'}
@@ -121,7 +122,8 @@ class BootstrapTests(unittest.TestCase):
         r1 = self.release.make('1.0.0')
         p = self.run_installer(r1, '--no-start')
         self.assertEqual(p.returncode, 0, p.stderr)
-        self.assertEqual(os.readlink(self.launcher), f'{self.runtime}/current/geist')
+        self.assertEqual(os.readlink(self.launcher), f'{self.runtime}/current/geisten')
+        self.assertEqual(os.readlink(self.alias), f'{self.runtime}/current/geisten')
         self.assertEqual(os.readlink(self.runtime/'current'), 'versions/1.0.0')
         self.assertEqual(self.receipt()['version'], '1.0.0')
         self.assertIn('is not on your PATH', p.stdout)
@@ -190,6 +192,11 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(p.returncode, 13, p.stderr)
         self.assertEqual(self.launcher.read_text(), '#!/bin/sh\necho mine\n')
         self.launcher.unlink()
+        # A foreign file at the old name is left alone as well.
+        self.alias.write_text('#!/bin/sh\necho mine\n')
+        self.assertEqual(self.run_installer(r, '--no-start').returncode, 13)
+        self.assertEqual(self.alias.read_text(), '#!/bin/sh\necho mine\n')
+        self.alias.unlink()
         self.runtime.mkdir(parents=True)
         (self.runtime/'notes.txt').write_text('mine')
         self.assertEqual(self.run_installer(r, '--no-start').returncode, 13)
@@ -249,7 +256,7 @@ class BootstrapTests(unittest.TestCase):
         (data/'model.gguf').write_text('weights')
         p = self.run_installer(r, '--uninstall')
         self.assertEqual(p.returncode, 0, p.stderr)
-        self.assertFalse(self.launcher.is_symlink() or self.runtime.exists())
+        self.assertFalse(self.launcher.is_symlink() or self.alias.is_symlink() or self.runtime.exists())
         self.assertEqual((data/'model.gguf').read_text(), 'weights')
 
 

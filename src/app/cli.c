@@ -357,7 +357,7 @@ static bool confirm(const char *question) {
     answer[n > 0 ? n : 0] = 0;
     return answer[0] == 'y' || answer[0] == 'Y' || answer[0] == 'j' || answer[0] == 'J';
 }
-/* `geist setup [--yes]` (#46): the first model for a fresh installation.
+/* `geisten setup [--yes]` (#46): the first model for a fresh installation.
  * The service chooses the model (/app/setup refuses a stale choice); this
  * only asks, follows progress and runs one short real generation. */
 static int setup(bool yes) {
@@ -386,7 +386,7 @@ static int setup(bool yes) {
             snprintf(question, sizeof question, "Download %.1f GB and load %s?", s.bytes / 1e9, name);
         printf("Recommended model: %s. %s\n", name, s.reason ? s.reason : "");
         if (!yes && !confirm(question)) {
-            printf("No model set up. Later, run: geist setup\n");
+            printf("No model set up. Later, run: geisten setup\n");
             setup_state_free(&s);
             return 0;
         }
@@ -406,13 +406,13 @@ static int setup(bool yes) {
             return 1;
         }
         /* The service downloads, verifies and loads. Ctrl-C leaves that
-         * running; a later `geist setup` resumes the download. */
+         * running; a later `geisten setup` resumes the download. */
         char   phase[128] = "";
         int    shown = -1, idle = 0;
         bool   started = false;
         for (;;) {
             if (!setup_state_read(&s, id)) {
-                fputs("Lost the connection to Geisten during setup. Run geist setup again.\n", stderr);
+                fputs("Lost the connection to Geisten during setup. Run geisten setup again.\n", stderr);
                 setup_state_free(&s);
                 return 1;
             }
@@ -448,17 +448,18 @@ static int setup(bool yes) {
     app_put(&b, ",\"messages\":[{\"role\":\"user\",\"content\":\"Say hello in one sentence.\"}],"
                 "\"max_tokens\":64}");
     if (request("/v1/chat/completions", body, 180) != 200) {
-        fprintf(stderr, "Test failed: %s\nThe model stays loaded; retry with: geist test\n", reply);
+        fprintf(stderr, "Test failed: %s\nThe model stays loaded; retry with: geisten test\n", reply);
         return 1;
     }
     puts("Test passed: the model answered through the local API.\n"
-         "Next: geist chat \"Hello\" | geist config continue | geist config opencode");
+         "Next: geisten chat \"Hello\" | geisten config continue | geisten config opencode");
     return 0;
 }
 static void usage(void) {
-    puts("geist start | stop | restart | status | models | open | setup [--yes]\n"
-         "geist download MODEL | use MODEL | chat TEXT | test | test-agent\n"
-         "geist connection | config continue | config opencode\n"
+    puts("geisten start | stop | restart | status | models | open | setup [--yes]\n"
+         "geisten download MODEL | use MODEL | chat TEXT | test | test-agent\n"
+         "geisten connection | config continue | config opencode\n"
+         "(geist is the earlier name of this command and still works.)\n"
          "Connection/config output contains your private local API key.\n"
          "Set GEIST_HOME to use an isolated service data folder.");
 }
@@ -516,7 +517,7 @@ static int run(int argc, char **argv) {
         return command(args) == 0 ? 0 : 1;
     }
     if (request("/app/status", nullptr, 5) != 200) {
-        fputs("Geisten is not running. Start the app or run: geist start\n", stderr);
+        fputs("Geisten is not running. Start the app or run: geisten start\n", stderr);
         return 1;
     }
     if (!strcmp(cmd, "status") || !strcmp(cmd, "models")) {

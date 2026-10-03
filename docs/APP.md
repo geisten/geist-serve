@@ -151,7 +151,7 @@ confirmation. Start at Login is optional in the native menu.
 Apple Silicon and macOS 14 or later are required by the Mac app.
 Previously downloaded catalog files in the Geisten data folder are reused
 after verification. The former Swift application's selected-model preference
-is not migrated: choose the model once in the model list. The new Connections panel and bundled `geist` terminal client use the same
+is not migrated: choose the model once in the model list. The new Connections panel and bundled `geisten` terminal client use the same
 loaded daemon. The older standalone geist-serve server is a separate legacy
 entry point; do not start it to connect an editor to the manager.
 
@@ -231,7 +231,7 @@ Tokens/s uses geistd generation wall time (including token streaming), not answe
 The C23 application service (`src/app/core.c`, `platform.c`, `main.c`) owns
 product policy. `geistlib` provides inference capabilities; it does not choose
 product defaults, ask for consent or select a model by scenario. Native hosts,
-the authenticated `/app/status` API and `geist models` see the same recommendation.
+the authenticated `/app/status` API and `geisten models` see the same recommendation.
 
 | Platform | Initial preview default | Smaller candidate |
 | --- | --- | --- |

@@ -32,12 +32,12 @@ if loaded; then echo "FAIL: profile remains loaded after removal" >&2; exit 1; f
 test ! -e /usr/bin/geist-desktop
 test ! -e /usr/share/applications/geist.desktop
 cmp "$profile" "$temporary/expected"
-test -x /usr/bin/geist
+test -x /usr/bin/geisten && test -x /usr/bin/geist
 apt-get install -y -qq "$package"
 loaded
 cmp "$profile" "$temporary/expected"
 apt-get purge -y -qq geist-desktop
 if loaded; then echo "FAIL: profile remains loaded after removal" >&2; exit 1; fi
 test ! -e "$profile"
-test -x /usr/bin/geist
+test -x /usr/bin/geisten && test -x /usr/bin/geist
 echo 'PASS: desktop profile ownership, conffile, reinstall, upgrade, rollback, remove and purge; headless service retained'

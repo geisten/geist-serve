@@ -13,7 +13,7 @@ case $(uname -m) in
 esac
 t=$(mktemp -d)
 home=$t/home
-geist=$home/.local/bin/geist
+geist=$home/.local/bin/geisten
 cleanup() {
     [ -x "$geist" ] && HOME=$home "$geist" stop >/dev/null 2>&1
     rm -rf "$t"
@@ -32,7 +32,8 @@ export HOME="$home" GEIST_INSTALL_TEST_ORIGIN="file://$t/release" GEIST_INSTALL_
 check() { desc=$1; shift; if "$@"; then echo "ok   $desc"; else echo "FAIL $desc" >&2; exit 1; fi; }
 
 sh scripts/install-geist.sh --no-start
-check "installed rootless, launcher linked" [ "$(readlink "$geist")" = "$home/.local/share/geist-runtime/current/geist" ]
+check "installed rootless, launcher linked" [ "$(readlink "$geist")" = "$home/.local/share/geist-runtime/current/geisten" ]
+check "the earlier name geist still works" [ "$(readlink "$home/.local/bin/geist")" = "$home/.local/share/geist-runtime/current/geisten" ]
 
 GEIST_MODEL="$model" "$geist" start
 for _ in $(seq 1 120); do

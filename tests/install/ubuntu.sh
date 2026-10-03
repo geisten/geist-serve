@@ -17,6 +17,8 @@ assert json.loads(subprocess.check_output(['/usr/lib/geist/geistd','--build-info
 assert manifest['geistlib']['source_state']=='clean'
 CHECK_ENGINE
 test ! -e /usr/share/applications/geist.desktop # GUI is a separate optional package.
+# #92: the CLI is geisten; geist remains an alias to the same program.
+test -x /usr/bin/geisten && test "$(readlink -f /usr/bin/geist)" = "$(readlink -f /usr/bin/geisten)"
 systemd-analyze verify --man=no /usr/lib/systemd/user/geist.service
 useradd -m geist-acceptance
 uid=$(id -u geist-acceptance)
@@ -43,8 +45,8 @@ as_user() {
 check_selected_model() {
     test -n "${GEIST_TEST_MODEL:-}" || return 0
     for attempt in $(seq 1 60); do
-        if as_user geist status | python3 -c 'import json,sys; s=json.load(sys.stdin); sys.exit(not(s["ready"] and s["active_id"]=="smollm2-360m"))'; then
-            as_user geist test | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["usage"]["completion_tokens"]>0'
+        if as_user geisten status | python3 -c 'import json,sys; s=json.load(sys.stdin); sys.exit(not(s["ready"] and s["active_id"]=="smollm2-360m"))'; then
+            as_user geisten test | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["usage"]["completion_tokens"]>0'
             echo "PASS: selected model answers through installed systemd service after $1"
             return 0
         fi
@@ -72,7 +74,7 @@ if test -d /run/systemd/system; then
     systemctl start "user@$uid.service"
     as_user geist start
     as_user systemctl --user enable geist.service
-    as_user geist status >/dev/null
+    as_user geisten status >/dev/null
     if test -n "${GEIST_TEST_MODEL:-}"; then
         install -o geist-acceptance -g geist-acceptance -m 600 "$GEIST_TEST_MODEL" \
             /home/geist-acceptance/.local/share/geist/models/smollm2-360m-instruct-q8_0.gguf
@@ -86,14 +88,14 @@ if test -d /run/systemd/system; then
     kill -KILL "$before"
     for attempt in $(seq 1 60); do
         after=$(as_user systemctl --user show -p MainPID --value geist.service)
-        if test "$after" -gt 1 && test "$after" != "$before" && as_user geist status >/dev/null 2>&1; then break; fi
+        if test "$after" -gt 1 && test "$after" != "$before" && as_user geisten status >/dev/null 2>&1; then break; fi
         sleep 1
     done
     test "$after" -gt 1
     test "$after" != "$before"
     check_selected_model 'supervisor crash'
     as_user geist restart
-    as_user geist status >/dev/null
+    as_user geisten status >/dev/null
     check_selected_model 'explicit restart'
     cmp "$testroot/key-before" /home/geist-acceptance/.local/share/geist/api-key
 else

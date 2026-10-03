@@ -14,7 +14,7 @@ import tempfile
 import threading
 from http_test import App, ROOT
 
-binary = Path(os.environ.get('GEIST_CLI_TEST_BINARY', ROOT/'geist'))
+binary = Path(os.environ.get('GEIST_CLI_TEST_BINARY', ROOT/'geisten'))
 model = os.environ.get('GEIST_TEST_MODEL')
 
 
@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix='geist-setup-cli-') as temporary:
     app = App(home)
     try:
         out = cli(home, app.port, 'setup')
-        assert 'No model set up' in out and 'geist setup' in out, out
+        assert 'No model set up' in out and 'geisten setup' in out, out
         assert not list((home/'models').glob('*')), 'setup without consent touched the models folder'
         assert not app.status()['job_model']
         cli(home, app.port, 'setup', '--bogus', code=2)
