@@ -1064,7 +1064,12 @@ const terminalHelp = window.geistDesktop === 'mac'
 const connectionHelp = {
   terminal: terminalHelp,
   continue: 'In Continue, open your local config.yaml and add the model from this configuration. JSON is valid YAML. Select geisten and use Chat mode. Preserve your existing configuration.',
-  opencode: 'Save as opencode.json in a private test folder. Run opencode there and choose geist-chat. This profile disables tools; it does not enable coding-agent workflows.'
+  opencode: 'Save as opencode.json in a private test folder. Run opencode there and choose geist-chat. This profile disables tools; it does not enable coding-agent workflows.',
+  // #142: the official OpenAI SDKs are the language bindings.
+  python: 'Python with the official openai package: install it, save the code as hello.py and run it. The answer streams in.',
+  javascript: 'JavaScript or TypeScript with the official openai package: install it, save the code as hello.mjs and run it with node.',
+  go: 'Go with the official openai-go module: the first line shows the setup, then go run. The answer streams in.',
+  java: 'Java 11 or newer, no dependencies: save the code as Hello.java and run java Hello.java. The openai-java SDK works with the same address and key.'
 };
 function updateConnectionHelp() { $('connection-help').textContent = t(connectionHelp[$('connection-client').value]); }
 $('connection-client').addEventListener('change', updateConnectionHelp);
@@ -1080,10 +1085,7 @@ $('copy-connection').addEventListener('click', async () => {
     let config;
     if (kind === 'continue') config = {name: 'geisten Local', version: '1.0.0', schema: 'v1', models: [{name: 'geisten', provider: 'openai', model: c.model, apiBase: base, apiKey: c.api_key, roles: ['chat'], capabilities: [], defaultCompletionOptions: {contextLength: 4096, maxTokens: 512}}]};
     else if (kind === 'opencode') config = {$schema: 'https://opencode.ai/config.json', provider: {geist: {npm: '@ai-sdk/openai-compatible', name: 'geisten', options: {baseURL: base, apiKey: c.api_key}, models: {[c.model]: {name: 'geisten local text', tool_call: false, limit: {context: 4096, output: 512}}}}}, model: `geist/${c.model}`, default_agent: 'geist-chat', agent: {'geist-chat': {mode: 'primary', description: 'Local text chat without tools', prompt: 'Answer the user briefly. You cannot access files or execute tools.', permission: {'*': 'deny'}}}};
-    else {
-      const quote = text => `'${text.replaceAll("'", "'\\''")}'`;
-      config = `curl ${quote(`${base}/chat/completions`)} -H ${quote(`Authorization: Bearer ${c.api_key}`)} -H 'Content-Type: application/json' --data ${quote(JSON.stringify({model: c.model, messages: [{role: 'user', content: 'Hello'}], max_tokens: 512}))}`;
-    }
+    else config = connectionSnippets[kind](base, c.api_key, c.model);
     await copyText(typeof config === 'string' ? config : JSON.stringify(config, null, 2));
     uiText($('connection-result'), 'Copied. The configuration contains your private local key.');
   } catch (error) { uiText($('connection-result'), error.message); }

@@ -227,7 +227,7 @@ async function checkActivityUX(assert, tick) {
     for (const locale of ['en-US', 'fr-FR', 'debug', '', undefined]) assert(resolveLanguage('system', locale) === 'en', `English fallback: ${locale}`);
     assert(resolveLanguage('en', 'de-DE') === 'en' && resolveLanguage('de', 'en-US') === 'de', 'manual preference overrides OS');
     assert(resolveLanguage('invalid', 'de-DE') === 'de', 'invalid preference returns to system');
-    const international = new Set(['geisten', 'geist', 'English', 'Deutsch', 'Home Assistant', 'Terminal', 'VS Code · Continue', '—', '— tokens/s', '— RAM']);
+    const international = new Set(['geisten', 'geist', 'English', 'Deutsch', 'Home Assistant', 'Terminal', 'VS Code · Continue', 'Python', 'JavaScript · TypeScript', 'Go', 'Java', '—', '— tokens/s', '— RAM']);
     const sources = [...staticTexts.map(([, text]) => text.trim()), ...staticAttributes.map(([, , text]) => text)];
     const missing = [...new Set(sources.filter(text => !international.has(text) && !Object.hasOwn(german, text)))];
     assert(!missing.length, `Missing German interface translations: ${missing.join(' | ')}`);
@@ -971,6 +971,20 @@ $$
       render({...saved, best_choice: null});
       assert($('best-choice').textContent === t('No model fits this computer well.') && $('best-action').hidden && $('recommend-action').hidden, '#122: nothing fits: said plainly, no action');
       render(saved);
+    }
+    { // #142: the SDK snippets on the Connect page carry the real address, key and model.
+      const originalCopyText = copyText; let copied = '';
+      copyText = async value => { copied = value; };
+      try {
+        const c = await (await api('/app/connections')).json(), select = $('connection-client');
+        for (const [kind, marker] of [['python', 'from openai import OpenAI'], ['javascript', 'import OpenAI from "openai"'], ['go', 'github.com/openai/openai-go'], ['java', 'java.net.http.HttpClient'], ['terminal', 'curl ']]) {
+          select.value = kind; select.dispatchEvent(new Event('change')); copied = '';
+          $('copy-connection').click();
+          for (let i = 0; i < 100 && !copied; i++) await new Promise(resolve => setTimeout(resolve, 20));
+          assert(copied.includes(marker) && copied.includes(`${location.origin}/v1`) && copied.includes(c.api_key) && copied.includes(c.model), `#142: ${kind} snippet uses this service`);
+          assert($('connection-help').textContent === t(connectionHelp[kind]) && $('connection-help').textContent, `#142: ${kind} has its own instructions`);
+        }
+      } finally { copyText = originalCopyText; $('connection-client').value = 'terminal'; updateConnectionHelp(); uiText($('connection-result'), ''); }
     }
     { // #103: the stopwatch measures the active model from the model view; the same button cancels.
       const saved = state, originalApi = api, originalPoll = poll, calls = [];

@@ -126,7 +126,7 @@ def main():
                 manifest = json.loads((ROOT/'web/vendor'/manifest_name).read_text())
                 for name, sha in manifest['files'].items():
                     assert hashlib.sha256((ROOT/'web/vendor'/name).read_bytes()).hexdigest() == sha
-            for route, source in [('/marked.js', 'vendor/marked.umd.js'), ('/katex.js', 'vendor/katex.min.js'), ('/markdown.js', 'markdown.js')]:
+            for route, source in [('/marked.js', 'vendor/marked.umd.js'), ('/katex.js', 'vendor/katex.min.js'), ('/markdown.js', 'markdown.js'), ('/snippets.js', 'snippets.js')]:
                 code, body, asset_headers = app.request(route, auth=False)
                 assert code == 200 and body == (ROOT/'web'/source).read_bytes()
                 assert asset_headers['Content-Type'].startswith('text/javascript')
