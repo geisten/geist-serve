@@ -69,11 +69,6 @@ int app_daemon_chat(const char           *path,
     for (enum chat_family k = CHAT_GEMMA3; k <= CHAT_BITNET; k++)
         if (family && strcmp(family, chat_family_name(k)) == 0)
             f = k;
-    /* Match geistagent's existing BitNet policy: the shipped 2B-4T model
-     * follows Llama-3 turn markers; the GGUF Human:/BITNETAssistant template
-     * produced repeating continuations in the app smoke test. */
-    if (f == CHAT_BITNET)
-        f = CHAT_LLAMA3;
     if (f == CHAT_UNKNOWN) {
         rc = 400;
         snprintf(error, 256, "This model's chat format is not supported.");
