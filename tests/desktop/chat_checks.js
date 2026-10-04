@@ -699,9 +699,9 @@ async function checkActivityUX(assert, tick) {
      const orders=[fresh,installed,active].map(s=>{render(structuredClone(s));return groupsOf();});
      render(base);
      assert(expected.length===groupIds.length && orders.every(o=>JSON.stringify(o)===JSON.stringify(expected)),`#57/#133: suitability order, the same whatever is installed or active: ${JSON.stringify({expected,orders})}`);
-     render(base); const mainBefore=[...$('models').children].map(g=>g.dataset.group);
-     render({...base,ranking:[...base.ranking].reverse()});
-     assert(JSON.stringify([...$('models').children].map(g=>g.dataset.group))===JSON.stringify([...mainBefore].reverse()),'#133: a different ranking reorders the list (weak models stay under Other models)');
+     render(base); const main=new Set([...$('models').children].map(g=>g.dataset.group)), reversed=[...base.ranking].reverse();
+     render({...base,ranking:reversed});
+     assert(JSON.stringify([...$('models').children].map(g=>g.dataset.group))===JSON.stringify([...new Set(reversed.map(groupOf))].filter(g=>main.has(g))),'#133: a different ranking reorders the list (weak models stay under Other models)');
      render(base);}
 
     {// #51: first launch names one recommendation, explains the icons and speaks plainly.
