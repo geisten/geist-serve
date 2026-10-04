@@ -132,6 +132,45 @@ jobs:
           python3 tests/app/download_test.py
           python3 tests/app/daemon_test.py
 
+  # Line coverage of C, Python and the web UI over the full suites
+  # (scripts/coverage.sh): make test, make test-app, the installer, tool and
+  # benchmark tests, and the WebView checks in headless Chrome. The minimums
+  # only rise; lower one only with a written reason in the PR.
+  coverage:
+    needs: [build-macos]
+    runs-on: macos-15
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: deps
+        run: brew install libomp
+      - name: build
+        run: make
+      - name: cache reference model
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf
+          key: geist-model-smollm2-360m-q8-48ab3034d0dd
+      - name: fetch reference model (SHA-verified)
+        run: make fetch-model
+      - name: coverage
+        env:
+          GEIST_TEST_MODEL: ${{ github.workspace }}/geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf
+          OMP_NUM_THREADS: 3
+        run: make coverage COVERAGE_MIN=86 COVERAGE_PYTHON_MIN=88 COVERAGE_WEB_MIN=94
+      - name: coverage report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage
+          path: |
+            build/coverage/report.txt
+            build/coverage/python.txt
+            build/coverage/web.txt
+            build/coverage/web.json
+            build/coverage/lcov.info
+          if-no-files-found: ignore
+
   installers:
     uses: ./.github/workflows/installers.yml
     with:

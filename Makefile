@@ -56,8 +56,10 @@ LIB := $(GEISTLIB)/$(ENGINE_LIB)/libgeist.a
 
 # EXTRA_* are geistlib's own escape hatches; the Linux release binary links
 # with EXTRA_LDFLAGS=-static against musl.
-CFLAGS  := -std=c23 -O2 -Wall -Wextra -I$(GEISTLIB)/include $(CFLAGS_TARGET) $(GEMM_CFLAGS) $(EXTRA_CFLAGS)
-LDFLAGS := $(LDFLAGS_TARGET) $(EXTRA_LDFLAGS)
+# COVERAGE_FLAGS instruments only this repository's sources (scripts/coverage.sh);
+# the engine library is never rebuilt with it.
+CFLAGS  := -std=c23 -O2 -Wall -Wextra -I$(GEISTLIB)/include $(CFLAGS_TARGET) $(GEMM_CFLAGS) $(EXTRA_CFLAGS) $(COVERAGE_FLAGS)
+LDFLAGS := $(LDFLAGS_TARGET) $(EXTRA_LDFLAGS) $(COVERAGE_FLAGS)
 LDLIBS  := $(LDLIBS_TARGET) $(GEMM_LDLIBS) $(EXTRA_LDLIBS)
 
 .PHONY: all help test fetch-model format clean distclean FORCE
@@ -87,12 +89,12 @@ $(GEISTD_OUTPUT): $(DAEMON_SOURCES) scripts/daemon-sources.list $(HDRS) $(LIB) s
 # Model-free unit test of the chat renderers and GGUF scan; no engine needed.
 build/test_template: tests/test_template.c src/template.c src/template.h src/gguf.c src/gguf.h
 	@mkdir -p build
-	$(CC) -std=c23 -O1 -g -Wall -Wextra -fsanitize=address,undefined -o $@ tests/test_template.c src/template.c src/gguf.c
+	$(CC) -std=c23 -O1 -g -Wall -Wextra -fsanitize=address,undefined $(COVERAGE_FLAGS) -o $@ tests/test_template.c src/template.c src/gguf.c
 
 # SIGTERM must stop the accept loop whichever thread receives it (#69); no engine needed.
 build/test_net_signal: tests/test_net_signal.c src/net.c src/net.h
 	@mkdir -p build
-	$(CC) -std=c23 -O1 -g -Wall -Wextra -D_POSIX_C_SOURCE=200809L -D_DARWIN_C_SOURCE -o $@ tests/test_net_signal.c src/net.c -lpthread
+	$(CC) -std=c23 -O1 -g -Wall -Wextra -D_POSIX_C_SOURCE=200809L -D_DARWIN_C_SOURCE $(COVERAGE_FLAGS) -o $@ tests/test_net_signal.c src/net.c -lpthread
 
 # Always delegate: the engine's own make is incremental, and a plain file
 # target goes stale on a GEIST_REF bump.

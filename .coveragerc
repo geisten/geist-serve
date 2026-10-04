@@ -1,0 +1,17 @@
+# Python line coverage for scripts/coverage.sh: every python3 process started
+# by the test suites (the venv's .pth hook) records into build/coverage/py.
+[run]
+parallel = true
+data_file = build/coverage/py/.coverage
+source =
+    scripts
+    workbench
+    desktop
+    clients
+omit =
+    */test_*.py
+    */*_test.py
+
+[report]
+show_missing = false
+skip_empty = true

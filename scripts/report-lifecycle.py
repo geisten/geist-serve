@@ -12,15 +12,17 @@ def load(root):
     traces=[json.loads(line) for line in (root/'samples.jsonl').read_text().splitlines()]
     return rows,groups,traces
 base,bg,bt=load(a.baseline);candidate,cg,ct=load(a.candidate)
+builds=[json.loads((root/'build.json').read_text()) for root in (a.baseline,a.candidate)]
+reps=builds[1].get('repetitions',5)
 print('# Model lifecycle comparison\n')
-print('Apple M1 Max, 64 GiB; geistlib 0.11.0/e264369. Five fixed-input trials per transition. '
+print(f'Revisions {builds[0].get("head","?")[:7]} → {builds[1].get("head","?")[:7]}. {reps} fixed-input trials per transition. '
       'Uncontrolled filesystem cache; no cold-disk claim. One owned model at a time. '
       'Raw observations are retained; this is a derived report.\n')
 print('| Transition | Ready baseline → candidate (s) | First visible baseline → candidate (s) | Guard |')
 print('|---|---:|---:|---|')
 flags=[]
 for key,old in bg.items():
-    new=cg[key];assert len(old)==len(new)==5
+    new=cg[key];assert len(old)==len(new)==reps
     pairs=[];issues=[]
     for field in ('ready_s','first_answer_from_action_s'):
         before=statistics.median(r[field] for r in old);after=statistics.median(r[field] for r in new)

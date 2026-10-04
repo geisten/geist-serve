@@ -19,8 +19,10 @@ async function checkDownloadRingMotion(assert) {
     const probe = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     probe.style.strokeDashoffset = '100';
     ring.querySelector('svg').append(probe);
-    const full = parseFloat(getComputedStyle(probe).strokeDashoffset);
-    const offset = parseFloat(style.strokeDashoffset); probe.remove();
+    // WebKit computes "90px", Chrome "calc(90px)": read the number either way.
+    const length = text => parseFloat(String(text).replace(/^calc\(/, ''));
+    const full = length(getComputedStyle(probe).strokeDashoffset);
+    const offset = length(style.strokeDashoffset); probe.remove();
     return 100 * (1 - offset / full);
   };
   const near = (a, b) => Math.abs(a - b) < .02;
@@ -1054,7 +1056,15 @@ $$
     assert(document.querySelector('.profile-table caption') && document.querySelectorAll('.profile-table th[scope="row"]').length===12, 'profile uses a semantic comparison table');
     assert(!$('measurement-note') && !$('speed'), 'old nested measurements removed');
     assert($('history-enabled').closest('#settings-page') && $('history-export').closest('#settings-page'), 'collection and export belong to settings');
-    { // #101: the export asks the native window where to save; nothing goes into the data folder.
+    if (!window.geistDesktop) { // #101 in a browser: a dated download of the service's export.
+      const originalClick = HTMLAnchorElement.prototype.click, downloads = [];
+      HTMLAnchorElement.prototype.click = function() { downloads.push([this.download, this.href]); };
+      try {
+        $('history-export').click(); for (let i = 0; i < 20; i++) await tick();
+        assert(downloads.length === 1 && /^geisten-measurements-\d{4}-\d{2}-\d{2}\.jsonl$/.test(downloads[0][0]) && downloads[0][1].startsWith('blob:'), '#101: the browser downloads a dated file');
+        assert($('history-result').textContent.includes(downloads[0][0]), '#101: the file name is shown');
+      } finally { HTMLAnchorElement.prototype.click = originalClick; uiText($('history-result'), ''); }
+    } else { // #101: the export asks the native window where to save; nothing goes into the data folder.
       const original = desktopMessage, calls = [];
       desktopMessage = async (action, value, wait) => { calls.push([action, value, wait]); return calls.length === 1 ? `/home/u/Downloads/${value}` : 'cancelled'; };
       try {
@@ -1185,7 +1195,7 @@ $$
     assert(computed.backgroundColor === 'rgb(255, 255, 255)', 'white background is consistent across system appearances');
     window.chatChecksStage = 'complete';
     window.chatChecksDone = true;
-  } catch (error) { window.chatChecksError = error.message; }
+  } catch (error) { window.chatChecksError = error.message; window.chatChecksStack = error.stack; }
   finally { api = originalAPI; window.confirm = originalConfirm; }
 })();
 true;
