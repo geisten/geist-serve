@@ -172,3 +172,9 @@ tag all come from it, so the app never shows two different recommendations.
 `recommendation` remains only for the stable list order and `geisten setup`.
 Pass rates within 2 percentage points (APP_RATE_TIE) count as equal, so one
 answer more out of 160 does not outweigh a much faster answer.
+
+**Appearance (#124).** Every colour is a token in `web/app.css`, with a
+light set and a dark set. The dark set applies when the system is dark,
+unless **Settings → Appearance** chooses Light or Dark; that choice is saved
+per device. A WebView check holds both sets to text 7:1 and muted text,
+links and verdict colours to 4.5:1 or 3:1.

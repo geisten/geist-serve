@@ -1224,10 +1224,25 @@ for (const input of document.querySelectorAll('[name="execution"]')) input.addEv
 });
 // #54: WebKit draws the native file control in the bundle's language, not the page's;
 // a translated button opens it and the chosen name is shown beside it.
+// #124: light, dark or like the system; a per-device convenience, so localStorage.
+function applyAppearance(value) {
+  if (value === 'light' || value === 'dark') document.documentElement.dataset.theme = value;
+  else delete document.documentElement.dataset.theme;
+}
+{
+  let saved = 'system';
+  try { saved = localStorage.getItem('geisten-appearance') || 'system'; } catch {}
+  $('ui-appearance').value = ['system', 'light', 'dark'].includes(saved) ? saved : 'system';
+  applyAppearance($('ui-appearance').value);
+}
+$('ui-appearance').addEventListener('change', () => {
+  applyAppearance($('ui-appearance').value);
+  try { localStorage.setItem('geisten-appearance', $('ui-appearance').value); } catch {}
+});
 $('catalog-choose').addEventListener('click', () => $('catalog-file').click());
 $('catalog-file').addEventListener('change', async () => {
   const file = $('catalog-file').files[0];
-  if (file) $('catalog-file-name').textContent = file.name;
+  if (file) { $('catalog-file-name').textContent = file.name; $('catalog-file-name').hidden = false; }
   if (!file || requesting) return;
   requesting = true; buttonStates(); $('catalog-file').disabled = $('catalog-choose').disabled = true;
   try {

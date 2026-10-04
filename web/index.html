@@ -76,15 +76,16 @@
   <section id="settings-page" class="page preferences-page" aria-labelledby="settings-title" hidden>
     <h2 id="settings-title">Settings</h2>
     <div class="settings-row"><label for="ui-language">Interface language</label><select id="ui-language"><option value="system">System language</option><option value="en" lang="en">English</option><option value="de" lang="de">Deutsch</option></select></div>
+    <div class="settings-row"><label for="ui-appearance">Appearance</label><select id="ui-appearance"><option value="system">Like the system</option><option value="light">Light</option><option value="dark">Dark</option></select></div>
     <div class="settings-row"><label for="language-choice">Answer language</label><select id="language-choice"><option value="en" lang="en">English</option><option value="de" lang="de">Deutsch</option></select></div>
     <section class="preference-group" aria-labelledby="catalog-title"><div class="catalog-heading"><h3 id="catalog-title">Model catalog</h3><span id="catalog-revision" class="hint"></span></div>
       <label for="catalog-file" class="sr-only">Model catalog JSON file</label><input id="catalog-file" class="sr-only" type="file" accept=".json,application/json" tabindex="-1">
-      <div class="catalog-pick"><button id="catalog-choose" type="button" aria-describedby="catalog-file-name">Import catalog…</button> <span id="catalog-file-name" class="hint">No file selected</span></div>
+      <div class="catalog-pick"><button id="catalog-choose" type="button" aria-describedby="catalog-file-name">Import catalog…</button> <span id="catalog-file-name" class="hint" hidden></span></div>
       <p class="hint">Import a newer JSON file from a source you trust. No automatic online updates.</p>
       <p id="catalog-result" class="hint" role="status"></p>
     </section>
     <section class="preference-group" aria-labelledby="history-title"><h3 id="history-title">Local measurements</h3>
-      <div class="settings-row"><label for="history-enabled">Collect numeric performance</label><input type="checkbox" id="history-enabled"></div>
+      <div class="settings-row"><label for="history-enabled">Collect numeric performance</label><input type="checkbox" id="history-enabled" class="switch" role="switch"></div>
       <div class="settings-row"><label for="history-days">Keep history</label><select id="history-days"><option value="30">30 days</option><option value="90">90 days</option><option value="365">365 days</option></select></div>
       <p class="hint">No prompts or replies. Stored only on this computer.</p><p id="history-storage" class="hint"></p>
       <div class="actions"><button id="history-export" type="button">Export JSONL</button><button id="history-clear" type="button">Delete history</button></div><p id="history-result" class="hint" role="status"></p>

@@ -1241,8 +1241,23 @@ $$
     filler.forEach(n=>n.remove());draft.value='';resizeComposer();
     showPage('test-page');
     $('prompt').focus();
-    const computed = getComputedStyle(document.body);
-    assert(computed.backgroundColor === 'rgb(255, 255, 255)', 'white background is consistent across system appearances');
+    { // #124: light and dark both readable: text 7:1 on its background, symbols 3:1 on the model panel.
+      const rgb = color => { const c = document.createElement('span'); c.style.color = color; document.body.append(c); const v = getComputedStyle(c).color.match(/[\d.]+/g).slice(0, 3).map(Number); c.remove(); return v; };
+      const luminance = ([r, g, b]) => [r, g, b].map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }).reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
+      const contrast = (a, b) => { const [x, y] = [luminance(rgb(a)), luminance(rgb(b))].sort((p, q) => q - p); return (x + .05) / (y + .05); };
+      const token = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      const before = $('ui-appearance').value;
+      for (const theme of ['light', 'dark']) {
+        $('ui-appearance').value = theme; $('ui-appearance').dispatchEvent(new Event('change'));
+        assert(document.documentElement.dataset.theme === theme, `#124: ${theme} applies`);
+        const pairs = [['--ink', '--bg', 7], ['--ink', '--panel', 7], ['--muted', '--bg', 4.5], ['--muted', '--panel', 4.5], ['--accent', '--bg', 4.5],
+          ['--good', '--panel', 3], ['--warning', '--panel', 3], ['--danger', '--panel', 3], ['--ink', '--selected', 7]];
+        for (const [fg, bg, min] of pairs) assert(contrast(token(fg), token(bg)) >= min, `#124 ${theme}: ${fg} on ${bg} ${contrast(token(fg), token(bg)).toFixed(2)} < ${min}`);
+      }
+      assert(getComputedStyle(document.body).backgroundColor !== 'rgb(255, 255, 255)', '#124: dark is dark');
+      $('ui-appearance').value = before; $('ui-appearance').dispatchEvent(new Event('change'));
+      assert($('history-enabled').getAttribute('role') === 'switch' && $('history-enabled').type === 'checkbox', '#124: on/off settings are switches, still a checkbox underneath');
+    }
     window.chatChecksStage = 'complete';
     window.chatChecksDone = true;
   } catch (error) { window.chatChecksError = error.message; window.chatChecksStack = error.stack; }
