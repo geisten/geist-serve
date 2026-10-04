@@ -122,6 +122,14 @@ static bool counts(const struct json *j, int object, const char *key, struct app
     m->quality_total += (unsigned) v[1];
     return v[1] && v[0] <= v[1];
 }
+static bool iso_date(const char *date) {
+    if (!date || strlen(date) != 10)
+        return false;
+    for (int i = 0; i < 10; ++i)
+        if (i == 4 || i == 7 ? date[i] != '-' : !isdigit((unsigned char) date[i]))
+            return false;
+    return true;
+}
 /* #102: reference benchmark evidence. Validated, then kept as its raw JSON text
  * (plain strings and digits only), so status can pass it through unchanged. */
 static const char *quality(struct app_catalog *c, const struct json *j, int object, struct app_model *m) {
@@ -130,12 +138,8 @@ static const char *quality(struct app_catalog *c, const struct json *j, int obje
     if (!keys(j, object, quality_keys) || !hex(string(c, j, object, "suite", 12), 12) ||
         !hex(string(c, j, object, "evidence", 64), 64) || !component(string(c, j, object, "engine", 48), false))
         return nullptr;
-    const char *date = string(c, j, object, "date", 10);
-    if (!date || strlen(date) != 10)
+    if (!iso_date(string(c, j, object, "date", 10)))
         return nullptr;
-    for (int i = 0; i < 10; ++i)
-        if (i == 4 || i == 7 ? date[i] != '-' : !isdigit((unsigned char) date[i]))
-            return nullptr;
     int tasks = json_get(j, object, "tasks");
     if (tasks < 0 || j->tok[tasks].type != JSMN_OBJECT || j->tok[tasks].size < 1 || j->tok[tasks].size > 8)
         return nullptr;
@@ -168,6 +172,33 @@ static const char *quality(struct app_catalog *c, const struct json *j, int obje
     c->used += n + 1;
     return out;
 }
+/* #104: speed on reference platforms, 1..4 entries of integers and plain
+ * strings; kept as validated raw JSON for status, like quality. */
+static const char *reference(struct app_catalog *c, const struct json *j, int list) {
+    static const char *const entry_keys[] = {"platform", "backend", "answer_ms", "tokens_per_s",
+                                             "memory_mib", "date", "engine", nullptr};
+    if (list < 0 || j->tok[list].type != JSMN_ARRAY || j->tok[list].size < 1 || j->tok[list].size > 4)
+        return nullptr;
+    for (int i = list + 1; i < j->n && j->tok[i].start < j->tok[list].end; ++i) {
+        if (j->tok[i].parent != list)
+            continue;
+        uint64_t    v;
+        const char *backend = keys(j, i, entry_keys) ? string(c, j, i, "backend", 3) : nullptr;
+        if (!backend || (strcmp(backend, "cpu") && strcmp(backend, "gpu")) || !string(c, j, i, "platform", 64) ||
+            !number(j, i, "answer_ms", 3600000, &v) || !number(j, i, "tokens_per_s", 100000, &v) ||
+            !number(j, i, "memory_mib", 1048576, &v) || !iso_date(string(c, j, i, "date", 10)) ||
+            !component(string(c, j, i, "engine", 48), false))
+            return nullptr;
+    }
+    size_t n = (size_t) (j->tok[list].end - j->tok[list].start);
+    if (n + 1 > sizeof c->strings - c->used)
+        return nullptr;
+    char *out = c->strings + c->used;
+    memcpy(out, j->src + j->tok[list].start, n);
+    out[n] = 0;
+    c->used += n + 1;
+    return out;
+}
 struct app_catalog *app_catalog_parse(const char *text, char error[static 256]) {
     snprintf(error, 256, "Invalid model catalog. Check schema, entries and unique IDs/files.");
     if (!text || strlen(text) > APP_CATALOG_BYTES)
@@ -192,6 +223,7 @@ struct app_catalog *app_catalog_parse(const char *text, char error[static 256]) 
                                              "quantization",
                                              "reasoning_format",
                                              "quality",
+                                             "reference",
                                              nullptr};
     uint64_t                 v, schema;
     if (json_parse(j, strlen(text), text) < 0 || !keys(j, 0, root_keys) ||
@@ -222,6 +254,8 @@ struct app_catalog *app_catalog_parse(const char *text, char error[static 256]) 
                 goto bad;
         }
         if (json_get(j, i, "quality") >= 0 && !(m->quality = quality(c, j, json_get(j, i, "quality"), m)))
+            goto bad;
+        if (json_get(j, i, "reference") >= 0 && !(m->reference = reference(c, j, json_get(j, i, "reference"))))
             goto bad;
         if (schema == 2) {
             m->group_id     = string(c, j, i, "group_id", 63);

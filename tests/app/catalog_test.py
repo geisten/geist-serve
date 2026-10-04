@@ -36,6 +36,15 @@ with tempfile.TemporaryDirectory(prefix='geist-catalog-') as temporary:
                        lambda q:q['tasks'].update(classify={'de':['1',20],'en':[0,20]}),lambda q:q['tasks'].update({'../x':{'de':[1,20],'en':[0,20]}})]:
             bad=copy.deepcopy(good);change(bad['models'][-1]['quality']);invalid.append(bad)
         bad=copy.deepcopy(good);bad['models'][-1]['quality']='146/160';invalid.append(bad)
+        # #104: reference speed on other platforms: 1..4 entries of integers and plain strings.
+        ref={'platform':'Apple M1 Max','backend':'gpu','answer_ms':3200,'tokens_per_s':72,'memory_mib':1200,'date':'2026-10-04','engine':'33db79d7764b'}
+        good['models'][-1]['reference']=[ref]
+        for change in [lambda r:r.update(backend='metal'),lambda r:r.update(answer_ms=0),lambda r:r.update(answer_ms=1.5),lambda r:r.update(tokens_per_s=-1),
+                       lambda r:r.update(memory_mib='1200'),lambda r:r.update(date='4.10.2026'),lambda r:r.update(engine='a b'),lambda r:r.update(platform=''),
+                       lambda r:r.update(platform='x'*65),lambda r:r.pop('engine'),lambda r:r.update(extra=1)]:
+            bad=copy.deepcopy(good);change(bad['models'][-1]['reference'][0]);invalid.append(bad)
+        for value in [[],[ref]*5,ref,'fast']:
+            bad=copy.deepcopy(good);bad['models'][-1]['reference']=value;invalid.append(bad)
         for field in ['group_id','group_name','quantization']:
             bad=copy.deepcopy(good);del bad['models'][0][field];invalid.append(bad)
         for field,value in [('group_name','Conflicting name'),('quantization','Q4_0')]:
@@ -73,6 +82,8 @@ with tempfile.TemporaryDirectory(prefix='geist-catalog-') as temporary:
         assert len(app.status()['models'])==len(good['models'])
         quality={m['id']:m['quality_evidence'] for m in app.status()['models']}
         assert quality.pop('another-small-model')==evidence and quality=={m['id']:m.get('quality') for m in base['models']}
+        references={m['id']:m['reference'] for m in app.status()['models']}
+        assert references.pop('another-small-model')==[ref] and references=={m['id']:m.get('reference') for m in base['models']}
         assert len(app.status()['quality_suite'])==12
         # #103: one verdict per model, never "good" without measured speed and evidence.
         snapshot=app.status()

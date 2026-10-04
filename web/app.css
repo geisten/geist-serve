@@ -1146,6 +1146,7 @@ body.manager-page main { max-width:1180px }
 .compare-point { cursor:pointer }
 .compare-basis { cursor:help; color:var(--muted) }
 .compare-table tr.highlight { background:color-mix(in srgb,var(--good) 8%,transparent) }
+.compare-reference { fill:none; stroke:var(--muted); stroke-width:1; stroke-dasharray:2 2; opacity:.7 }
 /* #122: the recommendation's action */
 .best-row { flex-wrap:wrap }
 .best-row .best-action { order:3; flex-basis:100%; justify-content:flex-start; padding:2px 0; color:var(--accent); font-weight:600 }

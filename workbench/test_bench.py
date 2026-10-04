@@ -126,6 +126,65 @@ class ReportTests(unittest.TestCase):
                 r = bench.summarize(raw.parent, bench.load_suite())
                 self.assertEqual({t: {l: [c[l]['passed'], c[l]['total']] for l in ('de', 'en')} for t, c in r['tasks'].items()}, q['tasks'])
 
+    def test_catalog_reference_has_its_evidence(self):
+        """#104: every reference entry is recomputed from its run record."""
+        models = json.loads((bench.ROOT/'models/catalog.json').read_text())['models']
+        for model in (m for m in models if 'reference' in m):
+            run = json.loads((HERE/'evidence/reference'/model['id']/'run.json').read_text())
+            entry = next(r for r in model['reference'] if r['platform'] == 'Apple M1 Max')
+            speed = run['speed']
+            self.assertEqual(entry['answer_ms'], round((speed['first_token_s'] + bench.TYPICAL_ANSWER_TOKENS / speed['tokens_per_s']) * 1000), model['id'])
+            self.assertEqual((entry['date'], entry['engine']), (run['finished_utc'][:10], run['engine']['engine_pin'][:12]), model['id'])
+
+    def test_reference_entries_from_app_speed(self):
+        """#104: a reference entry per model and processor, only from clean runs with app speed."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.make_run(root/'one', 'good')
+            run = json.loads((root/'one/good/run.json').read_text())
+            run['speed'] = dict(tokens_per_s=74.2, first_token_s=2.3, samples=161)
+            run['memory']['max_gpu_allocated_bytes'] = 3 << 30
+            (root/'one/good/run.json').write_text(json.dumps(run))
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                bench.reference(type('A', (), dict(run=str(root/'one'), platform='Apple M1 Max', write=False))())
+            entry = json.loads(out.getvalue())['good']
+            self.assertEqual(entry, dict(platform='Apple M1 Max', backend='gpu', answer_ms=round((2.3 + 200 / 74.2) * 1000),
+                                         tokens_per_s=74, memory_mib=3072, date='2026-10-03', engine='33db79d7764b'))
+            del run['speed']
+            (root/'one/good/run.json').write_text(json.dumps(run))
+            with self.assertRaises(ValueError):  # no app speed, no reference
+                bench.reference(type('A', (), dict(run=str(root/'one'), platform='Apple M1 Max', write=False))())
+
+    def test_write_updates_a_catalog_copy(self):
+        """--write adds quality and reference to the catalog and bumps its revision (on a copy)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root/'models').mkdir()
+            catalog = json.loads((bench.ROOT/'models/catalog.json').read_text())
+            catalog['models'][0]['id'] = 'good'
+            (root/'models/catalog.json').write_text(json.dumps(catalog))
+            self.make_run(root/'runs', 'good')
+            run = json.loads((root/'runs/good/run.json').read_text())
+            run['speed'] = dict(tokens_per_s=50, first_token_s=1, samples=3)
+            (root/'runs/good/run.json').write_text(json.dumps(run))
+            real, bench.ROOT = bench.ROOT, root
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    bench.quality(type('A', (), dict(run=str(root/'runs'), write=True))())
+                    bench.reference(type('A', (), dict(run=str(root/'runs'), platform='Test', write=True))())
+                    bench.reference(type('A', (), dict(run=str(root/'runs'), platform='Test', write=True))())  # replaces, never duplicates
+            finally:
+                bench.ROOT = real
+            written = json.loads((root/'models/catalog.json').read_text())
+            model = written['models'][0]
+            self.assertEqual(written['revision'], catalog['revision'] + 3)
+            self.assertEqual(model['quality']['tasks']['classify'], dict(de=[20, 20], en=[20, 20]))
+            platforms = [r['platform'] for r in model['reference']]
+            self.assertEqual(platforms.count('Test'), 1)  # replaced, never duplicated
+            self.assertEqual(len(platforms), len({r['platform'] for r in catalog['models'][0].get('reference', [])} | {'Test'}))  # others kept
+            self.assertEqual(next(r for r in model['reference'] if r['platform'] == 'Test')['answer_ms'], 5000)
+
     def test_p95_is_nearest_rank(self):
         self.assertEqual(bench.p95(list(range(1, 21))), 19)
         self.assertEqual(bench.p95([5.0]), 5.0)

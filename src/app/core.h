@@ -43,6 +43,7 @@ struct app_model {
     const char *quality;          /* optional validated reference benchmark JSON (#102) */
     unsigned    quality_passed, quality_total; /* its sums over tasks and languages */
     unsigned    quality_task[4][2]; /* passed, total per APP_QUALITY_TASKS entry (#103 intent) */
+    const char *reference; /* optional validated JSON: speed on reference platforms (#104) */
 };
 extern struct app_model app_models[APP_MODEL_COUNT];
 extern size_t           app_model_count;

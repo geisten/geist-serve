@@ -213,6 +213,7 @@ const german = {
   'Speed measured on this computer': 'Geschwindigkeit auf diesem Rechner gemessen',
   'engine': 'Engine',
   'Basis': 'Grundlage',
+  'Reference, not this computer': 'Referenz, nicht dieser Rechner',
   'No model fits this computer well.': 'Kein Modell passt gut zu diesem Rechner.',
   'Recommended here': 'Hier empfohlen',
   'Symbols': 'Symbole',

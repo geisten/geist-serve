@@ -440,6 +440,8 @@ void status_response(int fd, struct app_arena *arena) {
         /* #102: reference benchmark counts from the catalog, or null: never a guess. */
         app_put(&b, ",\"quality_evidence\":");
         app_put(&b, m->quality ? m->quality : "null");
+        app_put(&b, ",\"reference\":");
+        app_put(&b, m->reference ? m->reference : "null");
         /* Only modalities implemented by the bundled service are advertised. */
         app_put(&b,
                 ",\"capabilities\":{\"chat\":true,\"vision\":false,"

@@ -4,6 +4,7 @@
     bench.py run --candidate CATALOG_ID [--candidate …] --backend cpu|gpu --output NEW_DIR [--cases N]
     bench.py report RUN_DIR [--json]
     bench.py quality RUN_DIR [--write]   (catalog "quality" fields, #102)
+    bench.py reference RUN_DIR --platform NAME [--write]   (catalog "reference" speed, #104)
 
 Four small tasks (classify, extract, format, context) in German and English,
 scored automatically. See docs/MINI-BENCHMARK.md.
@@ -161,6 +162,17 @@ class App:
         finally:
             connection.close()
 
+    def export(self):
+        """The private app's own per-request timings (JSONL, numbers only)."""
+        connection = http.client.HTTPConnection('127.0.0.1', self.port, timeout=20)
+        try:
+            connection.request('GET', '/app/performance/export', headers={'Authorization': 'Bearer ' + self.token})
+            response = connection.getresponse()
+            body = response.read(64 << 20).decode()
+            return [json.loads(line) for line in body.splitlines() if line.strip()] if response.status == 200 else []
+        finally:
+            connection.close()
+
     def status(self):
         return self.call('/app/status')[1]
 
@@ -296,6 +308,14 @@ def run_candidate(suite, entry, model, backend, out, cases=None):
                         raw.write(json.dumps(row, ensure_ascii=False) + '\n')
                         raw.flush()
                         print(f'{entry["id"]} {case["id"]}: {"pass" if row["passed"] else row["reason"]}', flush=True)
+            # #104: generation rate and first-token time as the app measured them;
+            # the per-case times above include reading the prompt.
+            timed = [r for r in app.export() if r.get('outcome') == 'completed' and not r.get('warmup')
+                     and (r.get('generation_ns') or 0) > 0 and r.get('output')]
+            if timed:
+                record['speed'] = dict(source='/app/performance/export', samples=len(timed),
+                                       tokens_per_s=statistics.median(r['output'] / (r['generation_ns'] / 1e9) for r in timed),
+                                       first_token_s=statistics.median(max(r.get('first_ns') or 0, 0) / 1e9 for r in timed))
         except (OSError, RuntimeError, ValueError, KeyError) as error:
             record['errors'].append(str(error)[:500])
         finally:
@@ -417,6 +437,43 @@ def quality(args):
     print(f'{path}: quality for {", ".join(fields)}; revision {catalog["revision"]}')
 
 
+TYPICAL_ANSWER_TOKENS = 200  # about 150 words; the app's "typical answer" (#103)
+
+
+def reference(args):
+    """Speed on a reference platform from complete runs of a committed engine (#104).
+    One entry per model, platform and processor; --write replaces that entry in
+    models/catalog.json and keeps the others."""
+    directory = Path(args.run)
+    entries = {}
+    for d in sorted(p for p in directory.iterdir() if (p/'run.json').is_file()):
+        run = json.loads((d/'run.json').read_text())
+        speed = run.get('speed')
+        if run['errors'] or run['engine']['source_dirty'] or not run['engine']['engine_pin'] or not speed:
+            raise ValueError(f'{d.name}: failed, from an uncommitted engine or without app speed; not a reference')
+        backend = 'gpu' if run['execution']['active'] == 'gpu' else 'cpu'
+        memory = max(run['memory']['max_rss_bytes'] or 0, run['memory']['max_gpu_allocated_bytes'] or 0)
+        entries[run['candidate']] = dict(platform=args.platform, backend=backend,
+                                         answer_ms=round((speed['first_token_s'] + TYPICAL_ANSWER_TOKENS / speed['tokens_per_s']) * 1000),
+                                         tokens_per_s=max(1, round(speed['tokens_per_s'])), memory_mib=max(1, round(memory / 2**20)),
+                                         date=run['finished_utc'][:10], engine=run['engine']['engine_pin'][:12])
+    if not entries:
+        raise ValueError(f'{directory}: no candidate runs')
+    if not args.write:
+        print(json.dumps(entries, indent=2))
+        return
+    path = ROOT/'models/catalog.json'
+    catalog = json.loads(path.read_text())
+    for model in catalog['models']:
+        entry = entries.get(model['id'])
+        if entry:
+            kept = [r for r in model.get('reference', []) if (r['platform'], r['backend']) != (entry['platform'], entry['backend'])]
+            model['reference'] = kept + [entry]
+    catalog['revision'] += 1
+    path.write_text(json.dumps(catalog, indent=2, ensure_ascii=False) + '\n')
+    print(f'{path}: reference for {", ".join(entries)} on {args.platform}; revision {catalog["revision"]}')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest='command', required=True)
@@ -431,12 +488,16 @@ def main():
     p = sub.add_parser('report')
     p.add_argument('run')
     p.add_argument('--json', action='store_true')
+    f = sub.add_parser('reference')
+    f.add_argument('run')
+    f.add_argument('--platform', required=True)
+    f.add_argument('--write', action='store_true')
     q = sub.add_parser('quality')
     q.add_argument('run')
     q.add_argument('--write', action='store_true')
     args = parser.parse_args()
     try:
-        dict(run=run, report=report, quality=quality)[args.command](args)
+        dict(run=run, report=report, quality=quality, reference=reference)[args.command](args)
     except (ValueError, OSError) as error:
         sys.exit(f'bench: {error}')
 

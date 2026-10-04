@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "kind": "geist-mini-benchmark",
+  "candidate": "gemma4-e2b",
+  "backend_requested": "gpu",
+  "suite": {
+    "classify": {
+      "version": "1.0.0",
+      "sha256": "9f717e22c0b060e3f9b5eb8612f8a968214b8d7cb7b9b02b23716a9ebc5483bc"
+    },
+    "extract": {
+      "version": "1.0.0",
+      "sha256": "b391044925ab4963b3e9cc46fc7eef069c62a86493a468086bad7724e9456083"
+    },
+    "format": {
+      "version": "1.0.0",
+      "sha256": "41dca4811040c8fe33178208d6ca5d906bd45b2e251e9766e646868ac4e026a8"
+    },
+    "context": {
+      "version": "1.0.0",
+      "sha256": "2748b3a5b9f9d228eb56ac5313920028b8ffa88cded507539119bddf55fcc22a"
+    }
+  },
+  "model": {
+    "catalog_id": "gemma4-e2b",
+    "file": "gemma-4-E2B-it-Q4_K_M.gguf",
+    "sha256": "740185b21d22ceb83a11c3aa62ad5842ef32c70f6096d756bbee85a1e4ec34b8",
+    "bytes": 3106738272,
+    "quantization": "Q4_K_M",
+    "source": "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf"
+  },
+  "engine": {
+    "source": "62871504b81648cf577fa79d15008aae7ff71066",
+    "source_dirty": false,
+    "engine_pin": "33db79d7764b4f6177d944e8ae4fd9f7fadea9be",
+    "app_sha256": "3f1b1b5a96170d924516a971a68d20786ede6be1f38b00635d48057800b57b56",
+    "geistd_sha256": "a96eeeacb55de1df5576071fa5ce5eda310fc31a7eda74ef449e58a87bc8319d"
+  },
+  "host": {
+    "os": "Darwin",
+    "os_release": "27.0.0",
+    "machine": "arm64",
+    "cpu": "Apple M1 Max",
+    "logical_cpus": 10,
+    "memory_bytes": 68719476736
+  },
+  "sampler": {
+    "endpoint": "/v1/chat/completions",
+    "temperature": 0,
+    "generations_per_case": 1,
+    "retries": 0,
+    "warmup": 1,
+    "reasoning_budget": 0
+  },
+  "started_utc": "2026-10-04T09:54:58.776584+00:00",
+  "errors": [],
+  "prepare_ms": 6530.303165956866,
+  "execution": {
+    "active": "gpu",
+    "backend": "metal"
+  },
+  "speed": {
+    "source": "/app/performance/export",
+    "samples": 161,
+    "tokens_per_s": 74.37453873483189,
+    "first_token_s": 2.3150800000429155
+  },
+  "memory": {
+    "metric": "max of /app/status memory.process_rss_bytes and gpu_allocated_bytes (geistd)",
+    "rss_source": "macos.proc_pid_rusage.ri_resident_size",
+    "poll_interval_ms": 1000.0,
+    "samples": 394,
+    "max_rss_bytes": 607879168,
+    "max_gpu_allocated_bytes": 3427385344
+  },
+  "finished_utc": "2026-10-04T10:01:42.035128+00:00"
+}
