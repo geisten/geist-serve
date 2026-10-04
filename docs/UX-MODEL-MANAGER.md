@@ -142,3 +142,10 @@ throughput carries over between models. Native ternary formats decode faster
 per byte, so their estimates are conservative. An estimate is always
 labelled "estimated, download to measure". Without any measurement on a
 processor, there is no estimate.
+
+**Data basis.** Every verdict names what it rests on:
+- `verdict.measured_at` gives the time of the last speed measurement per processor.
+- `verdict.estimated_from` gives how many measured models an estimate scales from.
+- `quality_evidence` gives the reference test's date, engine and suite.
+
+The card tooltip shows the basis as a second line. In **Compare models**, each row has an ⓘ with the basis, and clicking a chart point highlights and focuses its row.

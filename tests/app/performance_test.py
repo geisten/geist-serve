@@ -95,6 +95,9 @@ def main():
             assert app.request('/app/catalog',catalog)[0]==200
             estimate=next(m for m in app.status()['models'] if m['id']=='not-installed')['verdict']
             assert estimate['basis']=='estimated' and estimate['reason']=='quality_unknown',estimate
+            # What a verdict rests on: when each processor was measured; how many models an estimate scales from.
+            assert all(time.time()-3600<verdict['measured_at'][p]<=time.time()+5 for p in ('cpu','gpu')),verdict
+            assert estimate['estimated_from']>=1 and estimate['measured_at']=={'cpu':None,'gpu':None},estimate
             assert estimate['seconds']['cpu']>verdict['seconds']['cpu'],(estimate,verdict)  # twice the bytes, slower
             gate.touch();assert app.request('/app/performance/compare',{'confirm':True})[0]==202
             app.wait(lambda s:s['comparison']['phase']=='warmup')

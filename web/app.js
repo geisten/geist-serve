@@ -447,6 +447,19 @@ function verdictReason(model) {
     unavailable: [t(model.reason || 'Unavailable on this computer')], unreliable: [correct && `${t('Reference test')}: ${correct}`],
     quality_unknown: [t('Answer quality not tested yet')], speed_unknown: [t('Speed on this computer not measured yet'), correct]}[v.reason] || [];
 }
+// #103: what a verdict rests on: the measurement here (date, processor), the
+// estimate (from how many measured models) and the reference test (date, engine).
+function verdictBasis(model) {
+  const v = model?.verdict, q = model?.quality_evidence;
+  if (!v) return '';
+  const day = seconds => new Date(seconds * 1000).toLocaleDateString(interfaceLanguage === 'de' ? 'de-DE' : 'en-US');
+  const measured = ['cpu', 'gpu'].filter(p => knownNumber(v.measured_at?.[p])).map(p => `${p.toUpperCase()} ${day(v.measured_at[p])}`);
+  const speed = v.basis === 'estimated' ? `${t('Speed estimated from measured models')}: ${v.estimated_from}`
+    : measured.length ? `${t('Speed measured on this computer')}: ${measured.join(', ')}` : t('Speed on this computer not measured yet');
+  const quality = q ? `${t('Reference test')}: ${q.date} · ${t('engine')} ${q.engine}${q.suite === state?.quality_suite ? '' : ` · ${t('older test version')}`}`
+    : t('Answer quality not tested yet');
+  return `${speed} · ${quality}`;
+}
 function verdictText(model) {
   if (!model?.verdict) return '';
   return [t(verdictNames[model.verdict.value]), ...verdictReason(model)].filter(Boolean).join(' · ');
@@ -483,9 +496,9 @@ function renderCompare() {
     [0, limits.fast_s, limits.usable_s].map(x => tick(sx(x), sy(0), sx(x), sy(0) + 4, `${formatNumber(x)} s`, 'middle', sx(x), sy(0) + 15)).join('') +
     [0, .5, limits.reliable, 1].filter((y, i, all) => all.indexOf(y) === i).map(y => tick(L - 4, sy(y), L, sy(y), `${Math.round(y * 100)}%`, 'end', L - 6, sy(y) + 3)).join('') +
     `<text x="${W - R}" y="${H - 2}" text-anchor="end">${escapeText(t('seconds per typical answer'))}</text>` +
-    points.map(({m, p, x, y}) => `<g class="compare-point" data-verdict="${m.verdict.value}"><circle cx="${sx(x)}" cy="${sy(y)}" r="5"/><text x="${sx(x) + 7}" y="${sy(y) + 3}">${escapeText(`${m.group_name || m.name} · ${p.toUpperCase()}`)}</text><title>${escapeText(`${modelLabel(m)} · ${p.toUpperCase()} · ${secondsText(x)} · ${m.verdict.passed}/${m.verdict.total}`)}</title></g>`).join('');
-  $('compare-table').tBodies[0].innerHTML = models.length ? models.map(m => `<tr><td><span class="model-verdict" data-verdict="${m.verdict.value}" title="${escapeText(verdictText(m))}">${verdictSymbols[m.verdict.value]}</span><span class="sr-only">${escapeText(verdictText(m))}</span></td><th scope="row">${escapeText(modelLabel(m))}</th><td>${secondsText(m.verdict.seconds.cpu)}</td><td>${secondsText(m.verdict.seconds.gpu)}</td><td>${m.verdict.total ? `${m.verdict.passed}/${m.verdict.total}` : '–'}</td></tr>`).join('')
-    : `<tr><td colspan="5">${escapeText(t('No model installed yet.'))}</td></tr>`;
+    points.map(({m, p, x, y}) => `<g class="compare-point" data-verdict="${m.verdict.value}" data-id="${escapeText(m.id)}"><circle cx="${sx(x)}" cy="${sy(y)}" r="5"/><text x="${sx(x) + 7}" y="${sy(y) + 3}">${escapeText(`${m.group_name || m.name} · ${p.toUpperCase()}`)}</text><title>${escapeText(`${modelLabel(m)} · ${p.toUpperCase()} · ${secondsText(x)} · ${m.verdict.passed}/${m.verdict.total}`)}</title></g>`).join('');
+  $('compare-table').tBodies[0].innerHTML = models.length ? models.map(m => `<tr data-id="${escapeText(m.id)}" tabindex="-1"><td><span class="model-verdict" data-verdict="${m.verdict.value}" title="${escapeText(verdictText(m))}">${verdictSymbols[m.verdict.value]}</span><span class="sr-only">${escapeText(verdictText(m))}</span></td><th scope="row">${escapeText(modelLabel(m))}</th><td>${secondsText(m.verdict.seconds.cpu)}</td><td>${secondsText(m.verdict.seconds.gpu)}</td><td>${m.verdict.total ? `${m.verdict.passed}/${m.verdict.total}` : '–'}</td><td><span class="compare-basis" title="${escapeText(verdictBasis(m))}" aria-hidden="true">ⓘ</span><span class="sr-only">${escapeText(verdictBasis(m))}</span></td></tr>`).join('')
+    : `<tr><td colspan="6">${escapeText(t('No model installed yet.'))}</td></tr>`;
   const fields = {'verdict-intent': limits.intent, 'verdict-fast': limits.fast_s, 'verdict-usable': limits.usable_s, 'verdict-reliable': Math.round(limits.reliable * 100)};
   for (const [id, value] of Object.entries(fields)) if (document.activeElement !== $(id)) $(id).value = value;
 }
@@ -603,7 +616,7 @@ function modelCard(model) {
   const verdict = card.querySelector('.model-verdict');
   verdict.dataset.verdict = model.verdict?.value || 'unknown';
   verdict.textContent = verdictSymbols[verdict.dataset.verdict];
-  verdict.title = verdictText(model);
+  verdict.title = `${verdictText(model)}\n${verdictBasis(model)}`;
   card.querySelector('.variant-size').textContent = [variantLabel(model), model.bytes ? bytes(model.bytes).replace(' ', '\u00a0') : ''].filter(Boolean).join(' · ');
   const recommendedTag = card.querySelector('.variant-recommended');
   recommendedTag.hidden = recommendedModel(state)?.id !== model.id || active;
@@ -1253,6 +1266,14 @@ $('open-activity').addEventListener('click',()=>{activityReturn=document.activeE
 $('close-activity').addEventListener('click',()=>$('activity-dialog').close());
 $('open-compare').addEventListener('click', () => { uiText($('verdict-result'), ''); $('compare-dialog').showModal(); $('close-compare').focus({preventScroll: true}); renderCompare(); });
 $('close-compare').addEventListener('click', () => $('compare-dialog').close());
+// A point leads to its row: the row has the values and what they rest on.
+$('compare-chart').addEventListener('click', event => {
+  const id = event.target.closest('.compare-point')?.dataset.id;
+  const row = id && [...$('compare-table').tBodies[0].rows].find(r => r.dataset.id === id);
+  if (!row) return;
+  for (const r of $('compare-table').tBodies[0].rows) r.classList.toggle('highlight', r === row);
+  row.scrollIntoView({block: 'nearest'}); row.focus({preventScroll: true});
+});
 for (const id of ['verdict-intent', 'verdict-fast', 'verdict-usable', 'verdict-reliable']) $(id).addEventListener('change', () => saveVerdictSettings({
   intent: $('verdict-intent').value, fast_s: Number($('verdict-fast').value), usable_s: Number($('verdict-usable').value), reliable: Number($('verdict-reliable').value) / 100}));
 $('verdict-reset').addEventListener('click', () => saveVerdictSettings({reset: true}));
