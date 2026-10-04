@@ -680,7 +680,7 @@ async function checkActivityUX(assert, tick) {
 
     {// #51: first launch names one recommendation, explains the icons and speaks plainly.
      const base=structuredClone(state), pickModel=base.models.find(m=>m.resource_fit!==2);
-     const fresh={...base,ready:false,active_id:'',recommendation:{...base.recommendation,id:pickModel.id,source:'default',eligible:true},
+     const fresh={...base,ready:false,active_id:'',recommendation:{...base.recommendation,id:pickModel.id,source:'default',eligible:true},best_choice:{id:pickModel.id,verdict:'unknown',action:'download',processor:null,basis:null},
        models:base.models.map(m=>({...m,installed:false}))};
      fresh.models.find(m=>m.id!==pickModel.id).reason='RAM is smaller than the model file, before context and OS memory.';
      const tight=fresh.models.find(m=>m.id!==pickModel.id); tight.resource_fit=1; tight.ram_gib=16;
@@ -696,7 +696,7 @@ async function checkActivityUX(assert, tick) {
      assert(!/high quality|hohe qualität|balanced|ausgewogen|very compact|sehr kompakt/i.test(listText),'#80: no quality ranking derived from the quantization');
      assert(['8-bit','4-bit','Ternary (native)'].map(x=>t(x)).includes(cards.get(pickModel.id).querySelector('.model-name').textContent),'#80: the row names the weight format');
      assert(!$('quality-note').hidden && $('quality-note').textContent===t('Answer quality not tested yet. Check answers.'),'#80: the list says that answer quality is not tested');
-     assert(tags[0].textContent===t('Suggested start') && $('model-prompt-hint').textContent.includes(t('Suggested start').split(' ')[0]),'#80: a suggested start, not a quality recommendation');
+     assert(tags[0].textContent===t('Suggested start') && $('model-prompt-hint').textContent===recommendation(fresh).text,'#80/#122: one recommendation, the same sentence in the empty pane');
      const badges=cards.get(pickModel.id).querySelector('.model-badges'); badges.focus();
      assert(badges.classList.contains('show-meaning') && getComputedStyle(badges,'::after').content.includes(t('Fits this computer')),'#51: focusing the icons shows their meaning');badges.blur();
      render(base);
@@ -933,14 +933,14 @@ $$
       assert(mark(first.id).title.split('\n')[0] === `${t('Good choice')} · ${t('about 3 s per answer on the graphics chip')} · 146/160 ${t('correct')}`, '#103: plain reason with seconds and processor');
       assert(mark(first.id).title.split('\n')[1] === verdictBasis({...first, verdict: verdict('good', 'good', {processor: 'gpu', seconds: {cpu: 9.6, gpu: 3.2}, passed: 146, total: 160})}), '#103: the tooltip names what the verdict rests on');
       assert(mark(second.id).title.split('\n')[0] === `${t('Not recommended here')} · ${t('Reference test')}: 31/160 ${t('correct')}`, '#103: the reason names the evidence');
-      assert(!$('best-choice').hidden && $('best-choice').textContent.startsWith(`✓ ${t('Best for you')}: `) && !/t\/s|Q4_K_M|Q8_0/.test($('best-choice').textContent), '#103: recommendation in plain words');
+      assert(!$('best-choice').hidden && $('best-choice').textContent.startsWith(`✓ ${t('Recommended here')}: `) && !/t\/s|Q4_K_M|Q8_0/.test($('best-choice').textContent), '#103: recommendation in plain words');
       assert(cards.get(second.id).querySelector('.model-pick').getAttribute('aria-label').includes(t('Not recommended here')) && !cards.get(second.id).querySelector('.model-pick').disabled, '#103: a ✗ explains and never blocks');
       render(snapshot(verdict('good', 'good', {basis: 'estimated', processor: 'cpu', seconds: {cpu: 4.4, gpu: null}, passed: 146, total: 160}), verdict('not_recommended', 'unreliable', {passed: 31, total: 160}), null));
       assert(mark(first.id).title.includes(`${t('about 4 s per answer on the processor')} (${t('estimated, download to measure')})`), '#103: an estimate is always labelled');
       render(snapshot(verdict('unknown', 'speed_unknown', {passed: 146, total: 160}), verdict('unknown', 'quality_unknown'), {id: first.id, verdict: 'unknown', processor: null}));
-      assert(mark(first.id).textContent === '?' && $('best-choice').textContent.startsWith(t('No installed model is a good choice yet.')), '#103: no "good" without a measurement');
+      assert(mark(first.id).textContent === '?' && $('best-choice').textContent.startsWith(`? ${t('Best option here')}: `), '#103: no "good" without a measurement');
       render({...saved, best_choice: null});
-      assert($('best-choice').hidden, '#103: no sentence without an installed model');
+      assert($('best-choice').textContent === t('No model fits this computer well.') && $('best-action').hidden && $('recommend-action').hidden, '#122: nothing fits: said plainly, no action');
       render(saved);
     }
     { // #103: measure speed on demand: the active model directly, another one after starting it; cancel while running.
@@ -1006,6 +1006,27 @@ $$
         $('close-compare').click();
         assert(!$('compare-dialog').open, '#103: the view closes');
       } finally { api = originalApi; poll = originalPoll; if ($('compare-dialog').open) $('compare-dialog').close(); render(saved); }
+    }
+    { // #122: one recommendation: the sentence, the card tag and both buttons name the same model; the action fits.
+      const saved = state, originalChoose = choose, chosen = [];
+      choose = async id => { chosen.push(id); };
+      const model = saved.models.find(m => m.resource_fit !== 2);
+      const snap = (action, verdict = 'good') => ({...saved, phase: '', loading: false, best_choice: {id: model.id, verdict, action, processor: null, basis: null},
+        models: saved.models.map(m => m.id === model.id ? {...m, verdict: {value: verdict, reason: verdict === 'good' ? 'good' : 'speed_unknown', processor: null, seconds: {cpu: null, gpu: null}, passed: 146, total: 160}} : m)});
+      try {
+        render(snap('download'));
+        const tag = [...document.querySelectorAll('.variant-recommended')].filter(e => !e.hidden).map(e => e.closest('.model').dataset.id);
+        assert(JSON.stringify(tag) === JSON.stringify([model.id]) && $('best-action').dataset.id === model.id && $('recommend-action').dataset.id === model.id, '#122: one model in every place');
+        assert($('best-action').textContent === `${t('Download')} (${bytes(model.bytes)})` && !$('recommend-action').hidden && $('model-prompt-hint').textContent === $('best-choice').textContent, '#122: download with its size; the empty pane repeats it');
+        $('recommend-action').click();
+        assert(chosen[0] === model.id, '#122: the action starts the normal download/start');
+        render(snap('start', 'usable'));
+        assert($('best-action').textContent === t('Start') && $('best-choice').textContent.startsWith(`◐ ${t('Best option here')}: `), '#122: an installed option starts');
+        render(snap('active'));
+        assert($('best-action').hidden && $('recommend-action').hidden, '#122: no action for the active model');
+        render({...snap('download'), phase: 'downloading'});
+        assert($('best-action').hidden, '#122: no second action while a model is being prepared');
+      } finally { choose = originalChoose; render(saved); }
     }
     { // #83: model actions are locked during a comparison; a pause says "Cancelling…" until the job ends.
       const saved = state, idle = saved.models.find(m => !m.installed && m.id !== saved.active_id && m.resource_fit !== 2);

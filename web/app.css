@@ -1073,3 +1073,7 @@ body.manager-page main { max-width:1180px }
 .compare-basis { cursor:help; color:var(--muted) }
 .compare-table tr.highlight { background:#1f7a3a14 }
 .compare-reference { fill:none; stroke:var(--muted); stroke-width:1; stroke-dasharray:2 2; opacity:.7 }
+/* #122: the recommendation's action */
+.best-row { flex-wrap:wrap }
+.best-row .best-action { order:3; flex-basis:100%; justify-content:flex-start; padding:2px 0; color:var(--accent); font-weight:600 }
+.recommend-action { margin-top:16px }

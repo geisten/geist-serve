@@ -92,7 +92,13 @@ with tempfile.TemporaryDirectory(prefix='geist-catalog-') as temporary:
             assert v['value'] in ('good','usable','not_recommended','unknown') and v['value']!='good', v
             assert (v['passed'] is None)==(m['quality_evidence'] is None)
         assert {m['id']:m['verdict']['reason'] for m in snapshot['models']}['another-small-model']=='unreliable'  # 57/80 in the fixture
-        assert snapshot['best_choice'] is None and snapshot['limits']=={'fast_s':10,'usable_s':30,'reliable':0.9,'intent':'chat'}
+        assert snapshot['limits']=={'fast_s':10,'usable_s':30,'reliable':0.9,'intent':'chat'}
+        # #122: with nothing installed, the one recommendation is a download, never a ✗ model,
+        # and among models of the same verdict none with known quality scores higher.
+        best=snapshot['best_choice'];chosen={m['id']:m for m in snapshot['models']}[best['id']]
+        assert best['action']=='download' and best['verdict']==chosen['verdict']['value']!='not_recommended',best
+        assert chosen['verdict']['total'] and all(m['verdict']['passed']/m['verdict']['total']<=chosen['verdict']['passed']/chosen['verdict']['total']
+            for m in snapshot['models'] if m['verdict']['value']==best['verdict'] and m['verdict']['total']),best
         # Thresholds and intent per computer: validated, saved, applied at once, and reset.
         for bad in [{'fast_s':0,'usable_s':30,'reliable':.9,'intent':'chat'},{'fast_s':20,'usable_s':10,'reliable':.9,'intent':'chat'},
                     {'fast_s':10,'usable_s':30,'reliable':.4,'intent':'chat'},{'fast_s':10,'usable_s':30,'reliable':.9,'intent':'poems'},

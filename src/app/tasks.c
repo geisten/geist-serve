@@ -79,3 +79,19 @@ const char *app_verdict_name(enum app_verdict verdict) {
     static const char *const names[] = {"good", "usable", "not_recommended", "unknown"};
     return names[verdict];
 }
+static int verdict_rank(enum app_verdict v) {
+    return v == APP_VERDICT_GOOD ? 0 : v == APP_VERDICT_USABLE ? 1 : v == APP_VERDICT_UNKNOWN ? 2 : 3;
+}
+bool app_candidate_better(struct app_candidate a, struct app_candidate b) {
+    if (verdict_rank(a.verdict) != verdict_rank(b.verdict))
+        return verdict_rank(a.verdict) < verdict_rank(b.verdict);
+    if ((a.rate >= 0) != (b.rate >= 0))
+        return a.rate >= 0;
+    if (a.installed != b.installed)
+        return a.installed;
+    if (a.rate != b.rate)
+        return a.rate > b.rate;
+    if ((a.seconds >= 0) != (b.seconds >= 0))
+        return a.seconds >= 0;
+    return a.seconds < b.seconds;
+}

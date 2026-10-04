@@ -149,3 +149,24 @@ processor, there is no estimate.
 - `quality_evidence` gives the reference test's date, engine and suite.
 
 The card tooltip shows the basis as a second line. In **Compare models**, each row has an ⓘ with the basis, and clicking a chart point highlights and focuses its row.
+
+**One recommendation (#122).** `best_choice` covers installed and catalog
+models.
+
+Ranking (`app_candidate_better`):
+1. Verdict: ✓, then ◐, then ?.
+2. Known quality before unknown.
+3. Installed before not installed.
+4. Higher pass rate.
+5. Faster answer.
+
+A ✗ model is never recommended. When nothing qualifies, `best_choice` is
+`null` and the app says "No model fits this computer well."
+
+Fields:
+- `action`: `active`, `start` or `download`
+- `basis`: measured, estimated or `null`
+
+The sentence above the list, the main button in the empty pane and the card
+tag all come from it, so the app never shows two different recommendations.
+`recommendation` remains only for the stable list order and `geisten setup`.
