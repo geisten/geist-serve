@@ -382,11 +382,11 @@ void status_response(int fd, struct app_arena *arena) {
     for (unsigned slot = 0; slot < 2; slot++)
         for (size_t i = 0; i < app_model_count; i++)
             measured_models[slot] += rates[slot][i] > 0;
-    /* #103: the installed model with the best verdict, then pass rate, then speed. */
+    /* #122: one recommendation over installed and catalog models (app_candidate_better). */
     const struct app_model *best = nullptr;
-    struct app_judgement    best_judgement = {APP_VERDICT_UNKNOWN, ""};
-    double                  best_rate = -1, best_seconds = -1;
+    struct app_candidate    best_candidate = {};
     const char             *best_processor = nullptr;
+    bool                    best_estimated = false;
     for (size_t i = 0; i < app_model_count; ++i) {
         const struct app_model *m         = &app_models[i];
         bool                    installed = inventory[i].installed;
@@ -522,19 +522,21 @@ void status_response(int fd, struct app_arena *arena) {
         app_put(&b, "}");
         double rate = total ? (double) passed / total : -1;
         double time = fastest < 0 ? -1 : seconds[fastest];
-        if (installed &&
-            (!best || j.verdict < best_judgement.verdict ||
-             (j.verdict == best_judgement.verdict &&
-              (rate > best_rate || (rate == best_rate && time >= 0 && (best_seconds < 0 || time < best_seconds)))))) {
-            best = m, best_judgement = j, best_rate = rate, best_seconds = time, best_processor = processor;
-        }
+        struct app_candidate candidate = {j.verdict, rate, time, installed};
+        if (j.verdict != APP_VERDICT_NOT_RECOMMENDED && (!best || app_candidate_better(candidate, best_candidate)))
+            best = m, best_candidate = candidate, best_processor = processor, best_estimated = estimated;
     }
     app_put(&b, "],\"best_choice\":");
     if (best) {
         app_put(&b, "{\"id\":");
         app_quote(&b, best->id);
         app_put(&b, ",\"verdict\":");
-        app_quote(&b, app_verdict_name(best_judgement.verdict));
+        app_quote(&b, app_verdict_name(best_candidate.verdict));
+        bool active = app.child.ready && !strcmp(app.child.active_id, best->id);
+        app_printf(&b,
+                   ",\"action\":\"%s\",\"basis\":%s",
+                   active ? "active" : best_candidate.installed ? "start" : "download",
+                   best_candidate.seconds < 0 ? "null" : best_estimated ? "\"estimated\"" : "\"measured\"");
         app_put(&b, ",\"processor\":");
         if (best_processor)
             app_quote(&b, best_processor);

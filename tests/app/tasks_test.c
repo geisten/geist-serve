@@ -47,4 +47,15 @@ int main(void) {
     double e = app_estimate_seconds(2000000000, rate, bytes, first, 3);
     assert(e > .4 + 200 / 30. - 1e-9 && e < .4 + 200 / 30. + 1e-9);
     assert(app_estimate_seconds(2000000000, rate, bytes, first, 0) < 0 && app_estimate_seconds(0, rate, bytes, first, 3) < 0);
+    /* #122: one recommendation. A good model to download beats a usable installed
+     * one; known quality beats unknown; then installed, pass rate, speed. */
+    struct app_candidate good_new = {APP_VERDICT_GOOD, .91, 5, false}, usable_installed = {APP_VERDICT_USABLE, .95, 12, true},
+                         unknown_known = {APP_VERDICT_UNKNOWN, .91, -1, false}, unknown_unknown = {APP_VERDICT_UNKNOWN, -1, 3, true},
+                         good_installed = {APP_VERDICT_GOOD, .90, 6, true};
+    assert(app_candidate_better(good_new, usable_installed) && !app_candidate_better(usable_installed, good_new));
+    assert(app_candidate_better(good_installed, good_new));       /* same verdict: installed first */
+    assert(app_candidate_better(unknown_known, unknown_unknown)); /* quality known first */
+    assert(app_candidate_better(usable_installed, unknown_known));
+    struct app_candidate fast = {APP_VERDICT_GOOD, .9, 3, true}, slow = {APP_VERDICT_GOOD, .9, 8, true}, unmeasured = {APP_VERDICT_GOOD, .9, -1, true};
+    assert(app_candidate_better(fast, slow) && app_candidate_better(slow, unmeasured) && !app_candidate_better(fast, fast));
 }

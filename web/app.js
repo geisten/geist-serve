@@ -140,8 +140,8 @@ const plainVariant = model => ({Q8_0:'8-bit', Q4_0:'4-bit', Q4_K_M:'4-bit', I2_S
 const hostName = () => window.geistDesktop === 'mac' ? 'Mac' : 'computer';
 // The platform default or fallback, until the user has chosen: exactly one card.
 const recommendedModel = snapshot => {
-  const rec = snapshot?.recommendation;
-  return rec?.eligible && rec.source !== 'saved' ? snapshot.models?.find(m => m.id === rec.id) || null : null;
+  const best = snapshot?.best_choice;
+  return best && best.action !== 'active' ? snapshot.models?.find(m => m.id === best.id) || null : null;
 };
 const ramReasons = new Set(['RAM is smaller than the model file, before context and OS memory.', 'Below the RAM recommendation; swapping or allocation failures are possible.', 'Available RAM is tight now. Close other apps before loading this model.']);
 const modelLabel = model => model ? model.quantization ? `${model.group_name || model.name} · ${model.quantization}` : model.name : state?.active || '';
@@ -464,15 +464,30 @@ function verdictText(model) {
   if (!model?.verdict) return '';
   return [t(verdictNames[model.verdict.value]), ...verdictReason(model)].filter(Boolean).join(' · ');
 }
-function renderBestChoice(snapshot) {
-  const best = snapshot.best_choice, model = best && snapshot.models.find(m => m.id === best.id);
-  $('best-choice').hidden = !model;
-  if (!model) return;
+// #122: one recommendation, from the service's best_choice: the sentence above
+// the list, the main action in the empty pane and the card tag all follow it.
+function recommendation(snapshot) {
+  const best = snapshot?.best_choice, model = best && snapshot.models.find(m => m.id === best.id);
+  if (!model) return {text: t('No model fits this computer well.'), model: null, action: null};
   const reason = verdictReason(model).filter(Boolean).join(' · ');
-  $('best-choice').dataset.verdict = best.verdict;
-  $('best-choice').textContent = best.verdict === 'good'
-    ? `${verdictSymbols.good} ${t('Best for you')}: ${plainModel(model)}${reason ? ` · ${reason}` : ''}`
-    : `${t('No installed model is a good choice yet.')} ${t('Best option')}: ${plainModel(model)} · ${verdictText(model)}`;
+  const text = best.verdict === 'good'
+    ? `${verdictSymbols.good} ${t('Recommended here')}: ${plainModel(model)}${reason ? ` · ${reason}` : ''}`
+    : `${verdictSymbols[best.verdict]} ${t('Best option here')}: ${plainModel(model)} · ${verdictText(model)}`;
+  const action = best.action === 'active' ? null : best.action === 'start' ? t('Start') : `${t('Download')} (${bytes(model.bytes)})`;
+  return {text, model, action, verdict: best.verdict};
+}
+function renderBestChoice(snapshot) {
+  const r = recommendation(snapshot);
+  $('best-choice').hidden = false;
+  $('best-choice').dataset.verdict = r.verdict || 'none';
+  uiText($('best-choice'), r.text);
+  for (const id of ['best-action', 'recommend-action']) {
+    $(id).hidden = !r.action || !!snapshot.phase || !!snapshot.loading;
+    $(id).textContent = r.action || '';
+    $(id).dataset.id = r.model?.id || '';
+  }
+  $('model-prompt-hint').hidden = !r.model;
+  uiText($('model-prompt-hint'), r.model ? r.text : '');
 }
 // #103 layer 3: compare installed models. Chart and table show the same values;
 // the table is the accessible equivalent. Markup is built from numbers and
@@ -685,10 +700,6 @@ function render(next) {
   $('workspace').hidden = !usable && !retained && !(next.activity?.load && !next.activity.load.outcome);
   $('test-unavailable').hidden = !$('workspace').hidden;
   $('model-prompt').textContent = t(working ? 'Getting ready…' : 'Choose a model to begin.');
-  const suggestion = working ? null : recommendedModel(next);
-  $('model-prompt-hint').hidden = !suggestion;
-  const counts = qualityCounts(suggestion);
-  if (suggestion) $('model-prompt-hint').textContent = t(`Suggested start for this ${hostName()}: ${modelLabel(suggestion)} (${bytes(suggestion.bytes)}). It fits the memory; ${counts ? `reference test: ${counts.passed}/${counts.total} correct` : 'answer quality is not tested yet'}.`);
   $('model-legend').hidden = !!next.active_id;
   renderBestChoice(next);
   continueMeasurement(next);
@@ -1264,6 +1275,8 @@ function renderActivity() {
 }
 $('open-activity').addEventListener('click',()=>{activityReturn=document.activeElement;closeMeasurements();$('activity-dialog').showModal();$('close-activity').focus({preventScroll:true});renderActivity();});
 $('close-activity').addEventListener('click',()=>$('activity-dialog').close());
+// #122: the recommendation's action starts or downloads it, the normal (verified) way.
+for (const id of ['best-action', 'recommend-action']) $(id).addEventListener('click', () => { if ($(id).dataset.id) choose($(id).dataset.id); });
 $('open-compare').addEventListener('click', () => { uiText($('verdict-result'), ''); $('compare-dialog').showModal(); $('close-compare').focus({preventScroll: true}); renderCompare(); });
 $('close-compare').addEventListener('click', () => $('compare-dialog').close());
 // A point leads to its row: the row has the values and what they rest on.
