@@ -1101,3 +1101,8 @@ body.manager-page main { max-width:1180px }
 .model-title .variant-active, .model-title .variant-recommended { flex:none }
 .model-badges { flex-wrap:wrap; row-gap:2px }
 .model-badges > span { white-space:nowrap }
+
+/* #123: plain first view; numbers and backend names are tooltips (still read aloud). */
+.execution-choice .processor-option small { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap }
+.runtime-speed { margin-left:10px; font-size:13px; font-weight:400; color:var(--muted); white-space:nowrap; flex:none; cursor:help }
+.runtime-speed:empty { display:none }

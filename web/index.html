@@ -27,7 +27,7 @@
   <div id="test-unavailable"><h2 id="model-prompt">Choose a model to begin.</h2><p id="model-prompt-hint" class="hint" hidden></p><button id="recommend-action" class="primary recommend-action" type="button" hidden></button></div>
   <div id="workspace" hidden>
     <div class="runtime-panel" tabindex="0" role="region" aria-label="Model measurements">
-    <div class="chat-heading"><div><h2 id="task-title" class="sr-only">Quick test</h2><h2 id="runtime-model" class="runtime-model"><span id="runtime-state" class="status-light" role="img" aria-label="Model ready" title="Model ready"></span><span id="runtime-name"></span></h2></div>
+    <div class="chat-heading"><div><h2 id="task-title" class="sr-only">Quick test</h2><h2 id="runtime-model" class="runtime-model"><span id="runtime-state" class="status-light" role="img" aria-label="Model ready" title="Model ready"></span><span id="runtime-name"></span><span id="runtime-speed" class="runtime-speed"></span></h2></div>
     <div class="activity-slot">
     <div id="activity-lane"><button id="open-activity" class="text-button" type="button" aria-haspopup="dialog" title="Activity"><span class="activity-copy"><span id="activity-label" role="status" aria-live="polite"></span><span id="activity-cpu-hint" class="hint" role="status" hidden></span></span><span id="activity-time" aria-hidden="true"></span></button><button id="activity-stop" class="text-button" type="button" aria-label="Stop" title="Stop" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button></div>
     <p id="profile-error" class="hint" role="status" hidden></p>
@@ -37,9 +37,9 @@
     </div>
     <div class="execution-row">
       <fieldset id="execution-choice" class="execution-choice" aria-describedby="execution-description"><legend class="sr-only">Execution</legend>
-        <label><input type="radio" name="execution" value="auto"><span>Auto</span></label>
-        <label><input type="radio" name="execution" value="cpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option" id="history-cpu"><span>CPU</span><small id="history-cpu-rate">— tok/s</small><small id="summary-cpu-first">—</small><small id="summary-cpu-count">—</small></span><small class="recommended-mark" role="img" hidden></small></label>
-        <label><input type="radio" name="execution" value="gpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option" id="history-gpu"><span>GPU</span><small class="processor-backend" hidden></small><small id="history-gpu-rate">— tok/s</small><small id="summary-gpu-first">—</small><small id="summary-gpu-count">—</small></span><small class="recommended-mark" role="img" hidden></small></label>
+        <label><input type="radio" name="execution" value="auto"><span>Automatic</span></label>
+        <label><input type="radio" name="execution" value="cpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option" id="history-cpu"><span>Processor</span><small id="history-cpu-rate">— tok/s</small><small id="summary-cpu-first">—</small><small id="summary-cpu-count">—</small></span><small class="recommended-mark" role="img" hidden></small></label>
+        <label><input type="radio" name="execution" value="gpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option" id="history-gpu"><span>Graphics chip</span><small class="processor-backend" hidden></small><small id="history-gpu-rate">— tok/s</small><small id="summary-gpu-first">—</small><small id="summary-gpu-count">—</small></span><small class="recommended-mark" role="img" hidden></small></label>
       </fieldset>
       <span id="execution-current" class="sr-only" role="status" aria-live="polite"></span>
       <span id="execution-description" class="sr-only"></span>
