@@ -190,3 +190,8 @@ links and verdict colours to 4.5:1 or 3:1.
 - An installed model without its own measurement gets the estimate too, labelled "estimated, measure to confirm", and keeps the stopwatch.
 
 **Connect (#133)** is an action of the active model, not an area. The button sits in the model's toolbar, and the page has "Back to the model". The sidebar holds Models and Settings (⌘1/⌘2). The Mac menu item "Connect a program" opens the same page.
+
+**Details without hover (#133).** The verdict chip is its own button. A tap,
+click or Enter opens a line under the card with the reason and what it rests
+on. It works on touch screens, where tooltips never appear. The chip never
+starts or downloads the model.

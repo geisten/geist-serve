@@ -465,10 +465,19 @@ function verdictReason(model) {
 // #103: what a verdict rests on: the measurement here (date, processor), the
 // estimate (from how many measured models) and the reference test (date, engine).
 const referenceText = (model, r) => `${t('Reference, not this computer')}: ${model.group_name || model.name} · ${r.platform} · ${r.backend.toUpperCase()} · ${secondsText(r.answer_ms / 1000)} · ${r.date}`;
+// One date formatter per language: WebKit builds a new one on every toLocaleDateString call.
+let dayFormatter = null, dayFormatterLanguage = '';
+const dayFormat = () => {
+  if (dayFormatterLanguage !== interfaceLanguage) {
+    dayFormatter = new Intl.DateTimeFormat(interfaceLanguage === 'de' ? 'de-DE' : 'en-US');
+    dayFormatterLanguage = interfaceLanguage;
+  }
+  return dayFormatter;
+};
 function verdictBasis(model) {
   const v = model?.verdict, q = model?.quality_evidence;
   if (!v) return '';
-  const day = seconds => new Date(seconds * 1000).toLocaleDateString(interfaceLanguage === 'de' ? 'de-DE' : 'en-US');
+  const day = seconds => dayFormat().format(new Date(seconds * 1000));
   const measured = ['cpu', 'gpu'].filter(p => knownNumber(v.measured_at?.[p])).map(p => `${p.toUpperCase()} ${day(v.measured_at[p])}`);
   const speed = v.basis === 'estimated' ? `${t('Speed estimated from measured models')}: ${v.estimated_from}`
     : measured.length ? `${t('Speed measured on this computer')}: ${measured.join(', ')}` : t('Speed on this computer not measured yet');
@@ -651,12 +660,18 @@ function modelCard(model) {
   if (!card) {
     card = document.createElement('article'); card.className = 'model'; card.dataset.id = model.id; card.setAttribute('role', 'listitem');
     // One button covers the name and download state. Information and removal are siblings.
-    card.innerHTML = '<button class="model-pick" type="button"><span class="model-ring"></span><span class="model-info"><span class="model-title"><span class="model-name"></span><span class="variant-recommended" hidden></span><span class="variant-active"></span><span class="model-verdict" aria-hidden="true"></span></span><span class="variant-size sr-only"></span><span class="download-state"></span></span></button><span class="model-badges" role="img" tabindex="0"></span><button class="measure text-button icon-button" type="button" hidden><svg class="measure-start" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg><svg class="measure-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1"/></svg></button><span class="variant-warning"></span><span class="transfer-detail"></span><button class="remove text-button icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button>';
+    card.innerHTML = '<button class="model-pick" type="button"><span class="model-ring"></span><span class="model-info"><span class="model-title"><span class="model-name"></span><span class="variant-recommended" hidden></span><span class="variant-active"></span></span><span class="variant-size sr-only"></span><span class="download-state"></span></span></button><button class="model-verdict" type="button" aria-expanded="false"></button><span class="model-badges" role="img" tabindex="0"></span><p class="model-detail" hidden></p><button class="measure text-button icon-button" type="button" hidden><svg class="measure-start" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg><svg class="measure-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1"/></svg></button><span class="variant-warning"></span><span class="transfer-detail"></span><button class="remove text-button icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button>';
     card.querySelector('.model-pick').addEventListener('click', event => { if (event.detail < 2) choose(model.id); });
     card.querySelector('.model-pick').addEventListener('keydown', event => {
       if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
     });
     card.querySelector('.remove').addEventListener('click', () => removeModel(model.id));
+    // #133: the verdict chip opens its explanation in place: works by tap, click and keyboard.
+    card.querySelector('.model-verdict').addEventListener('click', () => {
+      const detail = card.querySelector('.model-detail'), open = detail.hidden;
+      detail.hidden = !open;
+      card.querySelector('.model-verdict').setAttribute('aria-expanded', String(open));
+    });
     card.querySelector('.measure').addEventListener('click', () => measureSpeed(model.id));
     cards.set(model.id, card);
   }
@@ -672,7 +687,13 @@ function modelCard(model) {
   const verdict = card.querySelector('.model-verdict');
   verdict.dataset.verdict = model.verdict?.value || 'unknown';
   verdict.textContent = verdictSymbols[verdict.dataset.verdict];
-  verdict.title = `${verdictText(model)}\n${verdictBasis(model)}`;
+  const said = verdictText(model), basis = verdictBasis(model);
+  verdict.title = `${said}\n${basis}`;
+  verdict.setAttribute('aria-label', `${said}: ${t('Show details')}`);
+  const explanation = card.querySelector('.model-detail');
+  explanation.id ||= `model-detail-${model.id.replace(/[^\w-]/g, '_')}`;
+  verdict.setAttribute('aria-controls', explanation.id);
+  if (explanation.textContent !== `${said}. ${basis}`) explanation.textContent = `${said}. ${basis}`;
   card.querySelector('.variant-size').textContent = [variantLabel(model), model.bytes ? bytes(model.bytes).replace(' ', '\u00a0') : ''].filter(Boolean).join(' · ');
   const recommendedTag = card.querySelector('.variant-recommended');
   recommendedTag.hidden = recommendedModel(state)?.id !== model.id || active;
