@@ -170,3 +170,5 @@ Fields:
 The sentence above the list, the main button in the empty pane and the card
 tag all come from it, so the app never shows two different recommendations.
 `recommendation` remains only for the stable list order and `geisten setup`.
+Pass rates within 2 percentage points (APP_RATE_TIE) count as equal, so one
+answer more out of 160 does not outweigh a much faster answer.
