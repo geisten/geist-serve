@@ -140,6 +140,10 @@ static void accept_loop(struct server *sv, int lfd) {
 }
 
 int main(int argc, char **argv) {
+    /* An idle server must not spin: the engine asks OpenMP for active waiting
+     * unless told otherwise, which kept every core busy between requests.
+     * Same policy as the app gives geistd (child.c); OMP_WAIT_POLICY wins. */
+    setenv("OMP_WAIT_POLICY", "passive", 0);
     struct args a;
     if (!parse_args(argc, argv, &a))
         return usage(argv[0]);

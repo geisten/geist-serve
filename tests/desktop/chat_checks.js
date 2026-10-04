@@ -932,6 +932,8 @@ $$
       assert(mark(second.id).title === `${t('Not recommended here')} · ${t('Reference test')}: 31/160 ${t('correct')}`, '#103: the reason names the evidence');
       assert(!$('best-choice').hidden && $('best-choice').textContent.startsWith(`✓ ${t('Best for you')}: `) && !/t\/s|Q4_K_M|Q8_0/.test($('best-choice').textContent), '#103: recommendation in plain words');
       assert(cards.get(second.id).querySelector('.model-pick').getAttribute('aria-label').includes(t('Not recommended here')) && !cards.get(second.id).querySelector('.model-pick').disabled, '#103: a ✗ explains and never blocks');
+      render(snapshot(verdict('good', 'good', {basis: 'estimated', processor: 'cpu', seconds: {cpu: 4.4, gpu: null}, passed: 146, total: 160}), verdict('not_recommended', 'unreliable', {passed: 31, total: 160}), null));
+      assert(mark(first.id).title.includes(`${t('about 4 s per answer on the processor')} (${t('estimated, download to measure')})`), '#103: an estimate is always labelled');
       render(snapshot(verdict('unknown', 'speed_unknown', {passed: 146, total: 160}), verdict('unknown', 'quality_unknown'), {id: first.id, verdict: 'unknown', processor: null}));
       assert(mark(first.id).textContent === '?' && $('best-choice').textContent.startsWith(t('No installed model is a good choice yet.')), '#103: no "good" without a measurement');
       render({...saved, best_choice: null});

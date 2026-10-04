@@ -184,6 +184,25 @@ out=$(curl -s "$A/generate" -d '{"prompt":"hi","options":{"num_predict":"5"}}')
 check "options typed 400"      'wrong type'           "$out"
 out=$(curl -s "$A/chat" -d '{"model":"nope","messages":[{"role":"user","content":"hi"}]}')
 check "chat wrong model 404"   'model not found'      "$out"
+
+# --- idle after answering: no busy-waiting threads ----------------------------
+# The engine asks OpenMP for active waiting unless the server says passive;
+# that kept every core busy between requests. CPU seconds over 3 idle seconds.
+idle=$(python3 - "$pid" <<'PY'
+import subprocess, sys, time
+def cpu(pid):  # "[[dd-]hh:]mm:ss[.cc]" from ps, macOS and Linux
+    text = subprocess.run(['ps', '-o', 'time=', '-p', pid], capture_output=True, text=True).stdout.strip()
+    days, _, clock = text.rpartition('-')
+    seconds = 0.0
+    for part in clock.split(':'):
+        seconds = seconds * 60 + float(part)
+    return seconds + (int(days) * 86400 if days else 0)
+time.sleep(1)
+start = cpu(sys.argv[1]); time.sleep(3)
+print(f'{cpu(sys.argv[1]) - start:.2f}')
+PY
+)
+check "idle server does not spin" '^0\.[0-9]' "$idle"
 if command -v ollama >/dev/null; then
     out=$(OLLAMA_HOST=127.0.0.1:$PORT ollama run smollm2-360m-instruct-q8_0 "What is the capital of France? Answer in one word." 2>&1 | tr -d '\033' )
     check "real ollama CLI run"  'Paris'               "$out"

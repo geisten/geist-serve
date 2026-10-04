@@ -372,8 +372,11 @@ static int print_models(void) {
         char   quality[32] = "not tested", speed[48] = "not measured";
         if (passed >= 0 && total > 0)
             snprintf(quality, sizeof quality, "%.0f/%.0f correct", passed, total);
+        char *basis = json_strdup(j, json_get(j, verdict, "basis"));
         if (seconds >= 0)
-            snprintf(speed, sizeof speed, "~%.0f s per answer (%s)", seconds < 1 ? 1 : seconds, processor);
+            snprintf(speed, sizeof speed, "~%.0f s per answer (%s%s)", seconds < 1 ? 1 : seconds, processor,
+                     basis && !strcmp(basis, "estimated") ? ", estimated" : "");
+        free(basis);
         printf("%s %-18s %-10s %-16s %s\n",
                symbol,
                id ? id : "?",

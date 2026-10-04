@@ -87,6 +87,15 @@ def main():
             for r in (measured[3],measured[7]):  # the last measured reply per processor (CPU first, then GPU)
                 slot='gpu' if r['backend']==snapshot['execution']['gpu_backend'] else 'cpu'
                 assert abs(verdict['seconds'][slot]-(r['first_ns']/1e9+200/(r['output']/(r['generation_ns']/1e9))))<0.01,(slot,verdict,r)
+            # Models that are not installed get a labelled estimate from these measurements.
+            assert verdict['basis']=='measured'
+            catalog=json.loads(app.request('/app/catalog')[1]);catalog['revision']+=1
+            twice={**catalog['models'][0],'id':'not-installed','file':'not-installed.gguf','sha256':'e'*64,'bytes':catalog['models'][0]['bytes']*2,'group_id':'not-installed'}
+            twice.pop('quality',None);catalog['models'].append(twice)
+            assert app.request('/app/catalog',catalog)[0]==200
+            estimate=next(m for m in app.status()['models'] if m['id']=='not-installed')['verdict']
+            assert estimate['basis']=='estimated' and estimate['reason']=='quality_unknown',estimate
+            assert estimate['seconds']['cpu']>verdict['seconds']['cpu'],(estimate,verdict)  # twice the bytes, slower
             gate.touch();assert app.request('/app/performance/compare',{'confirm':True})[0]==202
             app.wait(lambda s:s['comparison']['phase']=='warmup')
             assert app.status()['execution']['mode']==before,"#83: the user's processor choice is shown during a comparison"
