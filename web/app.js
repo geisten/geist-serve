@@ -449,6 +449,7 @@ function verdictReason(model) {
 }
 // #103: what a verdict rests on: the measurement here (date, processor), the
 // estimate (from how many measured models) and the reference test (date, engine).
+const referenceText = (model, r) => `${t('Reference, not this computer')}: ${model.group_name || model.name} · ${r.platform} · ${r.backend.toUpperCase()} · ${secondsText(r.answer_ms / 1000)} · ${r.date}`;
 function verdictBasis(model) {
   const v = model?.verdict, q = model?.quality_evidence;
   if (!v) return '';
@@ -458,7 +459,7 @@ function verdictBasis(model) {
     : measured.length ? `${t('Speed measured on this computer')}: ${measured.join(', ')}` : t('Speed on this computer not measured yet');
   const quality = q ? `${t('Reference test')}: ${q.date} · ${t('engine')} ${q.engine}${q.suite === state?.quality_suite ? '' : ` · ${t('older test version')}`}`
     : t('Answer quality not tested yet');
-  return `${speed} · ${quality}`;
+  return [speed, quality, ...(model.reference || []).map(r => referenceText(model, r))].join(' · ');
 }
 function verdictText(model) {
   if (!model?.verdict) return '';
@@ -485,8 +486,11 @@ function renderCompare() {
   const models = state.models.filter(m => m.installed && m.verdict);
   const points = models.flatMap(m => ['cpu', 'gpu'].filter(p => knownNumber(m.verdict.seconds[p]) && m.verdict.total)
     .map(p => ({m, p, x: m.verdict.seconds[p], y: m.verdict.passed / m.verdict.total})));
+  // #104: speed on reference platforms, a faint labelled mark, never "this computer".
+  const references = models.flatMap(m => (m.reference || []).filter(r => m.verdict.total)
+    .map(r => ({m, r, x: r.answer_ms / 1000, y: m.verdict.passed / m.verdict.total})));
   const W = 340, H = 230, L = 40, R = 10, T = 10, B = 30;
-  const xmax = Math.max(limits.usable_s * 1.25, ...points.map(p => p.x * 1.1));
+  const xmax = Math.max(limits.usable_s * 1.25, ...points.map(p => p.x * 1.1), ...references.map(p => p.x * 1.1));
   const sx = x => L + (W - L - R) * Math.min(x, xmax) / xmax, sy = y => T + (H - T - B) * (1 - y);
   const tick = (x1, y1, x2, y2, text, anchor, tx, ty) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="compare-grid"/><text x="${tx}" y="${ty}" text-anchor="${anchor}">${escapeText(text)}</text>`;
   $('compare-chart').innerHTML =
@@ -496,6 +500,7 @@ function renderCompare() {
     [0, limits.fast_s, limits.usable_s].map(x => tick(sx(x), sy(0), sx(x), sy(0) + 4, `${formatNumber(x)} s`, 'middle', sx(x), sy(0) + 15)).join('') +
     [0, .5, limits.reliable, 1].filter((y, i, all) => all.indexOf(y) === i).map(y => tick(L - 4, sy(y), L, sy(y), `${Math.round(y * 100)}%`, 'end', L - 6, sy(y) + 3)).join('') +
     `<text x="${W - R}" y="${H - 2}" text-anchor="end">${escapeText(t('seconds per typical answer'))}</text>` +
+    references.map(({m, r, x, y}) => `<circle class="compare-reference" cx="${sx(x)}" cy="${sy(y)}" r="5"><title>${escapeText(referenceText(m, r))}</title></circle>`).join('') +
     points.map(({m, p, x, y}) => `<g class="compare-point" data-verdict="${m.verdict.value}" data-id="${escapeText(m.id)}"><circle cx="${sx(x)}" cy="${sy(y)}" r="5"/><text x="${sx(x) + 7}" y="${sy(y) + 3}">${escapeText(`${m.group_name || m.name} · ${p.toUpperCase()}`)}</text><title>${escapeText(`${modelLabel(m)} · ${p.toUpperCase()} · ${secondsText(x)} · ${m.verdict.passed}/${m.verdict.total}`)}</title></g>`).join('');
   $('compare-table').tBodies[0].innerHTML = models.length ? models.map(m => `<tr data-id="${escapeText(m.id)}" tabindex="-1"><td><span class="model-verdict" data-verdict="${m.verdict.value}" title="${escapeText(verdictText(m))}">${verdictSymbols[m.verdict.value]}</span><span class="sr-only">${escapeText(verdictText(m))}</span></td><th scope="row">${escapeText(modelLabel(m))}</th><td>${secondsText(m.verdict.seconds.cpu)}</td><td>${secondsText(m.verdict.seconds.gpu)}</td><td>${m.verdict.total ? `${m.verdict.passed}/${m.verdict.total}` : '–'}</td><td><span class="compare-basis" title="${escapeText(verdictBasis(m))}" aria-hidden="true">ⓘ</span><span class="sr-only">${escapeText(verdictBasis(m))}</span></td></tr>`).join('')
     : `<tr><td colspan="6">${escapeText(t('No model installed yet.'))}</td></tr>`;

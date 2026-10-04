@@ -213,6 +213,7 @@ const german = {
   'Speed measured on this computer': 'Geschwindigkeit auf diesem Rechner gemessen',
   'engine': 'Engine',
   'Basis': 'Grundlage',
+  'Reference, not this computer': 'Referenz, nicht dieser Rechner',
   'Cannot save the verdict settings.': 'Die Grenzwerte können nicht gespeichert werden.',
   'Use 1 ≤ fast ≤ usable ≤ 3600 s, a pass rate from 0.5 to 1 and a known intent.': 'Erlaubt sind 1 ≤ schnell ≤ nutzbar ≤ 3600 s, eine Trefferquote von 0,5 bis 1 und eine bekannte Aufgabe.',
   'Suggested start': 'Vorschlag zum Start',

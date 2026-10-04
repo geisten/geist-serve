@@ -978,7 +978,7 @@ $$
       poll = async () => {};
       const [a, b] = saved.models.filter(m => m.resource_fit !== 2).slice(0, 2);
       const snapshot = {...saved, limits: {fast_s: 10, usable_s: 30, reliable: .9, intent: 'chat'}, models: saved.models.map(m =>
-        m.id === a.id ? {...m, installed: true, verdict: {value: 'good', reason: 'good', basis: 'measured', processor: 'gpu', seconds: {cpu: 9.6, gpu: 3.2}, measured_at: {cpu: 1790000000, gpu: 1790000000}, estimated_from: 0, passed: 146, total: 160}}
+        m.id === a.id ? {...m, installed: true, verdict: {value: 'good', reason: 'good', basis: 'measured', processor: 'gpu', seconds: {cpu: 9.6, gpu: 3.2}, measured_at: {cpu: 1790000000, gpu: 1790000000}, estimated_from: 0, passed: 146, total: 160}, reference: [{platform: 'Apple M1 Max', backend: 'gpu', answer_ms: 4100, tokens_per_s: 70, memory_mib: 3300, date: '2026-10-04', engine: '33db79d7764b'}]}
         : m.id === b.id ? {...m, installed: true, verdict: {value: 'unknown', reason: 'speed_unknown', processor: null, seconds: {cpu: null, gpu: null}, passed: 31, total: 160}}
         : {...m, installed: false})};
       try {
@@ -993,6 +993,9 @@ $$
         assert(basis.startsWith(t('Speed measured on this computer')) && basis.includes('GPU') && rows[1].querySelector('.sr-only:last-child').textContent.includes(t('Answer quality not tested yet')) === !b.quality_evidence, '#103: each row names what it rests on');
         $('compare-chart').querySelector(`.compare-point[data-id="${a.id}"] circle`).dispatchEvent(new MouseEvent('click', {bubbles: true}));
         assert(rows[0].classList.contains('highlight') && document.activeElement === rows[0], '#103: a point leads to its row');
+        const reference = $('compare-chart').querySelector('.compare-reference');
+        assert(reference && reference.querySelector('title').textContent.startsWith(t('Reference, not this computer')) && reference.querySelector('title').textContent.includes('Apple M1 Max'), '#104: a reference is a labelled mark, not a measurement here');
+        assert(rows[0].querySelector('.compare-basis').title.includes('Apple M1 Max'), '#104: the row names the reference');
         $('verdict-fast').value = '15'; $('verdict-intent').value = 'context'; $('verdict-intent').dispatchEvent(new Event('change'));
         await new Promise(resolve => setTimeout(resolve, 0));
         assert(JSON.stringify(sent.at(-1)) === JSON.stringify(['/app/verdict-settings', {intent: 'context', fast_s: 15, usable_s: 30, reliable: .9}]), '#103: changes are saved per computer');

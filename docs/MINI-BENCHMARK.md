@@ -111,3 +111,19 @@ Measured 2026-10-03 on an Apple M1 Max (64 GB), Metal, engine pin
 | BitNet b1.58 2B · I2_S (CPU) | 63/160 | after the template fix in #106; measured 2026-10-04 |
 
 Not measured: Bonsai 2 27B and Qwen3.8 27B (too large for this round).
+
+## Reference speed (#104)
+
+`bench.py run` also records the generation rate and first-token time as the
+app measured them (`/app/performance/export` of its private home). The
+per-case times include reading the prompt.
+
+`bench.py reference RUN_DIR --platform NAME --write` stores per model and
+processor, in the catalog's `reference` field:
+- the time of a typical answer: first token plus 200 tokens
+- t/s
+- peak memory
+- date and engine
+
+The app shows these values only as faint, labelled marks in **Compare
+models**, never as a measurement of the user's own computer.

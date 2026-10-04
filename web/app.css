@@ -1072,3 +1072,4 @@ body.manager-page main { max-width:1180px }
 .compare-point { cursor:pointer }
 .compare-basis { cursor:help; color:var(--muted) }
 .compare-table tr.highlight { background:#1f7a3a14 }
+.compare-reference { fill:none; stroke:var(--muted); stroke-width:1; stroke-dasharray:2 2; opacity:.7 }
