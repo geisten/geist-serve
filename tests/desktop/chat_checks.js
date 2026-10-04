@@ -940,7 +940,8 @@ $$
     }
     { // #103: measure speed on demand: the active model directly, another one after starting it; cancel while running.
       const saved = state, originalApi = api, originalChoose = choose, originalPoll = poll, calls = [];
-      api = async (path, body) => { calls.push(path); return {ok: true, json: async () => ({})}; };
+      // Only the measurement calls are stubbed; a background status poll goes to the service.
+      api = async (path, body, signal) => { if (!path.startsWith('/app/performance/')) return originalApi(path, body, signal); calls.push(path); return {ok: true, json: async () => ({})}; };
       poll = async () => {};
       choose = async id => { calls.push(`choose:${id}`); };
       const unmeasured = {value: 'unknown', reason: 'speed_unknown', processor: null, seconds: {cpu: null, gpu: null}, passed: 146, total: 160};
@@ -969,7 +970,8 @@ $$
     }
     { // #103: compare view: chart and its table equivalent, thresholds and intent per computer.
       const saved = state, originalApi = api, originalPoll = poll, sent = [];
-      api = async (path, body) => { sent.push([path, body]); return {ok: true, json: async () => ({})}; };
+      // Only settings calls: a background status poll may arrive at any time.
+      api = async (path, body, signal) => { if (path !== '/app/verdict-settings') return originalApi(path, body, signal); sent.push([path, body]); return {ok: true, json: async () => ({})}; };
       poll = async () => {};
       const [a, b] = saved.models.filter(m => m.resource_fit !== 2).slice(0, 2);
       const snapshot = {...saved, limits: {fast_s: 10, usable_s: 30, reliable: .9, intent: 'chat'}, models: saved.models.map(m =>
