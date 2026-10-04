@@ -434,7 +434,7 @@ async function checkActivityUX(assert, tick) {
       assert(row(vf.models.find(m=>m.id==='bonsai2-27b-pq2')).closest('.model-group') !== group, 'Bonsai remains a separate derivative');
       assert(!row(q4).querySelector('.variant-active').hidden && row(q8).querySelector('.variant-active').hidden, 'active is separate from suitability and download state');
       assert(action(q4).getAttribute('aria-label').includes('Q4_0') && action(q8).getAttribute('aria-label').includes('Q8_0'), 'action labels identify the exact variant');
-      assert($('runtime-name').textContent === 'Qwen3.8 27B · Q4_0', 'loaded header identifies actual quantization');
+      assert($('runtime-name').textContent === `Qwen3.8 27B · ${t('4-bit')}` && $('runtime-name').title === 'Qwen3.8 27B · Q4_0', 'loaded header names the variant plainly; the format is its tooltip');
       assert(!row(q8).querySelector('.variant-warning').hidden && row(q8).querySelector('.variant-warning').textContent.startsWith(t('Available RAM is tight')) && row(q8).querySelector('.variant-warning').textContent.includes(t(`${vf.models.find(m=>m.id==='qwen38-27b-q8').ram_gib} GiB RAM recommended`)), 'warning reason and RAM need are visible without hover');
       assert(row(q8).querySelector('.variant-size').textContent.endsWith(bytes(q8.bytes).replace(' ','\u00a0')), 'each variant exposes its own download size');
       for (const lang of ['de','en']) {
@@ -457,7 +457,7 @@ async function checkActivityUX(assert, tick) {
       assert(!row(q8).classList.contains('active') && row(q8).querySelector('.variant-active').hidden && action(q8).querySelector('.model-ring').dataset.stage==='loading', 'loading variant stays pending even after active_id changes');
       assert(!$('workspace').hidden && $('prompt').value==='Draft across quantizations', 'variant loading retains the usable layout and draft');
       Object.assign(vf, {ready:true,loading:false}); paint();
-      assert(row(q8).classList.contains('active') && !row(q4).classList.contains('active') && $('runtime-name').textContent.endsWith('Q8_0'), 'only successful load activates new variant');
+      assert(row(q8).classList.contains('active') && !row(q4).classList.contains('active') && $('runtime-name').title.endsWith('Q8_0'), 'only successful load activates new variant');
       window.confirm=() => true;
       const deleteQ4=row(q4).querySelector('.remove');deleteQ4.focus();deleteQ4.click();await variantIdle();
       assert(variantCalls.at(-1)[0]==='/app/remove' && variantCalls.at(-1)[1].id===q4.id && q8.installed && vf.active_id===q8.id, 'remove targets only one variant without stopping its sibling');
@@ -847,8 +847,8 @@ $$
     finish(false); await idle();
     assert(conversation.length === 2 && conversation[1].content === answer+'\nLast line.', 'full reply kept in session context');
     assert($('prompt').value === 'My next draft', 'generation does not overwrite next draft');
-    assert(lastReply.tokens === 32 && lastReply.rate === 32 && $('result').querySelector('.reply-metrics').textContent.includes(rateText(32)), 'speed uses backend tokens, not streamed chunks');
-    assert(document.querySelector('.reply-metrics').textContent.includes('32'), 'completed reply retains its own metrics');
+    assert(lastReply.tokens === 32 && lastReply.rate === 32 && $('result').querySelector('.reply-metrics').title.includes(rateText(32)), 'speed uses backend tokens, not streamed chunks');
+    assert(document.querySelector('.reply-metrics').getAttribute('aria-label').includes('32') && !/tok\/s|Token\/s/.test(document.querySelector('.reply-metrics').textContent), '#123: the reply shows its time; rate and tokens are its tooltip and accessible name');
     const untranslatedAnswer = $('output').markdownSource;
     const replyCopy=$('copy'), originalCopyText=copyText;
     try {
@@ -1019,6 +1019,19 @@ $$
         assert(card.getBoundingClientRect().height <= 96, `#121: a compact card (${card.getBoundingClientRect().height}px)`);
         assert($('model-legend').tagName === 'DETAILS' && !$('model-legend').open && $('model-legend').textContent.includes(t('Good choice')), '#121: the legend is one click away and still names every symbol');
       } finally { render(saved); }
+    }
+    { // #123: layers 1-2 speak plainly: no t/s, weight formats, backend or RSS in the visible text of the main view.
+      const visible = root => { const out = []; const walk = node => {
+        if (node.nodeType === 3) { out.push(node.textContent); return; }
+        if (node.nodeType !== 1 || node.matches('dialog, .sr-only, [hidden]')) return;
+        const style = getComputedStyle(node);
+        if (style.display === 'none' || style.visibility === 'hidden' || (style.position === 'absolute' && style.clip === 'rect(0px, 0px, 0px, 0px)')) return;
+        node.childNodes.forEach(walk); };
+        walk(root); return out.join(' '); };
+      const text = visible($('models-page'));
+      const jargon = text.match(/tok\/s|Token\/s|tokens\/s|Q4_K_M|Q4_0|Q8_0|I2_S|PQ2_0|\bMetal\b|\bRSS\b|\bCPU\b|\bGPU\b/g);
+      assert(!jargon, `#123: technical terms in the first view: ${JSON.stringify(jargon)}`);
+      assert($('runtime-name').title.includes(' · ') && $('history-cpu').closest('label').title.includes($('history-cpu-rate').textContent), '#123: the details remain as tooltips');
     }
     { // #122: one recommendation: the sentence, the card tag and both buttons name the same model; the action fits.
       const saved = state, originalChoose = choose, chosen = [];

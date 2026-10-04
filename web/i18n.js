@@ -216,6 +216,8 @@ const german = {
   'No model fits this computer well.': 'Kein Modell passt gut zu diesem Rechner.',
   'Recommended here': 'Hier empfohlen',
   'Symbols': 'Symbole',
+  'Automatic': 'Automatisch',
+  'Graphics chip': 'Grafikchip',
   'Best option here': 'Beste Option hier',
   'Start': 'Starten',
   'Cannot save the verdict settings.': 'Die Grenzwerte können nicht gespeichert werden.',
