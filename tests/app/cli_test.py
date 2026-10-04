@@ -30,6 +30,7 @@ with tempfile.TemporaryDirectory(prefix='geist-cli-') as home:
         # #103: a readable verdict per model; JSON stays with `status`.
         listing=cli('models')
         assert 'gemma4-e2b' in listing and '146/160 correct' in listing and '✓ good choice' in listing, listing
+        assert 'Recommended here: ' in listing and 'geisten download ' in listing, listing  # #122: nothing installed yet
         assert json.loads(cli('status'))['models'][0]['verdict']['value'] in ('good','usable','not_recommended','unknown')
         if model:
             app.wait(lambda s:s['ready'],timeout=60)

@@ -38,3 +38,13 @@ double app_estimate_seconds(uint64_t bytes, const double *rate, const double *mo
 struct app_judgement app_judge(enum app_fit resource, double seconds, unsigned passed, unsigned total,
                                struct app_limits limits);
 const char *app_verdict_name(enum app_verdict verdict);
+/* #122: one recommendation across installed and catalog models. */
+struct app_candidate {
+    enum app_verdict verdict;
+    double           rate;    /* pass rate 0..1, < 0 without a reference test */
+    double           seconds; /* per typical answer, measured or estimated; < 0 unknown */
+    bool             installed;
+};
+/* True when a is the better recommendation: verdict (✓, ◐, ?), then known
+ * quality, then installed, then pass rate, then speed. ✗ never qualifies. */
+bool app_candidate_better(struct app_candidate a, struct app_candidate b);

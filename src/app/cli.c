@@ -385,9 +385,17 @@ static int print_models(void) {
                speed);
         free(id), free(value), free(processor);
     }
-    char *best = json_strdup(j, json_get(j, json_get(j, 0, "best_choice"), "id"));
-    if (best)
-        printf("\nBest choice here: %s\n", best);
+    int   choice = json_get(j, 0, "best_choice");
+    char *best = json_strdup(j, json_get(j, choice, "id")), *action = json_strdup(j, json_get(j, choice, "action"));
+    if (best && action && !strcmp(action, "download"))
+        printf("\nRecommended here: %s (geisten download %s)\n", best, best);
+    else if (best && action && !strcmp(action, "start"))
+        printf("\nRecommended here: %s (geisten use %s)\n", best, best);
+    else if (best)
+        printf("\nRecommended here: %s (active)\n", best);
+    else
+        puts("\nNo model fits this computer well.");
+    free(action);
     puts("\n✓ good choice  ◐ usable, with limits  ✗ not recommended here  ? not measured yet\n"
          "JSON with reasons: geisten status");
     free(best);
