@@ -115,3 +115,20 @@ model is first started the normal, verified way. During the run, the same
 button cancels it, and the card shows the progress. The newest reply,
 ordinary or controlled, is the verdict's speed basis (`speed` in
 `app_prefs`). The slow-reply warning still uses ordinary replies only (#81).
+
+**Compare view (layer 3).** A chart symbol next to the recommendation opens
+it. A quadrant chart plots each installed model on each measured processor:
+x is seconds per typical answer, y is the share of correct answers. The
+"good enough and fast enough" area is shaded, and the usable limit is a
+dashed line. A table below has the same values and is the accessible
+equivalent.
+
+The thresholds and the task can be changed per computer
+(`POST /app/verdict-settings` `{fast_s, usable_s, reliable, intent}`, or
+`{"reset": true}`), and the verdicts update at once. They are saved in the
+`verdict-settings` file as `"10 30 0.9 chat"`.
+
+Intents:
+- `chat` uses all tasks.
+- `context`, `classify`, `extract` and `format` each use only that task of
+  the reference test, in DE and EN.

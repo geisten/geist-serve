@@ -1047,3 +1047,25 @@ body.manager-page main { max-width:1180px }
 .model-badges.show-meaning::after { content:attr(aria-label); position:absolute; left:0; top:calc(100% + 4px); z-index:5; width:max-content; max-width:240px; padding:4px 8px; border-radius:6px; background:var(--ink); color:#fff; font-size:11px; line-height:1.35; white-space:normal }
 #model-prompt-hint { margin:8px 0 0; text-align:center }
 
+/* #103 comparison view */
+.best-row { display:flex; align-items:flex-start; gap:6px }
+.best-row .best-choice { flex:1 }
+.best-row #open-compare { margin-left:auto; min-width:28px; min-height:28px; padding:4px; color:var(--muted) }
+.best-row #open-compare svg { width:16px; height:16px }
+.compare-figure { margin:0 0 12px }
+#compare-chart { width:100%; height:auto; font-size:9px; fill:var(--ink) }
+#compare-chart text { fill:var(--muted) }
+.compare-zone { fill:#1f7a3a1f }
+.compare-usable { stroke:#96620d; stroke-dasharray:3 3 }
+.compare-axis,.compare-grid { stroke:var(--border); fill:none }
+.compare-point circle { stroke:#fff; stroke-width:1.5 }
+.compare-point[data-verdict="good"] circle { fill:#1f7a3a }
+.compare-point[data-verdict="usable"] circle { fill:#96620d }
+.compare-point[data-verdict="not_recommended"] circle { fill:#b42318 }
+.compare-point[data-verdict="unknown"] circle { fill:var(--muted) }
+.compare-point text { fill:var(--ink) }
+.compare-table { width:100%; border-collapse:collapse; font-size:12px; font-variant-numeric:tabular-nums }
+.compare-table th,.compare-table td { padding:5px 6px; border-bottom:1px solid var(--border); text-align:left }
+.compare-table th[scope="row"] { font-weight:500 }
+.compare-settings { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px 12px; align-items:end }
+.compare-settings label { display:flex; flex-direction:column; gap:3px; font-size:12px }

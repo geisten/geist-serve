@@ -463,10 +463,16 @@ void status_response(int fd, struct app_arena *arena) {
         int    fastest    = seconds[1] >= 0 && (seconds[0] < 0 || seconds[1] < seconds[0]) ? 1
                             : seconds[0] >= 0                                               ? 0
                                                                                             : -1;
+        /* Quality for the intent: all tasks for "chat", else that task (DE and EN). */
+        unsigned passed = m->quality_passed, total = m->quality_total;
+        static const char *const tasks[] = APP_QUALITY_TASKS;
+        for (unsigned k = 0; k < 4; k++)
+            if (!strcmp(app.prefs.intent, tasks[k]))
+                passed = m->quality_task[k][0], total = m->quality_task[k][1];
         struct app_judgement j = app_judge(app_assess(&adjusted, m, installed).fit,
                                            fastest < 0 ? -1 : seconds[fastest],
-                                           m->quality_passed,
-                                           m->quality_total,
+                                           passed,
+                                           total,
                                            app.prefs.limits);
         const char *processor = fastest < 0 ? nullptr : fastest ? "gpu" : "cpu";
         app_put(&b, ",\"verdict\":{\"value\":");
@@ -483,12 +489,12 @@ void status_response(int fd, struct app_arena *arena) {
         app_put(&b, ",\"gpu\":");
         numeric_rate(&b, seconds[1]);
         app_put(&b, "},\"passed\":");
-        if (m->quality_total)
-            app_printf(&b, "%u,\"total\":%u}", m->quality_passed, m->quality_total);
+        if (total)
+            app_printf(&b, "%u,\"total\":%u}", passed, total);
         else
             app_put(&b, "null,\"total\":null}");
         app_put(&b, "}");
-        double rate = m->quality_total ? (double) m->quality_passed / m->quality_total : -1;
+        double rate = total ? (double) passed / total : -1;
         double time = fastest < 0 ? -1 : seconds[fastest];
         if (installed &&
             (!best || j.verdict < best_judgement.verdict ||
@@ -512,10 +518,11 @@ void status_response(int fd, struct app_arena *arena) {
     } else
         app_put(&b, "null");
     app_printf(&b,
-               ",\"limits\":{\"fast_s\":%g,\"usable_s\":%g,\"reliable\":%g}",
+               ",\"limits\":{\"fast_s\":%g,\"usable_s\":%g,\"reliable\":%g,\"intent\":\"%s\"}",
                app.prefs.limits.fast_s,
                app.prefs.limits.usable_s,
-               app.prefs.limits.reliable);
+               app.prefs.limits.reliable,
+               app.prefs.intent);
     char artifact[65] = "";
     if (execution_model)
         snprintf(artifact, sizeof artifact, "%s", execution_model->sha256);

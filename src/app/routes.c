@@ -148,6 +148,38 @@ void handle(int fd, struct app_arena *arena) {
             error_response(fd, 503, "History export exceeds the memory budget.");
         return;
     }
+    /* #103: verdict thresholds and intent for this computer; {"reset":true} restores the defaults. */
+    if (!strcmp(r.path, "/app/verdict-settings") && !strcmp(r.method, "POST")) {
+        struct json *j = app_alloc(arena, 1, sizeof *j, _Alignof(struct json));
+        char         text[128], intent[16];
+        struct app_limits l = APP_LIMITS_DEFAULT;
+        bool         reset  = j && json_parse(j, strlen(r.body), r.body) >= 0 &&
+                              json_bool(j, json_get(j, 0, "reset"), false);
+        char        *name   = j && !reset ? json_strdup(j, json_get(j, 0, "intent")) : nullptr;
+        if (reset)
+            snprintf(text, sizeof text, "%g %g %g chat", l.fast_s, l.usable_s, l.reliable);
+        else
+            snprintf(text, sizeof text, "%.6g %.6g %.6g %.15s",
+                     j ? json_num(j, json_get(j, 0, "fast_s"), -1) : -1,
+                     j ? json_num(j, json_get(j, 0, "usable_s"), -1) : -1,
+                     j ? json_num(j, json_get(j, 0, "reliable"), -1) : -1,
+                     name && !strpbrk(name, " \t\n") ? name : "-");
+        free(name);
+        if (!verdict_settings_parse(text, &l, intent)) {
+            error_response(fd, 400, "Use 1 ≤ fast ≤ usable ≤ 3600 s, a pass rate from 0.5 to 1 and a known intent.");
+            return;
+        }
+        pthread_mutex_lock(&app.mutex);
+        bool ok = save_preference("verdict-settings", text);
+        if (ok)
+            app.prefs.limits = l, snprintf(app.prefs.intent, sizeof app.prefs.intent, "%s", intent);
+        pthread_mutex_unlock(&app.mutex);
+        if (ok)
+            response(fd, 200, "application/json", "{}", 2);
+        else
+            error_response(fd, 500, "Cannot save the verdict settings.");
+        return;
+    }
     if ((!strcmp(r.path, "/app/performance/settings") ||
          !strcmp(r.path, "/app/performance/clear")) &&
         !strcmp(r.method, "POST")) {

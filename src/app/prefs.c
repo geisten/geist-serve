@@ -23,6 +23,25 @@ bool read_preference(const char *name, char *out, size_t cap) {
     return true;
 }
 
+bool verdict_settings_parse(const char *text, struct app_limits *limits, char intent[static 16]) {
+    struct app_limits l;
+    char              name[16];
+    int               used = 0;
+    if (sscanf(text, "%lf %lf %lf %15s%n", &l.fast_s, &l.usable_s, &l.reliable, name, &used) != 4 ||
+        text[used] || !isfinite(l.fast_s) || !isfinite(l.usable_s) || !isfinite(l.reliable) || l.fast_s < 1 ||
+        l.usable_s < l.fast_s || l.usable_s > 3600 || l.reliable < .5 || l.reliable > 1)
+        return false;
+    static const char *const tasks[] = APP_QUALITY_TASKS;
+    bool                     known   = !strcmp(name, "chat");
+    for (unsigned k = 0; k < 4; k++)
+        known = known || !strcmp(name, tasks[k]);
+    if (!known)
+        return false;
+    *limits = l;
+    snprintf(intent, 16, "%s", name);
+    return true;
+}
+
 bool save_preference(const char *name, const char *value) {
     char target[APP_PATH_CAP], temporary[APP_PATH_CAP];
     if (!path_join(target, app.paths.home, name) || !path_join(temporary, app.paths.home, ".preference-XXXXXX"))

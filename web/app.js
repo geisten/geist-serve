@@ -460,6 +460,38 @@ function renderBestChoice(snapshot) {
     ? `${verdictSymbols.good} ${t('Best for you')}: ${plainModel(model)}${reason ? ` · ${reason}` : ''}`
     : `${t('No installed model is a good choice yet.')} ${t('Best option')}: ${plainModel(model)} · ${verdictText(model)}`;
 }
+// #103 layer 3: compare installed models. Chart and table show the same values;
+// the table is the accessible equivalent. Markup is built from numbers and
+// escaped catalog names only.
+const escapeText = text => String(text).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+const secondsText = value => value === null || value === undefined ? '–' : `${formatNumber(value, value < 10 ? 1 : 0)} s`;
+function renderCompare() {
+  if (!$('compare-dialog').open || !state) return;
+  const limits = state.limits || {fast_s: 10, usable_s: 30, reliable: .9, intent: 'chat'};
+  const models = state.models.filter(m => m.installed && m.verdict);
+  const points = models.flatMap(m => ['cpu', 'gpu'].filter(p => knownNumber(m.verdict.seconds[p]) && m.verdict.total)
+    .map(p => ({m, p, x: m.verdict.seconds[p], y: m.verdict.passed / m.verdict.total})));
+  const W = 340, H = 230, L = 40, R = 10, T = 10, B = 30;
+  const xmax = Math.max(limits.usable_s * 1.25, ...points.map(p => p.x * 1.1));
+  const sx = x => L + (W - L - R) * Math.min(x, xmax) / xmax, sy = y => T + (H - T - B) * (1 - y);
+  const tick = (x1, y1, x2, y2, text, anchor, tx, ty) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="compare-grid"/><text x="${tx}" y="${ty}" text-anchor="${anchor}">${escapeText(text)}</text>`;
+  $('compare-chart').innerHTML =
+    `<rect class="compare-zone" x="${sx(0)}" y="${sy(1)}" width="${sx(limits.fast_s) - sx(0)}" height="${sy(limits.reliable) - sy(1)}"/>` +
+    `<line class="compare-usable" x1="${sx(limits.usable_s)}" y1="${sy(1)}" x2="${sx(limits.usable_s)}" y2="${sy(0)}"/>` +
+    `<path class="compare-axis" d="M${L} ${T}V${sy(0)}H${W - R}"/>` +
+    [0, limits.fast_s, limits.usable_s].map(x => tick(sx(x), sy(0), sx(x), sy(0) + 4, `${formatNumber(x)} s`, 'middle', sx(x), sy(0) + 15)).join('') +
+    [0, .5, limits.reliable, 1].filter((y, i, all) => all.indexOf(y) === i).map(y => tick(L - 4, sy(y), L, sy(y), `${Math.round(y * 100)}%`, 'end', L - 6, sy(y) + 3)).join('') +
+    `<text x="${W - R}" y="${H - 2}" text-anchor="end">${escapeText(t('seconds per typical answer'))}</text>` +
+    points.map(({m, p, x, y}) => `<g class="compare-point" data-verdict="${m.verdict.value}"><circle cx="${sx(x)}" cy="${sy(y)}" r="5"/><text x="${sx(x) + 7}" y="${sy(y) + 3}">${escapeText(`${m.group_name || m.name} · ${p.toUpperCase()}`)}</text><title>${escapeText(`${modelLabel(m)} · ${p.toUpperCase()} · ${secondsText(x)} · ${m.verdict.passed}/${m.verdict.total}`)}</title></g>`).join('');
+  $('compare-table').tBodies[0].innerHTML = models.length ? models.map(m => `<tr><td><span class="model-verdict" data-verdict="${m.verdict.value}" title="${escapeText(verdictText(m))}">${verdictSymbols[m.verdict.value]}</span><span class="sr-only">${escapeText(verdictText(m))}</span></td><th scope="row">${escapeText(modelLabel(m))}</th><td>${secondsText(m.verdict.seconds.cpu)}</td><td>${secondsText(m.verdict.seconds.gpu)}</td><td>${m.verdict.total ? `${m.verdict.passed}/${m.verdict.total}` : '–'}</td></tr>`).join('')
+    : `<tr><td colspan="5">${escapeText(t('No model installed yet.'))}</td></tr>`;
+  const fields = {'verdict-intent': limits.intent, 'verdict-fast': limits.fast_s, 'verdict-usable': limits.usable_s, 'verdict-reliable': Math.round(limits.reliable * 100)};
+  for (const [id, value] of Object.entries(fields)) if (document.activeElement !== $(id)) $(id).value = value;
+}
+async function saveVerdictSettings(body) {
+  try { await api('/app/verdict-settings', body); uiText($('verdict-result'), 'Saved.'); await poll(); }
+  catch(error) { uiText($('verdict-result'), error.message); }
+}
 function renderModelLegend() {
   const icon = path => `<svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg>`;
   $('model-legend').innerHTML = `<span>${icon(fitIcons[0])}<span data-ui-text="Fits this computer"></span></span><span>${icon(capabilityIcons.chat.path)}<span data-ui-text="Text chat"></span></span><span>${icon(qualityIcon)}<span data-ui-text="Correct answers in the reference test"></span></span>` +
@@ -646,6 +678,7 @@ function render(next) {
   $('model-legend').hidden = !!next.active_id;
   renderBestChoice(next);
   continueMeasurement(next);
+  renderCompare();
   if (usable && previouslyHidden && !$('workspace').hidden && !$('models-page').hidden &&
       (document.activeElement === document.body || document.activeElement.closest('.model-pick'))) $('prompt').focus({preventScroll:true});
   $('disk-space').textContent = t(next.hardware.disk_known ? `${bytes(next.hardware.disk)} disk space available` : 'Disk space could not be read');
@@ -1217,6 +1250,11 @@ function renderActivity() {
 }
 $('open-activity').addEventListener('click',()=>{activityReturn=document.activeElement;closeMeasurements();$('activity-dialog').showModal();$('close-activity').focus({preventScroll:true});renderActivity();});
 $('close-activity').addEventListener('click',()=>$('activity-dialog').close());
+$('open-compare').addEventListener('click', () => { uiText($('verdict-result'), ''); $('compare-dialog').showModal(); $('close-compare').focus({preventScroll: true}); renderCompare(); });
+$('close-compare').addEventListener('click', () => $('compare-dialog').close());
+for (const id of ['verdict-intent', 'verdict-fast', 'verdict-usable', 'verdict-reliable']) $(id).addEventListener('change', () => saveVerdictSettings({
+  intent: $('verdict-intent').value, fast_s: Number($('verdict-fast').value), usable_s: Number($('verdict-usable').value), reliable: Number($('verdict-reliable').value) / 100}));
+$('verdict-reset').addEventListener('click', () => saveVerdictSettings({reset: true}));
 $('activity-dialog').addEventListener('close',()=>{if(activityReturn?.isConnected&&(document.activeElement===document.body||$('activity-dialog').contains(document.activeElement)||document.activeElement===activityReturn))activityReturn.focus({preventScroll:true});activityReturn=null;});
 $('activity-stop').addEventListener('click',async()=>{
   const a=currentActivity();if(!a){controller?.abort();return;}if(a.outcome||cancellingActivity)return;
