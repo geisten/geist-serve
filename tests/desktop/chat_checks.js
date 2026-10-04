@@ -283,9 +283,12 @@ async function checkActivityUX(assert, tick) {
     assert(innerWidth < 700 ? document.body.classList.contains('models-folded') || panes[0].bottom <= panes[1].top : panes[0].right <= panes[1].left, '#125: the list sits in the sidebar on wide windows and above the test (or folded) on small ones');
     { // #125: the sidebar stays with every area; ⌘1-3 switch areas; arrow keys walk the list; the list button folds it.
       const key = (k, extra = {}) => document.dispatchEvent(new KeyboardEvent('keydown', {key: k, metaKey: true, bubbles: true, cancelable: true, ...extra}));
-      key('3'); assert(!$('settings-page').hidden && $('model-sidebar').closest('.app-shell') && !$('model-sidebar').closest('.page'), '#125: ⌘3 opens Settings; the list is not part of a page');
+      key('2'); assert(!$('settings-page').hidden && $('model-sidebar').closest('.app-shell') && !$('model-sidebar').closest('.page'), '#125/#133: ⌘2 opens Settings; the list is not part of a page');
       if (innerWidth >= 700) assert($('model-sidebar').getBoundingClientRect().width > 0, '#125: the sidebar stays visible next to Settings');
-      key('2'); assert(!$('connect-page').hidden, '#125: ⌘2 opens Connect');
+      // #133: Connect is an action of the active model, not an area of the sidebar.
+      assert(!document.querySelector('nav [data-page="connect-page"]') && $('open-tools').closest('.execution-row'), '#133: Connect sits in the model toolbar, not in the sidebar');
+      $('open-tools').click(); assert(!$('connect-page').hidden, '#133: the toolbar button opens Connect');
+      $('connect-page').querySelector('.back-button').click(); assert(!$('models-page').hidden && $('connect-page').hidden, '#133: Back returns to the model');
       key('1'); assert(!$('models-page').hidden, '#125: ⌘1 returns to the models');
       const picks = [...$('model-sidebar').querySelectorAll('.model-pick')].filter(b => !b.disabled && b.offsetParent);
       if (picks.length > 1) {

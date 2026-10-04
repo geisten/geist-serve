@@ -188,3 +188,5 @@ links and verdict colours to 4.5:1 or 3:1.
 **Order (#133).**
 - The list runs from best suited to unsuitable. `/app/status` `ranking` uses the recommendation order (verdict, known quality, pass rate, speed), but without "installed", so a row doesn't move when a download completes. A group sits where its best variant ranks.
 - An installed model without its own measurement gets the estimate too, labelled "estimated, measure to confirm", and keeps the stopwatch.
+
+**Connect (#133)** is an action of the active model, not an area. The button sits in the model's toolbar, and the page has "Back to the model". The sidebar holds Models and Settings (⌘1/⌘2). The Mac menu item "Connect a program" opens the same page.
