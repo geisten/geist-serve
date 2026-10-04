@@ -29,6 +29,11 @@ struct app_judgement {
 };
 /* Seconds for a typical answer from a measured rate and first-token time; < 0 if unmeasured. */
 double app_answer_seconds(double rate, double first);
+/* #103: seconds per typical answer for a model that is not installed, from the
+ * models measured on the same processor here. Decoding is mostly memory bound,
+ * so throughput (rate × file bytes) carries over; the median of n measurements,
+ * and their median first-token time. < 0 without measurements. */
+double app_estimate_seconds(uint64_t bytes, const double *rate, const double *model_bytes, const double *first, size_t n);
 /* seconds < 0: not measured; total 0: no reference test. */
 struct app_judgement app_judge(enum app_fit resource, double seconds, unsigned passed, unsigned total,
                                struct app_limits limits);

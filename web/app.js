@@ -440,7 +440,8 @@ const verdictNames = {good:'Good choice', usable:'Usable, with limits', not_reco
 const plainModel = model => `${model.group_name || model.name} (${t(plainVariant(model))})`;
 function verdictReason(model) {
   const v = model.verdict, time = v.processor ? v.seconds[v.processor] : null;
-  const speed = time === null ? null : t(`about ${Math.max(1, Math.round(time))} s per answer on the ${v.processor === 'gpu' ? 'graphics chip' : 'processor'}`);
+  const speed = time === null ? null : t(`about ${Math.max(1, Math.round(time))} s per answer on the ${v.processor === 'gpu' ? 'graphics chip' : 'processor'}`) +
+    (v.basis === 'estimated' ? ` (${t('estimated, download to measure')})` : '');
   const correct = v.total ? `${v.passed}/${v.total} ${t('correct')}` : null;
   return {good: [speed, correct], slow: [speed, correct], too_slow: [speed], tight_memory: [t('Memory is tight on this computer'), speed],
     unavailable: [t(model.reason || 'Unavailable on this computer')], unreliable: [correct && `${t('Reference test')}: ${correct}`],

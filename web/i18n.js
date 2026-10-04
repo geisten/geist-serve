@@ -208,6 +208,7 @@ const german = {
   'Defaults: 10 s fast enough, 30 s usable, 90 % correct. A typical answer is about 150 words. Run your own test cases with workbench/bench.py (docs/MINI-BENCHMARK.md).': 'Standard: 10 s schnell genug, 30 s nutzbar, 90 % richtig. Eine typische Antwort hat etwa 150 Wörter. Eigene Testfälle: workbench/bench.py (docs/MINI-BENCHMARK.md).',
   'seconds per typical answer': 'Sekunden pro typischer Antwort',
   'No model installed yet.': 'Noch kein Modell installiert.',
+  'estimated, download to measure': 'geschätzt, zum Messen herunterladen',
   'Cannot save the verdict settings.': 'Die Grenzwerte können nicht gespeichert werden.',
   'Use 1 ≤ fast ≤ usable ≤ 3600 s, a pass rate from 0.5 to 1 and a known intent.': 'Erlaubt sind 1 ≤ schnell ≤ nutzbar ≤ 3600 s, eine Trefferquote von 0,5 bis 1 und eine bekannte Aufgabe.',
   'Suggested start': 'Vorschlag zum Start',
