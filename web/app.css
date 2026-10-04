@@ -1069,3 +1069,6 @@ body.manager-page main { max-width:1180px }
 .compare-table th[scope="row"] { font-weight:500 }
 .compare-settings { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px 12px; align-items:end }
 .compare-settings label { display:flex; flex-direction:column; gap:3px; font-size:12px }
+.compare-point { cursor:pointer }
+.compare-basis { cursor:help; color:var(--muted) }
+.compare-table tr.highlight { background:#1f7a3a14 }
