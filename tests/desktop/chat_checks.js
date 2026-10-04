@@ -279,8 +279,24 @@ async function checkActivityUX(assert, tick) {
     assert($('ui-language').closest('#settings-page') && $('language-choice').closest('#settings-page') && !$('unload') && !$('quit'), 'settings holds language preferences without unload or service-stop actions');
     window.geistNavigate('models-page');
     assert($('prompt').value === 'Keep this draft through settings', 'settings navigation keeps the draft'); input('');
-    const panes = [$('models-page').querySelector('.model-sidebar').getBoundingClientRect(), $('test-page').getBoundingClientRect()];
-    assert(innerWidth < 700 ? panes[0].bottom <= panes[1].top : panes[0].right <= panes[1].left, 'panes stack on small windows and sit side by side on wide ones');
+    const panes = [$('model-sidebar').getBoundingClientRect(), $('test-page').getBoundingClientRect()];
+    assert(innerWidth < 700 ? document.body.classList.contains('models-folded') || panes[0].bottom <= panes[1].top : panes[0].right <= panes[1].left, '#125: the list sits in the sidebar on wide windows and above the test (or folded) on small ones');
+    { // #125: the sidebar stays with every area; ⌘1-3 switch areas; arrow keys walk the list; the list button folds it.
+      const key = (k, extra = {}) => document.dispatchEvent(new KeyboardEvent('keydown', {key: k, metaKey: true, bubbles: true, cancelable: true, ...extra}));
+      key('3'); assert(!$('settings-page').hidden && $('model-sidebar').closest('.app-shell') && !$('model-sidebar').closest('.page'), '#125: ⌘3 opens Settings; the list is not part of a page');
+      if (innerWidth >= 700) assert($('model-sidebar').getBoundingClientRect().width > 0, '#125: the sidebar stays visible next to Settings');
+      key('2'); assert(!$('connect-page').hidden, '#125: ⌘2 opens Connect');
+      key('1'); assert(!$('models-page').hidden, '#125: ⌘1 returns to the models');
+      const picks = [...$('model-sidebar').querySelectorAll('.model-pick')].filter(b => !b.disabled && b.offsetParent);
+      if (picks.length > 1) {
+        picks[0].focus(); $('model-sidebar').dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true, cancelable: true}));
+        assert(document.activeElement === picks[1], '#125: ArrowDown moves to the next model');
+      }
+      const before = document.body.classList.contains('models-folded'), saved = modelsFoldedByUser;
+      $('toggle-models').click();
+      assert(document.body.classList.contains('models-folded') === !before && $('toggle-models').getAttribute('aria-expanded') === String(before), '#125: the list button folds and unfolds the list');
+      $('toggle-models').click(); modelsFoldedByUser = saved;
+    }
     // Model-row interactions use deterministic transport only; no test fetches a
     // catalog-sized model. The host separately loads a real installed GGUF.
     window.chatChecksStage = 'runtime-activity';
@@ -359,6 +375,8 @@ async function checkActivityUX(assert, tick) {
       assert(modelCalls.length === 1 && modelCalls[0][0] === '/app/select', 'installed model starts with one click and no download');
       assert(getComputedStyle(pick().querySelector('.ring-active')).display !== 'none' && getComputedStyle(pick().querySelector('.ring-check')).display === 'none' && getComputedStyle(pick().querySelector('.ring-download')).display === 'none', '#121: the active model shows one dot, not a check next to its verdict');
       assert(pick().disabled && !$('workspace').hidden && $('prompt').value === 'Draft survives model changes', 'active model has no redundant action and retains the draft');
+      // #125: in a narrow window the list folds once a model is ready; a user opens it to delete.
+      if (document.body.classList.contains('models-folded')) $('toggle-models').click();
       const remove = pick().closest('.model').querySelector('.remove');
       assert(!remove.hidden && !remove.disabled && !remove.closest('details'), 'each local model has a direct delete action, including the active model');
       window.confirm = () => false; remove.click(); await settle();
@@ -1058,7 +1076,7 @@ $$
         render(snap('download'));
         const tag = [...document.querySelectorAll('.variant-recommended')].filter(e => !e.hidden).map(e => e.closest('.model').dataset.id);
         assert(JSON.stringify(tag) === JSON.stringify([model.id]) && $('best-action').dataset.id === model.id && $('recommend-action').dataset.id === model.id, '#122: one model in every place');
-        assert($('best-action').textContent === `${t('Download')} (${bytes(model.bytes)})` && !$('recommend-action').hidden && $('model-prompt-hint').textContent === $('best-choice').textContent, '#122: download with its size; the empty pane repeats it');
+        assert($('best-action').textContent === `${t('Download')} (${bytes(model.bytes)})` && !$('recommend-action').hidden && $('model-prompt-hint').textContent.startsWith($('best-choice').textContent) && $('best-choice').title === $('model-prompt-hint').textContent, '#122/#125: download with its size; the empty pane gives the full sentence, the sidebar the short one with it as tooltip');
         $('recommend-action').click();
         assert(chosen[0] === model.id, '#122: the action starts the normal download/start');
         render(snap('start', 'usable'));

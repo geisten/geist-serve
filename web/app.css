@@ -1196,3 +1196,32 @@ input.switch:disabled { opacity:.5; cursor:default }
 /* #126: card actions share one column: remove on the first row, measure below */
 .model-variants .model:has(.measure:not([hidden])) { padding-right:4px }
 .model-variants .model .measure { position:static; grid-column:2; grid-row:2; width:44px; height:44px; min-width:44px; min-height:44px; padding:12px }
+
+/* #125: Mac layout. One persistent sidebar (areas, then the model list) and
+   the detail pane; below 700 px the list folds behind a button. */
+body.manager-page { display:block }
+.app-shell { height:100vh; height:100dvh; display:flex; flex-direction:column }
+.app-shell > main { flex:1; min-height:0; width:100%; display:flex; flex-direction:column }
+#models-page { display:flex; flex-direction:column; grid-template-columns:none; grid-template-rows:none }
+#test-page { border-left:0; padding-left:0 }
+.sidebar-toggle { display:none }
+@media (min-width:700px) {
+  .app-shell { display:grid; grid-template-columns:clamp(250px,30vw,340px) minmax(0,1fr); grid-template-rows:auto minmax(0,1fr) }
+  .app-shell > header, body.manager-page .app-shell > header { grid-column:1; grid-row:1; max-width:none; width:auto; margin:0; padding:16px 12px 10px; display:flex; flex-direction:column; align-items:stretch; gap:12px; background:var(--panel); border-right:1px solid var(--border) }
+  .app-shell > header .brand { font-size:20px; padding:0 8px }
+  .app-shell > header nav { flex-direction:column; gap:2px }
+  .app-shell > header nav button { justify-content:flex-start; width:100%; font-size:13px; padding:7px 10px; min-height:32px }
+  .app-shell > header nav button[aria-current] { background:var(--selected); color:var(--ink) }
+  .app-shell > .model-sidebar { grid-column:1; grid-row:2; min-height:0; overflow:auto; background:var(--panel); border-right:1px solid var(--border); border-radius:0; padding:4px 10px 12px }
+  .app-shell > main, body.manager-page .app-shell > main { grid-column:2; grid-row:1 / span 2; max-width:none; padding:14px 22px }
+}
+@media (max-width:699px) {
+  .app-shell > header { flex-wrap:nowrap }
+  .sidebar-toggle { display:inline-flex; order:-1; margin-right:4px; min-width:36px; min-height:36px; padding:6px }
+  .sidebar-toggle svg { width:18px; height:18px }
+  .app-shell > .model-sidebar { flex:none; max-height:36vh; overflow:auto; border-radius:0; border-bottom:1px solid var(--border); margin:0 12px }
+  body.models-folded .app-shell > .model-sidebar { display:none }
+}
+.app-shell > main { min-height:0; overflow:hidden }
+.app-shell > main > .page:not(#models-page) { min-height:0; overflow:auto }
+.app-shell > main { margin:0 }

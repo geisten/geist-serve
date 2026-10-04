@@ -178,3 +178,9 @@ light set and a dark set. The dark set applies when the system is dark,
 unless **Settings → Appearance** chooses Light or Dark; that choice is saved
 per device. A WebView check holds both sets to text 7:1 and muted text,
 links and verdict colours to 4.5:1 or 3:1.
+
+**Layout (#125).**
+- **Wide windows:** a persistent sidebar on the left holds the three areas (Models, Connect, Settings) and, below them, the model list. It stays visible in every area. The detail pane on the right shows the chat, Connect or Settings.
+- **Below 700 px:** the areas sit in a top bar, and the model list folds behind a list button. It folds by itself once a model is ready, and after the first toggle the user's choice wins.
+- **Keyboard:** ⌘1–3 (Ctrl on Linux) switch areas; ↑/↓ walk the model list.
+- **Recommendation:** the sidebar shows it in short form, with the reasons as tooltip. The empty pane gives the full sentence.

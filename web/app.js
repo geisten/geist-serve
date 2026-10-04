@@ -14,7 +14,8 @@ let pendingModel = null, languageInitialized = false, customPreviewAccepted = fa
 let stopped = false, timer;
 let tasks = [], selectedTask = null;
 let qualityRecords = [];
-let measuringModel = null; // #103: start this model, then measure its speed
+let measuringModel = null;
+let modelsFoldedByUser = null; // #125: null until the list button is used // #103: start this model, then measure its speed
 let connectionTesting = false;
 // Page memory only. Never store prompts, answers or conversation in browser storage.
 let conversation = [], conversationModel = '', followLatest = true;
@@ -483,19 +484,22 @@ function verdictText(model) {
 // the list, the main action in the empty pane and the card tag all follow it.
 function recommendation(snapshot) {
   const best = snapshot?.best_choice, model = best && snapshot.models.find(m => m.id === best.id);
-  if (!model) return {text: t('No model fits this computer well.'), model: null, action: null};
+  if (!model) return {text: t('No model fits this computer well.'), short: t('No model fits this computer well.'), model: null, action: null};
   const reason = verdictReason(model).filter(Boolean).join(' · ');
   const text = best.verdict === 'good'
     ? `${verdictSymbols.good} ${t('Recommended here')}: ${plainModel(model)}${reason ? ` · ${reason}` : ''}`
     : `${verdictSymbols[best.verdict]} ${t('Best option here')}: ${plainModel(model)} · ${verdictText(model)}`;
   const action = best.action === 'active' ? null : best.action === 'start' ? t('Start') : `${t('Download')} (${bytes(model.bytes)})`;
-  return {text, model, action, verdict: best.verdict};
+  // #125: the sidebar shows the short form; the reasons are its tooltip.
+  const short = `${verdictSymbols[best.verdict]} ${t(best.verdict === 'good' ? 'Recommended here' : 'Best option here')}: ${plainModel(model)}`;
+  return {text, short, model, action, verdict: best.verdict};
 }
 function renderBestChoice(snapshot) {
   const r = recommendation(snapshot);
   $('best-choice').hidden = false;
   $('best-choice').dataset.verdict = r.verdict || 'none';
-  uiText($('best-choice'), r.text);
+  uiText($('best-choice'), r.short);
+  $('best-choice').title = r.text;
   for (const id of ['best-action', 'recommend-action']) {
     $(id).hidden = !r.action || !!snapshot.phase || !!snapshot.loading;
     $(id).textContent = r.action || '';
@@ -730,6 +734,11 @@ function render(next) {
   const previouslyHidden = $('workspace').hidden;
   $('workspace').hidden = !usable && !retained && !(next.activity?.load && !next.activity.load.outcome);
   $('test-unavailable').hidden = !$('workspace').hidden;
+  // #125: in a narrow window the model list folds away once a model is ready;
+  // after the first toggle the user's choice wins.
+  const folded = modelsFoldedByUser ?? !$('workspace').hidden;
+  document.body.classList.toggle('models-folded', folded);
+  $('toggle-models').setAttribute('aria-expanded', String(!folded));
   $('model-prompt').textContent = t(working ? 'Getting ready…' : 'Choose a model to begin.');
   $('model-legend').hidden = !!next.active_id;
   renderBestChoice(next);
@@ -1082,6 +1091,25 @@ function showPage(id) {
 }
 // Native menus route only to these fixed pages, without reloading the document.
 window.geistNavigate = showPage;
+// #125: ⌘1-3 (Ctrl on Linux) for the areas; arrow keys walk the model list.
+document.addEventListener('keydown', event => {
+  if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+  const page = {'1': 'models-page', '2': 'connect-page', '3': 'settings-page'}[event.key];
+  if (page) { event.preventDefault(); showPage(page); }
+});
+$('model-sidebar').addEventListener('keydown', event => {
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+  const picks = [...$('model-sidebar').querySelectorAll('.model-pick')].filter(b => !b.disabled && b.offsetParent);
+  if (!picks.length) return;
+  const at = picks.indexOf(document.activeElement);
+  const next = picks[Math.max(0, Math.min(picks.length - 1, at < 0 ? 0 : at + (event.key === 'ArrowDown' ? 1 : -1)))];
+  event.preventDefault(); next.focus();
+});
+$('toggle-models').addEventListener('click', () => {
+  modelsFoldedByUser = !document.body.classList.contains('models-folded');
+  document.body.classList.toggle('models-folded', modelsFoldedByUser);
+  $('toggle-models').setAttribute('aria-expanded', String(!modelsFoldedByUser));
+});
 document.querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => showPage(button.dataset.page)));
 $('ui-language').value = interfacePreference;
 $('language-choice').value = interfaceLanguage;
@@ -1124,6 +1152,8 @@ async function removeModel(id) {
     if (removed && !$('models-page').hidden &&
         (document.activeElement === remove || document.activeElement === document.body)) {
       const pick = cards.get(id)?.querySelector('.model-pick');
+      // #125: focus returns to the list, so a folded list opens again.
+      if (document.body.classList.contains('models-folded')) { modelsFoldedByUser = false; document.body.classList.remove('models-folded'); $('toggle-models').setAttribute('aria-expanded', 'true'); }
       if (pick && !pick.disabled) pick.focus({preventScroll:true});
     }
   }
