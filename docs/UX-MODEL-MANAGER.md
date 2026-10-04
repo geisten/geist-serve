@@ -132,3 +132,13 @@ Intents:
 - `chat` uses all tasks.
 - `context`, `classify`, `extract` and `format` each use only that task of
   the reference test, in DE and EN.
+
+**Estimates (`verdict.basis: "estimated"`).** A model that is not installed
+and has no measurement of its own gets an estimate. It comes from the models
+measured on the same processor of this computer: their median throughput
+(output rate × file size) divided by the model's size, plus their median
+first-token time. Decoding is mostly limited by memory bandwidth, so the
+throughput carries over between models. Native ternary formats decode faster
+per byte, so their estimates are conservative. An estimate is always
+labelled "estimated, download to measure". Without any measurement on a
+processor, there is no estimate.

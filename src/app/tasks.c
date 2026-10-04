@@ -30,6 +30,26 @@ enum app_fit app_task_fit(enum app_fit resource, enum app_quality quality) {
     return resource == APP_RECOMMENDED && quality == APP_QUALITY_PASSED ? APP_RECOMMENDED
                                                                         : APP_CONDITIONAL;
 }
+static double median(double *v, size_t n) {
+    for (size_t i = 1; i < n; i++) /* insertion sort: n is at most the catalog size */
+        for (size_t k = i; k && v[k - 1] > v[k]; k--) {
+            double t = v[k];
+            v[k] = v[k - 1], v[k - 1] = t;
+        }
+    return n % 2 ? v[n / 2] : (v[n / 2 - 1] + v[n / 2]) / 2;
+}
+/* ponytail: one bandwidth figure per processor; native ternary kernels (I2_S,
+ * PQ2_0) decode faster per byte, so their estimates are conservative. */
+double app_estimate_seconds(uint64_t bytes, const double *rate, const double *model_bytes, const double *first, size_t n) {
+    double throughput[APP_MODEL_COUNT], firsts[APP_MODEL_COUNT];
+    size_t k = 0;
+    for (size_t i = 0; i < n && k < APP_MODEL_COUNT; i++)
+        if (rate[i] > 0 && model_bytes[i] > 0)
+            throughput[k] = rate[i] * model_bytes[i], firsts[k++] = first[i] > 0 ? first[i] : 0;
+    if (!k || !bytes)
+        return -1;
+    return app_answer_seconds(median(throughput, k) / (double) bytes, median(firsts, k));
+}
 double app_answer_seconds(double rate, double first) {
     return rate > 0 ? (first > 0 ? first : 0) + APP_TYPICAL_ANSWER_TOKENS / rate : -1;
 }

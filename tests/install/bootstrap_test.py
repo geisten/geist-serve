@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -94,7 +95,8 @@ class BootstrapTests(unittest.TestCase):
         (fakebin/'sudo').write_text('#!/bin/sh\necho "sudo $*" >> "$FAKE_LOG"\nexec "$@"\n')
         (fakebin/'apt-get').write_text('#!/bin/sh\nfor f in "$@"; do case $f in /*) test -r "$f" || exit 99;; esac; done\n'
                                        'echo "apt-get $*" >> "$FAKE_LOG"\nexit "${FAKE_APT_RC:-0}"\n')
-        for tool in ('sudo', 'apt-get'): (fakebin/tool).chmod(0o755)
+        (fakebin/'geisten-desktop').write_text('#!/bin/sh\necho "geisten-desktop $*" >> "$FAKE_LOG"\n')
+        for tool in ('sudo', 'apt-get', 'geisten-desktop'): (fakebin/tool).chmod(0o755)
         (t/'ubuntu').write_text('ID=ubuntu\nVERSION_ID="24.04"\n')
         (t/'debian').write_text('ID=debian\nVERSION_ID="12"\n')
         cls.t, cls.fakebin = t, fakebin
@@ -283,6 +285,21 @@ class BootstrapTests(unittest.TestCase):
         self.assertTrue(lines[1].endswith('/geisten-desktop_1.0.0_all.deb'), lines)
         self.assertFalse(self.runtime.exists() or self.launcher.is_symlink(), 'the desktop route created rootless files')
         log.unlink()
+        # #46: in a graphical session the window is offered; "n", no display or --yes leave it closed.
+        opened = lambda: any(line.startswith('geisten-desktop') for line in calls().splitlines())
+        for name, env, want in [('accepted', {'DISPLAY': ':0', 'GEIST_INSTALL_TEST_OPEN': 'y'}, True),
+                                ('no terminal to ask', {'WAYLAND_DISPLAY': 'wayland-0', 'GEIST_INSTALL_TEST_OPEN': ''}, False),
+                                ('declined', {'DISPLAY': ':0', 'GEIST_INSTALL_TEST_OPEN': 'n'}, False),
+                                ('no display', {'DISPLAY': '', 'WAYLAND_DISPLAY': '', 'GEIST_INSTALL_TEST_OPEN': 'y'}, False)]:
+            with self.subTest(name):
+                log.unlink(missing_ok=True)
+                p = self.run_installer(r, '--desktop', env=base | {'GEIST_INSTALL_TEST_CONFIRM': 'yes'} | env)
+                self.assertEqual(p.returncode, 0, p.stderr)
+                for _ in range(50):  # the window starts in the background
+                    if opened() or not want: break
+                    time.sleep(.1)
+                self.assertEqual(opened(), want, (name, calls(), p.stdout))
+        log.unlink(missing_ok=True)
         # apt fails: reported, not hidden.
         p = self.run_installer(r, '--desktop', env=base | {'GEIST_INSTALL_TEST_CONFIRM': 'yes', 'FAKE_APT_RC': '100'})
         self.assertEqual(p.returncode, 15, p.stderr)

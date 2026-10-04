@@ -208,6 +208,7 @@ const german = {
   'Defaults: 10 s fast enough, 30 s usable, 90 % correct. A typical answer is about 150 words. Run your own test cases with workbench/bench.py (docs/MINI-BENCHMARK.md).': 'Standard: 10 s schnell genug, 30 s nutzbar, 90 % richtig. Eine typische Antwort hat etwa 150 Wörter. Eigene Testfälle: workbench/bench.py (docs/MINI-BENCHMARK.md).',
   'seconds per typical answer': 'Sekunden pro typischer Antwort',
   'No model installed yet.': 'Noch kein Modell installiert.',
+  'estimated, download to measure': 'geschätzt, zum Messen herunterladen',
   'Cannot save the verdict settings.': 'Die Grenzwerte können nicht gespeichert werden.',
   'Use 1 ≤ fast ≤ usable ≤ 3600 s, a pass rate from 0.5 to 1 and a known intent.': 'Erlaubt sind 1 ≤ schnell ≤ nutzbar ≤ 3600 s, eine Trefferquote von 0,5 bis 1 und eine bekannte Aufgabe.',
   'Suggested start': 'Vorschlag zum Start',
@@ -374,7 +375,7 @@ Object.assign(german, {
   "Measured below the app's interactive target of 8 tokens/s. Still usable for patient tasks.": 'Gemessene Geschwindigkeit unter dem Zielwert von 8 Token/s. Für Aufgaben mit Wartezeit weiterhin nutzbar.',
   "Memory fits and measured speed meets the app's interactive target of 8 tokens/s.": 'Speicher passt, gemessene Geschwindigkeit erreicht den Zielwert von 8 Token/s.',
   'Measured on this device in this app session; workload and temperature affect speed.': 'In dieser Sitzung auf diesem Gerät gemessen; Aufgabe und Temperatur beeinflussen die Geschwindigkeit.',
-  'Paste the copied curl command into your terminal to try the loaded model. Ubuntu also installs geisten test and geisten chat. On Mac, the CLI is bundled at /Applications/Geist.app/Contents/MacOS/geist-cli.': 'Füge den kopierten curl-Befehl im Terminal ein. Unter Ubuntu gibt es auch geisten test und geisten chat. Auf dem Mac liegt die CLI unter /Applications/Geist.app/Contents/MacOS/geist-cli.',
+  'Paste the copied curl command into your terminal to try the loaded model. Ubuntu also installs geisten test and geisten chat. On Mac, the CLI is bundled at /Applications/geisten.app/Contents/MacOS/geist-cli.': 'Füge den kopierten curl-Befehl im Terminal ein. Unter Ubuntu gibt es auch geisten test und geisten chat. Auf dem Mac liegt die CLI unter /Applications/geisten.app/Contents/MacOS/geist-cli.',
   'In Continue, open your local config.yaml and add the model from this configuration. JSON is valid YAML. Select geisten and use Chat mode. Preserve your existing configuration.': 'Öffne in Continue deine lokale config.yaml und ergänze das Modell aus dieser Konfiguration. JSON ist gültiges YAML. Wähle geisten im Chat-Modus. Behalte deine bestehenden Einstellungen.',
   'Save as opencode.json in a private test folder. Run opencode there and choose geist-chat. This profile disables tools; it does not enable coding-agent workflows.': 'Speichere dies als opencode.json in einem privaten Testordner. Starte dort opencode und wähle geist-chat. Das Profil deaktiviert Werkzeuge und unterstützt keine Coding-Agenten.'
 });

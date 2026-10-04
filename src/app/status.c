@@ -372,6 +372,12 @@ void status_response(int fd, struct app_arena *arena) {
                        ? "true"
                        : "false",
                app.job.running && !app.job.activate ? "true" : "false");
+    /* #103: measurements on this computer, the basis for estimates of models not installed. */
+    double rates[2][APP_MODEL_COUNT], sizes[2][APP_MODEL_COUNT], firsts[2][APP_MODEL_COUNT];
+    for (unsigned slot = 0; slot < 2; slot++)
+        for (size_t i = 0; i < app_model_count; i++)
+            rates[slot][i] = app.prefs.speed[i][slot].rate, sizes[slot][i] = (double) app_models[i].bytes,
+            firsts[slot][i] = app.prefs.speed[i][slot].first;
     /* #103: the installed model with the best verdict, then pass rate, then speed. */
     const struct app_model *best = nullptr;
     struct app_judgement    best_judgement = {APP_VERDICT_UNKNOWN, ""};
@@ -460,6 +466,13 @@ void status_response(int fd, struct app_arena *arena) {
                              gpu_supported(m) ? app_answer_seconds(app.prefs.speed[i][1].rate,
                                                                    app.prefs.speed[i][1].first)
                                               : -1};
+        /* Not installed: an estimate, always labelled; never for installed models,
+         * which can be measured instead. */
+        bool estimated = !installed && seconds[0] < 0 && seconds[1] < 0;
+        if (estimated) {
+            seconds[0] = app_estimate_seconds(m->bytes, rates[0], sizes[0], firsts[0], app_model_count);
+            seconds[1] = gpu_supported(m) ? app_estimate_seconds(m->bytes, rates[1], sizes[1], firsts[1], app_model_count) : -1;
+        }
         int    fastest    = seconds[1] >= 0 && (seconds[0] < 0 || seconds[1] < seconds[0]) ? 1
                             : seconds[0] >= 0                                               ? 0
                                                                                             : -1;
@@ -475,7 +488,9 @@ void status_response(int fd, struct app_arena *arena) {
                                            total,
                                            app.prefs.limits);
         const char *processor = fastest < 0 ? nullptr : fastest ? "gpu" : "cpu";
-        app_put(&b, ",\"verdict\":{\"value\":");
+        app_put(&b, ",\"verdict\":{\"basis\":");
+        app_put(&b, fastest < 0 ? "null" : estimated ? "\"estimated\"" : "\"measured\"");
+        app_put(&b, ",\"value\":");
         app_quote(&b, app_verdict_name(j.verdict));
         app_put(&b, ",\"reason\":");
         app_quote(&b, j.reason);
