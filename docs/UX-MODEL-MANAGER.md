@@ -195,3 +195,9 @@ links and verdict colours to 4.5:1 or 3:1.
 click or Enter opens a line under the card with the reason and what it rests
 on. It works on touch screens, where tooltips never appear. The chip never
 starts or downloads the model.
+
+**Honest ✗ (#133).** A ✗ names its reason:
+- **Too many wrong answers:** answer quality belongs to the model, so there's no "here". Such models fold into the collapsed **Other models** area, unless one is active or being prepared.
+- **Doesn't fit this computer** and **Too slow here:** memory and speed belong to this computer.
+
+An *estimated* speed beyond "usable" is never a hard ✗. It reads "? Probably too slow here (estimated)" until a measurement confirms it. The "Answer quality not tested yet" note shows only while no model has a reference test.

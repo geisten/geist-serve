@@ -1243,3 +1243,7 @@ body.manager-page { display:block }
 .model .model-verdict:focus-visible { outline:2px solid var(--focus); outline-offset:2px }
 .model .model-verdict { min-height:28px; max-height:28px; align-self:center }
 .model-title .variant-recommended { flex:0 1 auto; white-space:normal; width:auto; max-width:100% }
+/* #133: models that are weak everywhere, one click away */
+.other-models { margin-top:12px; border-top:1px solid var(--border); padding-top:8px }
+.other-models > summary { cursor:pointer; font-size:12px; color:var(--muted); padding:4px }
+.other-models > p { margin:4px 4px 8px; font-size:12px }

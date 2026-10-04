@@ -35,7 +35,7 @@ int main(void) {
             {APP_RECOMMENDED, 99, 0, 0, APP_VERDICT_NOT_RECOMMENDED, "too_slow"},
     };
     for (size_t i = 0; i < sizeof cases / sizeof *cases; i++) {
-        struct app_judgement j = app_judge(cases[i].fit, cases[i].seconds, cases[i].passed, cases[i].total, l);
+        struct app_judgement j = app_judge(cases[i].fit, cases[i].seconds, false, cases[i].passed, cases[i].total, l);
         assert(j.verdict == cases[i].verdict && !strcmp(j.reason, cases[i].reason));
     }
     assert(app_answer_seconds(0, 1) < 0 && app_answer_seconds(20, 0.5) == 10.5 && app_answer_seconds(40, -1) == 5);
@@ -63,4 +63,11 @@ int main(void) {
     assert(app_candidate_better(e2b, e4b) && !app_candidate_better(e4b, e2b));
     struct app_candidate clear = {APP_VERDICT_USABLE, .95, 29, false}, fast_weaker = {APP_VERDICT_USABLE, .90, 18, false};
     assert(app_candidate_better(clear, fast_weaker)); /* five points are not noise */
+    /* #133: an estimate that says "too slow" is a "probably", never a hard ✗; quality still is. */
+    struct app_judgement guess = app_judge(APP_RECOMMENDED, 50, true, 146, 160, l);
+    assert(guess.verdict == APP_VERDICT_UNKNOWN && !strcmp(guess.reason, "probably_too_slow"));
+    guess = app_judge(APP_RECOMMENDED, 50, true, 31, 160, l);
+    assert(guess.verdict == APP_VERDICT_NOT_RECOMMENDED && !strcmp(guess.reason, "unreliable"));
+    guess = app_judge(APP_RECOMMENDED, 18, true, 146, 160, l);
+    assert(guess.verdict == APP_VERDICT_USABLE && !strcmp(guess.reason, "slow"));
 }

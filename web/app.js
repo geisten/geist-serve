@@ -451,14 +451,14 @@ function qualityText(model) {
 // #103 layer 1: one verdict per model. Symbols first; the words are the tooltip
 // and the accessible name, in plain language (no t/s, no weight format).
 const verdictSymbols = {good:'✓', usable:'◐', not_recommended:'✗', unknown:'?'};
-const verdictNames = {good:'Good choice', usable:'Usable, with limits', not_recommended:'Not recommended here', unknown:'Not measured yet'};
+const verdictNames = {good:'Good choice', usable:'Usable, with limits', not_recommended:'Not recommended', unknown:'Not measured yet'};
 const plainModel = model => `${model.group_name || model.name} (${t(plainVariant(model))})`;
 function verdictReason(model) {
   const v = model.verdict, time = v.processor ? v.seconds[v.processor] : null;
   const speed = time === null ? null : t(`about ${Math.max(1, Math.round(time))} s per answer on the ${v.processor === 'gpu' ? 'graphics chip' : 'processor'}`) +
     (v.basis === 'estimated' ? ` (${t(model.installed ? 'estimated, measure to confirm' : 'estimated, download to measure')})` : '');
   const correct = v.total ? `${v.passed}/${v.total} ${t('correct')}` : null;
-  return {good: [speed, correct], slow: [speed, correct], too_slow: [speed], tight_memory: [t('Memory is tight on this computer'), speed],
+  return {good: [speed, correct], slow: [speed, correct], too_slow: [speed], probably_too_slow: [speed, correct], tight_memory: [t('Memory is tight on this computer'), speed],
     unavailable: [t(model.reason || 'Unavailable on this computer')], unreliable: [correct && `${t('Reference test')}: ${correct}`],
     quality_unknown: [t('Answer quality not tested yet')], speed_unknown: [t('Speed on this computer not measured yet'), correct]}[v.reason] || [];
 }
@@ -485,9 +485,13 @@ function verdictBasis(model) {
     : t('Answer quality not tested yet');
   return [speed, quality, ...(model.reference || []).map(r => referenceText(model, r))].join(' · ');
 }
+// #133: a ✗ says why. Answer quality belongs to the model (no "here");
+// memory and speed belong to this computer.
+const verdictLabels = {unreliable: 'Too many wrong answers', unavailable: "Doesn't fit this computer", too_slow: 'Too slow here', probably_too_slow: 'Probably too slow here'};
+const verdictLabel = v => t(verdictLabels[v.reason] || verdictNames[v.value]);
 function verdictText(model) {
   if (!model?.verdict) return '';
-  return [t(verdictNames[model.verdict.value]), ...verdictReason(model)].filter(Boolean).join(' · ');
+  return [verdictLabel(model.verdict), ...verdictReason(model)].filter(Boolean).join(' · ');
 }
 // #122: one recommendation, from the service's best_choice: the sentence above
 // the list, the main action in the empty pane and the card tag all follow it.
@@ -618,16 +622,26 @@ function renderModelGroups(models) {
   const rank = new Map((state.ranking || []).map((id, index) => [id, index]));
   const place = variants => Math.min(...variants.map(m => rank.has(m.id) ? rank.get(m.id) : Infinity));
   const ordered = [...grouped].sort((a, b) => place(a[1]) - place(b[1]));
-  ordered.forEach(([id], index) => { const group = modelGroups.get(id); if (group && $('models').children[index] !== group) $('models').insertBefore(group, $('models').children[index] || null); });
+  // #133: models that answer too often wrong (on any computer) move into a
+  // collapsed "Other models" area; the active or preparing model always stays visible.
+  const weak = ([, variants]) => variants.every(m => m.verdict?.value === 'not_recommended' && m.verdict.reason === 'unreliable') &&
+    !variants.some(m => m.id === state.active_id || m.id === state.job_model);
+  const places = [[$('models'), ordered.filter(g => !weak(g))], [$('other-models-list'), ordered.filter(weak)]];
+  for (const [id] of ordered) if (!modelGroups.has(id)) {
+    const group = document.createElement('section'); group.className = 'model-group'; group.dataset.group = id;
+    const heading = document.createElement('h3'); heading.id = `model-group-${++groupSequence}`;
+    const rows = document.createElement('div'); rows.className = 'model-variants'; rows.setAttribute('role', 'list');
+    group.setAttribute('aria-labelledby', heading.id); group.append(heading, rows);
+    modelGroups.set(id, group);
+  }
+  for (const [container, list] of places) list.forEach(([id], index) => {
+    const group = modelGroups.get(id);
+    if (container.children[index] !== group) container.insertBefore(group, container.children[index] || null);
+  });
+  $('other-models').hidden = !places[1][1].length;
+  $('other-models-label').textContent = `${t('Other models')} (${places[1][1].length})`;
   for (const [id, variants] of ordered) {
-    let group = modelGroups.get(id);
-    if (!group) {
-      group = document.createElement('section'); group.className = 'model-group'; group.dataset.group = id;
-      const heading = document.createElement('h3'); heading.id = `model-group-${++groupSequence}`;
-      const rows = document.createElement('div'); rows.className = 'model-variants'; rows.setAttribute('role', 'list');
-      group.setAttribute('aria-labelledby', heading.id); group.append(heading, rows);
-      modelGroups.set(id, group); $('models').insertBefore(group, $('models').children[ordered.findIndex(([key]) => key === id)] || null);
-    }
+    const group = modelGroups.get(id);
     group.querySelector('h3').textContent = variants[0].group_name || variants[0].name;
     group.classList.toggle('single', variants.length === 1);
     const rows = group.querySelector('.model-variants');
@@ -769,6 +783,8 @@ function render(next) {
   $('model-prompt').textContent = t(working ? 'Getting ready…' : 'Choose a model to begin.');
   $('model-legend').hidden = !!next.active_id;
   renderBestChoice(next);
+  // #133: "not tested" only while no model has a reference test; the cards say the rest.
+  $('quality-note').hidden = next.models.some(m => m.quality_evidence);
   continueMeasurement(next);
   renderCompare();
   if (usable && previouslyHidden && !$('workspace').hidden && !$('models-page').hidden &&
@@ -1181,6 +1197,7 @@ async function removeModel(id) {
       const pick = cards.get(id)?.querySelector('.model-pick');
       // #125: focus returns to the list, so a folded list opens again.
       if (document.body.classList.contains('models-folded')) { modelsFoldedByUser = false; document.body.classList.remove('models-folded'); $('toggle-models').setAttribute('aria-expanded', 'true'); }
+      const other = pick?.closest('#other-models'); if (other && !other.open) other.open = true; // #133: focus may not land in a closed area
       if (pick && !pick.disabled) pick.focus({preventScroll:true});
     }
   }
