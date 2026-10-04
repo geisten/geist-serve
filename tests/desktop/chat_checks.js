@@ -696,9 +696,11 @@ async function checkActivityUX(assert, tick) {
      const fresh={...base,ready:false,active_id:'',recommendation:{...base.recommendation,id:''},models:base.models.map(m=>({...m,installed:false}))};
      const installed={...fresh,models:fresh.models.map(m=>m.id===last?{...m,installed:true}:m)};
      const active={...installed,ready:true,active_id:last,recommendation:{...base.recommendation,id:last,source:'saved'}};
-     const orders=[fresh,installed,active].map(s=>{render(structuredClone(s));return groupsOf();});
+     // Weak models fold under Other models, so each container follows the ranking on its own.
+     const orders=[fresh,installed,active].map(s=>{render(structuredClone(s));const main=new Set([...$('models').children].map(g=>g.dataset.group));
+       return {got:groupsOf(),want:[...expected.filter(g=>main.has(g)),...expected.filter(g=>!main.has(g))]};});
      render(base);
-     assert(expected.length===groupIds.length && orders.every(o=>JSON.stringify(o)===JSON.stringify(expected)),`#57/#133: suitability order, the same whatever is installed or active: ${JSON.stringify({expected,orders})}`);
+     assert(expected.length===groupIds.length && orders.every(o=>JSON.stringify(o.got)===JSON.stringify(o.want)),`#57/#133: suitability order, the same whatever is installed or active: ${JSON.stringify({expected,orders})}`);
      render(base); const main=new Set([...$('models').children].map(g=>g.dataset.group)), reversed=[...base.ranking].reverse();
      render({...base,ranking:reversed});
      assert(JSON.stringify([...$('models').children].map(g=>g.dataset.group))===JSON.stringify([...new Set(reversed.map(groupOf))].filter(g=>main.has(g))),'#133: a different ranking reorders the list (weak models stay under Other models)');
