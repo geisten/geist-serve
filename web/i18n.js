@@ -209,6 +209,7 @@ const german = {
   'seconds per typical answer': 'Sekunden pro typischer Antwort',
   'No model installed yet.': 'Noch kein Modell installiert.',
   'estimated, download to measure': 'geschätzt, zum Messen herunterladen',
+  'estimated, measure to confirm': 'geschätzt, zum Bestätigen messen',
   'Speed estimated from measured models': 'Geschwindigkeit geschätzt aus gemessenen Modellen',
   'Speed measured on this computer': 'Geschwindigkeit auf diesem Rechner gemessen',
   'engine': 'Engine',

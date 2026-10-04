@@ -184,3 +184,7 @@ links and verdict colours to 4.5:1 or 3:1.
 - **Below 700 px:** the areas sit in a top bar, and the model list folds behind a list button. It folds by itself once a model is ready, and after the first toggle the user's choice wins.
 - **Keyboard:** ⌘1–3 (Ctrl on Linux) switch areas; ↑/↓ walk the model list.
 - **Recommendation:** the sidebar shows it in short form, with the reasons as tooltip. The empty pane gives the full sentence.
+
+**Order (#133).**
+- The list runs from best suited to unsuitable. `/app/status` `ranking` uses the recommendation order (verdict, known quality, pass rate, speed), but without "installed", so a row doesn't move when a download completes. A group sits where its best variant ranks.
+- An installed model without its own measurement gets the estimate too, labelled "estimated, measure to confirm", and keeps the stopwatch.

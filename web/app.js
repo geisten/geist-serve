@@ -456,7 +456,7 @@ const plainModel = model => `${model.group_name || model.name} (${t(plainVariant
 function verdictReason(model) {
   const v = model.verdict, time = v.processor ? v.seconds[v.processor] : null;
   const speed = time === null ? null : t(`about ${Math.max(1, Math.round(time))} s per answer on the ${v.processor === 'gpu' ? 'graphics chip' : 'processor'}`) +
-    (v.basis === 'estimated' ? ` (${t('estimated, download to measure')})` : '');
+    (v.basis === 'estimated' ? ` (${t(model.installed ? 'estimated, measure to confirm' : 'estimated, download to measure')})` : '');
   const correct = v.total ? `${v.passed}/${v.total} ${t('correct')}` : null;
   return {good: [speed, correct], slow: [speed, correct], too_slow: [speed], tight_memory: [t('Memory is tight on this computer'), speed],
     unavailable: [t(model.reason || 'Unavailable on this computer')], unreliable: [correct && `${t('Reference test')}: ${correct}`],
@@ -601,8 +601,11 @@ function renderModelGroups(models) {
   // #57: one order for one catalog: the platform default group first, then catalog
   // order. It never depends on selection, downloads, timing or language, so a row
   // never moves under the pointer; only a catalog change can reorder groups.
-  const preferred = state.recommendation?.preferred_id;
-  const ordered = [...grouped].sort((a, b) => (b[1].some(m => m.id === preferred)) - (a[1].some(m => m.id === preferred)));
+  // #133: from best suited to unsuitable (the service's ranking); a group sits
+  // where its best variant ranks. Download state never changes the order.
+  const rank = new Map((state.ranking || []).map((id, index) => [id, index]));
+  const place = variants => Math.min(...variants.map(m => rank.has(m.id) ? rank.get(m.id) : Infinity));
+  const ordered = [...grouped].sort((a, b) => place(a[1]) - place(b[1]));
   ordered.forEach(([id], index) => { const group = modelGroups.get(id); if (group && $('models').children[index] !== group) $('models').insertBefore(group, $('models').children[index] || null); });
   for (const [id, variants] of ordered) {
     let group = modelGroups.get(id);
@@ -689,7 +692,7 @@ function modelCard(model) {
   renderModelBadges(card.querySelector('.model-badges'), model);
   // #103: measure on demand; the same button cancels its own run.
   const measure = card.querySelector('.measure'), running = !!state.comparison?.running && state.active_id === model.id;
-  measure.hidden = !running && !(model.installed && model.resource_fit !== 2 && model.verdict?.processor === null);
+  measure.hidden = !running && !(model.installed && model.resource_fit !== 2 && model.verdict?.basis !== 'measured');
   measure.disabled = !running && (stopped || requesting || state.loading || !!state.phase || state.busy || !!state.comparison?.running || measuringModel !== null);
   measure.dataset.running = running;
   measure.title = t(running ? 'Cancel speed measurement' : 'Measure speed on this computer');
