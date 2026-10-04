@@ -172,6 +172,9 @@ int main(int argc, char **argv) {
         curl_global_cleanup();
         return 1;
     }
+    int unix_fd = path_join(app.api_socket, app.paths.home, "api.sock") ? unix_listener(app.api_socket) : -1;
+    if (unix_fd < 0)
+        app.api_socket[0] = 0;
     printf("GEIST_APP_URL=http://127.0.0.1:%u/#%s\n", app.port, app.token);
     fflush(stdout);
     fprintf(stderr,
@@ -264,10 +267,12 @@ int main(int argc, char **argv) {
         fd_set         set;
         FD_ZERO(&set);
         FD_SET(fd, &set);
-        int ready = select(fd + 1, &set, nullptr, nullptr, &timeout);
+        if (unix_fd >= 0)
+            FD_SET(unix_fd, &set);
+        int ready = select((unix_fd > fd ? unix_fd : fd) + 1, &set, nullptr, nullptr, &timeout);
         if (ready <= 0)
             continue;
-        int client = accept(fd, nullptr, nullptr);
+        int client = accept(unix_fd >= 0 && FD_ISSET(unix_fd, &set) ? unix_fd : fd, nullptr, nullptr);
         if (client < 0)
             continue;
         (void) fcntl(client, F_SETFD, FD_CLOEXEC);
@@ -300,6 +305,10 @@ int main(int argc, char **argv) {
     atomic_store(&closing, true);
     atomic_store(&cancelled, true);
     close(fd);
+    if (unix_fd >= 0) {
+        close(unix_fd);
+        unlink(app.api_socket);
+    }
     if (monitoring)
         pthread_join(monitor, nullptr);
     pthread_mutex_lock(&app.mutex);

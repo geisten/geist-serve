@@ -972,6 +972,14 @@ $$
       assert($('best-choice').textContent === t('No model fits this computer well.') && $('best-action').hidden && $('recommend-action').hidden, '#122: nothing fits: said plainly, no action');
       render(saved);
     }
+    { // #143: the Connect page names the Unix socket when there is one.
+      const saved = state;
+      render({...saved, api_socket: '/home/me/geisten/api.sock'});
+      assert(!$('connection-socket').hidden && !$('connection-socket-label').hidden && $('connection-socket').textContent === '/home/me/geisten/api.sock', '#143: socket path shown');
+      render({...saved, api_socket: null});
+      assert($('connection-socket').hidden && $('connection-socket-label').hidden, '#143: no socket, no row');
+      render(saved);
+    }
     { // #103: the stopwatch measures the active model from the model view; the same button cancels.
       const saved = state, originalApi = api, originalPoll = poll, calls = [];
       // Only the measurement calls are stubbed; a background status poll goes to the service.

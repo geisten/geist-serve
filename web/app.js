@@ -336,6 +336,9 @@ function buttonStates() {
   $('test-connection').disabled = !state?.ready || inferenceBusy() || connectionTesting || runtimeRequest() || !!controller;
   $('copy-connection').disabled = !state?.ready;
   $('connection-endpoint').textContent = t(`${location.origin}/v1`);
+  // #143: the same API over a socket only this user account can open.
+  $('connection-socket').textContent = state?.api_socket || '';
+  $('connection-socket').hidden = $('connection-socket-label').hidden = !state?.api_socket;
   // #58: without a model this is a hint, not a copyable value.
   $('connection-model').classList.toggle('is-empty', !state?.active_id);
   if (state?.active_id) $('connection-model').textContent = state.active_id;

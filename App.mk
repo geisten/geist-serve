@@ -44,6 +44,7 @@ test-app: build/test_app_memory_journal build/test_app_memory build/test_app_lif
 	python3 tests/app/quality_test.py
 	python3 tests/app/deadline_test.py
 	python3 tests/app/http_test.py
+	python3 tests/app/api_socket_test.py
 	python3 tests/app/catalog_test.py
 	python3 tests/app/verification_test.py
 	python3 tests/app/engine_identity_test.py
