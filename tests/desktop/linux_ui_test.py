@@ -89,7 +89,7 @@ with tempfile.TemporaryDirectory(prefix='geist-desktop-') as temporary:
         wait_js(desktop.view, "document.documentElement.lang === 'de'")
         spin(lambda: desktop.preferences.exists())
         assert json.loads(desktop.preferences.read_text())['language'] == 'de'
-        assert evaluate(desktop.view, "document.getElementById('task-title').textContent") == 'Kurz testen'
+        assert evaluate(desktop.view, "document.getElementById('task-title').textContent") == 'Kurztest'
         evaluate(desktop.view, "showPage('test-page'); document.getElementById('prompt').value='Keep my input'; document.getElementById('ui-language').value='en'; document.getElementById('ui-language').dispatchEvent(new Event('change')); true")
         assert evaluate(desktop.view, "document.getElementById('prompt').value") == 'Keep my input'
         evaluate(desktop.view, "window.copyDone=false; copyText('geisten desktop clipboard test').then(() => window.copyDone=true); true")

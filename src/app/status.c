@@ -378,6 +378,10 @@ void status_response(int fd, struct app_arena *arena) {
         for (size_t i = 0; i < app_model_count; i++)
             rates[slot][i] = app.prefs.speed[i][slot].rate, sizes[slot][i] = (double) app_models[i].bytes,
             firsts[slot][i] = app.prefs.speed[i][slot].first;
+    unsigned measured_models[2] = {0, 0}; /* the basis of an estimate, per processor */
+    for (unsigned slot = 0; slot < 2; slot++)
+        for (size_t i = 0; i < app_model_count; i++)
+            measured_models[slot] += rates[slot][i] > 0;
     /* #103: the installed model with the best verdict, then pass rate, then speed. */
     const struct app_model *best = nullptr;
     struct app_judgement    best_judgement = {APP_VERDICT_UNKNOWN, ""};
@@ -503,7 +507,14 @@ void status_response(int fd, struct app_arena *arena) {
         numeric_rate(&b, seconds[0]);
         app_put(&b, ",\"gpu\":");
         numeric_rate(&b, seconds[1]);
-        app_put(&b, "},\"passed\":");
+        /* What the speed rests on (#103): when each processor was measured
+         * here, or how many measured models an estimate scales from. */
+        app_put(&b, "},\"measured_at\":{\"cpu\":");
+        numeric_rate(&b, estimated ? -1 : app.prefs.speed[i][0].recorded);
+        app_put(&b, ",\"gpu\":");
+        numeric_rate(&b, estimated || !gpu_supported(m) ? -1 : app.prefs.speed[i][1].recorded);
+        app_printf(&b, "},\"estimated_from\":%u", estimated ? measured_models[fastest > 0 ? 1 : 0] : 0);
+        app_put(&b, ",\"passed\":");
         if (total)
             app_printf(&b, "%u,\"total\":%u}", passed, total);
         else
