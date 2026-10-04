@@ -148,32 +148,17 @@ static const struct turn_fmt FMT_LLAMA3 = {"<|start_header_id|>",
                                            "user",
                                            "assistant"};
 
-/* BitNet b1.58 2B-4T (Llama-3 vocab, own template): no system role, so the
- * system text is folded into the first Human turn like Gemma 3. The
- * template ends every Human turn with eos right after "BITNETAssistant: ";
- * that eos is <|eot_id|>, which the vocab carries as a single token. */
+/* BitNet b1.58 2B-4T (Llama-3 vocab): the turn format from the model card,
+ * "System: …<|eot_id|>User: …<|eot_id|>Assistant: ". The GGUF's own
+ * "Human: … BITNETAssistant: " template never ends the turn, and Llama-3
+ * headers make the model end it at the first line break (#106). */
 static void render_bitnet(struct out *o, size_t n, const struct chat_msg msgs[]) {
-    size_t      i      = 0;
-    const char *folded = nullptr;
-    if (n > 0 && is_system(&msgs[0])) {
-        folded = msgs[0].content;
-        i      = 1;
-    }
-    for (; i < n; i++) {
-        if (is_assistant(&msgs[i])) {
-            put(o, msgs[i].content);
-            put(o, "<|eot_id|>");
-            continue;
-        }
-        put(o, "Human: ");
-        if (folded != nullptr) {
-            put(o, folded);
-            put(o, "\n\n");
-            folded = nullptr;
-        }
+    for (size_t i = 0; i < n; i++) {
+        put(o, is_system(&msgs[i]) ? "System: " : is_assistant(&msgs[i]) ? "Assistant: " : "User: ");
         put(o, msgs[i].content);
-        put(o, "\n\nBITNETAssistant: ");
+        put(o, "<|eot_id|>");
     }
+    put(o, "Assistant: ");
 }
 
 char *chat_render(enum chat_family f, size_t n, const struct chat_msg msgs[]) {
