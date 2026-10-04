@@ -82,7 +82,10 @@ function addTurn(prompt) {
   const userText = document.createElement('div'); userText.className = 'message-text'; userText.textContent = prompt;
   user.setAttribute('aria-label', t('You')); user.append(userText);
   const answer = document.createElement('article'); answer.className = 'chat-message assistant';
-  const label = document.createElement('div'); label.className = 'message-label'; label.textContent = `geisten · ${modelLabel(state.models.find(model => model.id === state.active_id))}`;
+  const replyModel = state.models.find(model => model.id === state.active_id);
+  const label = document.createElement('div'); label.className = 'message-label';
+  label.textContent = `geisten · ${replyModel ? `${replyModel.group_name || replyModel.name} · ${t(plainVariant(replyModel))}` : modelLabel(replyModel)}`;
+  label.title = modelLabel(replyModel); // #123: the weight format as detail
   const output = document.createElement('div'); output.id = 'output'; output.className = 'message-text markdown'; output.markdownSource = '';
   const status = document.createElement('p'); status.className = 'message-status'; uiText(status, 'Sending…');
   const actions = document.createElement('div'); actions.className = 'message-actions';
@@ -178,11 +181,15 @@ function engineText(engine) {
 }
 const rateText = value => `${knownNumber(value) ? formatNumber(value, 1) : '—'} ${t('tok/s')}`;
 const timeText = value => knownNumber(value) ? `${formatNumber(value, 2)} s` : '—';
+// #123: the reply shows how long it took; rate, tokens and first-text times are
+// its tooltip and accessible name (layer 2/3 detail).
 function renderReplyMetrics(element) {
   const m = element.replyMetrics;
   if (!m) return;
-  element.textContent = `${rateText(m.rate)} · ${knownNumber(m.tokens) ? m.tokens : '—'} ${t('tokens')} · ${timeText(m.total)}`;
-  element.title = `${t('First text')}: ${timeText(m.first)} · ${t('First answer')}: ${timeText(m.firstAnswer)}${m.reasoning ? ' · ' + t('Tokens and time include answer preparation.') : ''}`;
+  const detail = `${rateText(m.rate)} · ${knownNumber(m.tokens) ? m.tokens : '—'} ${t('tokens')} · ${timeText(m.total)}`;
+  element.textContent = timeText(m.total);
+  element.title = `${detail} · ${t('First text')}: ${timeText(m.first)} · ${t('First answer')}: ${timeText(m.firstAnswer)}${m.reasoning ? ' · ' + t('Tokens and time include answer preparation.') : ''}`;
+  element.setAttribute('aria-label', detail);
 }
 function renderMemory() {
   const r = state?.resources, memory = state?.memory;
@@ -356,7 +363,14 @@ function buttonStates() {
   $('runtime-state').setAttribute('aria-label', runtimeStatus); $('runtime-state').title = runtimeStatus;
   $('runtime-state').classList.toggle('inactive', !state?.ready);
   $('runtime-state').classList.toggle('loading', loading);
-  $('runtime-name').textContent = modelLabel(state?.models.find(model => model.id === (switching(state) ? state.job_model : state.active_id || state.job_model)));
+  // #123: plain words in the header; the weight format (Q8_0) is the tooltip.
+  const headerModel = state?.models.find(model => model.id === (switching(state) ? state.job_model : state.active_id || state.job_model));
+  $('runtime-name').textContent = headerModel ? `${headerModel.group_name || headerModel.name} · ${t(plainVariant(headerModel))}` : modelLabel(headerModel);
+  $('runtime-name').title = modelLabel(headerModel);
+  const processor = state?.execution?.active === 'gpu' ? 'gpu' : 'cpu', answer = headerModel?.verdict?.seconds?.[processor];
+  const speedOn = state?.ready && knownNumber(answer);
+  $('runtime-speed').textContent = speedOn ? `~${formatNumber(Math.max(1, Math.round(answer)))} s` : '';
+  $('runtime-speed').title = speedOn ? t(`about ${Math.max(1, Math.round(answer))} s per answer on the ${processor === 'gpu' ? 'graphics chip' : 'processor'}`) : '';
   renderActivity();
   $('language-choice').disabled = !!controller;
 }
