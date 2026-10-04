@@ -860,6 +860,10 @@ static int print_backends(void) {
 }
 
 int main(int argc, char **argv) {
+    /* An idle server must not spin: the engine asks OpenMP for active waiting
+     * unless told otherwise, which kept every core busy between requests.
+     * Same policy as the app gives geistd (child.c); OMP_WAIT_POLICY wins. */
+    setenv("OMP_WAIT_POLICY", "passive", 0);
     if (strcmp(geist_version_string(), GEIST_HEADER_VERSION)) {
         fprintf(stderr, "Linked library/header version mismatch; rebuild the engine\n");
         return 1;

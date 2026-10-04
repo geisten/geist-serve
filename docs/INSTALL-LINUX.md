@@ -31,8 +31,10 @@ instead of the rootless runtime: the matching `geisten_<v>_<arch>.deb` and
   first with `--uninstall` (models and settings stay), then use `--desktop`.
   An existing APT installation is upgraded by the same command.
 - `--dry-run` downloads and verifies the pair only; `--model recommended` runs
-  `geisten setup` after the install. Open the window from the application menu
-  or with `geisten-desktop`.
+  `geisten setup` after the install.
+- In a graphical session the installer then asks "Open geisten now? [Y/n]"
+  and starts the window. It doesn't ask with `--yes` or without a terminal.
+  Later, open it from the application menu or with `geisten-desktop`.
 
 ## First model
 
