@@ -448,6 +448,22 @@ desktop_install() {
         if [ $yes -eq 1 ]; then geisten setup --yes; else geisten setup; fi ||
             fail $E_MODEL "geisten is installed, but the model setup did not finish. Resume with: geisten setup"
     fi
+    # #46: in a graphical session, offer the window right away; never unattended.
+    if [ $yes -eq 0 ] && [ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]; then
+        answer=n
+        if test_mode && [ -n "${GEIST_INSTALL_TEST_OPEN:-}" ]; then
+            answer=$GEIST_INSTALL_TEST_OPEN
+        elif (true </dev/tty) 2>/dev/null; then
+            printf 'Open geisten now? [Y/n] ' >/dev/tty
+            read -r answer </dev/tty || answer=n
+        fi
+        case $answer in
+            '' | y | Y | yes | j | J | ja)
+                nohup geisten-desktop >/dev/null 2>&1 </dev/null &
+                say "geisten is opening. Later: application menu, or run geisten-desktop"
+                exit 0 ;;
+        esac
+    fi
     say "Open geisten from the application menu, or run: geisten-desktop"
     exit 0
 }

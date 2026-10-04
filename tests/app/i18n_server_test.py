@@ -76,3 +76,8 @@ if __name__ == '__main__':
     missing = [m for m in untranslated(sorted(set(found) - API_ONLY))]
     assert not missing, 'German text missing for server messages:\n' + '\n'.join(f'  {found[m]}: {m}' for m in missing)
     print(f'i18n: all {len(found) - len(API_ONLY & set(found))} UI-facing server messages have German text')
+    # #92: the product is "geisten"; the old name stays only in deliberate migration notes.
+    root = Path(__file__).resolve().parents[2]
+    old = [f'{p.relative_to(root)}:{n}' for p in [*root.glob('web/*.js'), *root.glob('web/*.html'), root/'docs/INSTALL.md', root/'README.md']
+           if p.exists() for n, line in enumerate(p.read_text().splitlines(), 1) if re.search(r'\bGeist(?![-_\w])', line)]
+    assert not old, 'the old product name is still visible:\n  ' + '\n  '.join(old)
