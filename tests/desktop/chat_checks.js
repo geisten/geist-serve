@@ -1043,12 +1043,23 @@ $$
         render({...saved, ready: true, loading: false, phase: '', active_id: model.id, models: saved.models.map(m => m.id === model.id ? {...m, installed: true, verdict} : m)});
         const card = cards.get(model.id), shown = selector => getComputedStyle(card.querySelector(selector)).display !== 'none';
         assert(card.classList.contains('active') && shown('.ring-active') && !shown('.ring-check') && card.querySelector('.model-verdict').textContent === '✗', '#121: active and ✗ without a second, green check');
-        assert(card.querySelector('.model-title .model-verdict') && card.querySelector('.model-name').textContent === (model.group_name || model.name), '#121: name and verdict share the first row');
+        const chip = card.querySelector('.model-verdict'), nameBox = card.querySelector('.model-name').getBoundingClientRect(), chipBox = chip.getBoundingClientRect();
+        assert(chip.tagName === 'BUTTON' && !chip.closest('.model-pick') && chipBox.top < nameBox.bottom && chipBox.bottom > nameBox.top && card.querySelector('.model-name').textContent === (model.group_name || model.name), '#121/#133: name and verdict share the first row; the chip is its own button');
+        { // #133: on touch there is no hover: a tap on the chip opens the explanation in place, never the model.
+          const originalChoose = choose, chosen = []; choose = async id => { chosen.push(id); };
+          try {
+            chip.click();
+            const detail = card.querySelector('.model-detail');
+            assert(!detail.hidden && chip.getAttribute('aria-expanded') === 'true' && chip.getAttribute('aria-controls') === detail.id && detail.textContent.includes(verdictText(cards.get(model.id) && state.models.find(m => m.id === model.id))) && detail.textContent.includes(verdictBasis(state.models.find(m => m.id === model.id))), '#133: a tap shows the reason and its basis under the card');
+            chip.click();
+            assert(detail.hidden && chip.getAttribute('aria-expanded') === 'false' && !chosen.length, '#133: a second tap closes it; the chip never starts or downloads the model');
+          } finally { choose = originalChoose; }
+        }
         assert(getComputedStyle(card.closest('.model-group').querySelector('h3')).display === 'none', '#121: no group heading for a single variant');
         const meta = card.querySelector('.model-badges');
         assert(meta.querySelector('.model-size').textContent === `${t(plainVariant(model))} · ${bytes(model.bytes)}` && meta.querySelector('.model-quality').textContent === (qualityCounts(model) ? `${Math.round(100 * qualityCounts(model).passed / qualityCounts(model).total)}%` : '') && meta.querySelector('.model-seconds').textContent === '~3 s', '#121: size · share · seconds in the second row');
         assert(!shown('.model-badges [data-capability="chat"]'), '#121: text chat is implied; only other capabilities get a symbol');
-        assert(card.getBoundingClientRect().height <= 96, `#121: a compact card (${card.getBoundingClientRect().height}px)`);
+        assert(card.getBoundingClientRect().height <= 116, `#121: a compact card, two rows of at most 52 + 52 px plus padding (${card.getBoundingClientRect().height}px)`);
         assert($('model-legend').tagName === 'DETAILS' && !$('model-legend').open && $('model-legend').textContent.includes(t('Good choice')), '#121: the legend is one click away and still names every symbol');
       } finally { render(saved); }
     }

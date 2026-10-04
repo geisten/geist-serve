@@ -218,6 +218,7 @@ const german = {
   'From best suited to unsuitable. Correct answers in the reference test (the mark is "reliable enough") and seconds per typical answer on this computer (marks: fast enough, usable). ≈ means estimated; a thin line is a reference measurement on another computer.': 'Von am besten geeignet bis ungeeignet. Richtige Antworten im Referenztest (die Markierung ist „zuverlässig genug“) und Sekunden pro typischer Antwort auf diesem Rechner (Markierungen: schnell genug, nutzbar). ≈ heißt geschätzt; eine dünne Linie ist eine Referenzmessung auf einem anderen Rechner.',
   'Seconds per answer': 'Sekunden pro Antwort',
   'Back to the model': 'Zurück zum Modell',
+  'Show details': 'Details zeigen',
   'Connect a program': 'Programm verbinden',
   'No model fits this computer well.': 'Kein Modell passt gut zu diesem Rechner.',
   'Recommended here': 'Hier empfohlen',
