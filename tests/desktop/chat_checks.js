@@ -1010,18 +1010,20 @@ $$
       try {
         render(snapshot);
         $('open-compare').click();
-        assert($('compare-dialog').open && $('compare-chart').querySelectorAll('.compare-point').length === 2, '#103: one point per measured processor');
-        assert($('compare-chart').querySelector('.compare-zone') && $('compare-chart').getAttribute('role') === 'img' && $('compare-chart').getAttribute('aria-labelledby') === 'compare-caption', '#103: the zone, and a labelled chart');
-        const rows = [...$('compare-table').tBodies[0].rows];
-        assert(rows.length === 2 && rows[0].cells[2].textContent === `${formatNumber(9.6, 1)} s` && rows[0].cells[4].textContent === '146/160' && rows[1].cells[2].textContent === '–', '#103: the table has the same values');
+        // #133: a ranked bar list in the list's order, values as text in the cells.
+        const rows = [...$('compare-table').tBodies[0].rows], order = rows.map(r => r.dataset.id);
+        const ranked = (snapshot.ranking || []).filter(id => snapshot.models.some(m => m.id === id && m.verdict));
+        assert($('compare-dialog').open && !$('compare-chart') && JSON.stringify(order) === JSON.stringify(ranked), '#133: one row per model, in suitability order');
+        const rowA = rows.find(r => r.dataset.id === a.id), rowB = rows.find(r => r.dataset.id === b.id);
+        assert(rowA.cells[2].textContent.includes('91%') && rowA.cells[3].textContent.includes(`${formatNumber(3.2, 1)} s`) && rowB.cells[3].textContent.includes('–'), '#133: share and seconds of the better processor as text');
+        const fill = rowA.querySelector('.bar-cell:nth-of-type(4) .bar-fill, td:nth-child(4) .bar-fill');
+        assert(fill && fill.dataset.zone === 'fast' && parseFloat(fill.style.width) > 0 && rowA.querySelectorAll('td:nth-child(4) .bar-mark').length === 2 && rowA.querySelector('td:nth-child(3) .bar-mark').style.left === '90%', '#133: bars drawn (CSSOM), zones and the fast/usable/reliable marks');
         assert($('verdict-fast').value === '10' && $('verdict-reliable').value === '90' && $('verdict-intent').value === 'chat', '#103: current thresholds shown');
-        const basis = rows[0].querySelector('.compare-basis').title;
-        assert(basis.startsWith(t('Speed measured on this computer')) && basis.includes('GPU') && rows[1].querySelector('.sr-only:last-child').textContent.includes(t('Answer quality not tested yet')) === !b.quality_evidence, '#103: each row names what it rests on');
-        $('compare-chart').querySelector(`.compare-point[data-id="${a.id}"] circle`).dispatchEvent(new MouseEvent('click', {bubbles: true}));
-        assert(rows[0].classList.contains('highlight') && document.activeElement === rows[0], '#103: a point leads to its row');
-        const reference = $('compare-chart').querySelector('.compare-reference');
-        assert(reference && reference.querySelector('title').textContent.startsWith(t('Reference, not this computer')) && reference.querySelector('title').textContent.includes('Apple M1 Max'), '#104: a reference is a labelled mark, not a measurement here');
-        assert(rows[0].querySelector('.compare-basis').title.includes('Apple M1 Max'), '#104: the row names the reference');
+        const basis = rowA.querySelector('.compare-basis').title;
+        assert(basis.startsWith(t('Speed measured on this computer')) && basis.includes('GPU') && rowB.querySelector('.sr-only:last-child').textContent.includes(t('Answer quality not tested yet')) === !b.quality_evidence, '#103: each row names what it rests on');
+        const reference = rowA.querySelector('.bar-reference');
+        assert(reference && reference.title.startsWith(t('Reference, not this computer')) && reference.title.includes('Apple M1 Max') && parseFloat(reference.style.left) > 0, '#104: a reference is a labelled thin mark, not a measurement here');
+        assert(rowA.querySelector('.compare-basis').title.includes('Apple M1 Max'), '#104: the row names the reference');
         $('verdict-fast').value = '15'; $('verdict-intent').value = 'context'; $('verdict-intent').dispatchEvent(new Event('change'));
         await new Promise(resolve => setTimeout(resolve, 0));
         assert(JSON.stringify(sent.at(-1)) === JSON.stringify(['/app/verdict-settings', {intent: 'context', fast_s: 15, usable_s: 30, reliable: .9}]), '#103: changes are saved per computer');

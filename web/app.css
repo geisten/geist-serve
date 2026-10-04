@@ -1126,27 +1126,13 @@ body.manager-page main { max-width:1180px }
 .best-row .best-choice { flex:1 }
 .best-row #open-compare { margin-left:auto; min-width:28px; min-height:28px; padding:4px; color:var(--muted) }
 .best-row #open-compare svg { width:16px; height:16px }
-.compare-figure { margin:0 0 12px }
-#compare-chart { width:100%; height:auto; font-size:9px; fill:var(--ink) }
-#compare-chart text { fill:var(--muted) }
-.compare-zone { fill:color-mix(in srgb,var(--good) 12%,transparent) }
-.compare-usable { stroke:var(--warning); stroke-dasharray:3 3 }
-.compare-axis,.compare-grid { stroke:var(--border); fill:none }
-.compare-point circle { stroke:var(--bg); stroke-width:1.5 }
-.compare-point[data-verdict="good"] circle { fill:var(--good) }
-.compare-point[data-verdict="usable"] circle { fill:var(--warning) }
-.compare-point[data-verdict="not_recommended"] circle { fill:var(--danger) }
-.compare-point[data-verdict="unknown"] circle { fill:var(--muted) }
-.compare-point text { fill:var(--ink) }
 .compare-table { width:100%; border-collapse:collapse; font-size:12px; font-variant-numeric:tabular-nums }
 .compare-table th,.compare-table td { padding:5px 6px; border-bottom:1px solid var(--border); text-align:left }
 .compare-table th[scope="row"] { font-weight:500 }
 .compare-settings { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px 12px; align-items:end }
 .compare-settings label { display:flex; flex-direction:column; gap:3px; font-size:12px }
-.compare-point { cursor:pointer }
 .compare-basis { cursor:help; color:var(--muted) }
 .compare-table tr.highlight { background:color-mix(in srgb,var(--good) 8%,transparent) }
-.compare-reference { fill:none; stroke:var(--muted); stroke-width:1; stroke-dasharray:2 2; opacity:.7 }
 /* #122: the recommendation's action */
 .best-row { flex-wrap:wrap }
 .best-row .best-action { order:3; flex-basis:100%; justify-content:flex-start; padding:2px 0; color:var(--accent); font-weight:600 }
@@ -1225,3 +1211,19 @@ body.manager-page { display:block }
 .app-shell > main { min-height:0; overflow:hidden }
 .app-shell > main > .page:not(#models-page) { min-height:0; overflow:auto }
 .app-shell > main { margin:0 }
+
+/* #133: ranked bar list in Compare models */
+.compare-table .bar-cell { min-width:120px; white-space:nowrap }
+.compare-table .bar { position:relative; display:inline-block; vertical-align:middle; width:calc(100% - 52px); min-width:60px; height:8px; border-radius:4px; background:var(--soft); overflow:visible }
+.compare-table .bar-fill { position:absolute; left:0; top:0; bottom:0; border-radius:4px; background:var(--muted) }
+.compare-table .bar-fill[data-zone="fast"] { background:var(--good) }
+.compare-table .bar-fill[data-zone="usable"] { background:var(--warning) }
+.compare-table .bar-fill[data-zone="slow"] { background:var(--danger) }
+.compare-table .bar-fill[data-estimated="true"] { background:transparent; border:1.5px dashed currentColor }
+.compare-table .bar-fill[data-estimated="true"][data-zone="fast"] { color:var(--good) }
+.compare-table .bar-fill[data-estimated="true"][data-zone="usable"] { color:var(--warning) }
+.compare-table .bar-fill[data-estimated="true"][data-zone="slow"] { color:var(--danger) }
+.compare-table .bar-mark { position:absolute; top:-3px; bottom:-3px; width:0; border-left:1.5px solid var(--ink); opacity:.55 }
+.compare-table .bar-reference { position:absolute; top:-4px; bottom:-4px; width:0; border-left:1px dashed var(--muted); cursor:help }
+.compare-table .bar-value { display:inline-block; width:48px; text-align:right; font-variant-numeric:tabular-nums }
+@media (max-width:540px) { .compare-table .bar-cell { min-width:90px } .compare-table .bar { width:calc(100% - 46px) } .compare-table .bar-value { width:42px } }

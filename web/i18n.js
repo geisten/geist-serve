@@ -215,6 +215,8 @@ const german = {
   'engine': 'Engine',
   'Basis': 'Grundlage',
   'Reference, not this computer': 'Referenz, nicht dieser Rechner',
+  'From best suited to unsuitable. Correct answers in the reference test (the mark is "reliable enough") and seconds per typical answer on this computer (marks: fast enough, usable). ≈ means estimated; a thin line is a reference measurement on another computer.': 'Von am besten geeignet bis ungeeignet. Richtige Antworten im Referenztest (die Markierung ist „zuverlässig genug“) und Sekunden pro typischer Antwort auf diesem Rechner (Markierungen: schnell genug, nutzbar). ≈ heißt geschätzt; eine dünne Linie ist eine Referenzmessung auf einem anderen Rechner.',
+  'Seconds per answer': 'Sekunden pro Antwort',
   'No model fits this computer well.': 'Kein Modell passt gut zu diesem Rechner.',
   'Recommended here': 'Hier empfohlen',
   'Symbols': 'Symbole',
