@@ -972,37 +972,29 @@ $$
       assert($('best-choice').textContent === t('No model fits this computer well.') && $('best-action').hidden && $('recommend-action').hidden, '#122: nothing fits: said plainly, no action');
       render(saved);
     }
-    { // #103: measure speed on demand: the active model directly, another one after starting it; cancel while running.
-      const saved = state, originalApi = api, originalChoose = choose, originalPoll = poll, calls = [];
+    { // #103: the stopwatch measures the active model from the model view; the same button cancels.
+      const saved = state, originalApi = api, originalPoll = poll, calls = [];
       // Only the measurement calls are stubbed; a background status poll goes to the service.
       api = async (path, body, signal) => { if (!path.startsWith('/app/performance/')) return originalApi(path, body, signal); calls.push(path); return {ok: true, json: async () => ({})}; };
       poll = async () => {};
-      choose = async id => { calls.push(`choose:${id}`); };
-      const unmeasured = {value: 'unknown', reason: 'speed_unknown', processor: null, seconds: {cpu: null, gpu: null}, passed: 146, total: 160};
-      const [a, b] = saved.models.filter(m => m.resource_fit !== 2).slice(0, 2);
-      const snap = extra => ({...saved, ready: true, loading: false, busy: false, phase: '', job_model: '', active_id: a.id, comparison: {running: false, step: 0, phase: '', result: ''},
-        models: saved.models.map(m => m.id === a.id || m.id === b.id ? {...m, installed: true, verdict: unmeasured} : m), ...extra});
+      const snap = extra => ({...saved, ready: true, loading: false, busy: false, phase: '', job_model: '', comparison: {running: false, step: 0, phase: '', result: ''}, ...extra});
       try {
+        const button = $('measure-speed');
+        assert(!document.querySelector('#models .measure, #other-models-list .measure'), '#133: no stopwatch in the model list');
         render(snap());
-        const button = id => cards.get(id).querySelector('.measure');
-        assert(!button(a.id).hidden && !button(a.id).disabled && button(a.id).getAttribute('aria-label').startsWith(t('Measure speed on this computer')), '#103: a symbol button for unmeasured installed models');
-        await measureSpeed(a.id);
-        assert(calls.includes('/app/performance/compare'), '#103: the active model is measured directly');
-        calls.length = 0; await measureSpeed(b.id);
-        assert(calls[0] === `choose:${b.id}` && measuringModel === b.id, '#103: another model is started first');
-        calls.length = 0; render(snap({active_id: b.id}));
-        await new Promise(resolve => setTimeout(resolve, 0));
-        assert(calls.includes('/app/performance/compare') && measuringModel === null, '#103: then measured once it is ready');
-        render(snap({active_id: b.id, comparison: {running: true, step: 3, phase: 'measuring', result: ''}}));
-        assert(button(b.id).dataset.running === 'true' && cards.get(b.id).querySelector('.download-state').textContent === `${t('Measuring speed')} · 3/${saved.execution?.gpu_available ? 8 : 4}`, '#103: progress on the card');
-        assert(button(a.id).disabled, '#103: one measurement at a time');
-        calls.length = 0; await measureSpeed(b.id);
+        assert(!button.hidden && !button.disabled && button.closest('.execution-row') && button.getAttribute('aria-label') === t('Measure speed on this computer'), '#133: a symbol button in the model view');
+        button.click(); await new Promise(resolve => setTimeout(resolve, 0));
+        assert(calls.includes('/app/performance/compare'), '#103: the active model is measured');
+        const running = snap({comparison: {running: true, step: 3, phase: 'measuring', result: ''}});
+        render(running);
+        assert(button.dataset.running === 'true' && !button.disabled && cards.get(running.active_id)?.querySelector('.download-state').textContent === `${t('Measuring speed')} · 3/${saved.execution?.gpu_available ? 8 : 4}`, '#103: progress on the card, stop shape on the button');
+        calls.length = 0; button.click(); await new Promise(resolve => setTimeout(resolve, 0));
         assert(calls[0] === '/app/performance/cancel', '#103: the same button cancels');
-        render(snap({models: saved.models.map(m => m.id === a.id ? {...m, installed: true, verdict: {...unmeasured, basis: 'measured', processor: 'gpu', seconds: {cpu: null, gpu: 3}}} : m)}));
-        assert(cards.get(a.id).querySelector('.measure').hidden, '#103: no button once measured');
-        render(snap({models: saved.models.map(m => m.id === a.id ? {...m, installed: true, verdict: {...unmeasured, value: 'usable', reason: 'slow', basis: 'estimated', processor: 'cpu', seconds: {cpu: 18, gpu: null}}} : m)}));
-        assert(!cards.get(a.id).querySelector('.measure').hidden && cards.get(a.id).querySelector('.model-verdict').title.includes(t('estimated, measure to confirm')), '#133: an installed model with an estimate keeps the stopwatch and says so');
-      } finally { api = originalApi; choose = originalChoose; poll = originalPoll; measuringModel = null; render(saved); }
+        render(snap({ready: false}));
+        assert(button.hidden, '#133: nothing to measure without a ready model');
+        render(snap({busy: true}));
+        assert(button.disabled, '#133: one thing at a time');
+      } finally { api = originalApi; poll = originalPoll; render(saved); }
     }
     { // #103: compare view: chart and its table equivalent, thresholds and intent per computer.
       const saved = state, originalApi = api, originalPoll = poll, sent = [];
@@ -1086,11 +1078,6 @@ $$
       const doubled = [...document.querySelectorAll('#settings-page .settings-row')].filter(row => row.nextElementSibling?.classList.contains('preference-group') && parseFloat(getComputedStyle(row).borderBottomWidth) > 0);
       assert(!doubled.length, '#126: no double divider before a settings group');
       showPage('models-page');
-      const saved = state, model = saved.models.find(m => m.resource_fit !== 2);
-      render({...saved, models: saved.models.map(m => m.id === model.id ? {...m, installed: true, verdict: {value: 'unknown', reason: 'speed_unknown', processor: null, seconds: {cpu: null, gpu: null}, passed: null, total: null}} : m)});
-      const card = cards.get(model.id), remove = card.querySelector('.remove').getBoundingClientRect(), measure = card.querySelector('.measure').getBoundingClientRect(), box = card.getBoundingClientRect();
-      assert(!card.querySelector('.measure').hidden && Math.abs(remove.left - measure.left) < 1 && measure.top >= remove.bottom - 1 && measure.right <= box.right + 1 && measure.width >= 44 && measure.height >= 44, '#126: remove and measure share one column inside the card');
-      render(saved);
     }
     { // #133: a ✗ says why; quality has no "here"; weak-everywhere models fold into "Other models", the active one stays.
       const single = m => saved.models.filter(x => (x.group_id || x.id) === (m.group_id || m.id)).length === 1;
