@@ -40,4 +40,11 @@ int main(void) {
     }
     assert(app_answer_seconds(0, 1) < 0 && app_answer_seconds(20, 0.5) == 10.5 && app_answer_seconds(40, -1) == 5);
     assert(!strcmp(app_verdict_name(APP_VERDICT_NOT_RECOMMENDED), "not_recommended"));
+    /* Estimates scale the measured throughput by file size; no measurement, no estimate. */
+    double rate[] = {20, 40, 0}, bytes[] = {4e9, 1e9, 2e9}, first[] = {.5, .3, 9};
+    assert(app_estimate_seconds(2000000000, rate, bytes, first, 3) > 0);
+    /* median throughput (80e9 + 40e9) / 2 = 60e9 B/s → 30 tokens/s for 2 GB; first (.3 + .5) / 2 */
+    double e = app_estimate_seconds(2000000000, rate, bytes, first, 3);
+    assert(e > .4 + 200 / 30. - 1e-9 && e < .4 + 200 / 30. + 1e-9);
+    assert(app_estimate_seconds(2000000000, rate, bytes, first, 0) < 0 && app_estimate_seconds(0, rate, bytes, first, 3) < 0);
 }
