@@ -192,6 +192,8 @@ jobs:
         run: make fetch-model
       - name: SDKs
         run: |
+          brew install go openjdk@21
+          echo "$(brew --prefix openjdk@21)/bin" >> "$GITHUB_PATH"
           python3 -m venv "$RUNNER_TEMP/sdk" && "$RUNNER_TEMP/sdk/bin/pip" install -q openai
           npm install -s --prefix "$RUNNER_TEMP/sdknode" openai
       - name: run every snippet
