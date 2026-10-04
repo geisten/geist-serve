@@ -227,7 +227,7 @@ async function checkActivityUX(assert, tick) {
     for (const locale of ['en-US', 'fr-FR', 'debug', '', undefined]) assert(resolveLanguage('system', locale) === 'en', `English fallback: ${locale}`);
     assert(resolveLanguage('en', 'de-DE') === 'en' && resolveLanguage('de', 'en-US') === 'de', 'manual preference overrides OS');
     assert(resolveLanguage('invalid', 'de-DE') === 'de', 'invalid preference returns to system');
-    const international = new Set(['geisten', 'geist', 'English', 'Deutsch', 'Home Assistant', 'Terminal', 'VS Code · Continue', '—', '— tok/s', '— RAM']);
+    const international = new Set(['geisten', 'geist', 'English', 'Deutsch', 'Home Assistant', 'Terminal', 'VS Code · Continue', '—', '— tokens/s', '— RAM']);
     const sources = [...staticTexts.map(([, text]) => text.trim()), ...staticAttributes.map(([, , text]) => text)];
     const missing = [...new Set(sources.filter(text => !international.has(text) && !Object.hasOwn(german, text)))];
     assert(!missing.length, `Missing German interface translations: ${missing.join(' | ')}`);
@@ -869,7 +869,7 @@ $$
     assert($('connection-result').textContent === t('Copied. The configuration contains your private local key.'), 'existing interface statuses switch language');
     assert($('output').markdownSource === untranslatedAnswer && $('prompt').value === 'My next draft', 'language change leaves answer and draft untouched');
     $('ui-language').value='en'; $('ui-language').dispatchEvent(new Event('change')); await tick();
-    assert(rateText(32.5) === '32.5 tok/s' && $('new-chat').title === 'Clear chat', 'switching back restores English');
+    assert(rateText(32.5) === '32.5 tokens/s' && $('new-chat').title === 'Clear chat', 'switching back restores English');
     window.chatChecksStage = 'metrics';
     assert($('history-cpu-rate').closest('.execution-choice') && $('history-gpu-rate').closest('.execution-choice'), 'typical speed belongs to each processor choice');
     { // #81: a processor without a reply says so; the GPU backend is matched by its reported name, Vulkan too.
@@ -1032,6 +1032,18 @@ $$
       const jargon = text.match(/tok\/s|Token\/s|tokens\/s|Q4_K_M|Q4_0|Q8_0|I2_S|PQ2_0|\bMetal\b|\bRSS\b|\bCPU\b|\bGPU\b/g);
       assert(!jargon, `#123: technical terms in the first view: ${JSON.stringify(jargon)}`);
       assert($('runtime-name').title.includes(' · ') && $('history-cpu').closest('label').title.includes($('history-cpu-rate').textContent), '#123: the details remain as tooltips');
+    }
+    { // #126: one unit for speed; one divider between settings and a group; card actions in one column.
+      assert(rateText(1).endsWith(` ${t('tokens/s')}`) && !document.body.innerHTML.includes('tok/s'), '#126: tokens/s (Token/s in German) everywhere');
+      showPage('settings-page');
+      const doubled = [...document.querySelectorAll('#settings-page .settings-row')].filter(row => row.nextElementSibling?.classList.contains('preference-group') && parseFloat(getComputedStyle(row).borderBottomWidth) > 0);
+      assert(!doubled.length, '#126: no double divider before a settings group');
+      showPage('models-page');
+      const saved = state, model = saved.models.find(m => m.resource_fit !== 2);
+      render({...saved, models: saved.models.map(m => m.id === model.id ? {...m, installed: true, verdict: {value: 'unknown', reason: 'speed_unknown', processor: null, seconds: {cpu: null, gpu: null}, passed: null, total: null}} : m)});
+      const card = cards.get(model.id), remove = card.querySelector('.remove').getBoundingClientRect(), measure = card.querySelector('.measure').getBoundingClientRect(), box = card.getBoundingClientRect();
+      assert(!card.querySelector('.measure').hidden && Math.abs(remove.left - measure.left) < 1 && measure.top >= remove.bottom - 1 && measure.right <= box.right + 1 && measure.width >= 44 && measure.height >= 44, '#126: remove and measure share one column inside the card');
+      render(saved);
     }
     { // #122: one recommendation: the sentence, the card tag and both buttons name the same model; the action fits.
       const saved = state, originalChoose = choose, chosen = [];

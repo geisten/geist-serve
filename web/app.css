@@ -1189,3 +1189,9 @@ input.switch:checked::before { transform:translateX(16px) }
 input.switch:focus-visible { outline:2px solid var(--focus); outline-offset:2px }
 input.switch:disabled { opacity:.5; cursor:default }
 @media (prefers-reduced-motion:reduce) { input.switch, input.switch::before { transition:none } }
+
+/* #126: one divider between settings rows and the next group, not two */
+.preferences-page .settings-row:has(+ .preference-group) { border-bottom:0 }
+/* #126: card actions share one column: remove on the first row, measure below */
+.model-variants .model:has(.measure:not([hidden])) { padding-right:4px }
+.model-variants .model .measure { position:static; grid-column:2; grid-row:2; width:44px; height:44px; min-width:44px; min-height:44px; padding:12px }

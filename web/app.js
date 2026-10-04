@@ -179,7 +179,7 @@ function engineText(engine) {
   if (!lib?.version) return '';
   return `geistlib ${lib.version}${lib.revision ? ` · ${lib.revision.slice(0, 12)}` : ''}${lib.source_state === 'modified' ? ` · ${t('Modified build')}` : ''}`;
 }
-const rateText = value => `${knownNumber(value) ? formatNumber(value, 1) : '—'} ${t('tok/s')}`;
+const rateText = value => `${knownNumber(value) ? formatNumber(value, 1) : '—'} ${t('tokens/s')}`;
 const timeText = value => knownNumber(value) ? `${formatNumber(value, 2)} s` : '—';
 // #123: the reply shows how long it took; rate, tokens and first-text times are
 // its tooltip and accessible name (layer 2/3 detail).
@@ -232,7 +232,7 @@ function renderPerformance() {
     const own = r => mode === 'gpu' ? r.backend === state?.execution?.gpu_backend : r.backend?.startsWith('cpu');
     const availability = mode==='gpu' && !state?.execution?.gpu_available ? 'Not available' : profile?.recent?.some(r=>r.historical && own(r)) ? 'Historical' : mode === 'gpu' ? 'No GPU reply yet' : 'No CPU reply yet';
     for (const id of ['rate','typical']) $(`history-${mode}-${id}`).textContent = knownNumber(sample?.rate) ? rateText(sample.rate) : t(availability);
-    $(`history-${mode}-range`).textContent = sample?.count >= 5 ? `${formatNumber(sample.q25,1)}–${formatNumber(sample.q75,1)} ${t('tok/s')}` : '—';
+    $(`history-${mode}-range`).textContent = sample?.count >= 5 ? `${formatNumber(sample.q25,1)}–${formatNumber(sample.q75,1)} ${t('tokens/s')}` : '—';
     $(`summary-${mode}-first`).textContent = `◷ ${timeText(sample?.first_answer)}`;
     $(`summary-${mode}-count`).textContent = sample ? `n=${sample.count}` : 'n=—';
     $(`summary-${mode}-count`).title = t(sample ? sample.count<5 ? 'First observations' : 'Observed' : availability);
