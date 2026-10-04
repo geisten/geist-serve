@@ -126,6 +126,16 @@ class ReportTests(unittest.TestCase):
                 r = bench.summarize(raw.parent, bench.load_suite())
                 self.assertEqual({t: {l: [c[l]['passed'], c[l]['total']] for l in ('de', 'en')} for t, c in r['tasks'].items()}, q['tasks'])
 
+    def test_catalog_reference_has_its_evidence(self):
+        """#104: every reference entry is recomputed from its run record."""
+        models = json.loads((bench.ROOT/'models/catalog.json').read_text())['models']
+        for model in (m for m in models if 'reference' in m):
+            run = json.loads((HERE/'evidence/reference'/model['id']/'run.json').read_text())
+            entry = next(r for r in model['reference'] if r['platform'] == 'Apple M1 Max')
+            speed = run['speed']
+            self.assertEqual(entry['answer_ms'], round((speed['first_token_s'] + bench.TYPICAL_ANSWER_TOKENS / speed['tokens_per_s']) * 1000), model['id'])
+            self.assertEqual((entry['date'], entry['engine']), (run['finished_utc'][:10], run['engine']['engine_pin'][:12]), model['id'])
+
     def test_p95_is_nearest_rank(self):
         self.assertEqual(bench.p95(list(range(1, 21))), 19)
         self.assertEqual(bench.p95([5.0]), 5.0)

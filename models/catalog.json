@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "revision": 7,
+  "revision": 9,
   "models": [
     {
       "id": "bitnet-2b",
@@ -64,7 +64,18 @@
             ]
           }
         }
-      }
+      },
+      "reference": [
+        {
+          "platform": "Apple M1 Max",
+          "backend": "cpu",
+          "answer_ms": 6019,
+          "tokens_per_s": 39,
+          "memory_mib": 1892,
+          "date": "2026-10-04",
+          "engine": "33db79d7764b"
+        }
+      ]
     },
     {
       "id": "smollm2-360m",
@@ -129,7 +140,18 @@
             ]
           }
         }
-      }
+      },
+      "reference": [
+        {
+          "platform": "Apple M1 Max",
+          "backend": "gpu",
+          "answer_ms": 2729,
+          "tokens_per_s": 76,
+          "memory_mib": 637,
+          "date": "2026-10-04",
+          "engine": "33db79d7764b"
+        }
+      ]
     },
     {
       "id": "qwen3-0.6b",
@@ -195,7 +217,18 @@
             ]
           }
         }
-      }
+      },
+      "reference": [
+        {
+          "platform": "Apple M1 Max",
+          "backend": "gpu",
+          "answer_ms": 1275,
+          "tokens_per_s": 174,
+          "memory_mib": 1184,
+          "date": "2026-10-04",
+          "engine": "33db79d7764b"
+        }
+      ]
     },
     {
       "id": "qwen35-0.8b",
@@ -261,7 +294,18 @@
             ]
           }
         }
-      }
+      },
+      "reference": [
+        {
+          "platform": "Apple M1 Max",
+          "backend": "gpu",
+          "answer_ms": 1301,
+          "tokens_per_s": 164,
+          "memory_mib": 1728,
+          "date": "2026-10-04",
+          "engine": "33db79d7764b"
+        }
+      ]
     },
     {
       "id": "gemma4-e2b",
@@ -326,7 +370,18 @@
             ]
           }
         }
-      }
+      },
+      "reference": [
+        {
+          "platform": "Apple M1 Max",
+          "backend": "gpu",
+          "answer_ms": 5004,
+          "tokens_per_s": 74,
+          "memory_mib": 3269,
+          "date": "2026-10-04",
+          "engine": "33db79d7764b"
+        }
+      ]
     },
     {
       "id": "gemma4-e4b",
@@ -391,7 +446,18 @@
             ]
           }
         }
-      }
+      },
+      "reference": [
+        {
+          "platform": "Apple M1 Max",
+          "backend": "gpu",
+          "answer_ms": 8638,
+          "tokens_per_s": 46,
+          "memory_mib": 5233,
+          "date": "2026-10-04",
+          "engine": "33db79d7764b"
+        }
+      ]
     },
     {
       "id": "bonsai2-27b-pq2",
