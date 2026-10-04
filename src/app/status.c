@@ -387,6 +387,8 @@ void status_response(int fd, struct app_arena *arena) {
     struct app_candidate    best_candidate = {};
     const char             *best_processor = nullptr;
     bool                    best_estimated = false;
+    struct app_candidate    ranked[APP_MODEL_COUNT];
+    size_t                  order[APP_MODEL_COUNT], ranked_count = 0;
     for (size_t i = 0; i < app_model_count; ++i) {
         const struct app_model *m         = &app_models[i];
         bool                    installed = inventory[i].installed;
@@ -472,9 +474,9 @@ void status_response(int fd, struct app_arena *arena) {
                              gpu_supported(m) ? app_answer_seconds(app.prefs.speed[i][1].rate,
                                                                    app.prefs.speed[i][1].first)
                                               : -1};
-        /* Not installed: an estimate, always labelled; never for installed models,
-         * which can be measured instead. */
-        bool estimated = !installed && seconds[0] < 0 && seconds[1] < 0;
+        /* No measurement of its own: an estimate, always labelled. Installed
+         * models keep the stopwatch to replace it with a measurement (#133). */
+        bool estimated = seconds[0] < 0 && seconds[1] < 0;
         if (estimated) {
             seconds[0] = app_estimate_seconds(m->bytes, rates[0], sizes[0], firsts[0], app_model_count);
             seconds[1] = gpu_supported(m) ? app_estimate_seconds(m->bytes, rates[1], sizes[1], firsts[1], app_model_count) : -1;
@@ -525,8 +527,21 @@ void status_response(int fd, struct app_arena *arena) {
         double rate = total ? (double) passed / total : -1;
         double time = fastest < 0 ? -1 : seconds[fastest];
         struct app_candidate candidate = {j.verdict, rate, time, installed};
+        /* #133: suitability order for the list; installed or not does not count,
+         * so a row never moves when a download completes. Stable insertion. */
+        struct app_candidate fit = {j.verdict, rate, time, false};
+        size_t at = ranked_count;
+        while (at > 0 && app_candidate_better(fit, ranked[at - 1]))
+            ranked[at] = ranked[at - 1], order[at] = order[at - 1], --at;
+        ranked[at] = fit, order[at] = i, ++ranked_count;
         if (j.verdict != APP_VERDICT_NOT_RECOMMENDED && (!best || app_candidate_better(candidate, best_candidate)))
             best = m, best_candidate = candidate, best_processor = processor, best_estimated = estimated;
+    }
+    app_put(&b, "],\"ranking\":[");
+    for (size_t k = 0; k < ranked_count; ++k) {
+        if (k)
+            app_put(&b, ",");
+        app_quote(&b, app_models[order[k]].id);
     }
     app_put(&b, "],\"best_choice\":");
     if (best) {

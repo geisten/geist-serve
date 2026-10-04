@@ -93,6 +93,11 @@ with tempfile.TemporaryDirectory(prefix='geist-catalog-') as temporary:
             assert (v['passed'] is None)==(m['quality_evidence'] is None)
         assert {m['id']:m['verdict']['reason'] for m in snapshot['models']}['another-small-model']=='unreliable'  # 57/80 in the fixture
         assert snapshot['limits']=={'fast_s':10,'usable_s':30,'reliable':0.9,'intent':'chat'}
+        # #133: the suitability ranking holds every model once; ✗ models come last.
+        verdicts={m['id']:m['verdict']['value'] for m in snapshot['models']}
+        assert sorted(snapshot['ranking'])==sorted(verdicts),snapshot['ranking']
+        kinds=[verdicts[i]=='not_recommended' for i in snapshot['ranking']]
+        assert kinds==sorted(kinds),[(i,verdicts[i]) for i in snapshot['ranking']]
         # #122: with nothing installed, the one recommendation is a download, never a ✗ model,
         # and among models of the same verdict none with known quality scores higher.
         best=snapshot['best_choice'];chosen={m['id']:m for m in snapshot['models']}[best['id']]

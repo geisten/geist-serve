@@ -686,15 +686,19 @@ async function checkActivityUX(assert, tick) {
     {// #57: one order for one catalog, whatever is installed, active or recommended by selection.
      const base=structuredClone(state), groupsOf=()=>[...$('models').children].map(g=>g.dataset.group);
      const groupIds=[];for(const m of base.models){const g=m.group_id||m.id;if(!groupIds.includes(g))groupIds.push(g);}
-     const preferredModel=base.models.find(m=>m.id===base.recommendation?.preferred_id), preferredGroup=preferredModel&&(preferredModel.group_id||preferredModel.id);
-     const expected=preferredGroup?[preferredGroup,...groupIds.filter(g=>g!==preferredGroup)]:groupIds;
+     // #133: the order is the service's suitability ranking; a group sits where its best variant ranks.
+     const groupOf=id=>{const m=base.models.find(x=>x.id===id);return m.group_id||m.id;};
+     const expected=[...new Set((base.ranking||[]).map(groupOf))];
      const last=base.models.at(-1).id;
      const fresh={...base,ready:false,active_id:'',recommendation:{...base.recommendation,id:''},models:base.models.map(m=>({...m,installed:false}))};
      const installed={...fresh,models:fresh.models.map(m=>m.id===last?{...m,installed:true}:m)};
      const active={...installed,ready:true,active_id:last,recommendation:{...base.recommendation,id:last,source:'saved'}};
      const orders=[fresh,installed,active].map(s=>{render(structuredClone(s));return groupsOf();});
      render(base);
-     assert(orders.every(o=>JSON.stringify(o)===JSON.stringify(expected)),`#57: platform default first, then catalog order, in every state: ${JSON.stringify({expected,orders})}`);}
+     assert(expected.length===groupIds.length && orders.every(o=>JSON.stringify(o)===JSON.stringify(expected)),`#57/#133: suitability order, the same whatever is installed or active: ${JSON.stringify({expected,orders})}`);
+     render({...base,ranking:[...base.ranking].reverse()});
+     assert(groupsOf()[0]===groupOf(base.ranking.at(-1)),'#133: a different ranking reorders the list');
+     render(base);}
 
     {// #51: first launch names one recommendation, explains the icons and speaks plainly.
      const base=structuredClone(state), pickModel=base.models.find(m=>m.resource_fit!==2);
@@ -987,8 +991,10 @@ $$
         assert(button(a.id).disabled, '#103: one measurement at a time');
         calls.length = 0; await measureSpeed(b.id);
         assert(calls[0] === '/app/performance/cancel', '#103: the same button cancels');
-        render(snap({models: saved.models.map(m => m.id === a.id ? {...m, installed: true, verdict: {...unmeasured, processor: 'gpu', seconds: {cpu: null, gpu: 3}}} : m)}));
+        render(snap({models: saved.models.map(m => m.id === a.id ? {...m, installed: true, verdict: {...unmeasured, basis: 'measured', processor: 'gpu', seconds: {cpu: null, gpu: 3}}} : m)}));
         assert(cards.get(a.id).querySelector('.measure').hidden, '#103: no button once measured');
+        render(snap({models: saved.models.map(m => m.id === a.id ? {...m, installed: true, verdict: {...unmeasured, value: 'usable', reason: 'slow', basis: 'estimated', processor: 'cpu', seconds: {cpu: 18, gpu: null}}} : m)}));
+        assert(!cards.get(a.id).querySelector('.measure').hidden && cards.get(a.id).querySelector('.model-verdict').title.includes(t('estimated, measure to confirm')), '#133: an installed model with an estimate keeps the stopwatch and says so');
       } finally { api = originalApi; choose = originalChoose; poll = originalPoll; measuringModel = null; render(saved); }
     }
     { // #103: compare view: chart and its table equivalent, thresholds and intent per computer.
