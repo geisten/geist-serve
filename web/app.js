@@ -1100,7 +1100,7 @@ window.geistNavigate = showPage;
 // #125: ⌘1-3 (Ctrl on Linux) for the areas; arrow keys walk the model list.
 document.addEventListener('keydown', event => {
   if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
-  const page = {'1': 'models-page', '2': 'connect-page', '3': 'settings-page'}[event.key];
+  const page = {'1': 'models-page', '2': 'settings-page'}[event.key]; // #133: Connect is an action, not an area
   if (page) { event.preventDefault(); showPage(page); }
 });
 $('model-sidebar').addEventListener('keydown', event => {

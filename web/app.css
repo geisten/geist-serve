@@ -1227,3 +1227,9 @@ body.manager-page { display:block }
 .compare-table .bar-reference { position:absolute; top:-4px; bottom:-4px; width:0; border-left:1px dashed var(--muted); cursor:help }
 .compare-table .bar-value { display:inline-block; width:48px; text-align:right; font-variant-numeric:tabular-nums }
 @media (max-width:540px) { .compare-table .bar-cell { min-width:90px } .compare-table .bar { width:calc(100% - 46px) } .compare-table .bar-value { width:42px } }
+/* #133: Connect lives in the model's toolbar; its page has a way back */
+.execution-row #open-tools { display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:4px 8px; color:var(--muted); font-size:13px; font-weight:500 }
+.execution-row #open-tools svg { width:16px; height:16px }
+.back-button { display:inline-flex; align-items:center; gap:4px; margin:0 0 8px -6px; padding:4px 6px; color:var(--muted) }
+.back-button svg { width:16px; height:16px }
+@media (max-width:540px) { .execution-row #open-tools>span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap } }
