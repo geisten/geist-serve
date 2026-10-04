@@ -204,9 +204,9 @@ PY
 )
 check "idle server does not spin" '^0\.[0-9]' "$idle"
 if command -v ollama >/dev/null; then
-    out=$(OLLAMA_HOST=127.0.0.1:$PORT ollama run smollm2-360m-instruct-q8_0 "What is the capital of France? Answer in one word." 2>&1 | tr -d '\033' )
+    out=$(OLLAMA_HOST=127.0.0.1:$PORT ollama run smollm2-360m-instruct-q8_0 "What is the capital of France? Answer in one word." </dev/null 2>&1 | tr -d '\033' )
     check "real ollama CLI run"  'Paris'               "$out"
-    out=$(OLLAMA_HOST=127.0.0.1:$PORT ollama list 2>&1)
+    out=$(OLLAMA_HOST=127.0.0.1:$PORT ollama list </dev/null 2>&1)
     check "real ollama CLI list" 'smollm2-360m-instruct-q8_0:latest' "$out"
 fi
 
