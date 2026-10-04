@@ -227,7 +227,7 @@ async function checkActivityUX(assert, tick) {
     for (const locale of ['en-US', 'fr-FR', 'debug', '', undefined]) assert(resolveLanguage('system', locale) === 'en', `English fallback: ${locale}`);
     assert(resolveLanguage('en', 'de-DE') === 'en' && resolveLanguage('de', 'en-US') === 'de', 'manual preference overrides OS');
     assert(resolveLanguage('invalid', 'de-DE') === 'de', 'invalid preference returns to system');
-    const international = new Set(['geisten', 'geist', 'English', 'Deutsch', 'Home Assistant', 'Terminal', 'VS Code · Continue', '—', '— tok/s', '— RAM']);
+    const international = new Set(['geisten', 'geist', 'English', 'Deutsch', 'Home Assistant', 'Terminal', 'VS Code · Continue', '—', '— tokens/s', '— RAM']);
     const sources = [...staticTexts.map(([, text]) => text.trim()), ...staticAttributes.map(([, , text]) => text)];
     const missing = [...new Set(sources.filter(text => !international.has(text) && !Object.hasOwn(german, text)))];
     assert(!missing.length, `Missing German interface translations: ${missing.join(' | ')}`);
@@ -869,7 +869,7 @@ $$
     assert($('connection-result').textContent === t('Copied. The configuration contains your private local key.'), 'existing interface statuses switch language');
     assert($('output').markdownSource === untranslatedAnswer && $('prompt').value === 'My next draft', 'language change leaves answer and draft untouched');
     $('ui-language').value='en'; $('ui-language').dispatchEvent(new Event('change')); await tick();
-    assert(rateText(32.5) === '32.5 tok/s' && $('new-chat').title === 'Clear chat', 'switching back restores English');
+    assert(rateText(32.5) === '32.5 tokens/s' && $('new-chat').title === 'Clear chat', 'switching back restores English');
     window.chatChecksStage = 'metrics';
     assert($('history-cpu-rate').closest('.execution-choice') && $('history-gpu-rate').closest('.execution-choice'), 'typical speed belongs to each processor choice');
     { // #81: a processor without a reply says so; the GPU backend is matched by its reported name, Vulkan too.
@@ -1035,6 +1035,18 @@ $$
       const jargon = text.match(/tok\/s|Token\/s|tokens\/s|Q4_K_M|Q4_0|Q8_0|I2_S|PQ2_0|\bMetal\b|\bRSS\b|\bCPU\b|\bGPU\b/g);
       assert(!jargon, `#123: technical terms in the first view: ${JSON.stringify(jargon)}`);
       assert($('runtime-name').title.includes(' · ') && $('history-cpu').closest('label').title.includes($('history-cpu-rate').textContent), '#123: the details remain as tooltips');
+    }
+    { // #126: one unit for speed; one divider between settings and a group; card actions in one column.
+      assert(rateText(1).endsWith(` ${t('tokens/s')}`) && !document.body.innerHTML.includes('tok/s'), '#126: tokens/s (Token/s in German) everywhere');
+      showPage('settings-page');
+      const doubled = [...document.querySelectorAll('#settings-page .settings-row')].filter(row => row.nextElementSibling?.classList.contains('preference-group') && parseFloat(getComputedStyle(row).borderBottomWidth) > 0);
+      assert(!doubled.length, '#126: no double divider before a settings group');
+      showPage('models-page');
+      const saved = state, model = saved.models.find(m => m.resource_fit !== 2);
+      render({...saved, models: saved.models.map(m => m.id === model.id ? {...m, installed: true, verdict: {value: 'unknown', reason: 'speed_unknown', processor: null, seconds: {cpu: null, gpu: null}, passed: null, total: null}} : m)});
+      const card = cards.get(model.id), remove = card.querySelector('.remove').getBoundingClientRect(), measure = card.querySelector('.measure').getBoundingClientRect(), box = card.getBoundingClientRect();
+      assert(!card.querySelector('.measure').hidden && Math.abs(remove.left - measure.left) < 1 && measure.top >= remove.bottom - 1 && measure.right <= box.right + 1 && measure.width >= 44 && measure.height >= 44, '#126: remove and measure share one column inside the card');
+      render(saved);
     }
     { // #122: one recommendation: the sentence, the card tag and both buttons name the same model; the action fits.
       const saved = state, originalChoose = choose, chosen = [];
@@ -1244,8 +1256,23 @@ $$
     filler.forEach(n=>n.remove());draft.value='';resizeComposer();
     showPage('test-page');
     $('prompt').focus();
-    const computed = getComputedStyle(document.body);
-    assert(computed.backgroundColor === 'rgb(255, 255, 255)', 'white background is consistent across system appearances');
+    { // #124: light and dark both readable: text 7:1 on its background, symbols 3:1 on the model panel.
+      const rgb = color => { const c = document.createElement('span'); c.style.color = color; document.body.append(c); const v = getComputedStyle(c).color.match(/[\d.]+/g).slice(0, 3).map(Number); c.remove(); return v; };
+      const luminance = ([r, g, b]) => [r, g, b].map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }).reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
+      const contrast = (a, b) => { const [x, y] = [luminance(rgb(a)), luminance(rgb(b))].sort((p, q) => q - p); return (x + .05) / (y + .05); };
+      const token = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      const before = $('ui-appearance').value;
+      for (const theme of ['light', 'dark']) {
+        $('ui-appearance').value = theme; $('ui-appearance').dispatchEvent(new Event('change'));
+        assert(document.documentElement.dataset.theme === theme, `#124: ${theme} applies`);
+        const pairs = [['--ink', '--bg', 7], ['--ink', '--panel', 7], ['--muted', '--bg', 4.5], ['--muted', '--panel', 4.5], ['--accent', '--bg', 4.5],
+          ['--good', '--panel', 3], ['--warning', '--panel', 3], ['--danger', '--panel', 3], ['--ink', '--selected', 7]];
+        for (const [fg, bg, min] of pairs) assert(contrast(token(fg), token(bg)) >= min, `#124 ${theme}: ${fg} on ${bg} ${contrast(token(fg), token(bg)).toFixed(2)} < ${min}`);
+      }
+      assert(getComputedStyle(document.body).backgroundColor !== 'rgb(255, 255, 255)', '#124: dark is dark');
+      $('ui-appearance').value = before; $('ui-appearance').dispatchEvent(new Event('change'));
+      assert($('history-enabled').getAttribute('role') === 'switch' && $('history-enabled').type === 'checkbox', '#124: on/off settings are switches, still a checkbox underneath');
+    }
     window.chatChecksStage = 'complete';
     window.chatChecksDone = true;
   } catch (error) { window.chatChecksError = error.message; window.chatChecksStack = error.stack; }
