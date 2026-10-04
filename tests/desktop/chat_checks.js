@@ -727,7 +727,7 @@ async function checkActivityUX(assert, tick) {
      assert($('quality-note').hidden===fresh.models.some(m=>m.quality_evidence) && $('quality-note').textContent===t('Answer quality not tested yet. Check answers.'),'#80/#133: "not tested" only while no model has a reference test');
      assert(tags[0].textContent===t('Suggested start') && $('model-prompt-hint').textContent===recommendation(fresh).text,'#80/#122: one recommendation, the same sentence in the empty pane');
      const badges=cards.get(pickModel.id).querySelector('.model-badges'); badges.focus();
-     assert(badges.classList.contains('show-meaning') && getComputedStyle(badges,'::after').content.includes(t('Fits this computer')),'#51: focusing the icons shows their meaning');badges.blur();
+     assert(badges.classList.contains('show-meaning') && getComputedStyle(badges,'::after').content.includes(t(['Fits this computer','Limited on this computer'][pickModel.resource_fit||0])),'#51: focusing the icons shows their meaning');badges.blur();
      render(base);
      assert($('model-legend').hidden===!!base.active_id,'#51: the legend steps back once a model is active');}
     assert(window.geistNavigate('invalid') === false && !$('models-page').hidden, 'native routing is allowlisted');
