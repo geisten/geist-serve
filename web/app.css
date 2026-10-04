@@ -876,12 +876,6 @@ body.manager-page main { max-width:1180px }
 .model { padding:5px 30px 7px 4px }
 .model .model-pick { min-height:40px; padding:4px; gap:8px }
 .model .remove { top:7px }
-/* #103: measure speed sits left of remove; the stop shape shows a running measurement. */
-.model .measure { position:absolute; top:7px; right:30px; min-width:28px; min-height:32px; padding:5px; color:var(--muted) }
-.model .measure svg { width:15px; height:15px }
-.model .measure:hover:not(:disabled),.model .measure[data-running="true"] { color:var(--accent) }
-.model:has(.measure:not([hidden])) { padding-right:60px }
-.model .measure[data-running="true"] .measure-start,.model .measure:not([data-running="true"]) .measure-stop { display:none }
 .model-badges { display:flex; align-items:center; width:fit-content; max-width:calc(100% - 40px); gap:8px; margin:0 0 0 40px; padding:2px 3px; color:var(--muted); border-radius:4px; cursor:help }
 .model-badges>span { display:inline-flex }
 .model-badges svg { width:13px; height:13px; stroke-width:1.6 }
@@ -1179,9 +1173,6 @@ input.switch:disabled { opacity:.5; cursor:default }
 
 /* #126: one divider between settings rows and the next group, not two */
 .preferences-page .settings-row:has(+ .preference-group) { border-bottom:0 }
-/* #126: card actions share one column: remove on the first row, measure below */
-.model-variants .model:has(.measure:not([hidden])) { padding-right:4px }
-.model-variants .model .measure { position:static; grid-column:2; grid-row:2; width:44px; height:44px; min-width:44px; min-height:44px; padding:12px }
 
 /* #125: Mac layout. One persistent sidebar (areas, then the model list) and
    the detail pane; below 700 px the list folds behind a button. */
@@ -1232,12 +1223,11 @@ body.manager-page { display:block }
 .execution-row #open-tools svg { width:16px; height:16px }
 .back-button { display:inline-flex; align-items:center; gap:4px; margin:0 0 8px -6px; padding:4px 6px; color:var(--muted) }
 .back-button svg { width:16px; height:16px }
-@media (max-width:540px) { .execution-row #open-tools>span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap } }
+@media (max-width:900px) { .execution-row #open-tools>span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap } }
 /* #133: the verdict chip is its own button; its details open under the card */
 .model-variants .model { grid-template-columns:minmax(0,1fr) auto 44px }
 .model-variants .model .model-verdict { grid-column:2; grid-row:1; align-self:center; margin-right:4px }
 .model-variants .model .remove { grid-column:3 }
-.model-variants .model .measure { grid-column:3 }
 .model-variants .model-badges { grid-column:1 / 3 }
 .model-variants .model-detail { grid-column:1 / -1; margin:2px 8px 6px 40px; font-size:12px; line-height:1.5; color:var(--muted) }
 .model .model-verdict:focus-visible { outline:2px solid var(--focus); outline-offset:2px }
@@ -1247,3 +1237,27 @@ body.manager-page { display:block }
 .other-models { margin-top:12px; border-top:1px solid var(--border); padding-top:8px }
 .other-models > summary { cursor:pointer; font-size:12px; color:var(--muted); padding:4px }
 .other-models > p { margin:4px 4px 8px; font-size:12px }
+
+/* Speed measurement for the active model sits in the model view, beside Measurements; the stop shape shows a running one. */
+/* Connect, measure and Measurements wrap together, at the right end of the row. */
+.view-actions { display:flex; align-items:center; gap:4px; margin-left:auto }
+.view-actions #open-measurements { margin-left:0 }
+.execution-row #measure-speed { flex:none; width:32px; min-height:32px; padding:4px; color:var(--muted) }
+.execution-row #measure-speed svg { width:16px; height:16px }
+.execution-row #measure-speed:hover:not(:disabled),.execution-row #measure-speed[data-running="true"] { color:var(--accent) }
+#measure-speed[data-running="true"] .measure-start,#measure-speed:not([data-running="true"]) .measure-stop { display:none }
+
+/* A denser model list for mouse and trackpad; touch keeps 44 px targets. */
+@media (pointer:fine) {
+  .best-row { margin-bottom:4px }
+  .best-row .best-action { min-height:28px; padding:0 }
+  .model-group { padding:4px 0 }
+  .model-group>h3 { margin:4px 8px 2px }
+  .model-variants { gap:2px }
+  .model-variants .model { grid-template-columns:minmax(0,1fr) auto 32px; padding:2px 4px }
+  .model-variants .model-pick { min-height:44px; padding:2px 4px }
+  .model-variants .remove { width:32px; height:32px; min-width:32px; min-height:32px; padding:8px }
+  .model-variants .model-badges { margin-left:36px; padding:0 4px; min-height:18px }
+  .model .model-verdict { min-width:24px; height:24px; min-height:24px; max-height:24px; font-size:12px }
+  .model-variants .model-badges { position:relative; margin-top:-10px }
+}
