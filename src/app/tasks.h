@@ -46,5 +46,7 @@ struct app_candidate {
     bool             installed;
 };
 /* True when a is the better recommendation: verdict (✓, ◐, ?), then known
- * quality, then installed, then pass rate, then speed. ✗ never qualifies. */
+ * quality, then installed, then pass rate (within APP_RATE_TIE: equal), then
+ * speed. ✗ never qualifies. */
+#define APP_RATE_TIE .02 /* pass rates this close count as equal; speed decides */
 bool app_candidate_better(struct app_candidate a, struct app_candidate b);

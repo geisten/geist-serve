@@ -58,4 +58,9 @@ int main(void) {
     assert(app_candidate_better(usable_installed, unknown_known));
     struct app_candidate fast = {APP_VERDICT_GOOD, .9, 3, true}, slow = {APP_VERDICT_GOOD, .9, 8, true}, unmeasured = {APP_VERDICT_GOOD, .9, -1, true};
     assert(app_candidate_better(fast, slow) && app_candidate_better(slow, unmeasured) && !app_candidate_better(fast, fast));
+    /* Gemma 4 E4B 147/160 at 29 s vs E2B 146/160 at 18 s: one answer is noise, speed decides. */
+    struct app_candidate e4b = {APP_VERDICT_USABLE, 147. / 160, 29, false}, e2b = {APP_VERDICT_USABLE, 146. / 160, 18, false};
+    assert(app_candidate_better(e2b, e4b) && !app_candidate_better(e4b, e2b));
+    struct app_candidate clear = {APP_VERDICT_USABLE, .95, 29, false}, fast_weaker = {APP_VERDICT_USABLE, .90, 18, false};
+    assert(app_candidate_better(clear, fast_weaker)); /* five points are not noise */
 }
