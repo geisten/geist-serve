@@ -83,7 +83,7 @@ const german = {
   "Ready for your programs.": "Für deine Programme bereit.",
   "Model in use by a program.": "Ein Programm verwendet das Modell.",
   "Connect a program": "Programm verbinden",
-  "Quick test": "Kurz testen", "Version": "Version",
+  "Quick test": "Kurztest", "Version": "Version",
   "Change model": "Modell wechseln",
   "Settings": "Einstellungen",
   "Clear test": "Test leeren",

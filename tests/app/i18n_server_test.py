@@ -80,4 +80,6 @@ if __name__ == '__main__':
     root = Path(__file__).resolve().parents[2]
     old = [f'{p.relative_to(root)}:{n}' for p in [*root.glob('web/*.js'), *root.glob('web/*.html'), root/'docs/INSTALL.md', root/'README.md']
            if p.exists() for n, line in enumerate(p.read_text().splitlines(), 1) if re.search(r'\bGeist(?![-_\w])', line)]
+    # The visible wordmark too: lowercase, so the check above cannot see it.
+    assert re.search(r'class="brand"[^>]*>geisten<', (root/'web/index.html').read_text()), 'the header wordmark must read geisten'
     assert not old, 'the old product name is still visible:\n  ' + '\n  '.join(old)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """bench.py — geisten mini benchmark: what can each local model do on this computer?
 
-    bench.py run --candidate CATALOG_ID [--candidate …] --backend cpu|gpu --output NEW_DIR
+    bench.py run --candidate CATALOG_ID [--candidate …] --backend cpu|gpu --output NEW_DIR [--cases N]
     bench.py report RUN_DIR [--json]
     bench.py quality RUN_DIR [--write]   (catalog "quality" fields, #102)
     bench.py reference RUN_DIR --platform NAME [--write]   (catalog "reference" speed, #104)
@@ -269,7 +269,7 @@ def host_identity():
                 logical_cpus=os.cpu_count(), memory_bytes=memory)
 
 
-def run_candidate(suite, entry, model, backend, out):
+def run_candidate(suite, entry, model, backend, out, cases=None):
     out.mkdir()
     record = dict(schema=1, kind='geist-mini-benchmark', candidate=entry['id'], backend_requested=backend,
                   suite={t: dict(version=s['version'], sha256=sha256(SUITE/f'{t}.json')) for t, s in suite.items()},
@@ -297,7 +297,7 @@ def run_candidate(suite, entry, model, backend, out):
                 record['warmup_error'] = str(error)[:300]
             with open(out/'results.jsonl', 'x', encoding='utf-8') as raw:
                 for task, spec in suite.items():
-                    for case in spec['cases']:
+                    for case in spec['cases'][:cases]:  # --cases: a quick check, never catalog evidence
                         row = dict(task=task, id=case['id'], language=case['language'], tags=case['tags'])
                         try:
                             output, finish, usage, ms = app.complete(spec['prompt'][case['language']], case['input'], spec['max_tokens'] + budget)
@@ -342,7 +342,7 @@ def run(args):
     out.mkdir(parents=True, exist_ok=False)  # never overwrite results
     for entry, model in resolved:  # one resident model at a time
         print(f'{entry["id"]}: {model.name} on {args.backend}', flush=True)
-        run_candidate(suite, entry, model, args.backend, out/entry['id'])
+        run_candidate(suite, entry, model, args.backend, out/entry['id'], args.cases)
     print(f'results: {out}\nreport:  {Path(__file__).name} report {out}')
 
 
@@ -481,6 +481,7 @@ def main():
     r.add_argument('--candidate', action='append', required=True)
     r.add_argument('--backend', choices=('cpu', 'gpu'), required=True)
     r.add_argument('--output', required=True)
+    r.add_argument('--cases', type=int, help='only the first N cases per task: a quick check, not evidence')
     base = Path.home()/('Library/Application Support' if sys.platform == 'darwin' else '.local/share')
     home = next((base/n for n in ('geisten', 'Geist' if sys.platform == 'darwin' else 'geist') if (base/n).is_dir()), base/'geisten')
     r.add_argument('--model-dir', default=os.environ.get('GEIST_HOME', str(home)) + '/models')
