@@ -318,6 +318,9 @@ make app                     # C23, libcurl; Linux also needs OpenSSL headers/li
 ./geist-app --check           # device advice without loading a model
 ./geist-app --port 0          # choose a free loopback port
 make test-app                # sanitizers + model-free HTTP tests
+make coverage                # the same suites plus make test, the installer, tool and
+                             # benchmark tests and the web checks in headless Chrome,
+                             # with C, Python and web line coverage (scripts/coverage.sh)
 make -f App.mk build/geist-app-test
 GEIST_APP_TEST_BINARY=build/geist-app-test GEIST_TEST_MODEL=/path/to/smollm2-360m-instruct-q8_0.gguf python3 tests/app/http_test.py
 GEIST_TEST_MODEL=/path/to/smollm2-360m-instruct-q8_0.gguf python3 tests/app/download_test.py

@@ -117,3 +117,8 @@ build/test_app_memory: tests/app/memory_test.c $(APP_SOURCE) src/json.c build/ap
 
 build/test_app_memory_journal: tests/app/memory_journal_test.c src/app/performance.c src/app/performance.h $(APP_SOURCE) src/json.c build/app_models.h
 	$(APP_CC) $(APP_CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ tests/app/memory_journal_test.c src/app/performance.c $(APP_SOURCE) src/json.c $(APP_LDLIBS)
+
+# Line coverage of the app over the full test-app suite (scripts/coverage.sh).
+.PHONY: coverage
+coverage:
+	sh scripts/coverage.sh $(COVERAGE_MIN) $(COVERAGE_PYTHON_MIN) $(COVERAGE_WEB_MIN)
