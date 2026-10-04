@@ -89,7 +89,8 @@ bool app_candidate_better(struct app_candidate a, struct app_candidate b) {
         return a.rate >= 0;
     if (a.installed != b.installed)
         return a.installed;
-    if (a.rate != b.rate)
+    /* One or two answers more in 160 is noise next to a much faster answer. */
+    if (a.rate - b.rate > APP_RATE_TIE || b.rate - a.rate > APP_RATE_TIE)
         return a.rate > b.rate;
     if ((a.seconds >= 0) != (b.seconds >= 0))
         return a.seconds >= 0;

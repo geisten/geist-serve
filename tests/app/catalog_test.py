@@ -97,7 +97,8 @@ with tempfile.TemporaryDirectory(prefix='geist-catalog-') as temporary:
         # and among models of the same verdict none with known quality scores higher.
         best=snapshot['best_choice'];chosen={m['id']:m for m in snapshot['models']}[best['id']]
         assert best['action']=='download' and best['verdict']==chosen['verdict']['value']!='not_recommended',best
-        assert chosen['verdict']['total'] and all(m['verdict']['passed']/m['verdict']['total']<=chosen['verdict']['passed']/chosen['verdict']['total']
+        # Pass rates within 2 points count as equal (APP_RATE_TIE); then speed decides.
+        assert chosen['verdict']['total'] and all(m['verdict']['passed']/m['verdict']['total']<=chosen['verdict']['passed']/chosen['verdict']['total']+.02
             for m in snapshot['models'] if m['verdict']['value']==best['verdict'] and m['verdict']['total']),best
         # Thresholds and intent per computer: validated, saved, applied at once, and reset.
         for bad in [{'fast_s':0,'usable_s':30,'reliable':.9,'intent':'chat'},{'fast_s':20,'usable_s':10,'reliable':.9,'intent':'chat'},

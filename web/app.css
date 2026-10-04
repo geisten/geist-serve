@@ -1077,3 +1077,28 @@ body.manager-page main { max-width:1180px }
 .best-row { flex-wrap:wrap }
 .best-row .best-action { order:3; flex-basis:100%; justify-content:flex-start; padding:2px 0; color:var(--accent); font-weight:600 }
 .recommend-action { margin-top:16px }
+
+/* #121: one row per model, the verdict as a chip; size · share · seconds below. */
+.model-title { display:flex; align-items:center; gap:6px; min-width:0; flex-wrap:wrap }
+.model-title .model-name { flex:0 1 auto }
+.model-title .model-verdict { margin-left:auto; display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; border-radius:11px; font-size:13px }
+.model-verdict[data-verdict="good"] { background:#1f7a3a1a }
+.model-verdict[data-verdict="usable"] { background:#96620d1a }
+.model-verdict[data-verdict="not_recommended"] { background:#b423181a }
+.model-verdict[data-verdict="unknown"] { background:#6b72801a }
+.model-group.single > h3 { display:none }
+.model-badges .model-fit[data-fit="0"], .model-badges [data-capability="chat"] { display:none }
+.model-badges .model-size, .model-badges .model-seconds { font-size:12px; font-variant-numeric:tabular-nums }
+.model-badges .model-seconds:empty { display:none }
+.model-ring[data-stage="downloaded"] { color:var(--muted) }
+.model-ring .ring-active { display:none; fill:var(--accent); stroke:none }
+.model.active .model-ring .ring-check { display:none }
+.model.active .model-ring .ring-active { display:block }
+.model-legend summary { cursor:pointer; width:fit-content }
+.model-legend summary::after { content:" ⓘ" }
+.model-legend[open] #model-legend-items { margin-top:6px }
+.model-variants .model-info .model-title { flex-basis:100%; flex-wrap:wrap; row-gap:2px }
+.model-variants .model-title .model-name { flex:0 1 auto; flex-basis:auto; min-width:0; overflow-wrap:anywhere }
+.model-title .variant-active, .model-title .variant-recommended { flex:none }
+.model-badges { flex-wrap:wrap; row-gap:2px }
+.model-badges > span { white-space:nowrap }

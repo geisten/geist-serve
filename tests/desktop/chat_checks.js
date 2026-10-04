@@ -357,7 +357,7 @@ async function checkActivityUX(assert, tick) {
       render(JSON.parse(JSON.stringify(fixture))); modelCalls=[];
       pick().querySelector('.model-name').click(); await settle();
       assert(modelCalls.length === 1 && modelCalls[0][0] === '/app/select', 'installed model starts with one click and no download');
-      assert(getComputedStyle(pick().querySelector('.ring-check')).display !== 'none' && getComputedStyle(pick().querySelector('.ring-download')).display === 'none', 'downloaded model has a completed green ring instead of an arrow');
+      assert(getComputedStyle(pick().querySelector('.ring-active')).display !== 'none' && getComputedStyle(pick().querySelector('.ring-check')).display === 'none' && getComputedStyle(pick().querySelector('.ring-download')).display === 'none', '#121: the active model shows one dot, not a check next to its verdict');
       assert(pick().disabled && !$('workspace').hidden && $('prompt').value === 'Draft survives model changes', 'active model has no redundant action and retains the draft');
       const remove = pick().closest('.model').querySelector('.remove');
       assert(!remove.hidden && !remove.disabled && !remove.closest('details'), 'each local model has a direct delete action, including the active model');
@@ -689,12 +689,12 @@ async function checkActivityUX(assert, tick) {
      assert(tags.length===1 && tags[0].closest('.model').dataset.id===pickModel.id,'#51: exactly one visible recommendation');
      assert(!$('model-prompt-hint').hidden && $('model-prompt-hint').textContent.includes(pickModel.group_name||pickModel.name),'#51: the empty state names the recommended model');
      assert(!$('model-legend').hidden && $('model-legend').textContent.includes(t('Fits this computer')),'#51: the icon legend is visible on first launch');
-     assert(cards.get(pickModel.id).querySelector('.model-name').textContent===t(plainVariant(pickModel)) && cards.get(pickModel.id).querySelector('.variant-size').textContent.includes(variantLabel(pickModel)),'#51: plain label first, technical label second');
+     assert(cards.get(pickModel.id).textContent.includes(t(plainVariant(pickModel))) && cards.get(pickModel.id).querySelector('.variant-size').textContent.includes(variantLabel(pickModel)),'#51: plain label first, technical label second');
      assert(cards.get(tight.id).querySelector('.variant-warning').textContent.includes(t('16 GiB RAM recommended')),'#51/#80: RAM guidance as a recommendation, in GiB');
      // #80: no unverified quality claim anywhere in the model list; the weight format instead, and one honest note.
      const listText=$('model-chooser').textContent;
      assert(!/high quality|hohe qualität|balanced|ausgewogen|very compact|sehr kompakt/i.test(listText),'#80: no quality ranking derived from the quantization');
-     assert(['8-bit','4-bit','Ternary (native)'].map(x=>t(x)).includes(cards.get(pickModel.id).querySelector('.model-name').textContent),'#80: the row names the weight format');
+     assert(['8-bit','4-bit','Ternary (native)'].map(x=>t(x)).some(x=>cards.get(pickModel.id).textContent.includes(x)),'#80: the row names the weight format');
      assert(!$('quality-note').hidden && $('quality-note').textContent===t('Answer quality not tested yet. Check answers.'),'#80: the list says that answer quality is not tested');
      assert(tags[0].textContent===t('Suggested start') && $('model-prompt-hint').textContent===recommendation(fresh).text,'#80/#122: one recommendation, the same sentence in the empty pane');
      const badges=cards.get(pickModel.id).querySelector('.model-badges'); badges.focus();
@@ -1006,6 +1006,22 @@ $$
         $('close-compare').click();
         assert(!$('compare-dialog').open, '#103: the view closes');
       } finally { api = originalApi; poll = originalPoll; if ($('compare-dialog').open) $('compare-dialog').close(); render(saved); }
+    }
+    { // #121: one row per model; the verdict as a chip; size · share · seconds below; no contradicting symbols.
+      const saved = state, model = saved.models.find(m => m.resource_fit !== 2 && saved.models.filter(x => (x.group_id || x.id) === (m.group_id || m.id)).length === 1);
+      const verdict = {value: 'not_recommended', reason: 'unreliable', basis: 'measured', processor: 'gpu', seconds: {cpu: null, gpu: 2.6}, measured_at: {cpu: null, gpu: 1790000000}, estimated_from: 0, passed: 31, total: 160};
+      try {
+        render({...saved, ready: true, loading: false, phase: '', active_id: model.id, models: saved.models.map(m => m.id === model.id ? {...m, installed: true, verdict} : m)});
+        const card = cards.get(model.id), shown = selector => getComputedStyle(card.querySelector(selector)).display !== 'none';
+        assert(card.classList.contains('active') && shown('.ring-active') && !shown('.ring-check') && card.querySelector('.model-verdict').textContent === '✗', '#121: active and ✗ without a second, green check');
+        assert(card.querySelector('.model-title .model-verdict') && card.querySelector('.model-name').textContent === (model.group_name || model.name), '#121: name and verdict share the first row');
+        assert(getComputedStyle(card.closest('.model-group').querySelector('h3')).display === 'none', '#121: no group heading for a single variant');
+        const meta = card.querySelector('.model-badges');
+        assert(meta.querySelector('.model-size').textContent === `${t(plainVariant(model))} · ${bytes(model.bytes)}` && meta.querySelector('.model-quality').textContent === (qualityCounts(model) ? `${Math.round(100 * qualityCounts(model).passed / qualityCounts(model).total)}%` : '') && meta.querySelector('.model-seconds').textContent === '~3 s', '#121: size · share · seconds in the second row');
+        assert(!shown('.model-badges [data-capability="chat"]'), '#121: text chat is implied; only other capabilities get a symbol');
+        assert(card.getBoundingClientRect().height <= 96, `#121: a compact card (${card.getBoundingClientRect().height}px)`);
+        assert($('model-legend').tagName === 'DETAILS' && !$('model-legend').open && $('model-legend').textContent.includes(t('Good choice')), '#121: the legend is one click away and still names every symbol');
+      } finally { render(saved); }
     }
     { // #122: one recommendation: the sentence, the card tag and both buttons name the same model; the action fits.
       const saved = state, originalChoose = choose, chosen = [];

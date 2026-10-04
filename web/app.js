@@ -361,7 +361,7 @@ function buttonStates() {
   $('language-choice').disabled = !!controller;
 }
 
-const ringMarkup = '<svg viewBox="0 0 36 36" aria-hidden="true"><circle class="ring-track" cx="18" cy="18" r="14"/><circle class="ring-fill" cx="18" cy="18" r="14" pathLength="100"/><path class="ring-check" d="m12 18 4 4 8-8"/><path class="ring-download" d="M18 7v16m-6-6 6 6 6-6M8 25v4h20v-4"/><path class="ring-pause" d="M15 13v10m6-10v10"/><path class="ring-resume" d="m15 12 9 6-9 6z"/></svg>';
+const ringMarkup = '<svg viewBox="0 0 36 36" aria-hidden="true"><circle class="ring-track" cx="18" cy="18" r="14"/><circle class="ring-fill" cx="18" cy="18" r="14" pathLength="100"/><path class="ring-check" d="m12 18 4 4 8-8"/><path class="ring-download" d="M18 7v16m-6-6 6 6 6-6M8 25v4h20v-4"/><path class="ring-pause" d="M15 13v10m6-10v10"/><path class="ring-resume" d="m15 12 9 6-9 6z"/><circle class="ring-active" cx="18" cy="18" r="6"/></svg>';
 function downloadState(model, current = state) {
   const total = Math.max(0, model?.bytes || 0);
   const transferring = current?.job_model === model?.id && !!current?.phase;
@@ -528,7 +528,7 @@ async function saveVerdictSettings(body) {
 }
 function renderModelLegend() {
   const icon = path => `<svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg>`;
-  $('model-legend').innerHTML = `<span>${icon(fitIcons[0])}<span data-ui-text="Fits this computer"></span></span><span>${icon(capabilityIcons.chat.path)}<span data-ui-text="Text chat"></span></span><span>${icon(qualityIcon)}<span data-ui-text="Correct answers in the reference test"></span></span>` +
+  $('model-legend-items').innerHTML = `<span>${icon(fitIcons[0])}<span data-ui-text="Fits this computer"></span></span><span>${icon(capabilityIcons.chat.path)}<span data-ui-text="Text chat"></span></span><span>${icon(qualityIcon)}<span data-ui-text="Correct answers in the reference test"></span></span>` +
     Object.entries(verdictSymbols).map(([key, symbol]) => `<span><span class="model-verdict" data-verdict="${key}" aria-hidden="true">${symbol}</span><span data-ui-text="${verdictNames[key]}"></span></span>`).join('');
   $('model-legend').querySelectorAll('[data-ui-text]').forEach(e => { e.textContent = t(e.dataset.uiText); });
 }
@@ -543,13 +543,21 @@ function renderModelBadges(element, model) {
   if (element.dataset.icons !== signature) {
     // All markup is local and allowlisted; metadata text is never interpreted as HTML.
     element.innerHTML = `<span class="model-fit" data-fit="${fit}"><svg viewBox="0 0 24 24" aria-hidden="true">${fitIcons[fit]}</svg></span>` + enabled.map(([key, icon]) => `<span data-capability="${key}"><svg viewBox="0 0 24 24" aria-hidden="true">${icon.path}</svg></span>`).join('') +
-      `<span class="model-quality" data-tested="${tested}"><svg viewBox="0 0 24 24" aria-hidden="true">${qualityIcon}</svg>${share}</span>`;
+      `<span class="model-quality" data-tested="${tested}"><svg viewBox="0 0 24 24" aria-hidden="true">${qualityIcon}</svg>${share}</span><span class="model-seconds"></span>`;
+    element.insertAdjacentHTML('afterbegin', '<span class="model-size"></span>');
     element.dataset.icons = signature;
   }
   const fitText = `${t(label)}${model.reason ? `: ${fitReason(model)}` : ''}`;
   element.querySelector('.model-fit').title = fitText;
   for (const [key, icon] of enabled) element.querySelector(`[data-capability="${key}"]`).title = t(icon.label);
   element.querySelector('.model-quality').title = qualityText(model);
+  // #121: the second row: size · share · seconds per typical answer (measured or estimated).
+  // A single variant names its weight format here; in a group the row title does.
+  const single = element.closest('.model')?.dataset.single === 'true';
+  element.querySelector('.model-size').textContent = [single ? t(plainVariant(model)) : '', model.bytes ? bytes(model.bytes) : ''].filter(Boolean).join(' · ');
+  const v = model.verdict, seconds = v?.processor ? v.seconds?.[v.processor] : null;
+  element.querySelector('.model-seconds').textContent = knownNumber(seconds) ? `~${formatNumber(Math.max(1, Math.round(seconds)))} s` : '';
+  element.querySelector('.model-seconds').title = knownNumber(seconds) ? verdictReason(model)[0] || '' : '';
   const specification = model.bytes ? t(`${bytes(model.bytes)} download · ${model.ram_gib} GiB RAM guidance`) : t('Local model');
   const description = [fitText, ...enabled.map(([, icon]) => t(icon.label)), qualityText(model), specification].join(' · ');
   element.title = description;
@@ -588,6 +596,7 @@ function renderModelGroups(models) {
       modelGroups.set(id, group); $('models').insertBefore(group, $('models').children[ordered.findIndex(([key]) => key === id)] || null);
     }
     group.querySelector('h3').textContent = variants[0].group_name || variants[0].name;
+    group.classList.toggle('single', variants.length === 1);
     const rows = group.querySelector('.model-variants');
     variants.forEach((model, index) => {
       modelCard(model);
@@ -618,7 +627,7 @@ function modelCard(model) {
   if (!card) {
     card = document.createElement('article'); card.className = 'model'; card.dataset.id = model.id; card.setAttribute('role', 'listitem');
     // One button covers the name and download state. Information and removal are siblings.
-    card.innerHTML = '<button class="model-pick" type="button"><span class="model-ring"></span><span class="model-info"><span class="model-verdict" aria-hidden="true"></span><span class="model-name"></span><span class="variant-recommended" hidden></span><span class="variant-size"></span><span class="variant-active"></span><span class="download-state"></span></span></button><span class="model-badges" role="img" tabindex="0"></span><button class="measure text-button icon-button" type="button" hidden><svg class="measure-start" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg><svg class="measure-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1"/></svg></button><span class="variant-warning"></span><span class="transfer-detail"></span><button class="remove text-button icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button>';
+    card.innerHTML = '<button class="model-pick" type="button"><span class="model-ring"></span><span class="model-info"><span class="model-title"><span class="model-name"></span><span class="variant-recommended" hidden></span><span class="variant-active"></span><span class="model-verdict" aria-hidden="true"></span></span><span class="variant-size sr-only"></span><span class="download-state"></span></span></button><span class="model-badges" role="img" tabindex="0"></span><button class="measure text-button icon-button" type="button" hidden><svg class="measure-start" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg><svg class="measure-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1"/></svg></button><span class="variant-warning"></span><span class="transfer-detail"></span><button class="remove text-button icon-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg></button>';
     card.querySelector('.model-pick').addEventListener('click', event => { if (event.detail < 2) choose(model.id); });
     card.querySelector('.model-pick').addEventListener('keydown', event => {
       if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
@@ -632,7 +641,10 @@ function modelCard(model) {
   const preparing = state.job_model === model.id && (!!state.phase || state.loading);
   const paused = canPause(model);
   card.className = `model${active ? ' active' : ''}${preparing || pending ? ' preparing' : ''}${model.resource_fit === 2 ? ' unavailable' : ''}`;
-  card.querySelector('.model-name').textContent = t(plainVariant(model));
+  // #121: one row per model; the group name joins the row when there is no second variant.
+  const single = state.models.filter(m => (m.group_id || m.id) === (model.group_id || model.id)).length === 1;
+  card.querySelector('.model-name').textContent = single ? model.group_name || model.name : t(plainVariant(model));
+  card.dataset.single = single;
   const verdict = card.querySelector('.model-verdict');
   verdict.dataset.verdict = model.verdict?.value || 'unknown';
   verdict.textContent = verdictSymbols[verdict.dataset.verdict];
