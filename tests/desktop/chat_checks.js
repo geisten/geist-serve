@@ -928,8 +928,9 @@ $$
       render(snapshot(verdict('good', 'good', {processor: 'gpu', seconds: {cpu: 9.6, gpu: 3.2}, passed: 146, total: 160}), verdict('not_recommended', 'unreliable', {passed: 31, total: 160}), {id: first.id, verdict: 'good', processor: 'gpu'}));
       const mark = id => cards.get(id).querySelector('.model-verdict');
       assert(mark(first.id).textContent === '✓' && mark(second.id).textContent === '✗', '#103: symbols, not words');
-      assert(mark(first.id).title === `${t('Good choice')} · ${t('about 3 s per answer on the graphics chip')} · 146/160 ${t('correct')}`, '#103: plain reason with seconds and processor');
-      assert(mark(second.id).title === `${t('Not recommended here')} · ${t('Reference test')}: 31/160 ${t('correct')}`, '#103: the reason names the evidence');
+      assert(mark(first.id).title.split('\n')[0] === `${t('Good choice')} · ${t('about 3 s per answer on the graphics chip')} · 146/160 ${t('correct')}`, '#103: plain reason with seconds and processor');
+      assert(mark(first.id).title.split('\n')[1] === verdictBasis({...first, verdict: verdict('good', 'good', {processor: 'gpu', seconds: {cpu: 9.6, gpu: 3.2}, passed: 146, total: 160})}), '#103: the tooltip names what the verdict rests on');
+      assert(mark(second.id).title.split('\n')[0] === `${t('Not recommended here')} · ${t('Reference test')}: 31/160 ${t('correct')}`, '#103: the reason names the evidence');
       assert(!$('best-choice').hidden && $('best-choice').textContent.startsWith(`✓ ${t('Best for you')}: `) && !/t\/s|Q4_K_M|Q8_0/.test($('best-choice').textContent), '#103: recommendation in plain words');
       assert(cards.get(second.id).querySelector('.model-pick').getAttribute('aria-label').includes(t('Not recommended here')) && !cards.get(second.id).querySelector('.model-pick').disabled, '#103: a ✗ explains and never blocks');
       render(snapshot(verdict('good', 'good', {basis: 'estimated', processor: 'cpu', seconds: {cpu: 4.4, gpu: null}, passed: 146, total: 160}), verdict('not_recommended', 'unreliable', {passed: 31, total: 160}), null));
@@ -977,7 +978,7 @@ $$
       poll = async () => {};
       const [a, b] = saved.models.filter(m => m.resource_fit !== 2).slice(0, 2);
       const snapshot = {...saved, limits: {fast_s: 10, usable_s: 30, reliable: .9, intent: 'chat'}, models: saved.models.map(m =>
-        m.id === a.id ? {...m, installed: true, verdict: {value: 'good', reason: 'good', processor: 'gpu', seconds: {cpu: 9.6, gpu: 3.2}, passed: 146, total: 160}}
+        m.id === a.id ? {...m, installed: true, verdict: {value: 'good', reason: 'good', basis: 'measured', processor: 'gpu', seconds: {cpu: 9.6, gpu: 3.2}, measured_at: {cpu: 1790000000, gpu: 1790000000}, estimated_from: 0, passed: 146, total: 160}}
         : m.id === b.id ? {...m, installed: true, verdict: {value: 'unknown', reason: 'speed_unknown', processor: null, seconds: {cpu: null, gpu: null}, passed: 31, total: 160}}
         : {...m, installed: false})};
       try {
@@ -988,6 +989,10 @@ $$
         const rows = [...$('compare-table').tBodies[0].rows];
         assert(rows.length === 2 && rows[0].cells[2].textContent === `${formatNumber(9.6, 1)} s` && rows[0].cells[4].textContent === '146/160' && rows[1].cells[2].textContent === '–', '#103: the table has the same values');
         assert($('verdict-fast').value === '10' && $('verdict-reliable').value === '90' && $('verdict-intent').value === 'chat', '#103: current thresholds shown');
+        const basis = rows[0].querySelector('.compare-basis').title;
+        assert(basis.startsWith(t('Speed measured on this computer')) && basis.includes('GPU') && rows[1].querySelector('.sr-only:last-child').textContent.includes(t('Answer quality not tested yet')) === !b.quality_evidence, '#103: each row names what it rests on');
+        $('compare-chart').querySelector(`.compare-point[data-id="${a.id}"] circle`).dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        assert(rows[0].classList.contains('highlight') && document.activeElement === rows[0], '#103: a point leads to its row');
         $('verdict-fast').value = '15'; $('verdict-intent').value = 'context'; $('verdict-intent').dispatchEvent(new Event('change'));
         await new Promise(resolve => setTimeout(resolve, 0));
         assert(JSON.stringify(sent.at(-1)) === JSON.stringify(['/app/verdict-settings', {intent: 'context', fast_s: 15, usable_s: 30, reliable: .9}]), '#103: changes are saved per computer');
