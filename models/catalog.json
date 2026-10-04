@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "revision": 6,
+  "revision": 7,
   "models": [
     {
       "id": "bitnet-2b",
@@ -16,7 +16,55 @@
       ],
       "group_id": "bitnet-2b",
       "group_name": "BitNet b1.58 2B",
-      "quantization": "I2_S"
+      "quantization": "I2_S",
+      "quality": {
+        "suite": "e6c9808edde3",
+        "date": "2026-10-04",
+        "engine": "33db79d7764b",
+        "evidence": "c84865a924b01d5b82329d687d8db395c0b1838667ba6829c80c53a8b7288ea7",
+        "tasks": {
+          "classify": {
+            "de": [
+              5,
+              20
+            ],
+            "en": [
+              8,
+              20
+            ]
+          },
+          "extract": {
+            "de": [
+              3,
+              20
+            ],
+            "en": [
+              0,
+              20
+            ]
+          },
+          "format": {
+            "de": [
+              0,
+              20
+            ],
+            "en": [
+              18,
+              20
+            ]
+          },
+          "context": {
+            "de": [
+              11,
+              20
+            ],
+            "en": [
+              18,
+              20
+            ]
+          }
+        }
+      }
     },
     {
       "id": "smollm2-360m",

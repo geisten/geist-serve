@@ -108,7 +108,6 @@ Measured 2026-10-03 on an Apple M1 Max (64 GB), Metal, engine pin
 | Qwen3 0.6B · Q8_0 | 100/160 | reproduced exactly on a second run |
 | Qwen3.5 0.8B · Q8_0 | 34/160 | at temperature 0, 110 cases think through the 3072-token budget without answering |
 | SmolLM2 360M · Q8_0 | 31/160 | |
+| BitNet b1.58 2B · I2_S (CPU) | 63/160 | after the template fix in #106; measured 2026-10-04 |
 
-Not measured: BitNet b1.58 2B (JSON answers stop after the first token,
-#106, so the score would describe the bug, not the model); Bonsai 2 27B and
-Qwen3.8 27B (too large for this round).
+Not measured: Bonsai 2 27B and Qwen3.8 27B (too large for this round).

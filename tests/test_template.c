@@ -100,10 +100,12 @@ int main(void) {
     free(p);
 
     p = chat_render(CHAT_BITNET, N, CONV);
-    eq("bitnet",
-       "Human: Be brief.\n\nHi\n\nBITNETAssistant: "
-       "Hello!<|eot_id|>"
-       "Human: Capital of France?\n\nBITNETAssistant: ",
+    eq("bitnet: model card turns, every turn closed by <|eot_id|> (#106)",
+       "System: Be brief.<|eot_id|>"
+       "User: Hi<|eot_id|>"
+       "Assistant: Hello!<|eot_id|>"
+       "User: Capital of France?<|eot_id|>"
+       "Assistant: ",
        p);
     free(p);
 
