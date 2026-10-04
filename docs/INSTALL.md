@@ -6,7 +6,7 @@ loaded geistd. No model is included; click a suggested model on first use.
 
 ## macOS (Apple Silicon, macOS 14+)
 
-Drag Geist.app from the DMG to Applications and open it. geisten opens its own
+Drag geisten.app from the DMG to Applications and open it. geisten opens its own
 desktop window. Click a model name or its download icon to download and start it.
 An installed model starts directly; progress, pause and resume stay in its row.
 A platform check suggests one model, including a smaller fallback when needed.
@@ -21,7 +21,7 @@ and available RAM and reply timings in the same place.
 These measurements describe performance, not answer quality. The Mac menu bar
 provides **Models** and **Connect a program** shortcuts.
 The bundled
-terminal client is `/Applications/Geist.app/Contents/MacOS/geist-cli`.
+terminal client is `/Applications/geisten.app/Contents/MacOS/geist-cli`.
 Use its full path, or link it as `geisten` in a directory on your PATH. Start at Login is
 optional. An actual distributable DMG still requires Developer ID signing and
 an Apple Accepted result; see the Mac repository's NOTARIZATION.md.
@@ -105,7 +105,7 @@ Before uninstalling Ubuntu, run `systemctl --user disable --now geisten.service`
 and `geisten stop`, then `sudo apt remove geisten-desktop geisten`. Models remain in the user data
 folder even after package purge. Delete that folder separately only if desired.
 On Mac, disable Start at Login, stop geisten, quit the desktop app, then move
-Geist.app to Trash. Cached models remain in `~/Library/Application Support/geisten`.
+geisten.app to Trash. Cached models remain in `~/Library/Application Support/geisten`.
 Quit/stop before replacing a Mac development bundle, then open the replacement.
 
 No package scripts obtain secrets or remove user models. Public update feeds,
