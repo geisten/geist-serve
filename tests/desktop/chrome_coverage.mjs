@@ -86,7 +86,7 @@ const {result} = await send('Profiler.takePreciseCoverage');
 const files = {};
 for (const script of result) {
   const name = new URL(script.url || 'about:blank').pathname.replace(/^\//, '');
-  if (!/^(app|i18n|markdown)\.js$/.test(name)) continue;
+  if (!/^(app|i18n|markdown|snippets)\.js$/.test(name)) continue;
   const source = readFileSync(join(ROOT, 'web', name), 'utf8');
   const ranges = script.functions.flatMap(f => f.ranges).sort((a, b) => a.startOffset - b.startOffset || b.endOffset - a.endOffset);
   let offset = 0, hit = 0, total = 0;

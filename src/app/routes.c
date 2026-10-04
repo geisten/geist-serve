@@ -23,6 +23,9 @@ static const unsigned char katex_js[] = {
 static const unsigned char markdown_js[] = {
 #embed "../../web/markdown.js"
 };
+static const unsigned char snippets_js[] = {
+#embed "../../web/snippets.js"
+};
 #else
 /* GCC 14 supports the C23 language used here but not #embed yet. */
 #include "../../build/app_assets.h"
@@ -86,6 +89,10 @@ void handle(int fd, struct app_arena *arena) {
         }
         if (strcmp(r.path, "/markdown.js") == 0) {
             response(fd, 200, "text/javascript; charset=utf-8", markdown_js, sizeof markdown_js);
+            return;
+        }
+        if (strcmp(r.path, "/snippets.js") == 0) {
+            response(fd, 200, "text/javascript; charset=utf-8", snippets_js, sizeof snippets_js);
             return;
         }
         if (strcmp(r.path, "/katex.js") == 0) {

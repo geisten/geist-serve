@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>geisten</title><link rel="stylesheet" href="/app.css">
-<script src="/i18n.js" defer></script><script src="/marked.js" defer></script><script src="/katex.js" defer></script><script src="/markdown.js" defer></script><script src="/app.js" defer></script>
+<script src="/i18n.js" defer></script><script src="/marked.js" defer></script><script src="/katex.js" defer></script><script src="/markdown.js" defer></script><script src="/snippets.js" defer></script><script src="/app.js" defer></script>
 </head>
 <body class="manager-page">
 <a class="skip" href="#main">Skip to content</a>
@@ -73,7 +73,7 @@
     <button class="text-button back-button" type="button" data-page="models-page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg><span>Back to the model</span></button>
     <h2 id="connections-title">Connect your program.</h2><p>Your editor and this window use the same model. Closing the window keeps the service running.</p>
     <dl><dt>Local endpoint</dt><dd id="connection-endpoint" class="connection-value"></dd><dt>Model</dt><dd id="connection-model" class="connection-value"></dd></dl>
-    <label for="connection-client">Use with</label><select id="connection-client"><option value="terminal">Terminal</option><option value="continue">VS Code · Continue</option><option value="opencode">OpenCode · text chat</option></select>
+    <label for="connection-client">Use with</label><select id="connection-client"><option value="terminal">Terminal</option><option value="continue">VS Code · Continue</option><option value="opencode">OpenCode · text chat</option><option value="python">Python</option><option value="javascript">JavaScript · TypeScript</option><option value="go">Go</option><option value="java">Java</option></select>
     <p id="connection-help" class="hint"></p><div class="actions"><button id="copy-connection" type="button" disabled aria-describedby="connection-disabled">Copy configuration</button><button id="test-connection" type="button" disabled aria-describedby="connection-disabled">Test local connection</button></div><p id="connection-disabled" class="hint" hidden><span id="connection-disabled-text"></span> <button id="connection-choose" class="text-button" type="button" hidden>Choose a model</button></p><p id="connection-result" role="status" aria-live="polite"></p>
     <p class="hint">Text chat is available after loading a model. Agent tools are not supported. Context: 4096 tokens. Copied configurations contain your private local key: keep them out of repositories.</p>
     <details class="settings"><summary>Home Assistant</summary><p class="hint">Use the existing Home Assistant integration. Device permissions and execution stay in Home Assistant. Product validation is still in progress.</p><a href="https://github.com/geisten/geist-home-assistant" target="_blank" rel="noreferrer">Open Home Assistant integration ↗</a></details>
