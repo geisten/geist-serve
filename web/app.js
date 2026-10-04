@@ -513,30 +513,33 @@ function renderBestChoice(snapshot) {
 // escaped catalog names only.
 const escapeText = text => String(text).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const secondsText = value => value === null || value === undefined ? '–' : `${formatNumber(value, value < 10 ? 1 : 0)} s`;
+// #133: a ranked bar list instead of a scatter plot. One row per model in the
+// list's order; "correct" against the reliability mark, "seconds per answer"
+// on a log scale with the fast/usable marks; estimates dashed (≈), references
+// a thin tick. Values are text in the cells, so the table is its own description.
+const speedScale = seconds => Math.max(0, Math.min(100, 100 * Math.log(Math.max(seconds, 1)) / Math.log(60)));
 function renderCompare() {
   if (!$('compare-dialog').open || !state) return;
   const limits = state.limits || {fast_s: 10, usable_s: 30, reliable: .9, intent: 'chat'};
-  const models = state.models.filter(m => m.installed && m.verdict);
-  const points = models.flatMap(m => ['cpu', 'gpu'].filter(p => knownNumber(m.verdict.seconds[p]) && m.verdict.total)
-    .map(p => ({m, p, x: m.verdict.seconds[p], y: m.verdict.passed / m.verdict.total})));
-  // #104: speed on reference platforms, a faint labelled mark, never "this computer".
-  const references = models.flatMap(m => (m.reference || []).filter(r => m.verdict.total)
-    .map(r => ({m, r, x: r.answer_ms / 1000, y: m.verdict.passed / m.verdict.total})));
-  const W = 340, H = 230, L = 40, R = 10, T = 10, B = 30;
-  const xmax = Math.max(limits.usable_s * 1.25, ...points.map(p => p.x * 1.1), ...references.map(p => p.x * 1.1));
-  const sx = x => L + (W - L - R) * Math.min(x, xmax) / xmax, sy = y => T + (H - T - B) * (1 - y);
-  const tick = (x1, y1, x2, y2, text, anchor, tx, ty) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="compare-grid"/><text x="${tx}" y="${ty}" text-anchor="${anchor}">${escapeText(text)}</text>`;
-  $('compare-chart').innerHTML =
-    `<rect class="compare-zone" x="${sx(0)}" y="${sy(1)}" width="${sx(limits.fast_s) - sx(0)}" height="${sy(limits.reliable) - sy(1)}"/>` +
-    `<line class="compare-usable" x1="${sx(limits.usable_s)}" y1="${sy(1)}" x2="${sx(limits.usable_s)}" y2="${sy(0)}"/>` +
-    `<path class="compare-axis" d="M${L} ${T}V${sy(0)}H${W - R}"/>` +
-    [0, limits.fast_s, limits.usable_s].map(x => tick(sx(x), sy(0), sx(x), sy(0) + 4, `${formatNumber(x)} s`, 'middle', sx(x), sy(0) + 15)).join('') +
-    [0, .5, limits.reliable, 1].filter((y, i, all) => all.indexOf(y) === i).map(y => tick(L - 4, sy(y), L, sy(y), `${Math.round(y * 100)}%`, 'end', L - 6, sy(y) + 3)).join('') +
-    `<text x="${W - R}" y="${H - 2}" text-anchor="end">${escapeText(t('seconds per typical answer'))}</text>` +
-    references.map(({m, r, x, y}) => `<circle class="compare-reference" cx="${sx(x)}" cy="${sy(y)}" r="5"><title>${escapeText(referenceText(m, r))}</title></circle>`).join('') +
-    points.map(({m, p, x, y}) => `<g class="compare-point" data-verdict="${m.verdict.value}" data-id="${escapeText(m.id)}"><circle cx="${sx(x)}" cy="${sy(y)}" r="5"/><text x="${sx(x) + 7}" y="${sy(y) + 3}">${escapeText(`${m.group_name || m.name} · ${p.toUpperCase()}`)}</text><title>${escapeText(`${modelLabel(m)} · ${p.toUpperCase()} · ${secondsText(x)} · ${m.verdict.passed}/${m.verdict.total}`)}</title></g>`).join('');
-  $('compare-table').tBodies[0].innerHTML = models.length ? models.map(m => `<tr data-id="${escapeText(m.id)}" tabindex="-1"><td><span class="model-verdict" data-verdict="${m.verdict.value}" title="${escapeText(verdictText(m))}">${verdictSymbols[m.verdict.value]}</span><span class="sr-only">${escapeText(verdictText(m))}</span></td><th scope="row">${escapeText(modelLabel(m))}</th><td>${secondsText(m.verdict.seconds.cpu)}</td><td>${secondsText(m.verdict.seconds.gpu)}</td><td>${m.verdict.total ? `${m.verdict.passed}/${m.verdict.total}` : '–'}</td><td><span class="compare-basis" title="${escapeText(verdictBasis(m))}" aria-hidden="true">ⓘ</span><span class="sr-only">${escapeText(verdictBasis(m))}</span></td></tr>`).join('')
-    : `<tr><td colspan="6">${escapeText(t('No model installed yet.'))}</td></tr>`;
+  const rank = new Map((state.ranking || []).map((id, index) => [id, index]));
+  const models = state.models.filter(m => m.verdict).sort((a, b) => (rank.get(a.id) ?? 1e9) - (rank.get(b.id) ?? 1e9));
+  const row = m => {
+    const v = m.verdict, share = v.total ? Math.round(100 * v.passed / v.total) : null;
+    const seconds = v.processor ? v.seconds[v.processor] : null, estimated = v.basis === 'estimated';
+    const zone = seconds === null ? '' : seconds <= limits.fast_s ? 'fast' : seconds <= limits.usable_s ? 'usable' : 'slow';
+    const ticks = (m.reference || []).map(r => `<span class="bar-reference" data-left="${speedScale(r.answer_ms / 1000).toFixed(1)}" title="${escapeText(referenceText(m, r))}"></span>`).join('');
+    const quality = share === null ? `<span class="bar-value">–</span>`
+      : `<span class="bar" aria-hidden="true"><span class="bar-fill" data-zone="${share >= limits.reliable * 100 ? 'fast' : 'slow'}" data-width="${share}"></span><span class="bar-mark" data-left="${Math.round(limits.reliable * 100)}"></span></span><span class="bar-value">${share}%</span>`;
+    const speed = seconds === null ? `<span class="bar" aria-hidden="true">${ticks}</span><span class="bar-value">–</span>`
+      : `<span class="bar" aria-hidden="true"><span class="bar-fill" data-zone="${zone}" data-estimated="${estimated}" data-width="${speedScale(seconds).toFixed(1)}"></span><span class="bar-mark" data-left="${speedScale(limits.fast_s).toFixed(1)}"></span><span class="bar-mark" data-left="${speedScale(limits.usable_s).toFixed(1)}"></span>${ticks}</span><span class="bar-value" title="${escapeText(verdictReason(m)[0] || '')}">${estimated ? '≈' : ''}${secondsText(seconds)}</span>`;
+    return `<tr data-id="${escapeText(m.id)}" tabindex="-1"><td><span class="model-verdict" data-verdict="${v.value}" title="${escapeText(verdictText(m))}">${verdictSymbols[v.value]}</span><span class="sr-only">${escapeText(verdictText(m))}</span></td>` +
+      `<th scope="row" title="${escapeText(modelLabel(m))}">${escapeText(plainModel(m))}</th><td class="bar-cell">${quality}</td><td class="bar-cell">${speed}</td>` +
+      `<td><span class="compare-basis" title="${escapeText(verdictBasis(m))}" aria-hidden="true">ⓘ</span><span class="sr-only">${escapeText(verdictBasis(m))}</span></td></tr>`;
+  };
+  $('compare-table').tBodies[0].innerHTML = models.map(row).join('');
+  // Inline style attributes are blocked by the page's CSP; CSSOM is not.
+  for (const e of $('compare-table').querySelectorAll('[data-width]')) e.style.width = `${e.dataset.width}%`;
+  for (const e of $('compare-table').querySelectorAll('[data-left]')) e.style.left = `${e.dataset.left}%`;
   const fields = {'verdict-intent': limits.intent, 'verdict-fast': limits.fast_s, 'verdict-usable': limits.usable_s, 'verdict-reliable': Math.round(limits.reliable * 100)};
   for (const [id, value] of Object.entries(fields)) if (document.activeElement !== $(id)) $(id).value = value;
 }
@@ -1097,7 +1100,7 @@ window.geistNavigate = showPage;
 // #125: ⌘1-3 (Ctrl on Linux) for the areas; arrow keys walk the model list.
 document.addEventListener('keydown', event => {
   if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
-  const page = {'1': 'models-page', '2': 'connect-page', '3': 'settings-page'}[event.key];
+  const page = {'1': 'models-page', '2': 'settings-page'}[event.key]; // #133: Connect is an action, not an area
   if (page) { event.preventDefault(); showPage(page); }
 });
 $('model-sidebar').addEventListener('keydown', event => {
@@ -1358,14 +1361,6 @@ $('close-activity').addEventListener('click',()=>$('activity-dialog').close());
 for (const id of ['best-action', 'recommend-action']) $(id).addEventListener('click', () => { if ($(id).dataset.id) choose($(id).dataset.id); });
 $('open-compare').addEventListener('click', () => { uiText($('verdict-result'), ''); $('compare-dialog').showModal(); $('close-compare').focus({preventScroll: true}); renderCompare(); });
 $('close-compare').addEventListener('click', () => $('compare-dialog').close());
-// A point leads to its row: the row has the values and what they rest on.
-$('compare-chart').addEventListener('click', event => {
-  const id = event.target.closest('.compare-point')?.dataset.id;
-  const row = id && [...$('compare-table').tBodies[0].rows].find(r => r.dataset.id === id);
-  if (!row) return;
-  for (const r of $('compare-table').tBodies[0].rows) r.classList.toggle('highlight', r === row);
-  row.scrollIntoView({block: 'nearest'}); row.focus({preventScroll: true});
-});
 for (const id of ['verdict-intent', 'verdict-fast', 'verdict-usable', 'verdict-reliable']) $(id).addEventListener('change', () => saveVerdictSettings({
   intent: $('verdict-intent').value, fast_s: Number($('verdict-fast').value), usable_s: Number($('verdict-usable').value), reliable: Number($('verdict-reliable').value) / 100}));
 $('verdict-reset').addEventListener('click', () => saveVerdictSettings({reset: true}));
