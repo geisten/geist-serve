@@ -396,7 +396,7 @@ static int print_models(void) {
     else
         puts("\nNo model fits this computer well.");
     free(action);
-    puts("\n✓ good choice  ◐ usable, with limits  ✗ not recommended here  ? not measured yet\n"
+    puts("\n✓ good choice  ◐ usable, with limits  ✗ not recommended  ? not measured yet\n"
          "JSON with reasons: geisten status");
     free(best);
     free(j);

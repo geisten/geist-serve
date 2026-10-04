@@ -271,7 +271,7 @@ async function checkActivityUX(assert, tick) {
     assert($('model-chooser').tagName === 'SECTION', 'model list is visible without a disclosure');
     assert(!$('recommendation-reason') && !$('preferences'), 'no recommendation explanation or nested settings section');
     assert(!$('new-chat').closest('.chat-heading') && $('runtime-state').parentElement === $('runtime-model') && !$('runtime-state').textContent, 'status dot precedes model name without redundant text or header trash');
-    assert(state.models.every(model => [...$('models').querySelectorAll('.model')].some(card => card.dataset.id === model.id)), 'main list includes every catalog model, including missing downloads');
+    assert(state.models.every(model => [...$('models').querySelectorAll('.model'), ...$('other-models-list').querySelectorAll('.model')].some(card => card.dataset.id === model.id)), 'every catalog model is listed, including missing downloads (#133: weak ones under Other models)');
     assert(!$('add-model') && !$('model-catalog'), 'downloads require no separate catalog dialog');
     input('Keep this draft through settings');
     $('open-preferences').click();
@@ -345,7 +345,7 @@ async function checkActivityUX(assert, tick) {
       };
       resetFixture(); input('Draft survives model changes');
       const originalRow = pick().closest('.model');
-      assert(pick().closest('#models') && !pick().disabled, 'undownloaded model is directly available in the main list');
+      assert(pick().closest('#models, #other-models-list') && !pick().disabled, 'undownloaded model is directly available in the main list');
       assert(!$('setup-start') && !$('setup') && !$('go-setup'), 'no second setup or start control');
       assert(pick().querySelector('.download-state').hidden && pick().getAttribute('aria-label').includes(t('Not downloaded')), 'missing state uses symbols while retaining an accessible explanation');
       // #51: a multi-GB download says its size first; cancelling starts nothing.
@@ -358,7 +358,7 @@ async function checkActivityUX(assert, tick) {
       pick().querySelector('.model-name').click(); await settle();
       assert(JSON.stringify(modelCalls.map(([path]) => path)) === JSON.stringify(['/app/preview','/app/download']), 'one name click grants preview and starts exactly one download');
       assert(modelCalls.every(([, body]) => body.id === modelID), 'action keeps the explicitly requested model');
-      assert(pick().closest('#models') && pick().closest('.model') === originalRow, 'download keeps progress in the same visible model row');
+      assert(pick().closest('#models, #other-models-list') && pick().closest('.model') === originalRow, 'download keeps progress in the same visible model row');
       assert(getComputedStyle(pick().querySelector('.ring-download')).display === 'none' && getComputedStyle(pick().querySelector('.ring-track')).display !== 'none' && getComputedStyle(pick().querySelector('.ring-pause')).display !== 'none', 'progress ring replaces the arrow and contains its pause control');
       assert(pick().getAttribute('aria-label').includes(t('Pause download')) && pick().querySelector('.model-ring').getAttribute('aria-valuenow') === '50', 'same row exposes real progress and pause');
       const count = modelCalls.length;
@@ -385,7 +385,7 @@ async function checkActivityUX(assert, tick) {
       window.confirm = () => false; remove.click(); await settle();
       assert(fixtureModel().installed, 'cancelled deletion keeps the file');
       window.confirm = () => true; remove.focus(); remove.click(); await settle();
-      assert(modelCalls.at(-1)[0] === '/app/remove' && pick().closest('#models') && pick().closest('.model') === originalRow && !fixtureModel().installed, 'deletion keeps the same model row in the main list');
+      assert(modelCalls.at(-1)[0] === '/app/remove' && pick().closest('#models, #other-models-list') && pick().closest('.model') === originalRow && !fixtureModel().installed, 'deletion keeps the same model row in the main list');
       assert(document.activeElement === pick() && !pick().disabled && pick().getAttribute('aria-label').includes(t('Download and start')) && remove.hidden, 'deletion restores keyboard focus to the available download action');
       modelCalls=[]; pick().click(); await settle();
       assert(modelCalls.at(-1)[0] === '/app/download', 'a deleted model can be downloaded again directly');
@@ -687,7 +687,7 @@ async function checkActivityUX(assert, tick) {
       api=beforeExecutionAPI;render(executionRealState);message('',false);input('');showPage('models-page');
     }
     {// #57: one order for one catalog, whatever is installed, active or recommended by selection.
-     const base=structuredClone(state), groupsOf=()=>[...$('models').children].map(g=>g.dataset.group);
+     const base=structuredClone(state), groupsOf=()=>[...$('models').children,...$('other-models-list').children].map(g=>g.dataset.group);
      const groupIds=[];for(const m of base.models){const g=m.group_id||m.id;if(!groupIds.includes(g))groupIds.push(g);}
      // #133: the order is the service's suitability ranking; a group sits where its best variant ranks.
      const groupOf=id=>{const m=base.models.find(x=>x.id===id);return m.group_id||m.id;};
@@ -699,12 +699,14 @@ async function checkActivityUX(assert, tick) {
      const orders=[fresh,installed,active].map(s=>{render(structuredClone(s));return groupsOf();});
      render(base);
      assert(expected.length===groupIds.length && orders.every(o=>JSON.stringify(o)===JSON.stringify(expected)),`#57/#133: suitability order, the same whatever is installed or active: ${JSON.stringify({expected,orders})}`);
-     render({...base,ranking:[...base.ranking].reverse()});
-     assert(groupsOf()[0]===groupOf(base.ranking.at(-1)),'#133: a different ranking reorders the list');
+     render(base); const main=new Set([...$('models').children].map(g=>g.dataset.group)), reversed=[...base.ranking].reverse();
+     render({...base,ranking:reversed});
+     assert(JSON.stringify([...$('models').children].map(g=>g.dataset.group))===JSON.stringify([...new Set(reversed.map(groupOf))].filter(g=>main.has(g))),'#133: a different ranking reorders the list (weak models stay under Other models)');
      render(base);}
 
     {// #51: first launch names one recommendation, explains the icons and speaks plainly.
-     const base=structuredClone(state), pickModel=base.models.find(m=>m.resource_fit!==2);
+     // #133: a model from the main list (weak-everywhere models fold under Other models).
+     const base=structuredClone(state), pickModel=base.models.find(m=>m.resource_fit!==2&&!(m.verdict?.value==='not_recommended'&&m.verdict.reason==='unreliable'));
      const fresh={...base,ready:false,active_id:'',recommendation:{...base.recommendation,id:pickModel.id,source:'default',eligible:true},best_choice:{id:pickModel.id,verdict:'unknown',action:'download',processor:null,basis:null},
        models:base.models.map(m=>({...m,installed:false}))};
      fresh.models.find(m=>m.id!==pickModel.id).reason='RAM is smaller than the model file, before context and OS memory.';
@@ -720,7 +722,7 @@ async function checkActivityUX(assert, tick) {
      const listText=$('model-chooser').textContent;
      assert(!/high quality|hohe qualität|balanced|ausgewogen|very compact|sehr kompakt/i.test(listText),'#80: no quality ranking derived from the quantization');
      assert(['8-bit','4-bit','Ternary (native)'].map(x=>t(x)).some(x=>cards.get(pickModel.id).textContent.includes(x)),'#80: the row names the weight format');
-     assert(!$('quality-note').hidden && $('quality-note').textContent===t('Answer quality not tested yet. Check answers.'),'#80: the list says that answer quality is not tested');
+     assert($('quality-note').hidden===fresh.models.some(m=>m.quality_evidence) && $('quality-note').textContent===t('Answer quality not tested yet. Check answers.'),'#80/#133: "not tested" only while no model has a reference test');
      assert(tags[0].textContent===t('Suggested start') && $('model-prompt-hint').textContent===recommendation(fresh).text,'#80/#122: one recommendation, the same sentence in the empty pane');
      const badges=cards.get(pickModel.id).querySelector('.model-badges'); badges.focus();
      assert(badges.classList.contains('show-meaning') && getComputedStyle(badges,'::after').content.includes(t('Fits this computer')),'#51: focusing the icons shows their meaning');badges.blur();
@@ -957,9 +959,9 @@ $$
       assert(mark(first.id).textContent === '✓' && mark(second.id).textContent === '✗', '#103: symbols, not words');
       assert(mark(first.id).title.split('\n')[0] === `${t('Good choice')} · ${t('about 3 s per answer on the graphics chip')} · 146/160 ${t('correct')}`, '#103: plain reason with seconds and processor');
       assert(mark(first.id).title.split('\n')[1] === verdictBasis({...first, verdict: verdict('good', 'good', {processor: 'gpu', seconds: {cpu: 9.6, gpu: 3.2}, passed: 146, total: 160})}), '#103: the tooltip names what the verdict rests on');
-      assert(mark(second.id).title.split('\n')[0] === `${t('Not recommended here')} · ${t('Reference test')}: 31/160 ${t('correct')}`, '#103: the reason names the evidence');
+      assert(mark(second.id).title.split('\n')[0] === `${t('Too many wrong answers')} · ${t('Reference test')}: 31/160 ${t('correct')}`, '#103/#133: the reason names the evidence');
       assert(!$('best-choice').hidden && $('best-choice').textContent.startsWith(`✓ ${t('Recommended here')}: `) && !/t\/s|Q4_K_M|Q8_0/.test($('best-choice').textContent), '#103: recommendation in plain words');
-      assert(cards.get(second.id).querySelector('.model-pick').getAttribute('aria-label').includes(t('Not recommended here')) && !cards.get(second.id).querySelector('.model-pick').disabled, '#103: a ✗ explains and never blocks');
+      assert(cards.get(second.id).querySelector('.model-pick').getAttribute('aria-label').includes(t('Too many wrong answers')) && !cards.get(second.id).querySelector('.model-pick').disabled, '#103: a ✗ explains and never blocks');
       render(snapshot(verdict('good', 'good', {basis: 'estimated', processor: 'cpu', seconds: {cpu: 4.4, gpu: null}, passed: 146, total: 160}), verdict('not_recommended', 'unreliable', {passed: 31, total: 160}), null));
       assert(mark(first.id).title.includes(`${t('about 4 s per answer on the processor')} (${t('estimated, download to measure')})`), '#103: an estimate is always labelled');
       render(snapshot(verdict('unknown', 'speed_unknown', {passed: 146, total: 160}), verdict('unknown', 'quality_unknown'), {id: first.id, verdict: 'unknown', processor: null}));
@@ -1087,6 +1089,21 @@ $$
       const card = cards.get(model.id), remove = card.querySelector('.remove').getBoundingClientRect(), measure = card.querySelector('.measure').getBoundingClientRect(), box = card.getBoundingClientRect();
       assert(!card.querySelector('.measure').hidden && Math.abs(remove.left - measure.left) < 1 && measure.top >= remove.bottom - 1 && measure.right <= box.right + 1 && measure.width >= 44 && measure.height >= 44, '#126: remove and measure share one column inside the card');
       render(saved);
+    }
+    { // #133: a ✗ says why; quality has no "here"; weak-everywhere models fold into "Other models", the active one stays.
+      const single = m => saved.models.filter(x => (x.group_id || x.id) === (m.group_id || m.id)).length === 1;
+      const saved = state, [weakOne, activeWeak, slowGuess] = saved.models.filter(m => m.resource_fit !== 2 && single(m)).slice(0, 3);
+      $('other-models').open = false;
+      const v = (value, reason, extra = {}) => ({value, reason, basis: 'estimated', processor: 'cpu', seconds: {cpu: 50, gpu: null}, passed: 31, total: 160, ...extra});
+      render({...saved, ready: true, active_id: activeWeak.id, models: saved.models.map(m => m.id === weakOne.id ? {...m, verdict: v('not_recommended', 'unreliable')}
+        : m.id === activeWeak.id ? {...m, installed: true, verdict: v('not_recommended', 'unreliable')}
+        : m.id === slowGuess.id ? {...m, verdict: v('unknown', 'probably_too_slow', {passed: 146})} : m)});
+      const inOther = id => !!cards.get(id).closest('#other-models-list');
+      assert(inOther(weakOne.id) && !inOther(activeWeak.id) && !$('other-models').hidden && !$('other-models').open, '#133: weak models fold away; the active one stays in view');
+      assert(cards.get(weakOne.id).querySelector('.model-verdict').title.startsWith(t('Too many wrong answers')) && !cards.get(weakOne.id).querySelector('.model-verdict').title.includes(t('Not recommended here')), '#133: quality is not "here"');
+      assert(cards.get(slowGuess.id).querySelector('.model-verdict').textContent === '?' && cards.get(slowGuess.id).querySelector('.model-verdict').title.startsWith(t('Probably too slow here')), '#133: an estimate is a "probably", never a hard ✗');
+      render(saved);
+      assert($('other-models').hidden === !$('other-models-list').children.length, '#133: the area hides when empty');
     }
     { // #122: one recommendation: the sentence, the card tag and both buttons name the same model; the action fits.
       const saved = state, originalChoose = choose, chosen = [];

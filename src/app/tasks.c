@@ -56,15 +56,17 @@ double app_answer_seconds(double rate, double first) {
 /* Known problems first, so a missing figure never hides a measured one. Memory
  * that does not fit, a pass rate below the limit or answers slower than usable
  * rule a model out; then missing data; then limits that leave it usable. */
-struct app_judgement app_judge(enum app_fit resource, double seconds, unsigned passed, unsigned total,
+struct app_judgement app_judge(enum app_fit resource, double seconds, bool estimated, unsigned passed, unsigned total,
                                struct app_limits limits) {
     bool known_quality = total > 0, known_speed = seconds >= 0;
     if (resource == APP_UNAVAILABLE)
         return (struct app_judgement) {APP_VERDICT_NOT_RECOMMENDED, "unavailable"};
     if (known_quality && passed < limits.reliable * total)
         return (struct app_judgement) {APP_VERDICT_NOT_RECOMMENDED, "unreliable"};
+    /* #133: an estimate alone never rules a model out; it says "probably". */
     if (known_speed && seconds > limits.usable_s)
-        return (struct app_judgement) {APP_VERDICT_NOT_RECOMMENDED, "too_slow"};
+        return estimated ? (struct app_judgement) {APP_VERDICT_UNKNOWN, "probably_too_slow"}
+                         : (struct app_judgement) {APP_VERDICT_NOT_RECOMMENDED, "too_slow"};
     if (!known_quality)
         return (struct app_judgement) {APP_VERDICT_UNKNOWN, "quality_unknown"};
     if (!known_speed)

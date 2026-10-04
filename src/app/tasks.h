@@ -34,8 +34,9 @@ double app_answer_seconds(double rate, double first);
  * so throughput (rate × file bytes) carries over; the median of n measurements,
  * and their median first-token time. < 0 without measurements. */
 double app_estimate_seconds(uint64_t bytes, const double *rate, const double *model_bytes, const double *first, size_t n);
-/* seconds < 0: not measured; total 0: no reference test. */
-struct app_judgement app_judge(enum app_fit resource, double seconds, unsigned passed, unsigned total,
+/* seconds < 0: not measured; estimated: seconds is an estimate (never a hard ✗);
+ * total 0: no reference test. */
+struct app_judgement app_judge(enum app_fit resource, double seconds, bool estimated, unsigned passed, unsigned total,
                                struct app_limits limits);
 const char *app_verdict_name(enum app_verdict verdict);
 /* #122: one recommendation across installed and catalog models. */

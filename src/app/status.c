@@ -492,6 +492,7 @@ void status_response(int fd, struct app_arena *arena) {
                 passed = m->quality_task[k][0], total = m->quality_task[k][1];
         struct app_judgement j = app_judge(app_assess(&adjusted, m, installed).fit,
                                            fastest < 0 ? -1 : seconds[fastest],
+                                           estimated,
                                            passed,
                                            total,
                                            app.prefs.limits);
