@@ -1,7 +1,6 @@
 src/geistd.c
 src/lifecycle.c
 src/resource_sampler.c
-src/template.c
 src/json.c
 src/net.c
 src/model.c

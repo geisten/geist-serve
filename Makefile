@@ -1,16 +1,17 @@
-# geist-serve — an Ollama- and OpenAI-compatible HTTP front for the geist engine.
+# geist-serve — the engine side of geisten: geistd (the model process) on the
+# pinned geistlib engine and geist-runtime; the app builds from App.mk.
 #
 # The engine is pinned by GEIST_REF below and checked out into $(GEISTLIB) by
 # scripts/sync-engine.sh — no git submodule. Every make run verifies the
 # checkout against the pin (same scheme as geist-diktat).
 #
 # Platform knowledge stays in geistlib: its detect-target.sh picks the target
-# and its mk/ fragments supply the flags, so geist-serve links with exactly
+# and its mk/ fragments supply the flags, so geistd links with exactly
 # what the engine was built with.
 #
-#> make               build ./geist-serve and ./geistd (syncs + builds libgeist.a on demand)
+#> make               build ./geistd (syncs + builds libgeist.a on demand)
 #> make fetch-model   the 369 MB SmolLM2 reference GGUF into the engine tree (SHA-pinned)
-#> make test          model-free unit tests + HTTP smoke against a GGUF (skips without one)
+#> make test          model-free unit tests + every geistd op against a GGUF (skips without one)
 #> make app test-app  the C23 app and its tests; run plain 'make' first (they need ./geistd)
 #> make format        clang-format, shared style file with the engine
 #> make clean         drop the binary; distclean also drops the engine
@@ -66,19 +67,12 @@ include runtime.mk
 
 .PHONY: all help test fetch-model format clean distclean FORCE
 
-all: geist-serve geistd
+all: geistd
 
 help:
 	@grep "^#>" Makefile | cut -c4-
 
-# geist-serve: HTTP, the generation core, and its two API dialects on top of
-# what it shares with geistd (model, GGUF header, chat templates, JSON, listeners).
-SHARED := src/model.c src/gguf.c src/template.c src/json.c src/net.c
-SERVE  := src/serve.c src/http.c src/generate.c src/openai.c src/ollama.c
 HDRS   := $(wildcard src/*.h)
-
-geist-serve: $(SERVE) $(SHARED) $(HDRS) $(LIB)
-	$(CC) $(CFLAGS) -o $@ $(SERVE) $(SHARED) $(LIB) $(LDFLAGS) $(LDLIBS)
 
 # geistd: libgeist over a socket for agents (resident sessions, logits).
 GEISTD_OUTPUT ?= geistd
@@ -88,11 +82,6 @@ $(GEISTD_OUTPUT): $(DAEMON_SOURCES) scripts/daemon-sources.list $(HDRS) $(LIB) s
 	@mkdir -p $(@D)
 	python3 scripts/engine-provenance.py capture $(GEISTLIB) --archive $(LIB) --expected $(ENGINE_SOURCE_ID) --output build/engine-build.h
 	$(CC) $(CFLAGS) -Ibuild -I$(GEISTR)/include -o $@ $(DAEMON_SOURCES) $(GEISTR_RUNTIME) $(GEISTR_CORE) $(LIB) $(LDFLAGS) $(LDLIBS) -lpthread
-
-# Model-free unit test of the chat renderers and GGUF scan; no engine needed.
-build/test_template: tests/test_template.c src/template.c src/template.h src/gguf.c src/gguf.h
-	@mkdir -p build
-	$(CC) -std=c23 -O1 -g -Wall -Wextra -fsanitize=address,undefined $(COVERAGE_FLAGS) -o $@ tests/test_template.c src/template.c src/gguf.c
 
 # SIGTERM must stop the accept loop whichever thread receives it (#69); no engine needed.
 build/test_net_signal: tests/test_net_signal.c src/net.c src/net.h
@@ -109,14 +98,12 @@ $(LIB): FORCE
 FORCE:
 
 # The CI reference model, fetched and SHA-verified by the engine's own rule
-# into geistlib/gguf_artifacts/, which is where tests/smoke.sh looks.
+# into geistlib/gguf_artifacts/, which is where tests/geistd.sh looks.
 fetch-model:
 	$(MAKE) -C $(GEISTLIB) fetch-llama-model
 
-test: geist-serve geistd build/test_template build/test_net_signal
-	./build/test_template
+test: geistd build/test_net_signal
 	./build/test_net_signal
-	sh tests/smoke.sh
 	sh tests/geistd.sh
 
 format:

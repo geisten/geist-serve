@@ -14,13 +14,13 @@ class ManifestTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
-        self.assets=[f'geist-serve-{p}{s}' for p in ['linux-x86_64','linux-aarch64','macos-arm64'] for s in ['', '-geistd']]+['geist-serve.socket','geist-serve.service','geist-serve.default','geisten_1.2.3_amd64.deb','geisten_1.2.3_arm64.deb','geisten-desktop_1.2.3_all.deb','geist-serve.cdx.json']
+        self.assets=['geisten_1.2.3_amd64.deb','geisten_1.2.3_arm64.deb','geisten-desktop_1.2.3_all.deb','geist-serve.cdx.json']
         for name in self.assets: (self.root/name).write_text(name)
 
     def test_all_payloads_and_package_sidecars_verified(self):
         self.assertEqual(set(manifest.assemble(self.root,'1.2.3')),set(self.assets))
         entries=(self.root/'SHA256SUMS').read_text().splitlines()
-        self.assertEqual(len(entries),13)
+        self.assertEqual(len(entries),4)
         for line in entries:
             digest,name=line.split()
             self.assertEqual(digest,hashlib.sha256((self.root/name).read_bytes()).hexdigest())
@@ -61,7 +61,7 @@ class ManifestTests(unittest.TestCase):
         with self.assertRaises(ValueError): manifest.assemble(self.root,'1.2.4')
 
     def test_symlink_asset_is_rejected(self):
-        p=self.root/'geist-serve.socket'; p.unlink(); p.symlink_to('geist-serve.service')
+        p=self.root/'geist-serve.cdx.json'; p.unlink(); p.symlink_to('geisten_1.2.3_amd64.deb')
         with self.assertRaises(ValueError): manifest.assemble(self.root,'1.2.3')
 
 if __name__=='__main__': unittest.main()

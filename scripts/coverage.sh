@@ -1,7 +1,7 @@
 #!/bin/sh
 # coverage.sh [C_MIN] [PYTHON_MIN] [WEB_MIN]: line coverage of this repository
 # over `make test`, `make test-app` and the web checks in headless Chrome:
-# C (app, geistd, geist-serve and shared code), Python (scripts, workbench,
+# C (app, geistd and shared code), Python (scripts, workbench,
 # desktop shell, client) and the web UI (web/*.js). Every app binary is rebuilt once with clang source-based coverage;
 # child processes started by the Python tests inherit LLVM_PROFILE_FILE.
 # Continuous mode (%c) keeps the counts of processes the tests kill on purpose.
@@ -15,7 +15,7 @@ cov=$(tool llvm-cov) || { echo "coverage: llvm-cov not found" >&2; exit 2; }
 out=build/coverage
 rm -rf "${out:?}" && mkdir -p "$out"
 # Rebuild this repository's binaries with instrumentation (never the engine library).
-rm -rf geist-app geisten geist geist-serve geistd build/geist-app-* build/test_app_* build/test_template build/test_net_signal
+rm -rf geist-app geisten geist geistd build/geist-app-* build/test_app_* build/test_net_signal
 flags="-fprofile-instr-generate -fcoverage-mapping"
 # Real-inference tests run when the small reference model is present.
 if [ -z "${GEIST_TEST_MODEL:-}" ]; then
@@ -52,7 +52,7 @@ web=0
 node tests/desktop/chrome_coverage.mjs "$web_min" | tee "$out/web.txt" || web=1
 "$profdata" merge -sparse "$out"/*.profraw -o "$out/merged.profdata"
 ignore='(tests/|build/|jsmn\.h|clients/|geistlib/|geist-runtime/)'
-for binary in geist-app geisten geist-serve geistd build/geist-app-* build/test_app_* build/test_template build/test_net_signal; do
+for binary in geist-app geisten geistd build/geist-app-* build/test_app_* build/test_net_signal; do
     [ -f "$binary" ] && [ -x "$binary" ] || continue
     "$cov" export "$binary" -instr-profile="$out/merged.profdata" -format=lcov -ignore-filename-regex="$ignore" \
         > "$out/$(basename "$binary").info" 2>/dev/null

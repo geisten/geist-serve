@@ -152,8 +152,7 @@ Apple Silicon and macOS 14 or later are required by the Mac app.
 Previously downloaded catalog files in the geisten data folder are reused
 after verification. The former Swift application's selected-model preference
 is not migrated: choose the model once in the model list. The new Connections panel and bundled `geisten` terminal client use the same
-loaded daemon. The older standalone geist-serve server is a separate legacy
-entry point; do not start it to connect an editor to the manager.
+loaded daemon.
 
 ## Start on a Raspberry Pi
 

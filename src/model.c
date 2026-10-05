@@ -15,12 +15,7 @@ void model_describe(struct model *mo, const char *path) {
     if (dot != nullptr && strcmp(dot, ".gguf") == 0)
         *dot = '\0';
 
-    /* Chat template family: fingerprint the GGUF's own template string
-     * (SmolLM2 is arch "llama" but speaks ChatML), fall back to the arch. */
     gguf_read_meta(path, &mo->meta);
-    mo->family = chat_family_from_template(mo->meta.tpl);
-    if (mo->family == CHAT_UNKNOWN)
-        mo->family = chat_family_from_arch(geist_model_arch(mo->m));
 
     /* Stop tokens: EOS plus the end-of-turn markers of the families we
      * serve — some GGUFs set them as EOS, some do not (Gemma). */

@@ -1,6 +1,8 @@
-# Tag v* → three static binaries + SHA256SUMS + the systemd units + a CycloneDX
-# SBOM, with signed build provenance, attached to a GitHub release. Linux is musl-static from Alpine (runs on any 64-bit
-# distro, Raspberry Pi OS included); macOS links libomp statically.
+# Tag v* → the geisten packages (Ubuntu DEBs, the signed rootless installer when
+# its key is set), SHA256SUMS and a CycloneDX SBOM, with signed build provenance,
+# attached to a GitHub release. The standalone geist-serve server, its install.sh,
+# systemd units and Homebrew formula are retired (#148): geist-app and geistd serve
+# the same APIs.
 name: release
 
 on:
@@ -37,62 +39,8 @@ jobs:
     permissions:
       contents: read
 
-  linux:
-    timeout-minutes: 30
-    strategy:
-      matrix:
-        include:
-          - runner: ubuntu-24.04
-            asset: geist-serve-linux-x86_64
-          - runner: ubuntu-24.04-arm
-            asset: geist-serve-linux-aarch64
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: build static (pinned Alpine, musl)
-        run: |
-          docker run --rm -v "$PWD:/w" -w /w alpine:3.23@sha256:85fe1e81d6758c208f3e1eed4338a1997e19d4be002d4dd32d3100c9a8c010a0 sh -ec '
-            apk add --no-cache build-base linux-headers git >/dev/null
-            git config --global --add safe.directory /w
-            make TARGET=linux CC=gcc GEMM_PROVIDER=native EXTRA_LDFLAGS=-static
-          '
-          cp geist-serve ${{ matrix.asset }}
-          cp geistd ${{ matrix.asset }}-geistd
-      - name: sanity on glibc (static binary runs here too)
-        run: |
-          file ${{ matrix.asset }} | grep -q 'statically linked'
-          ./${{ matrix.asset }} 2>/dev/null || test $? -eq 2
-          ./${{ matrix.asset }}-geistd 2>/dev/null || test $? -eq 2
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ${{ matrix.asset }}
-          path: |
-            ${{ matrix.asset }}
-            ${{ matrix.asset }}-geistd
-
-  macos:
-    timeout-minutes: 30
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: deps
-        run: brew install libomp
-      - name: build (static libomp)
-        run: make GEIST_STATIC_OMP=1 && cp geist-serve geist-serve-macos-arm64 && cp geistd geist-serve-macos-arm64-geistd
-      - name: sanity (no Homebrew library at runtime)
-        run: |
-          ! otool -L geist-serve-macos-arm64 | grep -q homebrew
-          ./geist-serve-macos-arm64 2>/dev/null || test $? -eq 2
-          ./geist-serve-macos-arm64-geistd 2>/dev/null || test $? -eq 2
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: geist-serve-macos-arm64
-          path: |
-            geist-serve-macos-arm64
-            geist-serve-macos-arm64-geistd
-
   publish:
-    needs: [version, verify, linux, macos]
+    needs: [version, verify]
     timeout-minutes: 15
     environment: release
     permissions:
@@ -104,11 +52,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          path: dist
-          pattern: geist-serve-*
-          merge-multiple: true
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
           path: candidates
           pattern: ubuntu-*-candidate
       - name: assemble
@@ -116,7 +59,7 @@ jobs:
           PACKAGE_VERSION: ${{ needs.version.outputs.package }}
           GEIST_MANIFEST_SIGNING_KEY: ${{ secrets.GEIST_MANIFEST_SIGNING_KEY }}
         run: |
-          cp deploy/systemd/geist-serve.socket deploy/systemd/geist-serve.service deploy/systemd/geist-serve.default dist/
+          mkdir -p dist
           cp candidates/ubuntu-amd64-candidate/*.deb dist/
           cp "candidates/ubuntu-arm64-candidate/geisten_${PACKAGE_VERSION}_arm64.deb" dist/
           if [ -n "$GEIST_MANIFEST_SIGNING_KEY" ]; then
@@ -134,10 +77,6 @@ jobs:
           python3 scripts/sbom.py dist/geist-serve.cdx.json "$PACKAGE_VERSION"
           python3 scripts/release-manifest.py dist "$PACKAGE_VERSION"
           (cd dist && sha256sum -c SHA256SUMS)
-      - name: installer against these exact assets
-        run: |
-          GEIST_SERVE_BASE="file://$PWD/dist" GEIST_SERVE_PREFIX=/tmp/gs-prefix sh install.sh
-          /tmp/gs-prefix/bin/geist-serve 2>/dev/null || test $? -eq 2
       # Signed build provenance (Sigstore, stored by GitHub) for every file
       # that is uploaded, SBOM and checksum files included (#34 §2). Check a
       # download with: gh attestation verify <file> --repo geisten/geist-serve
@@ -152,19 +91,3 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes
-      # Homebrew formula in geisten/homebrew-tap, pushed with a deploy key
-      # that can write that one repository and nothing else (secret
-      # TAP_DEPLOY_KEY; the public half is registered on the tap).
-      - name: bump homebrew tap
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          TAP_DEPLOY_KEY: ${{ secrets.TAP_DEPLOY_KEY }}
-        run: |
-          if [ -z "$TAP_DEPLOY_KEY" ]; then echo "::notice::TAP_DEPLOY_KEY not set — run scripts/bump-tap.sh $GITHUB_REF_NAME by hand"; exit 0; fi
-          umask 077; printf '%s\n' "$TAP_DEPLOY_KEY" > /tmp/tap_key
-          export GIT_SSH_COMMAND="ssh -i /tmp/tap_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
-          TAP=$(mktemp -d)/homebrew-tap
-          git clone -q git@github.com:geisten/homebrew-tap "$TAP"
-          sh scripts/bump-tap.sh "$GITHUB_REF_NAME" "$TAP"
-          git -C "$TAP" push -q origin HEAD:main
-          rm -f /tmp/tap_key

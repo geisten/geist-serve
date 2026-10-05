@@ -13,9 +13,11 @@ SmolLM2-360M and a 430-token system prompt on an M-series Mac, one chat
 turn costs about 1.8 s on an idle machine, so five turns are ~10 s there,
 against ~2 s through geistd (five processes, 1884 tokens reused, 501
 prefilled). The gap grows linearly with turns and is far larger on a
-Raspberry Pi, where prefill is the expensive part. `tests/agent_short_calls.py`
-runs the comparison and prints the load average, because under contention
-the stateless path degrades much faster (measured 187 s vs 4.4 s at load 215).
+Raspberry Pi, where prefill is the expensive part; under contention the
+stateless path degrades much faster (measured 187 s vs 4.4 s at load 215,
+with the since-retired standalone geist-serve as the stateless side). The
+chat ops below keep the same property at message level: a follow-up
+processes only its new message (`tests/geistd_ops.py`).
 
 **Raspberry Pi 5 (4 GB), measured 2026-09-25**, model on the board, agent
 on a Mac over an SSH tunnel to the board's Unix socket, `OMP_NUM_THREADS=4`,
