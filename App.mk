@@ -3,25 +3,8 @@
 APP_CC ?= cc
 APP_CFLAGS ?= -std=c23 -O2 -Wall -Wextra -Wpedantic -D_POSIX_C_SOURCE=200809L -D_DARWIN_C_SOURCE
 APP_LDLIBS ?= -lcurl -lpthread
-# geist-runtime (#148): catalog, fit, templates and text stages, pinned like
-# geistlib and synced by the same script. geist-app links only the part that
-# needs no engine (libgeistr-core.a).
-RUNTIME_REPO ?= https://github.com/geisten/geist-runtime.git
-RUNTIME_REF  ?= 53ba83222214dae74831b86c6f06940f30acd6a8
-GEISTR       ?= geist-runtime
-ifeq (,$(filter clean distclean,$(MAKECMDGOALS)))
-RUNTIME_SYNC := $(shell GEIST_REPO='$(RUNTIME_REPO)' GEIST_REF='$(RUNTIME_REF)' GEISTLIB='$(GEISTR)' \
-                        sh scripts/sync-engine.sh >&2 && echo ok)
-ifneq ($(RUNTIME_SYNC),ok)
-$(error geist-runtime sync failed — see the messages above)
-endif
-endif
-GEISTR_CORE := $(GEISTR)/build/libgeistr-core.a
+include runtime.mk
 override APP_CFLAGS += -I$(GEISTR)/include
-.PHONY: geistr-core
-$(GEISTR_CORE): geistr-core
-geistr-core:
-	$(MAKE) -C $(GEISTR) core CC="$(APP_CC)"
 ifeq ($(shell uname -s),Linux)
 APP_LDLIBS += -lcrypto -lm
 endif

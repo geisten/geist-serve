@@ -62,6 +62,8 @@ CFLAGS  := -std=c23 -O2 -Wall -Wextra -I$(GEISTLIB)/include $(CFLAGS_TARGET) $(G
 LDFLAGS := $(LDFLAGS_TARGET) $(EXTRA_LDFLAGS) $(COVERAGE_FLAGS)
 LDLIBS  := $(LDLIBS_TARGET) $(GEMM_LDLIBS) $(EXTRA_LDLIBS)
 
+include runtime.mk
+
 .PHONY: all help test fetch-model format clean distclean FORCE
 
 all: geist-serve geistd
@@ -81,10 +83,11 @@ geist-serve: $(SERVE) $(SHARED) $(HDRS) $(LIB)
 # geistd: libgeist over a socket for agents (resident sessions, logits).
 GEISTD_OUTPUT ?= geistd
 DAEMON_SOURCES := $(shell cat scripts/daemon-sources.list)
-$(GEISTD_OUTPUT): $(DAEMON_SOURCES) scripts/daemon-sources.list $(HDRS) $(LIB) scripts/engine-provenance.py
+# Its chat ops run on geist-runtime (#148), over the model it loaded itself.
+$(GEISTD_OUTPUT): $(DAEMON_SOURCES) scripts/daemon-sources.list $(HDRS) $(LIB) scripts/engine-provenance.py $(GEISTR_RUNTIME) $(GEISTR_CORE)
 	@mkdir -p $(@D)
 	python3 scripts/engine-provenance.py capture $(GEISTLIB) --archive $(LIB) --expected $(ENGINE_SOURCE_ID) --output build/engine-build.h
-	$(CC) $(CFLAGS) -Ibuild -o $@ $(DAEMON_SOURCES) $(LIB) $(LDFLAGS) $(LDLIBS)
+	$(CC) $(CFLAGS) -Ibuild -I$(GEISTR)/include -o $@ $(DAEMON_SOURCES) $(GEISTR_RUNTIME) $(GEISTR_CORE) $(LIB) $(LDFLAGS) $(LDLIBS) -lpthread
 
 # Model-free unit test of the chat renderers and GGUF scan; no engine needed.
 build/test_template: tests/test_template.c src/template.c src/template.h src/gguf.c src/gguf.h

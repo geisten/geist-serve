@@ -147,5 +147,56 @@ except geistd.GeistdError as e:
 for k in keep: k.close()
 check("close frees", c.info()["sessions"] == 0, c.info()["sessions"])
 
+# chats (#148): message level on geist-runtime, only the new messages per send
+check("chat api", info.get("chat_api") is True and info.get("max_chats", 0) >= 1, info)
+ch = c.chat()
+sys_q = [("system", "Answer in one word."), ("user", "What is the capital of France?")]
+a1 = ch.ask(sys_q); t1 = ch.last
+check("chat answers", "Paris" in a1 and t1["finish"] == "stop" and t1["length"] == 3, (a1, t1))
+a2 = ch.ask("And of Italy?"); t2 = ch.last
+check("a follow-up processes only the new message", t2["input_tokens"] < t1["input_tokens"] and
+      t2["context_tokens"] > t1["context_tokens"] and "Rome" in a2, (t1, t2, a2))
+check("rewind to an earlier message", ch.rewind(3) == 3)
+check("regenerate after rewind", "Rome" in ch.ask("And of Italy?") and ch.last["length"] == 5, ch.last)
+try:
+    ch.rewind(99); check("rewind past the end refused", False)
+except geistd.GeistdError as e:
+    check("rewind past the end refused", "at most" in str(e), e)
+lim = c.chat()
+lim.ask("Count from one to fifty in words.", max=4)
+check("max per send", lim.last["finish"] == "length" and lim.last["output_tokens"] == 4, lim.last)
+lim.close()
+parts = list(ch.send("Say hi.", max=16))
+check("streams answer parts", parts and all(p == "answer" for p, _ in parts), parts)
+try:
+    list(ch.send("word " * 5000)); check("too long refused", False)
+except geistd.GeistdError as e:
+    check("too long refused with status context", str(e).startswith("context"), e)
+check("chat unchanged after a refusal", ch.rewind(3) == 3)
+# a client that leaves mid-answer cancels it; the chat goes on
+c._connect()
+c._send({"op": "chat_send", "chat": ch.id, "max": 0},
+        json.dumps({"messages": [{"role": "user", "content": "Write a long story about the sea."}]}).encode())
+c._recv(); c.close()
+t0 = time.time()
+check("geistd is free again at once", c.info()["ok"] and time.time() - t0 < 5, time.time() - t0)
+ch.ask("Again: the capital of France?", max=16)
+check("chat survives a client that left", ch.last["finish"] in ("stop", "length") and ch.last["length"] == 7, ch.last)  # 3 kept + the left turn + this one
+# stop strings and thinking off by default
+st = c.chat(stop=["\n"])
+check("stop string ends the answer", "\n" not in st.ask("List three fruits, one per line.", max=64))
+st.close()
+try:
+    geistd.Chat(c, "0" * 16).ask("hi"); check("unknown chat", False)
+except geistd.GeistdError as e:
+    check("unknown chat refused", "unknown chat" in str(e), e)
+# the chat table evicts the least recently used
+others = [c.chat() for _ in range(info["max_chats"])]
+try:
+    ch.ask("still there?"); check("chat LRU evicted", False)
+except geistd.GeistdError as e:
+    check("chat LRU evicted", "unknown chat" in str(e), e)
+for o in others: o.close()
+
 print(f"geistd_ops: {'all passed' if not fails else str(fails) + ' FAILED'}")
 sys.exit(1 if fails else 0)

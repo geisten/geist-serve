@@ -99,6 +99,13 @@ class Client:
         h, _ = self._call({"op": "open", "temperature": temperature, "top_p": top_p, "top_k": top_k, "seed": seed})
         return Session(self, h["session"])
 
+    def chat(self, temperature=0.0, top_p=1.0, reasoning=None, thinking=False, overflow="refuse", stop=None):
+        """A message-level conversation (geist-runtime): send only new messages."""
+        h, _ = self._call({"op": "chat_open", "temperature": temperature, "top_p": top_p,
+                           "reasoning": reasoning or "none", "thinking": thinking,
+                           "overflow": overflow, "stop": stop or []})
+        return Chat(self, h["chat"])
+
     def resume(self, session_id):
         return Session(self, session_id)
 
@@ -155,6 +162,41 @@ class Session:
 
     def close(self):
         self._call("close")
+
+class Chat:
+    def __init__(self, client, cid):
+        self.client, self.id, self.last = client, cid, None
+
+    def send(self, messages, max=0):
+        """messages: a str (one user message) or [(role, content)]. Yields
+        (part, text); the final frame with the stats is .last after the loop."""
+        if isinstance(messages, str):
+            messages = [("user", messages)]
+        body = json.dumps({"messages": [{"role": r, "content": c} for r, c in messages]}).encode()
+        self.client._connect()
+        self.client._send({"op": "chat_send", "chat": self.id, "max": max}, body)
+        try:
+            while True:
+                h, _ = self.client._recv()
+                if not h.get("ok", False):
+                    raise GeistdError(h.get("status", "error") + ": " + h.get("error", "unknown error"))
+                if h.get("done"):
+                    self.last = h
+                    return
+                yield h["part"], h["text"]
+        finally:
+            self.client.close()
+
+    def ask(self, messages, max=0):
+        return "".join(t for p, t in self.send(messages, max) if p == "answer")
+
+    def rewind(self, keep):
+        h, _ = self.client._call({"op": "chat_rewind", "chat": self.id, "keep": keep})
+        return h["length"]
+
+    def close(self):
+        self.client._call({"op": "chat_close", "chat": self.id})
+
 
 if __name__ == "__main__":
     c = Client()
