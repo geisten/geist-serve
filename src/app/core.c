@@ -104,44 +104,69 @@ const struct app_model *app_model_find(const char *id) {
     return nullptr;
 }
 
+geistr_device app_device(const struct app_hardware *h, unsigned gpu) {
+    geistr_device d = {.size            = sizeof d,
+                       .kind            = h->device == APP_APPLE_SILICON ? GEISTR_DEVICE_APPLE_SILICON
+                                          : h->device == APP_PI5         ? GEISTR_DEVICE_PI5
+                                                                         : GEISTR_DEVICE_OTHER,
+                       .ram             = h->ram,
+                       .available       = h->available,
+                       .disk            = h->disk,
+                       .cores           = h->cores,
+                       .logical_cpus    = h->logical_cpus,
+                       .gpu             = gpu,
+                       .supported       = h->supported,
+                       .available_known = h->available_known,
+                       .disk_known      = h->disk_known};
+    snprintf(d.name, sizeof d.name, "%s", h->name);
+    snprintf(d.arch, sizeof d.arch, "%s", h->arch);
+    snprintf(d.os, sizeof d.os, "%s", h->os);
+    return d;
+}
+
+geistr_catalog_entry app_entry(const struct app_model *m) {
+    return (geistr_catalog_entry) {.id = m->id, .name = m->name, .file = m->file, .url = m->url,
+                                   .sha256 = m->sha256, .group_id = m->group_id, .group_name = m->group_name,
+                                   .quantization = m->quantization, .reasoning_format = m->reasoning_format,
+                                   .unsupported_format = m->unsupported_format, .quality = m->quality,
+                                   .reference = m->reference, .bytes = m->bytes, .working_mib = m->working_mib,
+                                   .recommended_ram_gib = m->recommended_ram_gib, .backends = m->backends,
+                                   .quality_passed = m->quality_passed, .quality_total = m->quality_total};
+}
+
+/* The rules are geist-runtime's (geistr_assess); the app words its reasons. */
+const char *app_resource_text(const char *code, const struct app_hardware *h, const struct app_model *m) {
+    static const char *const texts[][2] = {
+            {"unsupported_format", "This model requires PQ2_0 and Hadamard support, unavailable in the bundled engine."},
+            {"platform", "This CPU instruction set or platform is not supported by the bundled engine."},
+            {"disk", "Not enough disk space for the download plus 256 MiB reserve."},
+            {"ram", "RAM is smaller than the model file, before context and OS memory."},
+            {"ram_recommended", "Below the RAM recommendation; swapping or allocation failures are possible."},
+            {"available_ram", "Available RAM is tight now. Close other apps before loading this model."},
+            {"not_measured", "No known resource restriction. Speed has not been measured on this device."}};
+    if (!strcmp(code, "fits"))
+        return h->device == APP_PI5 && !strcmp(m->id, "bitnet-2b")
+                       ? "Fits Pi 5 memory. A reference Pi 5 measured about 18 tokens/s."
+                       : "Fits this Mac's memory. Speed not measured yet.";
+    for (size_t i = 0; i < sizeof texts / sizeof *texts; i++)
+        if (!strcmp(code, texts[i][0]))
+            return texts[i][1];
+    return code;
+}
+
 struct app_assessment
 app_assess(const struct app_hardware *h, const struct app_model *m, bool installed) {
-    /* Unknown speed is not a resource restriction: the verdict weighs speed
-     * separately (app_judge), so an unmeasured model must not read as tight
-     * memory on platforms without a profile (Linux). */
-    struct app_assessment a = {APP_RECOMMENDED,
-                               "No known resource restriction. Speed has not been measured on this device.",
-                               "Unknown on this device; measure after download."};
+    struct app_assessment a = {APP_RECOMMENDED, "", "Unknown on this device; measure after download."};
     if (h->device == APP_PI5 && strcmp(m->id, "bitnet-2b") == 0)
         a.performance = "Pi 5 reference: 17.8 tokens/s; your speed may differ.";
     else if (h->device == APP_APPLE_SILICON)
         a.performance = "Apple Silicon profile; run a local test for actual speed.";
-    if (m->unsupported_format || !m->backends) {
-        a.fit    = APP_UNAVAILABLE;
-        a.reason = "This model requires PQ2_0 and Hadamard support, unavailable in the bundled engine.";
-    } else if (!h->supported) {
-        a.fit    = APP_UNAVAILABLE;
-        a.reason = "This CPU instruction set or platform is not supported by the bundled engine.";
-    } else if (!installed && h->disk_known &&
-               (h->disk < m->bytes || h->disk - m->bytes < 256 * UINT64_C(1048576))) {
-        a.fit    = APP_UNAVAILABLE;
-        a.reason = "Not enough disk space for the download plus 256 MiB reserve.";
-    } else if (h->ram && h->ram < m->bytes) {
-        a.fit    = APP_UNAVAILABLE;
-        a.reason = "RAM is smaller than the model file, before context and OS memory.";
-    } else if (h->ram < (uint64_t) m->recommended_ram_gib * APP_GIB * 95 / 100) {
-        a.fit    = APP_CONDITIONAL;
-        a.reason = "Below the RAM recommendation; swapping or allocation failures are possible.";
-    } else if (h->available_known && h->available < (uint64_t) m->working_mib * 1048576) {
-        a.fit    = APP_CONDITIONAL;
-        a.reason = "Available RAM is tight now. Close other apps before loading this model.";
-    } else if (h->device == APP_PI5 && strcmp(m->id, "bitnet-2b") == 0) {
-        a.fit    = APP_RECOMMENDED;
-        a.reason = "Fits Pi 5 memory. A reference Pi 5 measured about 18 tokens/s.";
-    } else if (h->device == APP_APPLE_SILICON && h->cores >= 4) {
-        a.fit    = APP_RECOMMENDED;
-        a.reason = "Fits this Mac's memory. Speed not measured yet.";
-    }
+    geistr_device        d = app_device(h, 0);
+    geistr_catalog_entry e = app_entry(m);
+    const char          *code;
+    geistr_resource      r = geistr_assess(&e, &d, installed, &code);
+    a.fit    = r == GEISTR_RESOURCE_FITS ? APP_RECOMMENDED : r == GEISTR_RESOURCE_LIMITED ? APP_CONDITIONAL : APP_UNAVAILABLE;
+    a.reason = app_resource_text(code, h, m);
     return a;
 }
 

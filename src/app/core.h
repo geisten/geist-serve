@@ -2,6 +2,7 @@
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
+#include "geistr_catalog.h"
 
 #define APP_MODEL_COUNT 32
 #define APP_CATALOG_BYTES 24576
@@ -83,6 +84,10 @@ struct app_assessment {
 };
 struct app_assessment
 app_assess(const struct app_hardware *h, const struct app_model *m, bool installed);
+/* The runtime's views of app data (geist-runtime does fit and ranking). */
+geistr_device        app_device(const struct app_hardware *h, unsigned gpu);
+geistr_catalog_entry app_entry(const struct app_model *m);
+const char          *app_resource_text(const char *code, const struct app_hardware *h, const struct app_model *m);
 struct app_assessment app_assess_device(const struct app_hardware *h,
                                         const struct app_model    *m,
                                         bool                       installed,
