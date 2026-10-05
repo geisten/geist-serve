@@ -6,7 +6,6 @@
 
 #include "core.h"
 #include "daemon.h"
-#include "output.h"
 #include "tasks.h"
 #include "compat.h"
 #include "connection.h"

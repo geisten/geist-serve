@@ -6,7 +6,6 @@
  * use fresh sessions on that daemon. Actual prefix reuse is recorded. */
 struct compare_output {
     double                start, first;
-    struct app_utf8       utf8;
     struct app_run_stats *stats;
     uint64_t              operation, generation;
 };
@@ -23,12 +22,10 @@ static bool comparison_cancel(void *context) {
     }
     return atomic_load(&compare_cancelled) || atomic_load(&closing);
 }
-static bool comparison_emit(void *context, const char *piece) {
+static bool comparison_part(void *context, bool thinking, const char *text) {
     struct compare_output *o = context;
-    char                   decoded[8192];
-    if (!app_utf8_feed(&o->utf8, piece, decoded, sizeof decoded))
-        return false;
-    if (decoded[0] && !o->first)
+    (void) thinking;
+    if (text[0] && !o->first)
         o->first = monotonic_ms() - o->start;
     return !comparison_cancel(nullptr);
 }
@@ -103,13 +100,12 @@ static void *comparison_main(void *unused) {
                                                            128,
                                                            0,
                                                            1,
-                                                           comparison_emit,
+                                                           nullptr,
+                                                           comparison_part,
                                                            comparison_cancel,
                                                            &output,
                                                            &stats,
                                                            error);
-            if (output.utf8.failed || output.utf8.used)
-                rc = 502;
             if (comparison_cancel(nullptr))
                 rc = 499;
             observation_end(&r, rc, output.first, monotonic_ms() - output.start, &stats);

@@ -1,7 +1,12 @@
 /* Bounded OpenAI chat request parsing; no inference-engine dependency. */
 #pragma once
+#include <stddef.h>
+/* One message of a conversation, as clients send it. */
+struct chat_msg {
+    const char *role;    /* "system" | "user" | "assistant" (others → user) */
+    const char *content; /* UTF-8, NUL-terminated */
+};
 #include "core.h"
-#include "../template.h"
 #define APP_CHAT_MESSAGES 64
 struct app_chat {
     struct chat_msg messages[APP_CHAT_MESSAGES];

@@ -18,6 +18,8 @@
 
 #include "json.h"
 #include "model.h"
+#include "geistr.h"
+#include "geistr_engine.h"
 #include "net.h"
 #include "lifecycle.h"
 #include "resource_sampler.h"
@@ -38,6 +40,7 @@
 #define BODY_CAP (16u * 1024u * 1024u)
 #define TOPK_MAX 256
 #define SESS_MAX 16
+#define CHAT_MAX 8
 #define TOKEN_MIN 32
 
 /* ====================================================================== */
@@ -54,9 +57,21 @@ struct sess {
     time_t                used;
 };
 
+/* A geist-runtime chat (#148): the conversation lives here, a send carries
+ * only the new messages. */
+struct chat {
+    bool         live;
+    char         id[17];
+    geistr_chat *c;
+    time_t       used;
+};
+
 struct daemon {
     struct resource_sampler resources;
     struct model            mo;
+    geistr_model           *rt; /* the runtime over mo.m; nullptr if it failed */
+    struct chat             chats[CHAT_MAX];
+    int                     n_chats;
     size_t                  vocab;
     struct sess             sess[SESS_MAX];
     int                     n_max;
@@ -312,12 +327,15 @@ static bool op_info(struct daemon *d, struct conn *c) {
         live += d->sess[i].live;
     sb_printf(&h,
               "],\"ctx\":%d,\"vocab\":%zu,\"add_bos\":%s,\"bos\":%d,\"template\":\"%s\","
-              "\"agent_api\":1,\"backend\":\"%s\",\"sessions\":%d,\"max_sessions\":%d,\"engine\":",
+              "\"agent_api\":1,\"chat_api\":%s,\"max_chats\":%d,\"backend\":\"%s\",\"sessions\":%d,"
+              "\"max_sessions\":%d,\"engine\":",
               CTX_CAP,
               d->vocab,
               d->mo.meta.add_bos ? "true" : "false",
               geist_model_bos_token(d->mo.m),
               chat_family_name(d->mo.family),
+              d->rt ? "true" : "false",
+              d->n_chats,
               geist_backend_name(d->mo.be),
               live,
               d->n_max);
@@ -652,6 +670,176 @@ static bool op_generate(struct daemon *d, struct conn *c, struct sess *x, const 
 /* Dispatch                                                                */
 /* ====================================================================== */
 
+/* ====================================================================== */
+/* Chats (geist-runtime)                                                   */
+/* ====================================================================== */
+
+static struct chat *chat_find(struct daemon *d, const char *id) {
+    for (int i = 0; id && i < d->n_chats; i++)
+        if (d->chats[i].live && strcmp(d->chats[i].id, id) == 0) {
+            d->chats[i].used = time(nullptr);
+            return &d->chats[i];
+        }
+    return nullptr;
+}
+
+static void chat_free(struct chat *x) {
+    geistr_chat_close(x->c);
+    *x = (struct chat) {};
+}
+
+/* chat_open{temperature?,top_p?,reasoning?,thinking?,overflow?,stop?[]} → chat */
+static bool op_chat_open(struct daemon *d, struct conn *c, const struct json *j) {
+    if (d->rt == nullptr)
+        return reply_error(c, "chat_open: chat format of this model is not supported");
+    bool             bad = false;
+    geistr_chat_opts o   = GEISTR_CHAT_OPTS_INIT;
+    o.temperature        = (float) json_clamp(j, json_get(j, 0, "temperature"), 0, 0, 2, &bad);
+    o.top_p              = (float) json_clamp(j, json_get(j, 0, "top_p"), 1, 0, 1, &bad);
+    o.thinking           = json_bool(j, json_get(j, 0, "thinking"), false);
+    char *reasoning = json_strdup(j, json_get(j, 0, "reasoning")), *overflow = json_strdup(j, json_get(j, 0, "overflow"));
+    o.reasoning = reasoning && !strcmp(reasoning, "think_tags") ? GEISTR_REASONING_THINK_TAGS : GEISTR_REASONING_NONE;
+    o.overflow  = overflow && !strcmp(overflow, "drop_oldest") ? GEISTR_OVERFLOW_DROP_OLDEST : GEISTR_OVERFLOW_REFUSE;
+    free(reasoning);
+    free(overflow);
+    char *stops[8];
+    size_t n_stop = 0;
+    int    arr    = json_get(j, 0, "stop");
+    if (arr >= 0 && j->tok[arr].type == JSMN_ARRAY)
+        for (int i = arr + 1; i < j->n && n_stop < 8; i++)
+            if (j->tok[i].parent == arr && json_is_str(j, i))
+                stops[n_stop++] = json_strdup(j, i);
+    o.stop   = (const char *const *) stops;
+    o.n_stop = n_stop;
+    if (bad) {
+        for (size_t i = 0; i < n_stop; i++)
+            free(stops[i]);
+        return reply_error(c, "chat_open: temperature/top_p must be numbers");
+    }
+    /* A free slot, else the least recently used chat (closed). */
+    struct chat *x = nullptr;
+    for (int i = 0; i < d->n_chats && !x; i++)
+        if (!d->chats[i].live)
+            x = &d->chats[i];
+    if (!x) {
+        x = &d->chats[0];
+        for (int i = 1; i < d->n_chats; i++)
+            if (d->chats[i].used < x->used)
+                x = &d->chats[i];
+        fprintf(stderr, "geistd: chat %s evicted (table full)\n", x->id);
+        chat_free(x);
+    }
+    geistr_status st = geistr_chat_open(d->rt, &o, &x->c);
+    for (size_t i = 0; i < n_stop; i++)
+        free(stops[i]);
+    if (st != GEISTR_OK)
+        return reply_error(c, geistr_status_text(st));
+    x->live = true;
+    x->used = time(nullptr);
+    random_id(x->id);
+    struct sb h = {};
+    sb_printf(&h, "{\"ok\":true,\"chat\":\"%s\",\"ctx\":%d}", x->id, CTX_CAP);
+    return reply(c, &h, 0, nullptr);
+}
+
+static const char *finish_name(geistr_finish f) {
+    static const char *const names[] = {"none", "stop", "length", "context", "cancelled", "error"};
+    return names[f];
+}
+
+static void stats_json(struct sb *h, geistr_chat *chat) {
+    geistr_stats st = {.size = sizeof st};
+    (void) geistr_chat_stats(chat, &st);
+    sb_printf(h,
+              "\"finish\":\"%s\",\"input_tokens\":%u,\"context_tokens\":%u,\"output_tokens\":%u,"
+              "\"dropped\":%u,\"prefill_ms\":%.3f,\"first_answer_ms\":%.3f,\"generation_ms\":%.3f,"
+              "\"total_ms\":%.3f,\"length\":%zu",
+              finish_name(st.finish), st.input_tokens, st.context_tokens, st.output_tokens,
+              st.dropped_messages, st.prefill_ms, st.first_answer_ms, st.generation_ms, st.total_ms,
+              geistr_chat_length(chat));
+}
+
+/* chat_send{chat,max?} + body {"messages":[{role,content}…]}: only the new
+ * messages. Streams {done:false,part,text} frames, then {done:true,stats}.
+ * A client that goes away cancels the answer; what was said stays. */
+static bool op_chat_send(struct conn *c, struct chat *x, const struct json *j, size_t bl, const unsigned char *body) {
+    if (x == nullptr)
+        return reply_error(c, "chat_send: unknown chat");
+    bool     bad = false;
+    uint32_t max = (uint32_t) json_clamp(j, json_get(j, 0, "max"), 0, 0, CTX_CAP, &bad);
+    struct json *m = malloc(sizeof *m);
+    if (!m)
+        return reply_error(c, "chat_send: out of memory");
+    int list = bl && json_parse(m, bl, (const char *) body) >= 0 ? json_get(m, 0, "messages") : -1;
+    if (bad || list < 0 || m->tok[list].type != JSMN_ARRAY || m->tok[list].size < 1) {
+        free(m);
+        return reply_error(c, "chat_send: body {\"messages\":[…]} with at least one message");
+    }
+    size_t          n    = (size_t) m->tok[list].size, k = 0;
+    geistr_message *msgs = calloc(n, sizeof *msgs);
+    for (int i = list + 1; msgs && i < m->n && k < n; i++)
+        if (m->tok[i].parent == list) {
+            msgs[k].role    = json_strdup(m, json_get(m, i, "role"));
+            msgs[k].content = json_strdup(m, json_get(m, i, "content"));
+            k++;
+        }
+    free(m);
+    geistr_status st = !msgs ? GEISTR_NO_MEMORY : geistr_chat_limit(x->c, max);
+    for (size_t i = 0; msgs && st == GEISTR_OK && i < n; i++)
+        if (!msgs[i].role || !msgs[i].content)
+            st = GEISTR_INVALID;
+    if (st == GEISTR_OK)
+        st = geistr_chat_send(x->c, n, msgs);
+    for (size_t i = 0; msgs && i < n; i++)
+        free((char *) msgs[i].role), free((char *) msgs[i].content);
+    free(msgs);
+    if (st != GEISTR_OK) {
+        struct sb h = {};
+        sb_printf(&h, "{\"ok\":false,\"status\":\"%s\",\"error\":",
+                  st == GEISTR_CONTEXT ? "context" : st == GEISTR_INVALID ? "invalid" : st == GEISTR_CANCELLED ? "cancelled" : "error");
+        const char *why = geistr_chat_error(x->c);
+        sb_json_str(&h, strlen(why), why);
+        sb_puts(&h, "}");
+        return reply(c, &h, 0, nullptr);
+    }
+    /* The input is processed: an empty answer part says so (clients switch
+     * from input processing to generation and its deadlines). */
+    static const char processed[] = "{\"ok\":true,\"done\":false,\"part\":\"answer\",\"text\":\"\"}";
+    if (!write_frame(c, strlen(processed), processed, 0, nullptr)) {
+        geistr_chat_cancel(x->c);
+        geistr_piece q = {.size = sizeof q};
+        while (geistr_chat_next(x->c, &q) == GEISTR_OK && q.part != GEISTR_PART_END) {
+        }
+        return false;
+    }
+    geistr_piece p = {.size = sizeof p};
+    while ((st = geistr_chat_next(x->c, &p)) == GEISTR_OK && p.part != GEISTR_PART_END) {
+        struct sb h = {};
+        sb_printf(&h, "{\"ok\":true,\"done\":false,\"part\":\"%s\",\"text\":",
+                  p.part == GEISTR_PART_THINKING ? "thinking" : "answer");
+        sb_json_str(&h, p.len, p.text);
+        sb_puts(&h, "}");
+        if (!reply(c, &h, 0, nullptr)) {
+            geistr_chat_cancel(x->c); /* the client went away: stop, keep what was said */
+            while (geistr_chat_next(x->c, &p) == GEISTR_OK && p.part != GEISTR_PART_END) {
+            }
+            return false;
+        }
+    }
+    struct sb h = {};
+    if (st != GEISTR_OK && st != GEISTR_CANCELLED) {
+        const char *why = geistr_chat_error(x->c);
+        sb_puts(&h, "{\"ok\":false,\"status\":\"error\",\"error\":");
+        sb_json_str(&h, strlen(why), why);
+        sb_puts(&h, "}");
+        return reply(c, &h, 0, nullptr);
+    }
+    sb_puts(&h, "{\"ok\":true,\"done\":true,");
+    stats_json(&h, x->c);
+    sb_puts(&h, "}");
+    return reply(c, &h, 0, nullptr);
+}
+
 static bool handle(struct daemon       *d,
                    struct conn         *c,
                    const char          *hdr,
@@ -758,6 +946,31 @@ static bool handle(struct daemon       *d,
             sb_printf(&h, "{\"ok\":true,\"pinned\":%zu}", n);
             ok = reply(c, &h, 0, nullptr);
         }
+    } else if (strncmp(op, "chat_", 5) == 0) {
+        char        *cid = json_strdup(&j, json_get(&j, 0, "chat"));
+        struct chat *ch  = chat_find(d, cid);
+        free(cid);
+        if (strcmp(op, "chat_open") == 0)
+            ok = op_chat_open(d, c, &j);
+        else if (strcmp(op, "chat_send") == 0)
+            ok = op_chat_send(c, ch, &j, bl, body);
+        else if (!ch)
+            ok = reply_error(c, "unknown chat");
+        else if (strcmp(op, "chat_rewind") == 0) {
+            bool   bad  = false;
+            size_t keep = (size_t) json_clamp(&j, json_get(&j, 0, "keep"), -1, 0, 1e9, &bad);
+            if (bad || geistr_chat_rewind(ch->c, keep) != GEISTR_OK)
+                ok = reply_error(c, "chat_rewind: keep must be at most the chat's length");
+            else {
+                struct sb h = {};
+                sb_printf(&h, "{\"ok\":true,\"length\":%zu}", geistr_chat_length(ch->c));
+                ok = reply(c, &h, 0, nullptr);
+            }
+        } else if (strcmp(op, "chat_close") == 0) {
+            chat_free(ch);
+            ok = reply(c, &(struct sb) {.p = strdup("{\"ok\":true}"), .len = 11, .cap = 12}, 0, nullptr);
+        } else
+            ok = reply_error(c, "unknown op");
     } else if (strcmp(op, "close") == 0) {
         if (x == nullptr)
             ok = reply_error(c, "close: unknown session");
@@ -810,12 +1023,14 @@ static int usage(const char *argv0) {
             "hello first\n"
             "  --sessions N   resident sessions (default 4, max %d); --idle S  evict after S s "
             "idle (default 1800)\n"
+            "  --chats N      resident chats, message level (default 2, max %d; each holds a KV cache)\n"
             "  --stdio        one connection on stdin/stdout\n"
             "  --backend cpu|gpu   choose execution backend\n"
             "  --backends     print available backends as JSON\n"
             "  --build-info   print linked engine provenance without loading a model\n",
             argv0,
-            SESS_MAX);
+            SESS_MAX,
+            CHAT_MAX);
     return 2;
 }
 
@@ -881,7 +1096,7 @@ int main(int argc, char **argv) {
     const char   *model = nullptr, *sock = nullptr, *host = nullptr, *backend = "auto";
     int           port  = 0;
     bool          stdio = false;
-    struct daemon d     = {.n_max = 4, .idle_s = 1800};
+    struct daemon d     = {.n_max = 4, .n_chats = 2, .idle_s = 1800};
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--stdio") == 0)
             stdio = true;
@@ -897,6 +1112,8 @@ int main(int argc, char **argv) {
             port = atoi(argv[++i]);
         else if (strcmp(argv[i], "--sessions") == 0 && i + 1 < argc)
             d.n_max = atoi(argv[++i]);
+        else if (strcmp(argv[i], "--chats") == 0 && i + 1 < argc)
+            d.n_chats = atoi(argv[++i]);
         else if (strcmp(argv[i], "--idle") == 0 && i + 1 < argc)
             d.idle_s = atoi(argv[++i]);
         else if (argv[i][0] == '-' || model != nullptr)
@@ -904,7 +1121,8 @@ int main(int argc, char **argv) {
         else
             model = argv[i];
     }
-    if (model == nullptr || d.n_max < 1 || d.n_max > SESS_MAX || d.idle_s < 1)
+    if (model == nullptr || d.n_max < 1 || d.n_max > SESS_MAX || d.n_chats < 0 || d.n_chats > CHAT_MAX ||
+        d.idle_s < 1)
         return usage(argv[0]);
     if ((host != nullptr) != (port > 0))
         return usage(argv[0]);
@@ -967,6 +1185,14 @@ int main(int argc, char **argv) {
     }
     lifecycle_phase(lifecycle, LC_METADATA);
     model_describe(&d.mo, model);
+    /* Chats run on geist-runtime over this same model, at today's window. */
+    {
+        geistr_model_opts ro = GEISTR_MODEL_OPTS_INIT;
+        char              why[256];
+        ro.context           = CTX_CAP;
+        if (geistr_model_wrap(d.mo.m, d.mo.be, &ro, &d.rt, why, sizeof why) != GEISTR_OK)
+            fprintf(stderr, "geistd: no chat ops: %s\n", why);
+    }
     lifecycle_phase(lifecycle, LC_WARMUP);
     /* Vocabulary size: one forward pass over BOS in a throwaway session. */
     {
@@ -1021,6 +1247,10 @@ int main(int argc, char **argv) {
     for (int i = 0; i < SESS_MAX; i++)
         if (d.sess[i].live)
             sess_free(&d.sess[i]);
+    for (int i = 0; i < CHAT_MAX; i++)
+        if (d.chats[i].live)
+            chat_free(&d.chats[i]);
+    geistr_model_close(d.rt); /* before the engine model it borrows */
     resource_sampler_stop(&d.resources);
     lifecycle_close(&lifecycle);
     model_close(&d.mo);

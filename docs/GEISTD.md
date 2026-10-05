@@ -124,6 +124,33 @@ session not used for S seconds; a full table evicts the least recently
 used. An evicted id answers `unknown session`; the client re-opens and
 prefills (the whole context, once).
 
+## Chats (geist-runtime)
+
+Message-level ops on [geist-runtime](https://github.com/geisten/geist-runtime)
+over the model geistd already loaded (`geistr_model_wrap`: one copy in memory).
+The runtime renders the chat template, keeps the conversation and its KV
+cache, and streams complete UTF-8 text with thinking separated. A send carries
+**only the new messages**; the answer joins the conversation by itself.
+
+| op | header | body | reply |
+|---|---|---|---|
+| `chat_open` | `temperature?, top_p?, reasoning?` (`none`/`think_tags`), `thinking?`, `overflow?` (`refuse`/`drop_oldest`), `stop?[]` | – | `chat` (16-hex), `ctx` |
+| `chat_send` | `chat, max?` (0 = the rest of the context) | `{"messages":[{"role","content"}…]}` | frames `{done:false, part:"answer"\|"thinking", text}`, then `{done:true, finish, input_tokens, context_tokens, output_tokens, dropped, prefill_ms, first_answer_ms, generation_ms, total_ms, length}` |
+| `chat_rewind` | `chat, keep` | – | `length` |
+| `chat_close` | `chat` | – | `ok` |
+
+- `finish`: `stop`, `length`, `context`, `cancelled`. `input_tokens` is what
+  this send processed; a follow-up processes only its new message.
+- A conversation that does not fit fails the send with `status:"context"`
+  and leaves the chat unchanged (`refuse`).
+- The first frame after the input is processed is an empty answer part:
+  input processing is over, generation starts.
+- A client that disconnects mid-answer cancels it; what was said stays part
+  of the chat.
+- `--chats N` (default 2, max 8) resident chats, each with its KV cache;
+  a new one beyond that closes the least recently used. `info` reports
+  `chat_api` and `max_chats`.
+
 ## Security
 
 - Unix socket file mode 0600: the file is the local access control.

@@ -3,25 +3,8 @@
 APP_CC ?= cc
 APP_CFLAGS ?= -std=c23 -O2 -Wall -Wextra -Wpedantic -D_POSIX_C_SOURCE=200809L -D_DARWIN_C_SOURCE
 APP_LDLIBS ?= -lcurl -lpthread
-# geist-runtime (#148): catalog, fit, templates and text stages, pinned like
-# geistlib and synced by the same script. geist-app links only the part that
-# needs no engine (libgeistr-core.a).
-RUNTIME_REPO ?= https://github.com/geisten/geist-runtime.git
-RUNTIME_REF  ?= 53ba83222214dae74831b86c6f06940f30acd6a8
-GEISTR       ?= geist-runtime
-ifeq (,$(filter clean distclean,$(MAKECMDGOALS)))
-RUNTIME_SYNC := $(shell GEIST_REPO='$(RUNTIME_REPO)' GEIST_REF='$(RUNTIME_REF)' GEISTLIB='$(GEISTR)' \
-                        sh scripts/sync-engine.sh >&2 && echo ok)
-ifneq ($(RUNTIME_SYNC),ok)
-$(error geist-runtime sync failed — see the messages above)
-endif
-endif
-GEISTR_CORE := $(GEISTR)/build/libgeistr-core.a
+include runtime.mk
 override APP_CFLAGS += -I$(GEISTR)/include
-.PHONY: geistr-core
-$(GEISTR_CORE): geistr-core
-geistr-core:
-	$(MAKE) -C $(GEISTR) core CC="$(APP_CC)"
 ifeq ($(shell uname -s),Linux)
 APP_LDLIBS += -lcrypto -lm
 endif
@@ -29,8 +12,8 @@ override APP_LDLIBS += $(GEISTR_CORE)
 # geist-app itself: app.h holds the shared state these files split between them.
 APP_MAIN := src/app/main.c src/app/request.c src/app/child.c src/app/prefs.c src/app/observe.c src/app/jobs.c src/app/status.c src/app/chat.c src/app/compare.c src/app/routes.c
 APP_SOURCE := src/app/memory.c src/app/engine.c src/app/catalog.c src/app/core.c src/app/platform.c src/app/resources.c
-APP_RUNTIME := src/lifecycle.c src/app/activity.c src/app/output.c src/app/performance.c src/app/daemon.c src/template.c src/app/tasks.c src/app/compat.c src/app/connection.c
-APP_HEADERS := src/app/app.h src/app/memory.h src/lifecycle.h src/app/activity.h src/app/engine.h src/app/output.h src/app/performance.h build/app_models.h src/app/resources.h src/app/version.h src/app/tasks.h build/app_tasks.h src/app/daemon.h src/app/compat.h src/app/connection.h clients/geistd_client.h src/jsmn.h src/template.h src/json.h
+APP_RUNTIME := src/lifecycle.c src/app/activity.c src/app/performance.c src/app/daemon.c src/app/tasks.c src/app/compat.c src/app/connection.c
+APP_HEADERS := src/app/app.h src/app/memory.h src/lifecycle.h src/app/activity.h src/app/engine.h src/app/performance.h build/app_models.h src/app/resources.h src/app/version.h src/app/tasks.h build/app_tasks.h src/app/daemon.h src/app/compat.h src/app/connection.h clients/geistd_client.h src/jsmn.h src/json.h
 .PHONY: app test-app
 app: geist-app geisten geist
 # The CLI is `geisten` (#92); `geist` stays as an alias.
@@ -43,7 +26,7 @@ geist-app: $(GEISTR_CORE) $(APP_MAIN) $(APP_SOURCE) $(APP_RUNTIME) $(APP_HEADERS
 build/test_app_core: $(GEISTR_CORE) build/app_models.h tests/app/core_test.c $(APP_SOURCE) src/app/core.h
 	@mkdir -p build
 	$(APP_CC) $(APP_CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ tests/app/core_test.c $(APP_SOURCE) src/json.c $(APP_LDLIBS)
-test-app: build/test_app_memory_journal build/test_app_memory build/test_app_lifecycle build/test_app_activity build/test_app_engine build/test_app_output build/test_app_engine_identity build/test_app_performance build/test_app_resources build/geist-app-old build/geist-app-new build/geist-app-legacy build/geist-app-test geist-app geisten geist build/test_app_core build/test_app_client build/test_app_tasks
+test-app: build/test_app_memory_journal build/test_app_memory build/test_app_lifecycle build/test_app_activity build/test_app_engine build/test_app_engine_identity build/test_app_performance build/test_app_resources build/geist-app-old build/geist-app-new build/geist-app-legacy build/geist-app-test geist-app geisten geist build/test_app_core build/test_app_client build/test_app_tasks
 	@# The CLI and lifecycle tests start geist-app, which needs a real geistd (#70).
 	@test -x "$${GEIST_EXECUTION_DAEMON:-geistd}" || { echo "test-app needs ./geistd (or GEIST_EXECUTION_DAEMON): run 'make' first."; exit 1; }
 	./build/test_app_memory
@@ -54,7 +37,6 @@ test-app: build/test_app_memory_journal build/test_app_memory build/test_app_lif
 	python3 tests/app/lifecycle_fault_test.py
 	./build/test_app_engine
 	python3 tests/app/engine_provenance_test.py
-	./build/test_app_output
 	./build/test_app_resources
 	./build/test_app_core
 	./build/test_app_tasks
@@ -120,8 +102,6 @@ build/test_app_performance: $(GEISTR_CORE) tests/app/performance_test.c src/app/
 build/test_app_engine_identity: $(GEISTR_CORE) tests/app/engine_identity_test.c $(APP_SOURCE) src/app/core.h build/app_models.h src/json.c
 	$(APP_CC) $(APP_CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ tests/app/engine_identity_test.c $(APP_SOURCE) src/json.c $(APP_LDLIBS)
 
-build/test_app_output: tests/app/output_test.c src/app/output.c src/app/output.h
-	$(APP_CC) $(APP_CFLAGS) -g -fsanitize=address,undefined -o $@ tests/app/output_test.c src/app/output.c
 
 build/test_app_engine: tests/app/engine_test.c $(APP_SOURCE) src/json.c
 	@mkdir -p build

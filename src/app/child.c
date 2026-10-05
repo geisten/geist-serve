@@ -369,7 +369,7 @@ static bool start_child_mode_impl(const char *path, const char *id, const char *
         return false;
     }
     char *args[] = {
-            app.paths.server, (char *) path, "--socket", app.child.socket_path, "--sessions", "1", nullptr};
+            app.paths.server, (char *) path, "--socket", app.child.socket_path, "--sessions", "1", "--chats", "1", nullptr};
     size_t count = 0;
     while (environ[count])
         ++count;

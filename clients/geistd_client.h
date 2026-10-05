@@ -38,6 +38,22 @@ int geistd_generate_ex(struct geistd *g, const char *id, size_t max,
 const char    *geistd_error(const struct geistd *g);
 
 int geistd_info(struct geistd *g, size_t cap, char json_out[static cap]); /* raw info JSON */
+/* Chats (geist-runtime, see docs/GEISTD.md): the conversation lives in geistd;
+ * a send carries only the new messages. part() gets complete UTF-8 text,
+ * thinking already separated; returning false leaves (geistd cancels). */
+struct geistd_chat_stats {
+    char   finish[16]; /* stop, length, context, cancelled; "client" if part() said stop */
+    char   status[16]; /* on failure: context, invalid, error (else empty) */
+    size_t input_tokens, context_tokens, output_tokens, dropped, length;
+    double prefill_ms, first_answer_ms, generation_ms, total_ms;
+};
+int geistd_chat_open(struct geistd *g, float temperature, float top_p, const char *reasoning, bool thinking,
+                     char id_out[static 17]);
+int geistd_chat_send(struct geistd *g, const char *id, size_t max, size_t count, const char *const roles[static count],
+                     const char *const contents[static count], bool (*part)(void *, bool thinking, const char *text),
+                     void *ctx, struct geistd_chat_stats *out);
+int geistd_chat_rewind(struct geistd *g, const char *id, size_t keep, size_t *length_out);
+int geistd_chat_close(struct geistd *g, const char *id);
 int geistd_open(struct geistd *g, float temperature, float top_p, int top_k, uint64_t seed, char id_out[static 17]);
 int geistd_close_session(struct geistd *g, const char *id);
 int geistd_reset(struct geistd *g, const char *id);
@@ -518,5 +534,119 @@ int geistd_generate_ex(struct geistd *g, const char *id, size_t max, bool (*emit
 int geistd_generate(struct geistd *g, const char *id, size_t max,
     bool (*emit)(void *, const char *), void *ctx, char reason[static 16]) {
     return geistd_generate_ex(g, id, max, emit, ctx, reason, nullptr);
+}
+
+/* ---- chats ---------------------------------------------------------------- */
+struct gd_buf { char *p; size_t len, cap; bool failed; };
+static void gd_put(struct gd_buf *b, const char *s, size_t n) {
+    if (b->failed) return;
+    if (b->len + n + 1 > b->cap) {
+        size_t cap = b->cap ? b->cap : 1024;
+        while (cap < b->len + n + 1) cap *= 2;
+        char *p = realloc(b->p, cap);
+        if (!p) { b->failed = true; return; }
+        b->p = p, b->cap = cap;
+    }
+    memcpy(b->p + b->len, s, n), b->len += n, b->p[b->len] = 0;
+}
+static void gd_put_json(struct gd_buf *b, const char *s) {
+    gd_put(b, "\"", 1);
+    for (; *s; s++) {
+        unsigned char ch = (unsigned char) *s;
+        char esc[8];
+        if (ch == '"' || ch == '\\') esc[0] = '\\', esc[1] = (char) ch, gd_put(b, esc, 2);
+        else if (ch < 0x20) snprintf(esc, sizeof esc, "\\u%04x", ch), gd_put(b, esc, 6);
+        else gd_put(b, s, 1);
+    }
+    gd_put(b, "\"", 1);
+}
+static void gd_copy(const struct geistd *g, const char *key, size_t cap, char out[static cap]) {
+    int t = gd_find(g, key);
+    snprintf(out, cap, "%.*s", t < 0 ? 0 : g->tok[t].end - g->tok[t].start, t < 0 ? "" : g->hdr + g->tok[t].start);
+}
+static double gd_real(const struct geistd *g, const char *key) {
+    int t = gd_find(g, key);
+    return t < 0 ? -1 : strtod(g->hdr + g->tok[t].start, nullptr);
+}
+
+int geistd_chat_open(struct geistd *g, float temperature, float top_p, const char *reasoning, bool thinking,
+                     char id_out[static 17]) {
+    char h[240];
+    snprintf(h, sizeof h, "{\"op\":\"chat_open\",\"temperature\":%g,\"top_p\":%g,\"reasoning\":\"%s\",\"thinking\":%s}",
+             (double) temperature, (double) top_p, reasoning && !strcmp(reasoning, "think_tags") ? "think_tags" : "none",
+             thinking ? "true" : "false");
+    if (gd_call(g, h, 0, nullptr) != 0) return -1;
+    int t = gd_find(g, "chat");
+    if (t < 0 || g->tok[t].end - g->tok[t].start != 16) return gd_fail(g, "no chat id in reply");
+    memcpy(id_out, g->hdr + g->tok[t].start, 16), id_out[16] = '\0';
+    return 0;
+}
+
+int geistd_chat_send(struct geistd *g, const char *id, size_t max, size_t count, const char *const roles[static count],
+                     const char *const contents[static count], bool (*part)(void *, bool thinking, const char *text),
+                     void *ctx, struct geistd_chat_stats *out) {
+    *out = (struct geistd_chat_stats) {.prefill_ms = -1, .first_answer_ms = -1};
+    struct gd_buf body = {};
+    gd_put(&body, "{\"messages\":[", 13);
+    for (size_t i = 0; i < count; i++) {
+        gd_put(&body, i ? ",{\"role\":" : "{\"role\":", i ? 9 : 8);
+        gd_put_json(&body, roles[i]);
+        gd_put(&body, ",\"content\":", 11);
+        gd_put_json(&body, contents[i]);
+        gd_put(&body, "}", 1);
+    }
+    gd_put(&body, "]}", 2);
+    char h[120];
+    snprintf(h, sizeof h, "{\"op\":\"chat_send\",\"chat\":\"%s\",\"max\":%zu}", id, max);
+    int rc = body.failed ? gd_fail(g, "out of memory") : gd_connect(g);
+    if (rc == 0 && !gd_send(g, h, body.len, body.p)) rc = gd_fail(g, "send failed");
+    free(body.p);
+    if (rc != 0) return -1;
+    for (;;) {
+        if (g->stream_idle) g->deadline = gd_now() + g->timeout_ms;
+        if (gd_recv(g) != 0) return -1;
+        int ok = gd_find(g, "ok");
+        if (ok < 0 || g->hdr[g->tok[ok].start] != 't') {
+            gd_copy(g, "status", sizeof out->status, out->status);
+            return gd_check_ok(g);
+        }
+        int done = gd_find(g, "done");
+        if (done >= 0 && g->hdr[g->tok[done].start] == 't') {
+            gd_copy(g, "finish", sizeof out->finish, out->finish);
+            out->input_tokens = gd_num(g, "input_tokens"), out->context_tokens = gd_num(g, "context_tokens");
+            out->output_tokens = gd_num(g, "output_tokens"), out->dropped = gd_num(g, "dropped");
+            out->length = gd_num(g, "length");
+            out->prefill_ms = gd_real(g, "prefill_ms"), out->first_answer_ms = gd_real(g, "first_answer_ms");
+            out->generation_ms = gd_real(g, "generation_ms"), out->total_ms = gd_real(g, "total_ms");
+            close(g->fd), g->fd = -1;
+            return 0;
+        }
+        int t = gd_find(g, "text"), pt = gd_find(g, "part");
+        char *text = t >= 0 && g->tok[t].type == JSMN_STRING ? gd_unescape(g->hdr + g->tok[t].start, g->hdr + g->tok[t].end)
+                                                             : strdup("");
+        if (!text) return gd_fail(g, "out of memory");
+        bool thinking = pt >= 0 && g->tok[pt].end - g->tok[pt].start == 8 && !memcmp(g->hdr + g->tok[pt].start, "thinking", 8);
+        bool keep     = !part || part(ctx, thinking, text);
+        free(text);
+        if (!keep) {
+            close(g->fd), g->fd = -1;
+            snprintf(out->finish, sizeof out->finish, "client");
+            return 0;
+        }
+    }
+}
+
+int geistd_chat_rewind(struct geistd *g, const char *id, size_t keep, size_t *length_out) {
+    char h[120];
+    snprintf(h, sizeof h, "{\"op\":\"chat_rewind\",\"chat\":\"%s\",\"keep\":%zu}", id, keep);
+    if (gd_call(g, h, 0, nullptr) != 0) return -1;
+    if (length_out) *length_out = gd_num(g, "length");
+    return 0;
+}
+
+int geistd_chat_close(struct geistd *g, const char *id) {
+    char h[100];
+    snprintf(h, sizeof h, "{\"op\":\"chat_close\",\"chat\":\"%s\"}", id);
+    return gd_call(g, h, 0, nullptr);
 }
 #endif /* GEISTD_CLIENT_IMPLEMENTATION */

@@ -44,6 +44,21 @@ with tempfile.TemporaryDirectory(prefix='geist-session-chat-') as home:
             assert code == 400 and b'context' in body, body
             assert not app.status()['busy']
             print('Real multi-turn response:', repr(answer))
+            # #148: the conversation stays in geistd; a follow-up processes only what is new.
+            def turn(messages):
+                code, body, _ = app.request('/app/generate', base | {'prompt':messages[-1]['content'], 'messages':messages})
+                events = [json.loads(line) for line in body.decode().splitlines()]
+                assert code == 200 and events[-1]['done'], body
+                return ''.join(e.get('response','') for e in events), events[-1]
+            first = [{'role':'user','content':'Remember the word lighthouse.'}]
+            a1, f1 = turn(first)
+            a2, f2 = turn(first + [{'role':'assistant','content':a1}, {'role':'user','content':base['prompt']}])
+            new_input = f2['prompt_eval_count'] - f2['reused']
+            assert f2['reused'] >= f1['prompt_eval_count'] + f1['eval_count'] - 2 and new_input < f1['prompt_eval_count'], (f1, f2)
+            # An edited history (another assistant text) is followed: rewound to the edit, the rest sent.
+            a3, f3 = turn(first + [{'role':'assistant','content':'I will remember lighthouse.'}, {'role':'user','content':base['prompt']}])
+            assert a3 and 0 < f3['reused'] < f2['reused'] and f3['reused'] <= f1['prompt_eval_count'], (f2, f3)
+            print(f'stateful chat: follow-up read {new_input} new tokens, reused {f2["reused"]}; edited history rewound to {f3["reused"]}')
     finally:
         app.close()
 print('session chat: role/order/current-input/consent/model/limits passed; real inference ' + ('passed' if model else 'SKIPPED'))

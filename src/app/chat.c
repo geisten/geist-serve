@@ -5,8 +5,12 @@ struct proxy {
     int                   fd;
     bool                  started, disconnected, expired, preparing, app, reading;
     double                start, first, first_answer, heartbeat, progress, phase_since;
-    struct app_utf8       utf8;
-    struct app_output     output;
+    /* The answer arrives as parts (geist-runtime): complete UTF-8, thinking
+     * separated. visible: answer text arrived; reasoning: thinking did;
+     * thinking_now: thinking with no answer yet. */
+    bool visible, reasoning, thinking_now;
+    bool (*think)(void *, const char *); /* #93: the UI's thinking view, else dropped */
+    const char *format;                  /* the model's reasoning_format (catalog) */
     struct app_run_stats *stats;
     bool (*send)(void *, const char *);
     bool (*keepalive)(void *);
@@ -96,38 +100,46 @@ static bool proxy_keepalive(void *opaque) {
     struct proxy *p = opaque;
     if (!p->started && !proxy_send(p, ""))
         return false;
-    const char *event = p->output.state == OUTPUT_REASONING && !p->first_answer
+    const char *event = p->thinking_now && !p->first_answer
                                 ? "{\"phase\":\"preparing\"}\n"
                                 : "{\"heartbeat\":true}\n";
     return send_bytes(p->fd, event, strlen(event));
 }
-static bool proxy_decode(struct proxy *p, const char *piece) {
+static bool proxy_part(void *opaque, bool thinking, const char *text) {
+    struct proxy *p = opaque;
     if (proxy_cancel(p))
         return false;
-    char decoded[8192];
-    if (!app_utf8_feed(&p->utf8, piece, decoded, sizeof decoded))
-        return false;
-    if (*decoded && !p->first)
+    if (*text && !p->first)
         p->first = monotonic_ms() - p->start;
-    bool ok = app_output_feed(&p->output, decoded, p->send, p->target);
-    if (*decoded) {
+    bool ok = true;
+    if (thinking) {
+        p->reasoning    = true;
+        p->thinking_now = !p->visible;
+        if (p->think && *text)
+            ok = p->think(p->target, text);
+    } else if (*text) {
+        p->thinking_now = false;
+        p->visible      = p->visible || text[strspn(text, " \t\r\n")];
+        ok              = p->send(p->target, text);
+    }
+    if (*text) {
         pthread_mutex_lock(&app.mutex);
         if (app.activity.request.id == p->operation &&
             app.activity.request.generation == p->generation) {
             activity_progress(&app.activity.request, ++p->pieces, monotonic_ms());
-            if (p->output.visible)
+            if (p->visible)
                 activity_change(&app.activity.request, ACT_ANSWER);
-            else if (p->output.state == OUTPUT_REASONING)
+            else if (p->thinking_now)
                 activity_change(&app.activity.request, ACT_PREPARING);
         }
         pthread_mutex_unlock(&app.mutex);
     }
-    if (ok && p->output.reasoning && !p->preparing && p->keepalive) {
+    if (ok && p->reasoning && !p->preparing && p->keepalive) {
         ok           = p->keepalive(p->target);
         p->preparing = true;
     }
     /* #93: while the model thinks, the app gets the token count about once a second. */
-    if (ok && p->app && p->output.state == OUTPUT_REASONING && *decoded) {
+    if (ok && p->app && p->thinking_now && *text) {
         ++p->thought;
         if (monotonic_ms() - p->progress >= 1000) {
             p->progress = monotonic_ms();
@@ -138,24 +150,20 @@ static bool proxy_decode(struct proxy *p, const char *piece) {
     }
     return ok;
 }
-static bool proxy_emit(void *opaque, const char *piece) {
-    return proxy_decode(opaque, piece);
-}
 static void proxy_init(struct proxy *p) {
+    const struct app_model *model = app_model_find(app.child.active_id);
+    p->format                     = model ? model->reasoning_format : nullptr;
     p->operation                  = app.activity.request.id;
     p->generation                 = app.activity.request.generation;
-    const struct app_model *model = app_model_find(app.child.active_id);
-    app_output_init(&p->output, model ? model->reasoning_format : nullptr);
     app.error.message[0] = app.error.stage[0] = app.error.model[0] = app.error.backend[0] = 0;
     app.error.code                                                                     = 0;
     strcpy(app.activity.request_phase, "connect");
 }
 static void
 proxy_finish(struct proxy *p, struct app_run_stats *stats, int *rc, char error[static 256]) {
-    stats->reasoning       = p->output.reasoning;
-    stats->no_answer       = !p->output.visible;
-    stats->first_answer_ns = p->output.visible && p->first_answer > 0 ? p->first_answer * 1e6 : -1;
-    app_output_finish(&p->output);
+    stats->reasoning       = p->reasoning;
+    stats->no_answer       = !p->visible;
+    stats->first_answer_ns = p->visible && p->first_answer > 0 ? p->first_answer * 1e6 : -1;
     if (p->expired) {
         *rc = 504;
         snprintf(error,
@@ -322,7 +330,7 @@ void generate(int fd, struct request *r, struct app_arena *arena) {
                                   .app       = true};
     proxy.target               = &proxy;
     proxy_init(&proxy);
-    app_output_thinking(&proxy.output, proxy_thinking);
+    proxy.think = proxy_thinking;
     pthread_mutex_unlock(&app.mutex);
     char error[256];
     int  rc = conversation ? app_daemon_chat(app.child.socket_path,
@@ -331,7 +339,8 @@ void generate(int fd, struct request *r, struct app_arena *arena) {
                                              chat.max_tokens,
                                              chat.temperature,
                                              chat.top_p,
-                                             proxy_emit,
+                                             proxy.format,
+                                             proxy_part,
                                              proxy_cancel,
                                              &proxy,
                                              &stats,
@@ -339,16 +348,13 @@ void generate(int fd, struct request *r, struct app_arena *arena) {
                            : app_daemon_run(app.child.socket_path,
                                             composed,
                                             benchmark ? 64 : task->output_limit,
-                                            proxy_emit,
+                                            proxy.format,
+                                            proxy_part,
                                             proxy_cancel,
                                             &proxy,
                                             &stats,
                                             error);
     free(prompt);
-    if (proxy.utf8.used || proxy.utf8.failed) {
-        rc = 502;
-        snprintf(error, sizeof error, "The model stream ended with invalid text encoding.");
-    }
     proxy_finish(&proxy, &stats, &rc, error);
     if (rc == 0 && !proxy.started && !proxy_send(&proxy, ""))
         rc = 502;
@@ -453,9 +459,9 @@ static bool completion_keepalive(void *opaque) {
         return false;
     return send_bytes(p->transport.fd, ": preparing\n\n", 13);
 }
-static bool completion_emit(void *opaque, const char *piece) {
+static bool completion_part(void *opaque, bool thinking, const char *text) {
     struct completion_proxy *p = opaque;
-    return proxy_decode(&p->transport, piece);
+    return proxy_part(&p->transport, thinking, text);
 }
 
 void completions(int fd, const struct request *r, struct app_arena *arena) {
@@ -517,17 +523,18 @@ void completions(int fd, const struct request *r, struct app_arena *arena) {
                               chat.max_tokens,
                               chat.temperature,
                               chat.top_p,
-                              completion_emit,
+                              p.transport.format,
+                              completion_part,
                               proxy_cancel,
                               &p,
                               &stats,
                               error);
     /* completion_proxy begins with proxy, so the cancellation callback borrows it. */
-    if (p.transport.utf8.used || p.transport.utf8.failed || p.text.failed) {
+    if (p.text.failed) {
         rc = 502;
         snprintf(error, sizeof error, "The model produced invalid or oversized text.");
     }
-    if (!rc && !p.transport.output.visible) {
+    if (!rc && !p.transport.visible) {
         rc = 422;
         snprintf(error,
                  sizeof error,
