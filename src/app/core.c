@@ -106,8 +106,11 @@ const struct app_model *app_model_find(const char *id) {
 
 struct app_assessment
 app_assess(const struct app_hardware *h, const struct app_model *m, bool installed) {
-    struct app_assessment a = {APP_CONDITIONAL,
-                               "Performance on this device is not measured yet.",
+    /* Unknown speed is not a resource restriction: the verdict weighs speed
+     * separately (app_judge), so an unmeasured model must not read as tight
+     * memory on platforms without a profile (Linux). */
+    struct app_assessment a = {APP_RECOMMENDED,
+                               "No known resource restriction. Speed has not been measured on this device.",
                                "Unknown on this device; measure after download."};
     if (h->device == APP_PI5 && strcmp(m->id, "bitnet-2b") == 0)
         a.performance = "Pi 5 reference: 17.8 tokens/s; your speed may differ.";
@@ -127,8 +130,10 @@ app_assess(const struct app_hardware *h, const struct app_model *m, bool install
         a.fit    = APP_UNAVAILABLE;
         a.reason = "RAM is smaller than the model file, before context and OS memory.";
     } else if (h->ram < (uint64_t) m->recommended_ram_gib * APP_GIB * 95 / 100) {
+        a.fit    = APP_CONDITIONAL;
         a.reason = "Below the RAM recommendation; swapping or allocation failures are possible.";
     } else if (h->available_known && h->available < (uint64_t) m->working_mib * 1048576) {
+        a.fit    = APP_CONDITIONAL;
         a.reason = "Available RAM is tight now. Close other apps before loading this model.";
     } else if (h->device == APP_PI5 && strcmp(m->id, "bitnet-2b") == 0) {
         a.fit    = APP_RECOMMENDED;
@@ -162,12 +167,6 @@ struct app_assessment app_assess_device(const struct app_hardware *h,
                                        const struct app_model *m, bool installed,
                                        double cpu_rate, bool gpu_available, double gpu_rate) {
     struct app_assessment a = app_assess(h, m, installed);
-    /* Unknown speed is not a resource incompatibility. Keep legacy setup and
-     * task-quality policy separate from the catalog's device-compatibility badge. */
-    if (a.fit == APP_CONDITIONAL && !strcmp(a.reason, "Performance on this device is not measured yet.")) {
-        a.fit = APP_RECOMMENDED;
-        a.reason = "No known resource restriction. Speed has not been measured on this device.";
-    }
     if (a.fit == APP_RECOMMENDED &&
         app_rate_below_target(app_device_rate(cpu_rate, gpu_available, gpu_rate))) {
         a.fit = APP_CONDITIONAL;
