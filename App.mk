@@ -3,9 +3,29 @@
 APP_CC ?= cc
 APP_CFLAGS ?= -std=c23 -O2 -Wall -Wextra -Wpedantic -D_POSIX_C_SOURCE=200809L -D_DARWIN_C_SOURCE
 APP_LDLIBS ?= -lcurl -lpthread
+# geist-runtime (#148): catalog, fit, templates and text stages, pinned like
+# geistlib and synced by the same script. geist-app links only the part that
+# needs no engine (libgeistr-core.a).
+RUNTIME_REPO ?= https://github.com/geisten/geist-runtime.git
+RUNTIME_REF  ?= 53ba83222214dae74831b86c6f06940f30acd6a8
+GEISTR       ?= geist-runtime
+ifeq (,$(filter clean distclean,$(MAKECMDGOALS)))
+RUNTIME_SYNC := $(shell GEIST_REPO='$(RUNTIME_REPO)' GEIST_REF='$(RUNTIME_REF)' GEISTLIB='$(GEISTR)' \
+                        sh scripts/sync-engine.sh >&2 && echo ok)
+ifneq ($(RUNTIME_SYNC),ok)
+$(error geist-runtime sync failed — see the messages above)
+endif
+endif
+GEISTR_CORE := $(GEISTR)/build/libgeistr-core.a
+override APP_CFLAGS += -I$(GEISTR)/include
+.PHONY: geistr-core
+$(GEISTR_CORE): geistr-core
+geistr-core:
+	$(MAKE) -C $(GEISTR) core CC="$(APP_CC)"
 ifeq ($(shell uname -s),Linux)
 APP_LDLIBS += -lcrypto -lm
 endif
+override APP_LDLIBS += $(GEISTR_CORE)
 # geist-app itself: app.h holds the shared state these files split between them.
 APP_MAIN := src/app/main.c src/app/request.c src/app/child.c src/app/prefs.c src/app/observe.c src/app/jobs.c src/app/status.c src/app/chat.c src/app/compare.c src/app/routes.c
 APP_SOURCE := src/app/memory.c src/app/engine.c src/app/catalog.c src/app/core.c src/app/platform.c src/app/resources.c
@@ -16,11 +36,11 @@ app: geist-app geisten geist
 # The CLI is `geisten` (#92); `geist` stays as an alias.
 geist: geisten
 	ln -sf geisten geist
-geisten: build/app_models.h src/app/catalog.c src/app/version.h src/app/cli.c src/app/connection.c src/app/connection.h src/app/core.c src/app/core.h src/json.c src/json.h
+geisten: $(GEISTR_CORE) build/app_models.h src/app/catalog.c src/app/version.h src/app/cli.c src/app/connection.c src/app/connection.h src/app/core.c src/app/core.h src/json.c src/json.h
 	$(APP_CC) $(APP_CFLAGS) -Isrc -o $@ src/app/cli.c src/app/connection.c src/app/core.c src/app/catalog.c src/json.c $(APP_LDLIBS)
-geist-app: $(APP_MAIN) $(APP_SOURCE) $(APP_RUNTIME) $(APP_HEADERS) src/app/core.h src/json.c src/json.h web/index.html web/app.css web/app.js web/i18n.js web/markdown.js web/vendor/marked.umd.js web/vendor/katex.min.js build/app_assets.h
+geist-app: $(GEISTR_CORE) $(APP_MAIN) $(APP_SOURCE) $(APP_RUNTIME) $(APP_HEADERS) src/app/core.h src/json.c src/json.h web/index.html web/app.css web/app.js web/i18n.js web/markdown.js web/vendor/marked.umd.js web/vendor/katex.min.js build/app_assets.h
 	$(APP_CC) $(APP_CFLAGS) -Isrc -o $@ $(APP_MAIN) $(APP_SOURCE) $(APP_RUNTIME) src/json.c $(APP_LDLIBS)
-build/test_app_core: build/app_models.h tests/app/core_test.c $(APP_SOURCE) src/app/core.h
+build/test_app_core: $(GEISTR_CORE) build/app_models.h tests/app/core_test.c $(APP_SOURCE) src/app/core.h
 	@mkdir -p build
 	$(APP_CC) $(APP_CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ tests/app/core_test.c $(APP_SOURCE) src/json.c $(APP_LDLIBS)
 test-app: build/test_app_memory_journal build/test_app_memory build/test_app_lifecycle build/test_app_activity build/test_app_engine build/test_app_output build/test_app_engine_identity build/test_app_performance build/test_app_resources build/geist-app-old build/geist-app-new build/geist-app-legacy build/geist-app-test geist-app geisten geist build/test_app_core build/test_app_client build/test_app_tasks
@@ -65,7 +85,7 @@ test-app: build/test_app_memory_journal build/test_app_memory build/test_app_lif
 	python3 tests/app/cli_test.py
 	GEIST_OLD_APP="$(CURDIR)/build/geist-app-old" GEIST_NEW_APP="$(CURDIR)/build/geist-app-new" GEIST_LEGACY_APP="$(CURDIR)/build/geist-app-legacy" python3 tests/app/upgrade_test.py
 
-build/geist-app-test: $(APP_MAIN) $(APP_SOURCE) $(APP_RUNTIME) $(APP_HEADERS) src/app/core.h src/json.c web/index.html web/app.css web/app.js web/i18n.js web/markdown.js web/vendor/marked.umd.js web/vendor/katex.min.js build/app_assets.h
+build/geist-app-test: $(GEISTR_CORE) $(APP_MAIN) $(APP_SOURCE) $(APP_RUNTIME) $(APP_HEADERS) src/app/core.h src/json.c web/index.html web/app.css web/app.js web/i18n.js web/markdown.js web/vendor/marked.umd.js web/vendor/katex.min.js build/app_assets.h
 	@mkdir -p build
 	$(APP_CC) $(APP_CFLAGS) -DAPP_TESTING -g -fsanitize=address,undefined -Isrc -o $@ $(APP_MAIN) $(APP_SOURCE) $(APP_RUNTIME) src/json.c $(APP_LDLIBS)
 
@@ -83,7 +103,7 @@ build/test_app_tasks: tests/app/tasks_test.c src/app/tasks.c src/app/tasks.h bui
 	$(APP_CC) $(APP_CFLAGS) -g -fsanitize=address,undefined -o $@ tests/app/tasks_test.c src/app/tasks.c
 
 # The test fixtures differ only in the version reported by the real service.
-build/geist-app-old build/geist-app-new build/geist-app-legacy: $(APP_MAIN) $(APP_SOURCE) $(APP_RUNTIME) $(APP_HEADERS) build/app_assets.h
+build/geist-app-old build/geist-app-new build/geist-app-legacy: $(GEISTR_CORE) $(APP_MAIN) $(APP_SOURCE) $(APP_RUNTIME) $(APP_HEADERS) build/app_assets.h
 	$(APP_CC) $(APP_CFLAGS) -DAPP_VERSION='"$(if $(filter build/geist-app-old,$@),0.4.9,$(if $(filter build/geist-app-new,$@),0.6.0,))"' -Isrc -o $@ $(APP_MAIN) $(APP_SOURCE) $(APP_RUNTIME) src/json.c $(APP_LDLIBS)
 
 # OS resource counters and sampling invariants, including the Linux parser on Mac.
@@ -94,10 +114,10 @@ build/test_app_resources: tests/app/resources_test.c src/app/resources.c src/app
 build/app_models.h: models/catalog.json scripts/embed-models.py $(wildcard workbench/suite/*.json)
 	python3 scripts/embed-models.py
 
-build/test_app_performance: tests/app/performance_test.c src/app/performance.c src/app/performance.h $(APP_SOURCE) src/app/core.h src/json.c
+build/test_app_performance: $(GEISTR_CORE) tests/app/performance_test.c src/app/performance.c src/app/performance.h $(APP_SOURCE) src/app/core.h src/json.c
 	$(APP_CC) $(APP_CFLAGS) -DAPP_TESTING -g -O1 -fsanitize=address,undefined -o $@ tests/app/performance_test.c src/app/performance.c $(APP_SOURCE) src/json.c $(APP_LDLIBS)
 
-build/test_app_engine_identity: tests/app/engine_identity_test.c $(APP_SOURCE) src/app/core.h build/app_models.h src/json.c
+build/test_app_engine_identity: $(GEISTR_CORE) tests/app/engine_identity_test.c $(APP_SOURCE) src/app/core.h build/app_models.h src/json.c
 	$(APP_CC) $(APP_CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ tests/app/engine_identity_test.c $(APP_SOURCE) src/json.c $(APP_LDLIBS)
 
 build/test_app_output: tests/app/output_test.c src/app/output.c src/app/output.h
@@ -107,16 +127,16 @@ build/test_app_engine: tests/app/engine_test.c $(APP_SOURCE) src/json.c
 	@mkdir -p build
 	$(APP_CC) $(APP_CFLAGS) -g -fsanitize=address,undefined -o $@ $^ $(APP_LDLIBS)
 
-build/test_app_activity: tests/app/activity_test.c src/app/activity.c src/app/activity.h $(APP_SOURCE)
+build/test_app_activity: $(GEISTR_CORE) tests/app/activity_test.c src/app/activity.c src/app/activity.h $(APP_SOURCE)
 	$(APP_CC) $(APP_CFLAGS) -g -fsanitize=address,undefined -Isrc -o $@ tests/app/activity_test.c src/app/activity.c $(APP_SOURCE) src/json.c $(APP_LDLIBS)
 
 build/test_app_lifecycle: tests/app/lifecycle_test.c src/lifecycle.c src/lifecycle.h
 	$(APP_CC) $(APP_CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ tests/app/lifecycle_test.c src/lifecycle.c $(APP_LDLIBS)
 
-build/test_app_memory: tests/app/memory_test.c $(APP_SOURCE) src/json.c build/app_models.h
+build/test_app_memory: $(GEISTR_CORE) tests/app/memory_test.c $(APP_SOURCE) src/json.c build/app_models.h
 	$(APP_CC) $(APP_CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ tests/app/memory_test.c $(APP_SOURCE) src/json.c $(APP_LDLIBS)
 
-build/test_app_memory_journal: tests/app/memory_journal_test.c src/app/performance.c src/app/performance.h $(APP_SOURCE) src/json.c build/app_models.h
+build/test_app_memory_journal: $(GEISTR_CORE) tests/app/memory_journal_test.c src/app/performance.c src/app/performance.h $(APP_SOURCE) src/json.c build/app_models.h
 	$(APP_CC) $(APP_CFLAGS) -g -O1 -fsanitize=address,undefined -o $@ tests/app/memory_journal_test.c src/app/performance.c $(APP_SOURCE) src/json.c $(APP_LDLIBS)
 
 # Line coverage of the app over the full test-app suite (scripts/coverage.sh).

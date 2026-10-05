@@ -5,11 +5,11 @@ arch=${1:?amd64 or arm64}
 apk add --no-cache build-base linux-headers git python3 file pkgconf curl-dev curl-static openssl-dev c-ares-dev openssl-libs-static brotli-static zstd-static zlib-static nghttp2-static nghttp3-static ngtcp2-static libidn2-static libunistring-static libpsl-static dpkg
 mkdir -p /tmp/geist-build
 cd /tmp/geist-build
-cp -R /source/src /source/clients /source/scripts /source/web /source/models /source/tasks /source/quality /source/tests /source/App.mk /source/LICENSE /source/docs /source/deploy /source/geistlib .
+cp -R /source/src /source/clients /source/scripts /source/web /source/models /source/tasks /source/quality /source/tests /source/App.mk /source/LICENSE /source/docs /source/deploy /source/geistlib /source/geist-runtime .
 mkdir -p workbench && cp -R /source/workbench/suite workbench/  # the reference test suite id (#102)
 # These are disposable copies. Host glibc/compiler objects must never be linked
 # into the musl package even when make considers their timestamps current.
-rm -rf geistlib/build geistlib/lib geistlib/bin
+rm -rf geistlib/build geistlib/lib geistlib/bin geist-runtime/build
 if [ "${REUSE_GEISTD:-0}" = 1 ]; then
     # Explicit local-only iteration flag; CI always rebuilds the pinned engine.
     cp /out/geistd ./geistd

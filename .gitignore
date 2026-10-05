@@ -4,6 +4,7 @@
 /geist
 /geistd
 /geistlib/
+/geist-runtime/
 /build/
 *.tar.gz
 __pycache__/

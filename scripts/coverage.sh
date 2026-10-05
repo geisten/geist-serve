@@ -51,7 +51,7 @@ fi
 web=0
 node tests/desktop/chrome_coverage.mjs "$web_min" | tee "$out/web.txt" || web=1
 "$profdata" merge -sparse "$out"/*.profraw -o "$out/merged.profdata"
-ignore='(tests/|build/|jsmn\.h|clients/|geistlib/)'
+ignore='(tests/|build/|jsmn\.h|clients/|geistlib/|geist-runtime/)'
 for binary in geist-app geisten geist-serve geistd build/geist-app-* build/test_app_* build/test_template build/test_net_signal; do
     [ -f "$binary" ] && [ -x "$binary" ] || continue
     "$cov" export "$binary" -instr-profile="$out/merged.profdata" -format=lcov -ignore-filename-regex="$ignore" \

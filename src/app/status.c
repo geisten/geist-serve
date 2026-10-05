@@ -377,23 +377,43 @@ void status_response(int fd, struct app_arena *arena) {
                        ? "true"
                        : "false",
                app.job.running && !app.job.activate ? "true" : "false");
-    /* #103: measurements on this computer, the basis for estimates of models not installed. */
-    double rates[2][APP_MODEL_COUNT], sizes[2][APP_MODEL_COUNT], firsts[2][APP_MODEL_COUNT];
-    for (unsigned slot = 0; slot < 2; slot++)
-        for (size_t i = 0; i < app_model_count; i++)
-            rates[slot][i] = app.prefs.speed[i][slot].rate, sizes[slot][i] = (double) app_models[i].bytes,
-            firsts[slot][i] = app.prefs.speed[i][slot].first;
-    unsigned measured_models[2] = {0, 0}; /* the basis of an estimate, per processor */
-    for (unsigned slot = 0; slot < 2; slot++)
-        for (size_t i = 0; i < app_model_count; i++)
-            measured_models[slot] += rates[slot][i] > 0;
-    /* #122: one recommendation over installed and catalog models (app_candidate_better). */
-    const struct app_model *best = nullptr;
-    struct app_candidate    best_candidate = {};
-    const char             *best_processor = nullptr;
-    bool                    best_estimated = false;
-    struct app_candidate    ranked[APP_MODEL_COUNT];
-    size_t                  order[APP_MODEL_COUNT], ranked_count = 0;
+    /* #103/#122/#133: verdicts, estimates, the suitability order and the one
+     * recommendation are geist-runtime's (geistr_rank); the app supplies what
+     * it knows here: installed, partial downloads, measured speed. */
+    static geistr_catalog *ranked_catalog;
+    static const char     *ranked_json;
+    if (ranked_json != app_catalog_json) {
+        geistr_catalog_free(ranked_catalog);
+        ranked_catalog = nullptr;
+        ranked_json    = app_catalog_json;
+        if (geistr_catalog_parse(app_catalog_json, strlen(app_catalog_json), &ranked_catalog, nullptr, 0) !=
+                    GEISTR_OK ||
+            geistr_catalog_count(ranked_catalog) != app_model_count) {
+            geistr_catalog_free(ranked_catalog);
+            ranked_catalog = nullptr;
+        }
+    }
+    geistr_local local[APP_MODEL_COUNT];
+    for (size_t i = 0; i < app_model_count; i++)
+        local[i] = (geistr_local) {.size      = sizeof *local,
+                                   .installed = inventory[i].installed,
+                                   .partial   = inventory[i].partial,
+                                   .cpu       = {app.prefs.speed[i][0].rate, app.prefs.speed[i][0].first},
+                                   .gpu       = {app.prefs.speed[i][1].rate, app.prefs.speed[i][1].first}};
+    geistr_device    device = app_device(&h, app.backend.gpu_available ? (!strcmp(app.backend.gpu, "metal") ? 2u : 4u) : 0u);
+    geistr_rank_opts limits = {.size     = sizeof limits,
+                               .fast_s   = app.prefs.limits.fast_s,
+                               .usable_s = app.prefs.limits.usable_s,
+                               .reliable = app.prefs.limits.reliable,
+                               .task     = strcmp(app.prefs.intent, "chat") ? app.prefs.intent : nullptr};
+    geistr_ranking  *ranking = nullptr;
+    const geistr_fit *fits[APP_MODEL_COUNT] = {};
+    if (ranked_catalog && geistr_rank(ranked_catalog, &device, local, &limits, &ranking) == GEISTR_OK)
+        for (size_t k = 0; k < geistr_ranking_count(ranking); k++) {
+            const geistr_fit *f = geistr_ranking_get(ranking, k);
+            fits[f->entry - geistr_catalog_get(ranked_catalog, 0)] = f;
+        }
+    static const char *const verdict_names[] = {"good", "usable", "not_recommended", "unknown"};
     for (size_t i = 0; i < app_model_count; ++i) {
         const struct app_model *m         = &app_models[i];
         bool                    installed = inventory[i].installed;
@@ -473,101 +493,68 @@ void status_response(int fd, struct app_arena *arena) {
             app_put(&b, "}");
         } else
             app_put(&b, "null");
-        /* #103: verdict for "good enough and fast enough here". Resource fit
-         * without the speed hint; speed enters as seconds per typical answer. */
-        double seconds[2] = {app_answer_seconds(app.prefs.speed[i][0].rate, app.prefs.speed[i][0].first),
-                             gpu_supported(m) ? app_answer_seconds(app.prefs.speed[i][1].rate,
-                                                                   app.prefs.speed[i][1].first)
-                                              : -1};
-        /* No measurement of its own: an estimate, always labelled. Installed
-         * models keep the stopwatch to replace it with a measurement (#133). */
-        bool estimated = seconds[0] < 0 && seconds[1] < 0;
-        if (estimated) {
-            seconds[0] = app_estimate_seconds(m->bytes, rates[0], sizes[0], firsts[0], app_model_count);
-            seconds[1] = gpu_supported(m) ? app_estimate_seconds(m->bytes, rates[1], sizes[1], firsts[1], app_model_count) : -1;
-        }
-        int    fastest    = seconds[1] >= 0 && (seconds[0] < 0 || seconds[1] < seconds[0]) ? 1
-                            : seconds[0] >= 0                                               ? 0
-                                                                                            : -1;
-        /* Quality for the intent: all tasks for "chat", else that task (DE and EN). */
-        unsigned passed = m->quality_passed, total = m->quality_total;
-        static const char *const tasks[] = APP_QUALITY_TASKS;
-        for (unsigned k = 0; k < 4; k++)
-            if (!strcmp(app.prefs.intent, tasks[k]))
-                passed = m->quality_task[k][0], total = m->quality_task[k][1];
-        struct app_judgement j = app_judge(app_assess(&adjusted, m, installed).fit,
-                                           fastest < 0 ? -1 : seconds[fastest],
-                                           estimated,
-                                           passed,
-                                           total,
-                                           app.prefs.limits);
-        const char *processor = fastest < 0 ? nullptr : fastest ? "gpu" : "cpu";
+        /* #103: verdict for "good enough and fast enough here" (geistr_rank).
+         * No measurement of its own: an estimate, always labelled. */
+        static const geistr_fit none = {.verdict = GEISTR_VERDICT_UNKNOWN, .reason = "quality_unknown",
+                                        .seconds_cpu = -1, .seconds_gpu = -1};
+        const geistr_fit *f = fits[i] ? fits[i] : &none;
+        bool estimated = !(app.prefs.speed[i][0].rate > 0) && !(gpu_supported(m) && app.prefs.speed[i][1].rate > 0);
         app_put(&b, ",\"verdict\":{\"basis\":");
-        app_put(&b, fastest < 0 ? "null" : estimated ? "\"estimated\"" : "\"measured\"");
+        app_put(&b, f->basis == GEISTR_BASIS_NONE ? "null" : f->basis == GEISTR_BASIS_ESTIMATED ? "\"estimated\"" : "\"measured\"");
         app_put(&b, ",\"value\":");
-        app_quote(&b, app_verdict_name(j.verdict));
+        app_quote(&b, verdict_names[f->verdict]);
         app_put(&b, ",\"reason\":");
-        app_quote(&b, j.reason);
+        app_quote(&b, f->reason);
         app_put(&b, ",\"processor\":");
-        if (processor)
-            app_quote(&b, processor);
+        if (f->processor != GEISTR_PROCESSOR_AUTO)
+            app_quote(&b, f->processor == GEISTR_PROCESSOR_GPU ? "gpu" : "cpu");
         else
             app_put(&b, "null");
         app_put(&b, ",\"seconds\":{\"cpu\":");
-        numeric_rate(&b, seconds[0]);
+        numeric_rate(&b, f->seconds_cpu);
         app_put(&b, ",\"gpu\":");
-        numeric_rate(&b, seconds[1]);
+        numeric_rate(&b, f->seconds_gpu);
         /* What the speed rests on (#103): when each processor was measured
          * here, or how many measured models an estimate scales from. */
         app_put(&b, "},\"measured_at\":{\"cpu\":");
         numeric_rate(&b, estimated ? -1 : app.prefs.speed[i][0].recorded);
         app_put(&b, ",\"gpu\":");
         numeric_rate(&b, estimated || !gpu_supported(m) ? -1 : app.prefs.speed[i][1].recorded);
-        app_printf(&b, "},\"estimated_from\":%u", estimated ? measured_models[fastest > 0 ? 1 : 0] : 0);
+        app_printf(&b, "},\"estimated_from\":%u", f->estimated_from);
         app_put(&b, ",\"passed\":");
-        if (total)
-            app_printf(&b, "%u,\"total\":%u}", passed, total);
+        if (f->total)
+            app_printf(&b, "%u,\"total\":%u}", f->passed, f->total);
         else
             app_put(&b, "null,\"total\":null}");
         app_put(&b, "}");
-        double rate = total ? (double) passed / total : -1;
-        double time = fastest < 0 ? -1 : seconds[fastest];
-        struct app_candidate candidate = {j.verdict, rate, time, installed};
-        /* #133: suitability order for the list; installed or not does not count,
-         * so a row never moves when a download completes. Stable insertion. */
-        struct app_candidate fit = {j.verdict, rate, time, false};
-        size_t at = ranked_count;
-        while (at > 0 && app_candidate_better(fit, ranked[at - 1]))
-            ranked[at] = ranked[at - 1], order[at] = order[at - 1], --at;
-        ranked[at] = fit, order[at] = i, ++ranked_count;
-        if (j.verdict != APP_VERDICT_NOT_RECOMMENDED && (!best || app_candidate_better(candidate, best_candidate)))
-            best = m, best_candidate = candidate, best_processor = processor, best_estimated = estimated;
     }
     app_put(&b, "],\"ranking\":[");
-    for (size_t k = 0; k < ranked_count; ++k) {
+    for (size_t k = 0; k < geistr_ranking_count(ranking); ++k) {
         if (k)
             app_put(&b, ",");
-        app_quote(&b, app_models[order[k]].id);
+        app_quote(&b, geistr_ranking_get(ranking, k)->entry->id);
     }
     app_put(&b, "],\"best_choice\":");
+    const geistr_fit *best = geistr_ranking_best(ranking);
     if (best) {
         app_put(&b, "{\"id\":");
-        app_quote(&b, best->id);
+        app_quote(&b, best->entry->id);
         app_put(&b, ",\"verdict\":");
-        app_quote(&b, app_verdict_name(best_candidate.verdict));
-        bool active = app.child.ready && !strcmp(app.child.active_id, best->id);
+        app_quote(&b, verdict_names[best->verdict]);
+        bool active = app.child.ready && !strcmp(app.child.active_id, best->entry->id);
         app_printf(&b,
                    ",\"action\":\"%s\",\"basis\":%s",
-                   active ? "active" : best_candidate.installed ? "start" : "download",
-                   best_candidate.seconds < 0 ? "null" : best_estimated ? "\"estimated\"" : "\"measured\"");
+                   active ? "active" : best->installed ? "start" : "download",
+                   best->basis == GEISTR_BASIS_NONE ? "null" : best->basis == GEISTR_BASIS_ESTIMATED ? "\"estimated\"" : "\"measured\"");
         app_put(&b, ",\"processor\":");
-        if (best_processor)
-            app_quote(&b, best_processor);
+        if (best->processor != GEISTR_PROCESSOR_AUTO)
+            app_quote(&b, best->processor == GEISTR_PROCESSOR_GPU ? "gpu" : "cpu");
         else
             app_put(&b, "null");
         app_put(&b, "}");
     } else
         app_put(&b, "null");
+    geistr_ranking_free(ranking);
     app_printf(&b,
                ",\"limits\":{\"fast_s\":%g,\"usable_s\":%g,\"reliable\":%g,\"intent\":\"%s\"}",
                app.prefs.limits.fast_s,
