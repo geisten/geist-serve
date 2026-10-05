@@ -116,8 +116,8 @@ def main():
             code, html, headers = app.request("/", auth=False)
             assert code == 200 and b'class="brand"' in html and b'id="catalog-preview"' not in html and b'id="setup-start"' not in html
             assert b'id="chat-speed"' not in html and b'id="chat-memory"' not in html
-            assert html.index(b'id="runtime-model"') < html.index(b'id="open-measurements"') < html.index(b'id="transcript"')
-            assert b'<dialog id="performance"' in html and b'<details id="performance"' not in html
+            assert html.index(b'id="runtime-model"') < html.index(b'id="measure-speed"') < html.index(b'id="transcript"')
+            assert b'id="performance"' not in html and b'id="open-measurements"' not in html  # #146
             assert html == (ROOT/'web/index.html').read_bytes(), 'Served assets must match the built candidate source'
             assert "frame-ancestors 'none'" in headers["Content-Security-Policy"]
             assert "Access-Control-Allow-Origin" not in headers
