@@ -120,6 +120,7 @@ jobs:
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/reasoning_test.py
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/deadline_test.py
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/http_test.py
+          GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/api_socket_test.py
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/compat_test.py
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/chat_test.py
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/catalog_test.py

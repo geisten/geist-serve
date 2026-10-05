@@ -165,9 +165,14 @@ int read_request(int fd, struct app_arena *arena, struct request *r) {
         }
         line = next + 2;
     }
-    if (!loopback_host(r->host))
+    /* Host/Origin guard browsers against DNS rebinding over TCP. A browser cannot
+     * reach the Unix socket (#143); there the file permissions and the key apply. */
+    struct sockaddr_storage local;
+    socklen_t               local_len = sizeof local;
+    bool unix_socket = getsockname(fd, (struct sockaddr *) &local, &local_len) == 0 && local.ss_family == AF_UNIX;
+    if (!unix_socket && !loopback_host(r->host))
         return 403;
-    if (*r->origin) {
+    if (!unix_socket && *r->origin) {
         char expected[160];
         snprintf(expected, sizeof expected, "http://%s", r->host);
         if (strcmp(r->origin, expected))
@@ -200,6 +205,32 @@ bool authorized(const struct request *r) {
     for (size_t i = 0; expected[i]; ++i)
         mismatch |= (unsigned char) r->auth[i] ^ (unsigned char) expected[i];
     return mismatch == 0;
+}
+
+/* #143: the same API on <home>/api.sock, 0600. The caller holds app.lock, so a
+ * socket left at that path is stale. Anything else there is never removed. */
+int unix_listener(const char *path) {
+    struct sockaddr_un sa = {.sun_family = AF_UNIX};
+    struct stat        s;
+    if (strlen(path) >= sizeof sa.sun_path)
+        return -1; /* path too long for a socket: TCP only */
+    if (lstat(path, &s) == 0 && (!S_ISSOCK(s.st_mode) || unlink(path) != 0))
+        return -1;
+    strcpy(sa.sun_path, path);
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd < 0)
+        return -1;
+    (void) fcntl(fd, F_SETFD, FD_CLOEXEC);
+    mode_t mask = umask(077); /* never reachable by others, not even before chmod */
+    bool   ok   = bind(fd, (struct sockaddr *) &sa, sizeof sa) == 0;
+    umask(mask);
+    if (!ok || chmod(path, 0600) != 0 || listen(fd, 16) != 0) {
+        if (ok)
+            unlink(path);
+        close(fd);
+        return -1;
+    }
+    return fd;
 }
 
 int listener(unsigned *port) {

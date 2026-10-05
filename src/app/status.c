@@ -147,6 +147,11 @@ void status_response(int fd, struct app_arena *arena) {
     app_put(&b, "{\"version\":");
     app_quote(&b, APP_VERSION);
     app_printf(&b, ",\"catalog_revision\":%u", app_catalog_revision);
+    app_put(&b, ",\"api_socket\":");
+    if (*app.api_socket)
+        app_quote(&b, app.api_socket);
+    else
+        app_put(&b, "null");
     app_put(&b, ",\"quality_suite\":");
     app_quote(&b, app_quality_suite);
     app_put(&b, ",\"recommendation\":{\"id\":");

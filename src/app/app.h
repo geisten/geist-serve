@@ -139,6 +139,7 @@ struct app_state {
         char home[APP_PATH_CAP], server[APP_PATH_CAP], models[APP_PATH_CAP];
     } paths;
     char                token[65], instance[80], message[512];
+    char                api_socket[APP_PATH_CAP]; /* #143: empty when unavailable */
     unsigned            port, workers;
     uint64_t            generation;
     bool                stopping;
@@ -201,6 +202,7 @@ void error_response(int fd, int code, const char *message);
 int read_request(int fd, struct app_arena *arena, struct request *r);
 bool authorized(const struct request *r);
 int listener(unsigned *port);
+int unix_listener(const char *path);
 
 /* child.c — geistd supervision: backend probe, spawn, poll, stop, lifecycle sampling */
 void probe_backends(void);

@@ -77,6 +77,11 @@ tunnel to port 8766 and the private URL; there is no public network listener.
 local URL, current model and private API key. Treat the key as a credential.
 It is stored with user-only permissions and survives service restarts.
 
+The same API is also on a Unix socket, `api.sock` in the data folder (its path
+is `socket` in `geisten connection`, `null` if the path is too long). Only your
+user account can open it, and the key is still required:
+`curl --unix-socket <path> -H "Authorization: Bearer <key>" http://localhost/v1/models`.
+
 `geisten config continue` prints JSON that is also valid YAML for a local Continue
 config.yaml. Preserve existing settings; add its model and select Chat mode.
 `geisten config opencode` prints a private opencode.json for an isolated folder.

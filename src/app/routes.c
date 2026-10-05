@@ -48,6 +48,11 @@ void connections(int fd, bool models) {
     } else {
         app_printf(&b, "{\"base_url\":\"http://127.0.0.1:%u/v1\",\"api_key\":", app.port);
         app_quote(&b, app.token);
+        app_put(&b, ",\"socket\":");
+        if (*app.api_socket)
+            app_quote(&b, app.api_socket);
+        else
+            app_put(&b, "null");
         app_put(&b, ",\"model\":");
         app_quote(&b, app.child.pid > 0 ? app.child.active_id : "");
         app_printf(&b,

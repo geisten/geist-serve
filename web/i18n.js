@@ -138,7 +138,7 @@ const german = {
   'Your result': 'Dein Ergebnis', 'Copy': 'Kopieren', 'Copied': 'Kopiert', 'Generation speed': 'Ausgabegeschwindigkeit', 'First text': 'Erster Text', 'Total time': 'Gesamtzeit',
   'Measurements appear after a run.': 'Messwerte erscheinen nach einem Durchlauf.', 'Bring your own tools.': 'Nutze deine Programme.',
   'Your editor and this window use the same model. Closing the window keeps the service running.': 'Dein Editor und dieses Fenster verwenden dasselbe Modell. Beim Schließen läuft der Dienst weiter.',
-  'Local endpoint': 'Lokaler Endpunkt', 'Model': 'Modell', 'Use with': 'Verwenden mit', 'OpenCode · text chat': 'OpenCode · Textchat',
+  'Local endpoint': 'Lokaler Endpunkt', 'Unix socket': 'Unix-Socket', 'Only your user account can open it; the key is still required.': 'Nur dein Benutzerkonto kann ihn öffnen; der Schlüssel ist weiterhin nötig.', 'Model': 'Modell', 'Use with': 'Verwenden mit', 'OpenCode · text chat': 'OpenCode · Textchat',
   'Copy configuration': 'Konfiguration kopieren', 'Test local connection': 'Lokale Verbindung testen',
   'Text chat is available after loading a model. Agent tools are not supported. Context: 4096 tokens. Copied configurations contain your private local key: keep them out of repositories.': 'Textchat ist nach dem Laden verfügbar. Agentenwerkzeuge werden nicht unterstützt. Kontext: 4096 Token. Kopierte Konfigurationen enthalten deinen privaten lokalen Schlüssel und gehören nicht in Repositories.',
   'Models stay on this computer. Prompts and results are not saved as chat history.': 'Modelle bleiben auf diesem Rechner. Eingaben und Ergebnisse werden nicht als Chatverlauf gespeichert.',
