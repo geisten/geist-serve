@@ -39,15 +39,14 @@
     <div class="execution-row">
       <fieldset id="execution-choice" class="execution-choice" aria-describedby="execution-description"><legend class="sr-only">Execution</legend>
         <label><input type="radio" name="execution" value="auto"><span>Automatic</span></label>
-        <label><input type="radio" name="execution" value="cpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option" id="history-cpu"><span>Processor</span><small id="history-cpu-rate">— tokens/s</small><small id="summary-cpu-first">—</small><small id="summary-cpu-count">—</small></span><small class="recommended-mark" role="img" hidden></small></label>
-        <label><input type="radio" name="execution" value="gpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option" id="history-gpu"><span>Graphics chip</span><small class="processor-backend" hidden></small><small id="history-gpu-rate">— tokens/s</small><small id="summary-gpu-first">—</small><small id="summary-gpu-count">—</small></span><small class="recommended-mark" role="img" hidden></small></label>
+        <label><input type="radio" name="execution" value="cpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option" id="history-cpu"><span>CPU</span><small id="history-cpu-rate"></small><small id="summary-cpu-first">—</small><small id="summary-cpu-count">—</small></span><small class="recommended-mark" role="img" hidden></small></label>
+        <label><input type="radio" name="execution" value="gpu"><span class="processor-indicator" aria-hidden="true"></span><span class="processor-option" id="history-gpu"><span>GPU</span><small class="processor-backend" hidden></small><small id="history-gpu-rate"></small><small id="summary-gpu-first">—</small><small id="summary-gpu-count">—</small></span><small class="recommended-mark" role="img" hidden></small></label>
       </fieldset>
       <span id="execution-current" class="sr-only" role="status" aria-live="polite"></span>
       <span id="execution-description" class="sr-only"></span>
       <span class="view-actions">
       <button id="open-tools" data-page="connect-page" type="button" class="text-button" title="Connect a program" data-ui-title="Connect a program"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 13 4-4m-7 6-1 1a4 4 0 0 0 6 6l4-4m1-9 1-1a4 4 0 0 0-6-6L8 6"/></svg><span>Connect</span></button>
       <button id="measure-speed" type="button" class="text-button icon-button" hidden><svg class="measure-start" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg><svg class="measure-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1"/></svg></button>
-      <button id="open-measurements" type="button" class="text-button" aria-haspopup="dialog" title="Measurements"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3v17h17M8 15v-4m5 4V6m5 9V9"/></svg><span>Measurements</span></button>
       </span>
     </div>
     </div>
@@ -99,39 +98,7 @@
     <section class="preference-group" aria-labelledby="storage-title"><h3 id="storage-title">Storage</h3><p id="disk-space" class="hint"></p></section>
   </section>
 <footer>Models stay on this computer. Prompts and results are not saved as chat history.</footer>
-</main></div><dialog id="performance" class="measurement-sheet" aria-labelledby="measurements-title">
-<div class="sheet-heading"><h2 id="measurements-title">Measurements</h2><button id="close-measurements" type="button" aria-label="Close" title="Close" autofocus><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
-        <div class="performance-content" tabindex="0" role="region" aria-label="Measurements">
-          <p id="profile-collection" class="hint"></p><p id="profile-group" class="hint"></p><p id="profile-engine" class="hint"></p>
-          <table class="profile-table"><caption id="processor-history-title">Local performance profile</caption><thead><tr><th scope="col">Measurement</th><th scope="col">CPU<small id="profile-cpu-confidence"></small></th><th scope="col">GPU<small id="profile-gpu-confidence"></small></th></tr></thead><tbody><tr><th scope="row">Median speed</th><td id="history-cpu-typical">—</td><td id="history-gpu-typical">—</td></tr>
-<tr><th scope="row">Middle 50%</th><td id="history-cpu-range">—</td><td id="history-gpu-range">—</td></tr>
-<tr><th scope="row">First answer</th><td id="history-cpu-answer">—</td><td id="history-gpu-answer">—</td></tr>
-<tr><th scope="row">First text</th><td id="history-cpu-first">—</td><td id="history-gpu-first">—</td></tr>
-<tr><th scope="row">Total time</th><td id="history-cpu-total">—</td><td id="history-gpu-total">—</td></tr>
-<tr><th scope="row">Output tokens</th><td id="history-cpu-tokens">—</td><td id="history-gpu-tokens">—</td></tr>
-<tr><th scope="row">Process RSS · after reply</th><td id="history-cpu-ram">—</td><td id="history-gpu-ram">—</td></tr>
-<tr><th scope="row">RSS sampled peak · 2 s</th><td id="history-cpu-peak">—</td><td id="history-gpu-peak">—</td></tr>
-<tr><th scope="row">Metal allocated · after reply</th><td id="history-cpu-gpu-memory">—</td><td id="history-gpu-gpu-memory">—</td></tr>
-              <tr><th scope="row">Metal sampled peak · 2 s</th><td id="history-cpu-gpu-peak">—</td><td id="history-gpu-gpu-peak">—</td></tr>
-              <tr><th scope="row">Observations</th><td id="history-cpu-count">—</td><td id="history-gpu-count">—</td></tr>
-<tr><th scope="row">Measured</th><td id="history-cpu-time">—</td><td id="history-gpu-time">—</td></tr>
-</tbody></table>
-          <p class="hint" id="profile-confidence"></p>
-          <p class="hint recommended-legend"><span class="recommended-mark" aria-hidden="true"></span> Default processor for this model size</p>
-          <section class="profile-info"><h3>About these measurements</h3><p>Median of up to 30 comparable replies. Range: middle 50%. Different prompts are observations, not a controlled speed comparison. First text includes hidden preparation. RAM is process RSS; sampled peaks can miss brief spikes. Metal shows device allocation, not unique physical memory. Do not add it to RSS. Power is not measured.</p>
-          <p id="performance-system" class="system-name"></p><p id="performance-os" class="hint"></p>
-          <dl class="performance-grid"><div><dt>Model CPU · now</dt><dd id="performance-cpu">—</dd></div><div><dt>System RAM</dt><dd id="performance-ram">—</dd></div><div><dt>Available RAM</dt><dd id="performance-available">—</dd></div></dl></section>
-          <section class="profile-info"><h3>Current memory</h3>
-          <div class="model-metrics" aria-label="Current memory">
-      <span><span>Process RSS</span> <span id="test-memory">—</span></span>
-      <span title="Device allocation; do not add to RSS"><span>Metal allocated</span> <span id="test-gpu-memory">—</span></span>
-      <span><span>File</span> <span id="test-size">—</span></span>
-          </div>
-          <p id="memory-live"></p><p id="memory-source"></p></section>
-          <section class="profile-info"><h3>Recent observations</h3><ol id="profile-recent"></ol></section>
-          <div class="profile-actions"><button id="benchmark" class="text-button" type="button" disabled>Measure comparison</button><button id="comparison-stop" type="button" hidden>Cancel comparison</button></div><p id="comparison-status" class="hint" role="status"></p>
-        </div>
-</dialog>
+</main></div>
 <dialog id="activity-dialog" class="measurement-sheet" aria-labelledby="activity-title">
 <div class="sheet-heading"><h2 id="activity-title">Activity</h2><button id="close-activity" type="button" aria-label="Close" title="Close" autofocus><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
 <div class="performance-content" tabindex="0" role="region" aria-label="Activity">

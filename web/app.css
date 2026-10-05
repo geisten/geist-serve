@@ -669,13 +669,6 @@ button.markdown-copy { background:transparent; color:var(--muted); border:0; bor
 }
 
 /* Technical detail stays one disclosure away; reading remains the main surface. */
-.performance-content h4 { margin:18px 0 10px; font-size:12px; font-weight:600 }
-.performance-content .system-name { margin:0; font-size:14px; font-weight:550 }
-.performance-content #performance-os { margin:2px 0 16px }
-.performance-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px 24px; margin:0 }
-.performance-grid dt { font-size:11px; color:var(--muted) }
-.performance-grid dd { margin:2px 0 0; font-size:19px; font-weight:500; color:var(--accent); font-variant-numeric:tabular-nums; letter-spacing:-.3px }
-.performance-content .performance-note { margin:14px 0 0; color:var(--muted); font-size:11px; line-height:1.6 }
 .reply-metrics { align-self:center; padding:4px 2px; font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; overflow-wrap:anywhere }
 .performance-content:focus-visible { outline-offset:-3px }
 
@@ -745,8 +738,6 @@ body.manager-page footer { display:none }
 .model-sidebar>.settings>summary { font-size:12px; font-weight:500 }
 .model-sidebar .settings-row { display:block }
 .model-sidebar .settings-row select { width:100%; margin-top:8px; font-size:12px }
-.performance-grid { gap:12px }
-.performance-grid dd { font-size:16px }
 #test-page,#workspace { display:flex; flex-direction:column; min-width:0; min-height:0; flex:1 }
 #test-page { border-left:1px solid var(--border); padding-left:22px }
 #test-unavailable { margin:auto; padding:30px 10px; text-align:center; color:var(--muted); max-width:340px }
@@ -808,9 +799,6 @@ body.manager-page main { max-width:1180px }
 .chat-heading .runtime-model { font-size:16px; line-height:1.25; font-weight:550; color:var(--ink); overflow-wrap:anywhere }
 .chat-heading .state { font-size:11px; margin-top:5px }
 #new-chat { min-width:32px; min-height:32px; padding:6px }
-.model-metrics { display:flex; flex:none; flex-wrap:wrap; gap:5px 14px; margin:0 4px 8px; font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums }
-.model-metrics>span { display:inline-flex; align-items:center; gap:5px }
-.model-metrics svg { width:14px; height:14px; flex:none }
 #chat-empty { margin:auto; padding:24px 12px }
 #chat-empty h3 { font-size:22px; font-weight:500; letter-spacing:-.5px; color:var(--muted) }
 #task-form { border-radius:16px; box-shadow:0 2px 10px #20232906 }
@@ -823,7 +811,6 @@ body.manager-page main { max-width:1180px }
   .model { padding:8px 6px }
   .chat-heading { padding:0 2px 3px }
   .chat-heading .runtime-model { font-size:16px }
-  .model-metrics { gap:4px 10px; font-size:10px; margin-bottom:4px }
   #chat-empty { padding:8px }
   #chat-empty h3 { font-size:18px }
 }
@@ -985,24 +972,10 @@ body.manager-page main { max-width:1180px }
 .execution-choice .processor-option small { font-size:10px; font-weight:400; white-space:nowrap; font-variant-numeric:tabular-nums }
 .execution-choice label { align-items:flex-start; padding:6px 9px }
 .execution-choice .processor-indicator { margin-top:4px }
-.model-metrics small { font-size:10px }
-.profile-table { width:100%; border-collapse:collapse; font-size:11px; table-layout:fixed; font-variant-numeric:tabular-nums }
-.profile-table caption { text-align:left; font-size:13px; font-weight:600; margin-bottom:10px }
-.profile-table th,.profile-table td { padding:7px 5px; border-bottom:1px solid var(--border); overflow-wrap:anywhere; vertical-align:top }
-.profile-table th { text-align:left; font-weight:500; width:36% }
-.profile-table td,.profile-table thead th:not(:first-child) { text-align:right; width:32% }
-.profile-info { margin:12px 0; font-size:11px; color:var(--muted) }
-.profile-info summary { font-size:11px; padding:4px 0 }
-.profile-info ol { padding-left:18px }
-.profile-info li { padding:4px 0; overflow-wrap:anywhere }
-.profile-actions { display:flex; gap:8px; flex-wrap:wrap }
-.profile-actions button { font-size:11px; padding:6px 8px }
-#profile-group,#profile-confidence,#comparison-status { font-size:10px; line-height:1.5 }
 #history-result { overflow-wrap:anywhere }
 #history-enabled { width:18px; height:18px; accent-color:var(--accent) }
-@media(max-width:390px) { .model-metrics { gap:7px } .execution-choice .processor-option { min-width:48px } .profile-table th,.profile-table td { padding:6px 3px } }
+@media(max-width:390px) { .execution-choice .processor-option { min-width:48px } }
 
-.profile-table thead small { display:block; margin-top:3px; font-size:10px; font-weight:400; color:var(--muted) }
 
 /* Fixed summary and one intentional, independently scrolling measurement sheet. */
 .measurement-sheet { width:min(660px,calc(100vw - 32px)); max-width:none; max-height:calc(100dvh - 32px); padding:0; border:1px solid var(--border); border-radius:18px; background:var(--surface); color:var(--ink); box-shadow:0 20px 70px #20232930; overflow:hidden }
@@ -1012,12 +985,9 @@ body.manager-page main { max-width:1180px }
 .sheet-heading h2 { margin:0; font-size:17px }
 .sheet-heading button { width:44px; height:44px; padding:0; font-size:25px; background:transparent; border:0 }
 .measurement-sheet .performance-content { min-height:0; overflow:auto; overscroll-behavior:contain; padding:18px; font-size:13px }
-.measurement-sheet .profile-info h3 { font-size:12px; margin:16px 0 8px }
 .measurement-sheet .performance-content:focus-visible { outline-offset:-3px }
-#open-measurements { display:inline-flex; align-items:center; gap:5px; min-height:28px; padding:4px 6px; font-size:11px; margin-left:auto }
 .execution-choice label { min-height:28px }
 .execution-choice .processor-option small { white-space:normal; line-height:1.25; min-height:1.25em }
-.model-metrics { align-items:center; margin-bottom:2px }
 .activity-slot { flex:none; height:36px; overflow:auto; font-size:11px }
 .activity-slot p { margin:0!important }
 @media (max-width:540px) {
@@ -1041,8 +1011,6 @@ body.manager-page main { max-width:1180px }
  * sample count stay in the DOM for the tooltip and the Measurements dialog (#49). */
 .execution-choice .processor-option { flex-direction:row; align-items:baseline; gap:6px; min-width:0 }
 .execution-choice .processor-option [id^="summary-"] { display:none }
-#profile-engine { overflow-wrap:anywhere }
-@media(max-width:540px) { #open-measurements>span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap } #open-measurements { width:44px; justify-content:center } }
 
 .measurement-sheet button { min-height:44px }
 
@@ -1092,9 +1060,6 @@ body.manager-page main { max-width:1180px }
 
 /* #52: the main view keeps model, processor and speed; figures live behind this
  * icon (named "Measurements" for assistive tech and as a tooltip). */
-.execution-row #open-measurements { flex:none; width:32px; justify-content:center; padding:4px }
-.execution-row #open-measurements>span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap }
-.recommended-legend { display:flex; align-items:center; gap:6px }
 
 /* #54: translated picker button; the native input stays for .click() and assistive tech. */
 .catalog-pick { display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px; margin:6px 0 }
@@ -1157,8 +1122,10 @@ body.manager-page main { max-width:1180px }
 .model-badges { flex-wrap:wrap; row-gap:2px }
 .model-badges > span { white-space:nowrap }
 
-/* #123: plain first view; numbers and backend names are tooltips (still read aloud). */
-.execution-choice .processor-option small { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap }
+/* #146: CPU/GPU show the measured speed and the GPU backend; first answer and count stay in the tooltip. */
+.execution-choice .processor-option [id^="summary-"] { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap }
+.execution-choice .processor-option small:empty { display:none }
+.execution-choice .processor-option small { color:var(--muted) }
 .runtime-speed { margin-left:10px; font-size:13px; font-weight:400; color:var(--muted); white-space:nowrap; flex:none; cursor:help }
 .runtime-speed:empty { display:none }
 
@@ -1241,7 +1208,6 @@ body.manager-page { display:block }
 /* Speed measurement for the active model sits in the model view, beside Measurements; the stop shape shows a running one. */
 /* Connect, measure and Measurements wrap together, at the right end of the row. */
 .view-actions { display:flex; align-items:center; gap:4px; margin-left:auto }
-.view-actions #open-measurements { margin-left:0 }
 .execution-row #measure-speed { flex:none; width:32px; min-height:32px; padding:4px; color:var(--muted) }
 .execution-row #measure-speed svg { width:16px; height:16px }
 .execution-row #measure-speed:hover:not(:disabled),.execution-row #measure-speed[data-running="true"] { color:var(--accent) }
