@@ -64,7 +64,8 @@ int main(void) {
     h.disk_known      = false;
     h.available_known = false;
     h.device          = APP_UNKNOWN;
-    assert(app_assess(&h, bitnet, false).fit == APP_CONDITIONAL);
+    /* Unmeasured is not limited: a fast, reliable model on Linux is "good" (#6). */
+    assert(app_assess(&h, bitnet, false).fit == APP_RECOMMENDED);
     h.ram = APP_GIB;
     assert(app_assess(&h, bitnet, false).fit == APP_UNAVAILABLE);
     h.ram    = 16 * APP_GIB;
