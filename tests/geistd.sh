@@ -1,7 +1,7 @@
 #!/bin/sh
-# geistd.sh — the daemon end to end: ops suite and the C client over the Unix socket, TCP with
-# and without the token, --stdio, and the short-calls timing against
-# geist-serve. Needs a GGUF (GEIST_MODEL, else the CI reference); skips otherwise.
+# geistd.sh — the daemon end to end: ops suite (raw sessions and chats) and the C
+# client over the Unix socket, TCP with and without the token, --stdio. Needs a
+# GGUF (GEIST_MODEL, else the CI reference); skips otherwise.
 set -eu
 cd "$(dirname "$0")/.."
 MODEL=${GEIST_MODEL:-geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf}
@@ -11,7 +11,7 @@ SOCK=/tmp/geistd-test-$$.sock; LOG=/tmp/geistd-test-$$.log
 fail=0
 ok() { echo "ok   $1"; }; bad() { echo "FAIL $1"; fail=1; }
 wait_log() { i=0; while [ $i -lt "$2" ]; do grep -q "$1" "$LOG" && return 0; sleep 1; i=$((i+1)); done; return 1; }
-trap 'kill ${D1:-} ${D2:-} ${S1:-} 2>/dev/null || true; wait 2>/dev/null || true; rm -f "$SOCK" "$LOG"' EXIT
+trap 'kill ${D1:-} ${D2:-} 2>/dev/null || true; wait 2>/dev/null || true; rm -f "$SOCK" "$LOG"' EXIT
 
 # --- Unix socket + ops --------------------------------------------------------
 ./geistd "$MODEL" --socket "$SOCK" --sessions 3 2>"$LOG" & D1=$!
@@ -50,12 +50,6 @@ printf '%s\n' "$out" | grep -q 'no-token:refused' && ok "tcp without hello refus
 printf '%s\n' "$out" | grep -q 'bad-token:refused' && ok "tcp wrong token refused" || bad "tcp wrong token: $out"
 printf '%s\n' "$out" | grep -q 'good-token:smollm2' && ok "tcp with token serves" || bad "tcp with token: $out"
 kill $D2; wait $D2 2>/dev/null || true
-
-# --- the point: short calls against a resident session vs the chat API -------
-SPORT=$(( 28000 + $$ % 1000 ))
-./geist-serve "$MODEL" --port $SPORT 2>>"$LOG" & S1=$!
-i=0; while ! curl -sf http://127.0.0.1:$SPORT/health >/dev/null 2>&1 && [ $i -lt 60 ]; do sleep 1; i=$((i+1)); done
-python3 -u tests/agent_short_calls.py "$SOCK" $SPORT 5 && ok "resident session beats stateless re-prefill" || bad "short-calls timing"
 
 [ $fail -eq 0 ] && echo "geistd: all passed"
 exit $fail

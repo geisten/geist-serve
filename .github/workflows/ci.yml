@@ -34,21 +34,20 @@ jobs:
       - name: build
         run: make CC=gcc-14 TARGET=linux && make app test-app APP_CC=gcc-14
       - name: usage exits 2
-        run: ./geist-serve 2>/dev/null || test $? -eq 2
+        run: ./geistd 2>/dev/null || test $? -eq 2
       - name: installer failure and rollback tests
         run: |
-          python3 tests/install/legacy_test.py
           python3 tests/install/manifest_test.py
           python3 tests/install/sbom_test.py
           CC=gcc-14 python3 tests/install/bootstrap_test.py
       - name: mini benchmark (model-free)
         run: python3 workbench/test_bench.py
       - name: unit tests (model-free)
-        run: make CC=gcc-14 TARGET=linux build/test_template build/test_net_signal && ./build/test_template && ./build/test_net_signal
+        run: make CC=gcc-14 TARGET=linux build/test_net_signal && ./build/test_net_signal
       - name: systemd units parse
         run: |
-          sudo install -m 0755 geist-serve /usr/local/bin/geist-serve
-          systemd-analyze verify --man=no deploy/systemd/geist-serve.socket deploy/systemd/geist-serve.service
+          sudo install -m 0755 geistd /usr/local/bin/geistd
+          systemd-analyze verify --man=no deploy/systemd/geistd.service
 
   build-macos:
     timeout-minutes: 25
@@ -60,14 +59,13 @@ jobs:
       - name: build
         run: make && make app test-app
       - name: usage exits 2
-        run: ./geist-serve 2>/dev/null || test $? -eq 2
+        run: ./geistd 2>/dev/null || test $? -eq 2
       - name: installer failure and rollback tests
         run: |
-          python3 tests/install/legacy_test.py
           python3 tests/install/manifest_test.py
           python3 tests/install/sbom_test.py
       - name: unit tests (model-free)
-        run: make build/test_template build/test_net_signal && ./build/test_template && ./build/test_net_signal
+        run: make build/test_net_signal && ./build/test_net_signal
 
   # The real thing: the HTTP contract against a model, on every runner OS
   # and CPU we ship for. ~369 MB SmolLM2, cached under the same key the

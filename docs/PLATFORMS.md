@@ -1,6 +1,7 @@
 # Platforms
 
-Where geist-serve is known to run, as of 2026-09-23. The server is plain
+Where geistd and the app are known to run, as of 2026-09-23 (the standalone
+geist-serve server listed here earlier is retired, #148). geistd is plain
 POSIX C23 — sockets, `recv` with `MSG_DONTWAIT`, `clock_gettime`,
 `gmtime_r`, `sigaction` — on top of libgeist, so "does it run" is mostly
 "does the engine build there", and the engine's own targets are in
@@ -8,7 +9,7 @@ POSIX C23 — sockets, `recv` with `MSG_DONTWAIT`, `clock_gettime`,
 
 | Platform | Engine target | Status | Evidence |
 | :-- | :-- | :-- | :-- |
-| Linux x86-64 | `linux` | works | CI: build, unit test, full HTTP smoke against SmolLM2 on every PR |
+| Linux x86-64 | `linux` | works | CI: build, unit test, every geistd op against SmolLM2 on every PR |
 | Linux arm64 | `linux` | works | CI: same, on the arm64 runner |
 | macOS arm64 | `mac-omp` | works | developed and tested here; `ollama` CLI end to end |
 | macOS x86-64 | `mac-omp` | compiles | `clang -arch x86_64` compile check of the server sources; no Intel Mac to run on |

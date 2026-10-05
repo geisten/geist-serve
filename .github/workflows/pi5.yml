@@ -30,11 +30,15 @@ jobs:
           echo "temp=$t load=$l"; test "$t" -lt 60000
       - name: smoke + wire-level suite
         run: OMP_NUM_THREADS=4 ~/bin/with-pi-lock make TARGET=pi5 test
-      - name: decode rate through /api/generate
+      - name: decode and prefill rate through a geistd chat
         run: |
           ~/bin/with-pi-lock sh -c '
-            OMP_NUM_THREADS=4 ./geist-serve geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf --port 28090 2>/tmp/gs.log &
-            pid=$!; for i in $(seq 1 60); do grep -q listening /tmp/gs.log && break; sleep 1; done
-            curl -s http://127.0.0.1:28090/api/generate -d "{\"prompt\":\"Write a paragraph about rivers.\",\"stream\":false,\"options\":{\"num_predict\":64,\"temperature\":0}}" \
-              | python3 -c "import json,sys; d=json.load(sys.stdin); print(\"decode tok/s:\", round(d[\"eval_count\"]/(d[\"eval_duration\"]/1e9),1), \"prefill tok/s:\", round(d[\"prompt_eval_count\"]/(d[\"prompt_eval_duration\"]/1e9),1))"
+            OMP_NUM_THREADS=4 ./geistd geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf --socket /tmp/pi5-rate.sock 2>/tmp/gd.log &
+            pid=$!; for i in $(seq 1 60); do grep -q listening /tmp/gd.log && break; sleep 1; done
+            python3 -c "
+          import sys; sys.path.insert(0, \"clients\"); import geistd
+          ch = geistd.Client(path=\"/tmp/pi5-rate.sock\").chat()
+          ch.ask(\"Write a paragraph about rivers.\", max=64); s = ch.last
+          print(\"decode tok/s:\", round(s[\"output_tokens\"] / (s[\"generation_ms\"] / 1e3), 1),
+                \"prefill tok/s:\", round(s[\"input_tokens\"] / (s[\"prefill_ms\"] / 1e3), 1))"
             kill $pid; wait $pid'

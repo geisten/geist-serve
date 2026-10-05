@@ -313,6 +313,12 @@ static void engine_info(struct sb *b) {
     sb_puts(b, "}");
 }
 
+/* The chat format geist-runtime detected ("gemma4", "chatml", …), "unknown" without it. */
+static const char *chat_format(const struct daemon *d) {
+    geistr_model_info i = {.size = sizeof i};
+    return d->rt && geistr_model_info_get(d->rt, &i) == GEISTR_OK && i.chat_format ? i.chat_format : "unknown";
+}
+
 static bool op_info(struct daemon *d, struct conn *c) {
     struct sb h = {};
     sb_printf(&h,
@@ -333,7 +339,7 @@ static bool op_info(struct daemon *d, struct conn *c) {
               d->vocab,
               d->mo.meta.add_bos ? "true" : "false",
               geist_model_bos_token(d->mo.m),
-              chat_family_name(d->mo.family),
+              chat_format(d),
               d->rt ? "true" : "false",
               d->n_chats,
               geist_backend_name(d->mo.be),

@@ -57,7 +57,7 @@ def build(version):
         'components': [
             {'type': 'library', 'name': 'geistlib', 'version': ref,
              'purl': f'pkg:github/geisten/geistlib@{ref}',
-             'description': 'inference engine, statically linked into geist-serve and geistd',
+             'description': 'inference engine, statically linked into geistd',
              'externalReferences': [{'type': 'vcs', 'url': repo}]},
             {'type': 'library', 'name': 'jsmn', 'version': 'unversioned (vendored header)',
              'purl': 'pkg:github/zserge/jsmn',
