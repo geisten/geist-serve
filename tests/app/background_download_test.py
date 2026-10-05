@@ -47,10 +47,22 @@ def peer():
                     header, length = struct.unpack('<II', exact(conn, 8))
                     request = json.loads(exact(conn, header)); data = exact(conn, length)
                     op = request['op']
-                    if op == 'info': reply(conn, {'backend': os.environ['GEIST_BACKEND'], 'ctx':4096, 'template':'chatml', **({'engine':json.loads(os.environ['GEIST_PEER_ENGINE'])} if os.environ.get('GEIST_PEER_ENGINE') else {})})
+                    if op == 'info': reply(conn, {'backend': os.environ['GEIST_BACKEND'], 'ctx':4096, 'template':'chatml', 'chat_api':True, **({'engine':json.loads(os.environ['GEIST_PEER_ENGINE'])} if os.environ.get('GEIST_PEER_ENGINE') else {})})
                     elif op == 'open': reply(conn, {'session':'1234567890abcdef'})
                     elif op == 'tokenize': reply(conn, {}, struct.pack('<iii',1,2,3))
                     elif op == 'prefill': reply(conn, {'prefilled':len(data)//4})
+                    elif op == 'chat_open': reply(conn, {'chat':'1234567890abcdef','ctx':4096})
+                    elif op == 'chat_rewind': reply(conn, {'length':request['keep']})
+                    elif op == 'chat_send':  # #148: parts, as geistd's runtime sends them
+                        reply(conn, {'part':'answer','text':'Fixture response. ', 'done':False})
+                        deadline = time.monotonic()+25
+                        while gate.exists() and time.monotonic()<deadline:
+                            time.sleep(.05)
+                            reply(conn, {'part':'answer','text':'', 'done':False})
+                        reply(conn, {'part':'answer','text':'Complete.', 'done':False})
+                        reply(conn, {'done':True,'finish':'stop','input_tokens':3,'context_tokens':5,'output_tokens':2,
+                                     'dropped':0,'prefill_ms':1,'first_answer_ms':1,'generation_ms':100,'total_ms':101,'length':2})
+                        return
                     elif op == 'generate':
                         reply(conn, {'piece':'Fixture response. ', 'done':False})
                         deadline = time.monotonic()+25

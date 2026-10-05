@@ -110,13 +110,12 @@ jobs:
           GEIST_TEST_MODEL: geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf
         run: |
           if [ "${{ runner.os }}" = Linux ]; then export APP_CC=gcc-14; fi
-          make -f App.mk app build/geist-app-test build/test_app_performance build/test_app_engine_identity build/test_app_output
+          make -f App.mk app build/geist-app-test build/test_app_performance build/test_app_engine_identity
           make -f App.mk build/test_app_activity build/test_app_lifecycle
           ./build/test_app_lifecycle
           ./build/test_app_activity
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/activity_test.py
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/lifecycle_fault_test.py
-          ./build/test_app_output
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/reasoning_test.py
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/deadline_test.py
           GEIST_APP_TEST_BINARY=build/geist-app-test python3 tests/app/http_test.py

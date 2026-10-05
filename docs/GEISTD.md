@@ -143,6 +143,8 @@ cache, and streams complete UTF-8 text with thinking separated. A send carries
   this send processed; a follow-up processes only its new message.
 - A conversation that does not fit fails the send with `status:"context"`
   and leaves the chat unchanged (`refuse`).
+- The first frame after the input is processed is an empty answer part:
+  input processing is over, generation starts.
 - A client that disconnects mid-answer cancels it; what was said stays part
   of the chat.
 - `--chats N` (default 2, max 8) resident chats, each with its KV cache;

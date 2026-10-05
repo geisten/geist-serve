@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory(prefix='geist-activity-') as temporary:
     try:
         initial=app.wait(lambda s:s['ready'])
         assert initial['activity']['load']['outcome']=='completed'
-        for stage in ['connect','open','tokenize','prefill','generate']:
+        for stage in ['connect','open','prefill','generate']:  # #148: geistd tokenizes inside the send
             op='info' if stage=='connect' else stage
             config(**{op+'_pause':30});(home/(op+'-started')).unlink(missing_ok=True)
             connection=http.client.HTTPConnection('127.0.0.1',app.port,timeout=15)

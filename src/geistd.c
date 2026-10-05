@@ -802,6 +802,16 @@ static bool op_chat_send(struct conn *c, struct chat *x, const struct json *j, s
         sb_puts(&h, "}");
         return reply(c, &h, 0, nullptr);
     }
+    /* The input is processed: an empty answer part says so (clients switch
+     * from input processing to generation and its deadlines). */
+    static const char processed[] = "{\"ok\":true,\"done\":false,\"part\":\"answer\",\"text\":\"\"}";
+    if (!write_frame(c, strlen(processed), processed, 0, nullptr)) {
+        geistr_chat_cancel(x->c);
+        geistr_piece q = {.size = sizeof q};
+        while (geistr_chat_next(x->c, &q) == GEISTR_OK && q.part != GEISTR_PART_END) {
+        }
+        return false;
+    }
     geistr_piece p = {.size = sizeof p};
     while ((st = geistr_chat_next(x->c, &p)) == GEISTR_OK && p.part != GEISTR_PART_END) {
         struct sb h = {};
