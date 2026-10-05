@@ -191,39 +191,11 @@ function renderReplyMetrics(element) {
   element.title = `${detail} · ${t('First text')}: ${timeText(m.first)} · ${t('First answer')}: ${timeText(m.firstAnswer)}${m.reasoning ? ' · ' + t('Tokens and time include answer preparation.') : ''}`;
   element.setAttribute('aria-label', detail);
 }
-function renderMemory() {
-  const r = state?.resources, memory = state?.memory;
-  const localAge=Math.max(0,performance.now()-stateReceivedAt);
-  const rssFresh=knownNumber(memory?.process_rss_sample_age_ms) && memory.process_rss_sample_age_ms+localAge<=6000;
-  const rss = !executionLoading() && state?.ready && rssFresh && r?.scope === 'geistd' && knownNumber(memory?.process_rss_bytes) ? memory.process_rss_bytes : null;
-  const rssReason=t(!rssFresh && knownNumber(memory?.process_rss_sample_age_ms) ? 'Stale measurement' : ({query_failed:'Measurement failed',stale:'Stale measurement'})[memory?.rss_unavailable_reason] || 'Not measured yet');
-  $('test-memory').textContent = rss === null ? '—' : gib(rss);
-  $('test-memory').title=rss===null ? rssReason : sourceText(memory.rss_source) || t('Process RSS');
-  $('test-memory').setAttribute('aria-label',`${t('Process RSS')}: ${rss===null?rssReason:gib(rss)}`);
-  const age=(memory?.gpu_sample_age_ms ?? 0)+localAge;
-  const stale=age>6000;
-  const gpuMemory = !executionLoading() && !stale && memory?.status===1 && knownNumber(memory.gpu_allocated_bytes) ? memory.gpu_allocated_bytes : null;
-  const memoryReason = t(stale ? 'Stale measurement' : ({unsupported:'Unsupported',query_failed:'Measurement failed',stale:'Stale measurement'})[memory?.gpu_unavailable_reason] || 'Not measured yet');
-  $('test-gpu-memory').textContent = gpuMemory===null ? '—' : gib(gpuMemory);
-  $('test-gpu-memory').title = gpuMemory===null ? memoryReason : `${sourceText(memory.gpu_source)} · ${formatNumber(age/1000,1)} s`;
-  $('test-gpu-memory').setAttribute('aria-label',`${t('Metal allocated')}: ${gpuMemory===null ? memoryReason : gib(gpuMemory)}`);
-  $('memory-live').textContent = `${t('Process RSS')}: ${rss===null?rssReason:gib(rss)} · ${t('Metal allocated')}: ${gpuMemory===null?memoryReason:gib(gpuMemory)}`;
-  $('memory-source').textContent = [sourceText(memory?.rss_source), sourceText(memory?.gpu_source), memory?.gpu_source && knownNumber(memory?.gpu_sample_age_ms) ? `${t('Sample age')}: ${formatNumber(age/1000,1)} s` : null, memory?.unified_memory ? t('Shared memory; values overlap.') : null].filter(Boolean).join(' · ');
-}
 function renderPerformance() {
   if (lastReply && lastReply.model !== modelIdentity()) lastReply = null;
   // #83: a connection-test result describes one model; drop it when the model changes.
   if (resultModel !== (state?.active_id || '')) { resultModel = state?.active_id || ''; uiText($('connection-result'), ''); }
-  const h=state?.hardware, r=state?.resources;
-  const cpu=!executionLoading() && state?.ready && r?.scope==='geistd' && knownNumber(r.cpu_percent) ? r.cpu_percent : null;
-  renderMemory();
-  const model = state?.models.find(item => item.id === state.active_id);
-  $('test-size').textContent = model && knownNumber(model.bytes) ? bytes(model.bytes) : '—';
-  $('performance-system').textContent = h?.name || t('Not available');
-  $('performance-os').textContent = h ? [h.os, h.arch, h.logical_cpus ? `${h.logical_cpus} ${t('logical CPUs')}` : null].filter(Boolean).join(' · ') : '—';
-  $('performance-cpu').textContent = cpu === null ? '—' : `${formatNumber(cpu, 1)} %`;
-  $('performance-ram').textContent = h?.known && knownNumber(h.ram) ? gib(h.ram) : '—';
-  $('performance-available').textContent = h?.available_known && knownNumber(h.available) ? gib(h.available) : '—';
+  const r=state?.resources, model = state?.models.find(item => item.id === state.active_id);
   const profile = state?.performance_profile;
   const compatible = profile && profile.artifact === model?.sha256;
   for (const mode of ['cpu', 'gpu']) {
@@ -231,46 +203,13 @@ function renderPerformance() {
     // #81: the GPU backend by its reported name (Metal or Vulkan), never a hard-coded one.
     const own = r => mode === 'gpu' ? r.backend === state?.execution?.gpu_backend : r.backend?.startsWith('cpu');
     const availability = mode==='gpu' && !state?.execution?.gpu_available ? 'Not available' : profile?.recent?.some(r=>r.historical && own(r)) ? 'Historical' : mode === 'gpu' ? 'No GPU reply yet' : 'No CPU reply yet';
-    for (const id of ['rate','typical']) $(`history-${mode}-${id}`).textContent = knownNumber(sample?.rate) ? rateText(sample.rate) : t(availability);
-    $(`history-${mode}-range`).textContent = sample?.count >= 5 ? `${formatNumber(sample.q25,1)}–${formatNumber(sample.q75,1)} ${t('tokens/s')}` : '—';
+    // #146: the speed is visible on the processor choice; the reason for a missing one is its tooltip.
+    $(`history-${mode}-rate`).textContent = knownNumber(sample?.rate) ? rateText(sample.rate) : '';
+    $(`history-${mode}-rate`).title = knownNumber(sample?.rate) ? '' : t(availability);
     $(`summary-${mode}-first`).textContent = `◷ ${timeText(sample?.first_answer)}`;
     $(`summary-${mode}-count`).textContent = sample ? `n=${sample.count}` : 'n=—';
-    $(`summary-${mode}-count`).title = t(sample ? sample.count<5 ? 'First observations' : 'Observed' : availability);
-    $(`summary-${mode}-count`).setAttribute('aria-label', `${$(`summary-${mode}-count`).title} · ${sample?.count || 0}`);
     $(`summary-${mode}-first`).setAttribute('aria-label', `${t('First answer')}: ${timeText(sample?.first_answer)}`);
-    $(`summary-${mode}-first`).title = `${t('Known values')}: ${sample?.first_answer_count || 0}`;
-    $(`history-${mode}-answer`).textContent = `${timeText(sample?.first_answer)} · n=${sample?.first_answer_count || 0}`;
-    $(`history-${mode}-first`).textContent = timeText(sample?.first);
-    $(`history-${mode}-total`).textContent = timeText(sample?.total);
-    $(`history-${mode}-tokens`).textContent = knownNumber(sample?.tokens) ? formatNumber(sample.tokens,Number.isInteger(sample.tokens)?0:1) : '—';
-    $(`history-${mode}-ram`).textContent = knownNumber(sample?.rss_bytes) ? gib(sample.rss_bytes) : '—';
-    $(`history-${mode}-peak`).textContent = knownNumber(sample?.sampled_peak_rss) ? gib(sample.sampled_peak_rss) : '—';
-    $(`history-${mode}-gpu-memory`).textContent = knownNumber(sample?.gpu_allocated_bytes) ? `${gib(sample.gpu_allocated_bytes)} · n=${sample.gpu_known_count}` : '—';
-    $(`history-${mode}-gpu-peak`).textContent = knownNumber(sample?.gpu_sampled_peak) ? gib(sample.gpu_sampled_peak) : '—';
-    $(`history-${mode}-count`).textContent = sample ? `${sample.count} · ${t(sample.count < 5 ? 'First observations' : 'Typical')}` : '—';
-    $(`profile-${mode}-confidence`).textContent = sample ? `${sample.count} · ${t(sample.count < 5 ? 'First observations' : 'Typical')}` : t(availability);
-    $(`history-${mode}-time`).textContent = sample?.recorded_at ? new Intl.DateTimeFormat(interfaceLanguage, {dateStyle:'short',timeStyle:'short'}).format(new Date(sample.recorded_at * 1000)) : '—';
     $(`history-${mode}`).title = `${mode.toUpperCase()}: ${t(sample ? sample.count < 5 ? 'First observations' : 'Typical' : availability)} · ${sample?.count || 0}`;
-  }
-  // The engine that produced these measurements, else the one installed now (#55).
-  const engineLine = engineText((compatible ? profile[state?.execution?.active]?.engine : null) || state?.engine);
-  $('profile-engine').textContent = engineLine; $('profile-engine').hidden = !engineLine;
-  // #81: each processor has its own workload; describe the one of the active processor.
-  const group = compatible ? profile[`${state?.execution?.active}_group`] || profile.group : null;
-  $('profile-collection').textContent = t(profile?.enabled ? 'Collection enabled' : 'Collection disabled');
-  $('profile-group').textContent = group ? [t('Latest workload'), `${t('Input')}: ${['≤512','513–2048','>2048'][group.input]}`, `${t('Output')}: ${['<32','32–127','128–511','≥512'][group.output]}`, t('tokens'), t(group.cached ? 'Cache reused' : 'No cache reuse'), t(group.cold ? 'First reply after load' : 'Warm'), group.contention ? t('Download overlap') : '', group.controlled ? t('Controlled comparison') : t('Ordinary use')].filter(Boolean).join(' · ') : t('Not measured yet');
-  $('profile-confidence').textContent = t('First observations: fewer than 5 replies. No automatic processor changes.');
-  // Keep focused disclosure nodes stable during polling; replace only changed text.
-  const recent = compatible ? profile.recent || [] : [];
-  const recentKey = JSON.stringify([interfaceLanguage,recent]);
-  if ($('profile-recent').dataset.key !== recentKey) {
-    $('profile-recent').dataset.key = recentKey;
-    $('profile-recent').replaceChildren(...recent.map(item => {
-      const li = document.createElement('li');
-      const rate = item.output && item.generation_ns > 0 ? item.output / (item.generation_ns / 1e9) : null;
-      li.textContent = [new Intl.DateTimeFormat(interfaceLanguage,{dateStyle:'short',timeStyle:'short'}).format(new Date(item.timestamp*1000)), item.backend, rateText(rate), `${item.input}/${item.output} ${t('tokens')}`, t(item.outcome), t(item.source), item.historical ? t('Earlier configuration') : '', item.warmup ? t('Warmup') : '', item.contention ? t('Download overlap') : ''].filter(Boolean).join(' · ');
-      return li;
-    }));
   }
   if (profile && !historySaving) {
     $('history-enabled').checked = profile.enabled;
@@ -280,10 +219,6 @@ function renderPerformance() {
   $('profile-error').hidden = !profile?.error && !profile?.invalid;
   const profileError = profile?.error ? `${t('History could not be saved.')} ${profile.dropped} ${t('unsaved observations')}` : profile?.invalid ? `${profile.invalid} ${t('invalid records skipped')}` : '';
   if ($('profile-error').textContent !== profileError) $('profile-error').textContent = profileError;
-  const comparison = state?.comparison;
-  $('comparison-stop').hidden = !comparison?.running;
-  const comparisonText = comparison?.running ? `${t(comparison.phase)} · ${comparison.step}/${state?.execution?.gpu_available ? 8 : 4}` : comparison?.result ? t(comparison.result) : '';
-  if ($('comparison-status').textContent !== comparisonText) $('comparison-status').textContent = comparisonText;
 
 }
 
@@ -356,8 +291,6 @@ function buttonStates() {
   $('run').hidden = !!controller;
   $('new-chat').disabled = !!controller || !(conversation.length || $('result').children.length || $('prompt').value);
   $('new-chat').hidden = false;
-  $('benchmark').disabled = !state?.ready || state?.busy || runtimeRequest() || !!controller ||
-    !allowed(state?.models.find(m => m.id === state.active_id), tasks.find(t => t.id === 'freeform'));
   if (!controller && document.activeElement === $('stop')) $('prompt').focus({preventScroll: true});
   $('stop').hidden = !controller;
   document.body.classList.toggle('generating', !!controller);
@@ -766,7 +699,6 @@ function render(next) {
   const usable = next.ready && allowed(active);
   if (usable) workspaceModel = workspaceIdentity();
   const retained = workspaceModel !== null && ((workspaceModel === workspaceIdentity() && !!active && allowed(active)) || working);
-  if (modelChanged || (!usable && !retained)) closeMeasurements();
   const previouslyHidden = $('workspace').hidden;
   $('workspace').hidden = !usable && !retained && !(next.activity?.load && !next.activity.load.outcome);
   $('test-unavailable').hidden = !$('workspace').hidden;
@@ -879,7 +811,7 @@ async function run(prompt, benchmark = false, preserveDraft = false) {
   if (turn) { lastReply = null; replyPending = true; }
   const target = turn.output;
   target.hidden = false; target.textContent = '';
-  if (!benchmark) { if (!preserveDraft) $('prompt').value = ''; $('chat-help').open = false; closeMeasurements(); resizeComposer(); $('prompt').focus(); }
+  if (!benchmark) { if (!preserveDraft) $('prompt').value = ''; $('chat-help').open = false; resizeComposer(); $('prompt').focus(); }
   buttonStates(); visibleModels().forEach(modelCard); message('');
   uiText($('chat-announcement'), 'Sending…');
   const start = performance.now(); let first = null, done = false, reader, completion = null;
@@ -993,7 +925,7 @@ $('new-chat').addEventListener('click', () => {
   if (controller) return;
   if ((conversation.length || $('result').children.length || $('prompt').value) && !confirm(t('Clear this conversation and draft? They are not saved.'))) return;
   conversation = []; conversationModel = ''; lastReply = null; pendingMarkdown.clear(); $('result').replaceChildren(); $('result').hidden = true; $('chat-empty').hidden = false;
-  $('prompt').value = ''; $('chat-help').open = false; closeMeasurements(); message(''); uiText($('chat-announcement'), 'Chat cleared.');
+  $('prompt').value = ''; $('chat-help').open = false; message(''); uiText($('chat-announcement'), 'Chat cleared.');
   resizeComposer(); buttonStates(); followLatest = true; $('latest').hidden = true; $('transcript').scrollTop = 0; $('prompt').focus();
 });
 function chooseTask(id) {
@@ -1014,15 +946,6 @@ async function loadTasks() {
   if (state) render(state);
 }
 $('stop').addEventListener('click', () => { controller?.abort(); $('prompt').focus({preventScroll: true}); });
-$('benchmark').addEventListener('click', async () => {
-  if (!confirm(t('Run a short CPU/GPU comparison? Each processor loads once, warms up, then answers three times. Your previous processor setting is restored.'))) return;
-  try { await api('/app/performance/compare',{confirm:true}); await poll(); }
-  catch(error) { message(error.message); }
-});
-$('comparison-stop').addEventListener('click', async () => {
-  try { await api('/app/performance/cancel',{}); await poll(); }
-  catch(error) { message(error.message); }
-});
 for (const id of ['history-enabled','history-days']) $(id).addEventListener('change', async () => {
   historySaving = true; $('history-enabled').disabled = $('history-days').disabled = true;
   try { await api('/app/performance/settings',{enabled:$('history-enabled').checked,days:Number($('history-days').value)}); uiText($('history-result'),'Saved.'); }
@@ -1118,7 +1041,7 @@ function showPage(id) {
     if (button.dataset.page === id) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
-  $('chat-help').open = false; closeMeasurements();
+  $('chat-help').open = false;
   chatLayout();
   if (quickTest && !$('workspace').hidden) $('prompt').focus({preventScroll: true});
   else { const heading = $(id).querySelector('h1, h2'); heading.tabIndex = -1; heading.focus({preventScroll:true}); }
@@ -1197,26 +1120,6 @@ async function removeModel(id) {
 }
 
 // Native dialog supplies top-layer modality and an inert background.
-let measurementReturn = null, measurementDraft = null;
-function openMeasurements() {
-  if ($('performance').open) return;
-  if ($('activity-dialog').open) $('activity-dialog').close();
-  measurementReturn = document.activeElement;
-  measurementDraft = {value:$('prompt').value, selection:[$('prompt').selectionStart, $('prompt').selectionEnd, $('prompt').selectionDirection]};
-  $('chat-help').open = false;
-  $('performance').showModal();
-  $('close-measurements').focus({preventScroll:true});
-}
-function closeMeasurements() {
-  if ($('performance').open) $('performance').close();
-}
-$('open-measurements').addEventListener('click', openMeasurements);
-$('close-measurements').addEventListener('click', closeMeasurements);
-$('performance').addEventListener('close', () => {
-  if (measurementDraft && $('prompt').value===measurementDraft.value) $('prompt').setSelectionRange(...measurementDraft.selection);
-  if (measurementReturn?.isConnected && (document.activeElement===document.body || document.activeElement===measurementReturn || $('performance').contains(document.activeElement))) measurementReturn.focus({preventScroll:true});
-  measurementReturn = null; measurementDraft = null;
-});
 document.addEventListener('keydown', event => {
   const modal = document.querySelector('dialog[open]');
   if (event.key === 'Tab' && modal) {
@@ -1229,7 +1132,6 @@ document.addEventListener('keydown', event => {
   }
   if (event.key !== 'Escape') return;
   if ($('activity-dialog').open) { event.preventDefault(); $('activity-dialog').close(); }
-  else if ($('performance').open) { event.preventDefault(); closeMeasurements(); }
   else if ($('chat-help').open) {
     event.preventDefault(); $('chat-help').open = false;
     $('chat-help').querySelector('summary').focus({preventScroll:true});
@@ -1386,7 +1288,7 @@ function renderActivity() {
   const engineLine=engineText(a?.engine?.geistlib?.version ? a.engine : state?.engine);
   $('activity-engine').textContent=engineLine; $('activity-engine').hidden=!engineLine;
 }
-$('open-activity').addEventListener('click',()=>{activityReturn=document.activeElement;closeMeasurements();$('activity-dialog').showModal();$('close-activity').focus({preventScroll:true});renderActivity();});
+$('open-activity').addEventListener('click',()=>{activityReturn=document.activeElement;$('activity-dialog').showModal();$('close-activity').focus({preventScroll:true});renderActivity();});
 $('close-activity').addEventListener('click',()=>$('activity-dialog').close());
 // #122: the recommendation's action starts or downloads it, the normal (verified) way.
 for (const id of ['best-action', 'recommend-action']) $(id).addEventListener('click', () => { if ($(id).dataset.id) choose($(id).dataset.id); });
@@ -1403,4 +1305,4 @@ $('activity-stop').addEventListener('click',async()=>{
   catch(error){message(error.message);}
   finally {cancellingActivity=false;renderActivity();}
 });
-setInterval(()=>{renderActivity();renderMemory();},1000);
+setInterval(renderActivity,1000);

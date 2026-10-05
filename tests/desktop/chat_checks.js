@@ -227,17 +227,16 @@ async function checkActivityUX(assert, tick) {
     for (const locale of ['en-US', 'fr-FR', 'debug', '', undefined]) assert(resolveLanguage('system', locale) === 'en', `English fallback: ${locale}`);
     assert(resolveLanguage('en', 'de-DE') === 'en' && resolveLanguage('de', 'en-US') === 'de', 'manual preference overrides OS');
     assert(resolveLanguage('invalid', 'de-DE') === 'de', 'invalid preference returns to system');
-    const international = new Set(['geisten', 'geist', 'English', 'Deutsch', 'Home Assistant', 'Terminal', 'VS Code · Continue', 'Python', 'JavaScript · TypeScript', 'Go', 'Java', '—', '— tokens/s', '— RAM']);
+    const international = new Set(['geisten', 'geist', 'English', 'Deutsch', 'Home Assistant', 'Terminal', 'VS Code · Continue', 'CPU', 'GPU', 'Python', 'JavaScript · TypeScript', 'Go', 'Java', '—', '— tokens/s', '— RAM']);
     const sources = [...staticTexts.map(([, text]) => text.trim()), ...staticAttributes.map(([, , text]) => text)];
     const missing = [...new Set(sources.filter(text => !international.has(text) && !Object.hasOwn(german, text)))];
     assert(!missing.length, `Missing German interface translations: ${missing.join(' | ')}`);
     assert($('new-chat').querySelector('svg') && !$('new-chat').textContent.trim(), 'clear test uses a labelled trash icon');
     assert($('new-chat').getAttribute('aria-label') === t('Clear chat'), 'trash accessible label follows locale');
     assert(!$('new-chat').hidden, 'clear chat remains discoverable even when disabled');
-    assert($('summary-cpu-first').closest('.execution-choice') && $('test-size').closest('.model-metrics'), 'measurements stay under their processor/model');
-    assert($('performance').tagName==='DIALOG' && !$('performance').closest('#workspace'), 'measurements use a separate modal, not a chat disclosure');
+    assert($('summary-cpu-first').closest('.execution-choice'), 'measurements stay under their processor');
+    assert(!$('performance') && !$('open-measurements'), '#146: no separate Measurements view; the model comparison covers it');
     assert(!$('chat-speed') && !$('chat-memory') && !$('performance-rss') && !$('performance-speed'), 'no duplicate performance summaries or live counters');
-    assert($('open-measurements').getAttribute('aria-haspopup')==='dialog', 'measurement inspection is an explicit accessible action');
     assert(new Set([...document.querySelectorAll('[id]')].map(el => el.id)).size === document.querySelectorAll('[id]').length, 'unique IDs preserve control bindings');
     api = async (path, body, signal) => {
       if (path !== '/app/generate') return originalAPI(path, body, signal);
@@ -630,10 +629,9 @@ async function checkActivityUX(assert, tick) {
       interfaceLanguage=warningLanguage;renderExecution();
       if (fixtureModel) assert(cards.get(fixtureModel.id).querySelector('.model-fit').dataset.fit==='0', 'adequate GPU keeps the whole-device badge suitable despite slow CPU');
       const retainedTranscript=$('result'), retainedContent=$('result').innerHTML;
-      openMeasurements();await tick();
       const cpu = document.querySelector('[name="execution"][value="cpu"]'), gpu=document.querySelector('[name="execution"][value="gpu"]');
       assert(document.querySelector('[name="execution"]:checked').value==='auto' && !gpu.closest('label').querySelector('.recommended-mark').hidden, 'recommendation and selected mode remain distinct');
-      assert(gpu.closest('label').querySelector('.recommended-mark').getAttribute('aria-label')===t('Default processor') && document.querySelector('.recommended-legend'),'#52: the star has a name and a visible legend');
+      assert(gpu.closest('label').querySelector('.recommended-mark').getAttribute('aria-label')===t('Default processor') && gpu.closest('label').querySelector('.recommended-mark').title===t('Default processor'),'#52/#146: the star has a name and a tooltip');
       assert(cpu.closest('label').classList.contains('is-active') && !gpu.closest('label').classList.contains('is-active'), 'Auto exposes the actual processor inside its option');
       assert(cpu.getAttribute('aria-label').includes(t('Active processor')) && gpu.closest('label').querySelector('.processor-backend').textContent==='Metal', 'active processor is accessible and GPU backend is an option sublabel');
       assert($('execution-current').classList.contains('sr-only'), 'no duplicate visible processor label outside the choices');
@@ -644,9 +642,8 @@ async function checkActivityUX(assert, tick) {
       assert($('execution-performance').hidden, 'loading never repeats the previous processor warning');
       assert(!$('workspace').hidden && $('test-unavailable').hidden && $('runtime-state').classList.contains('loading'), 'asynchronous reload keeps the workspace and shows a status ring');
       assert(getComputedStyle($('runtime-state')).animationName === (matchMedia('(prefers-reduced-motion:reduce)').matches ? 'none' : 'processor-loading'), 'loading animation respects reduced motion');
-      assert($('result')===retainedTranscript && $('result').innerHTML===retainedContent && $('performance').open, 'reload preserves transcript nodes and expanded metrics');
-      assert($('history-cpu-rate').textContent===rateText(32) && $('history-gpu-rate').textContent===rateText(64), 'CPU/GPU measurements remain visible together during reload');
-      assert($('test-memory').textContent==='—', 'reload clears live RSS while preserving historical samples');
+      assert($('result')===retainedTranscript && $('result').innerHTML===retainedContent, 'reload preserves transcript nodes');
+      assert($('history-cpu-rate').textContent===rateText(32) && $('history-gpu-rate').textContent===rateText(64) && $('history-cpu-rate').checkVisibility() && $('history-gpu-rate').checkVisibility(), '#146: CPU/GPU speeds stay visible on the choice during reload');
       assert($('run').disabled && cpu.disabled && gpu.disabled && !$('prompt').disabled, 'reload locks send and switching but permits drafting');
       input('Edited during reload');
       executionFixture.ready=true;executionFixture.loading=false;executionFixture.execution.active='gpu';executionFixture.execution.backend='metal';
@@ -844,7 +841,7 @@ $$
     const long = 'Very long draft line with umlauts äöü\n'.repeat(200) + 'x'.repeat(1800);
     input(long); assert($('prompt').value === long, 'long pasted text preserved');
     assert($('prompt').scrollHeight > $('prompt').clientHeight, 'long draft scrollable');
-    assert($('run').getBoundingClientRect().bottom <= innerHeight, `send visible with long draft: ${JSON.stringify({run:$('run').getBoundingClientRect().toJSON(),height:innerHeight,workspace:$('workspace').getBoundingClientRect().toJSON(),metrics:$('open-measurements').getBoundingClientRect().toJSON()})}`);
+    assert($('run').getBoundingClientRect().bottom <= innerHeight, `send visible with long draft: ${JSON.stringify({run:$('run').getBoundingClientRect().toJSON(),height:innerHeight,workspace:$('workspace').getBoundingClientRect().toJSON()})}`);
     assert(document.documentElement.scrollWidth <= innerWidth, 'draft does not overflow horizontally');
     input('Remember lighthouse.');
     assert(!key({shiftKey:true}) && !key({isComposing:true}) && !key({keyCode:229}), 'newline and IME not intercepted');
@@ -905,7 +902,7 @@ $$
       const saved = state, model = state.models.find(m => m.id === state.active_id) || state.models[0];
       render({...state, execution:{...state.execution, gpu_available:true, gpu_backend:'vulkan'},
         performance_profile:{...(state.performance_profile||{}), artifact:model.sha256, cpu:null, gpu:null, recent:[{id:'v',backend:'vulkan',source:'app',outcome:'completed',engine:null,timestamp:Date.now()/1000-3600,generation_ns:1e9,input:20,output:40,warmup:false,contention:false,historical:true}]}});
-      assert($('history-cpu-rate').textContent === t('No CPU reply yet') && $('history-gpu-rate').textContent === t('Historical'), '#81: missing CPU reply named, Vulkan history recognised');
+      assert(!$('history-cpu-rate').textContent && $('history-cpu-rate').title === t('No CPU reply yet') && $('history-gpu-rate').title === t('Historical'), '#81/#146: no number without a reply; the reason is the tooltip; Vulkan history recognised');
       render(saved);
     }
     { // #82: status and notices stay true during a switch, after a reply and after a lost connection.
@@ -1090,7 +1087,7 @@ $$
         node.childNodes.forEach(walk); };
         walk(root); return out.join(' '); };
       const text = visible($('models-page'));
-      const jargon = text.match(/tok\/s|Token\/s|tokens\/s|Q4_K_M|Q4_0|Q8_0|I2_S|PQ2_0|\bMetal\b|\bRSS\b|\bCPU\b|\bGPU\b/g);
+      const jargon = text.match(/Q4_K_M|Q4_0|Q8_0|I2_S|PQ2_0|\bRSS\b/g); // #146: CPU/GPU, the backend and t/s are wanted on the processor choice
       assert(!jargon, `#123: technical terms in the first view: ${JSON.stringify(jargon)}`);
       assert($('runtime-name').title.includes(' · ') && $('history-cpu').closest('label').title.includes($('history-cpu-rate').textContent), '#123: the details remain as tooltips');
     }
@@ -1186,7 +1183,6 @@ $$
       [conversation, conversationModel] = keep; $('result').replaceChildren(...keep[2]); $('result').hidden = keep[3]; $('chat-empty').hidden = keep[4]; $('prompt').value = keep[5];
       render(saved);
     }
-    assert(document.querySelector('.profile-table caption') && document.querySelectorAll('.profile-table th[scope="row"]').length===12, 'profile uses a semantic comparison table');
     assert(!$('measurement-note') && !$('speed'), 'old nested measurements removed');
     assert($('history-enabled').closest('#settings-page') && $('history-export').closest('#settings-page'), 'collection and export belong to settings');
     if (!window.geistDesktop) { // #101 in a browser: a dated download of the service's export.
@@ -1209,39 +1205,10 @@ $$
       } finally { desktopMessage = original; }
     }
 
-    const measuredReply = lastReply;
-    const savedState = state;
-    state = {...savedState, memory:{process_rss_bytes:2**30,process_rss_sample_age_ms:0,status:2,gpu_unavailable_reason:'unsupported'}, resources:{scope:'geistd', rss_bytes:2**30, cpu_percent:0}}; renderPerformance();
-    assert($('test-memory').textContent === '1.0 GiB' && $('performance-cpu').textContent === '0.0 %', 'real zero CPU differs from unknown');
-    state = {...savedState, memory:{process_rss_bytes:null,status:0}, resources:{scope:'geistd', rss_bytes:null, cpu_percent:null}}; renderPerformance();
-    assert($('test-memory').textContent === '—' && $('performance-cpu').textContent === '—', 'unknown resource counters are not zero');
-    const beforeMemoryLayout=$('transcript').getBoundingClientRect().toJSON();
-    stateReceivedAt=performance.now();
-    state={...savedState,memory:{process_rss_bytes:.3*2**30,process_rss_sample_age_ms:0,status:1,gpu_allocated_bytes:10*2**30,gpu_sample_age_ms:0,gpu_source:'metal.MTLDevice.currentAllocatedSize',unified_memory:true},resources:{scope:'geistd',cpu_percent:0}};
-    renderPerformance();
-    assert($('test-memory').textContent==='0.3 GiB' && $('test-gpu-memory').textContent==='10.0 GiB', 'small RSS and large synthetic Metal allocation have separate scopes');
-    const metricsBounds=document.querySelector('.model-metrics').getBoundingClientRect();
-    for(const id of ['test-memory','test-gpu-memory','test-size']) {
-      const bounds=$(id).parentElement.getBoundingClientRect();
-      assert(bounds.top>=metricsBounds.top && bounds.bottom<=metricsBounds.bottom+1, `${id} fits inside the three-row summary without clipping`);
-    }
-    assert($('memory-live').textContent.includes('Process RSS') && $('memory-source').textContent.includes('values overlap'), 'scopes and shared-memory overlap are visible');
-    // #52: figures live behind Measurements; sources are words; the main view keeps model, processor, speed.
-    assert(!document.querySelector('.runtime-panel #test-memory, .runtime-panel #test-gpu-memory') && $('test-memory').closest('dialog'),'#52: RSS and Metal figures are in the Measurements dialog, not the main view');
-    assert(!/proc_pid|MTLDevice|proc_pid_stat/.test($('memory-source').textContent + $('test-gpu-memory').title + $('test-memory').title) && $('memory-source').textContent.includes(t('Reported by Metal')),'#52: no raw API identifier is shown, a plain source is');
-    assert($('open-measurements').closest('.runtime-panel') && $('open-measurements').title && $('open-measurements').textContent.trim(),'#52: Measurements stays one click away and keeps its name');
-    state.memory.gpu_allocated_bytes=0;renderMemory();
-    assert($('test-gpu-memory').textContent==='0.0 GiB', 'known zero Metal differs from unavailable');
-    stateReceivedAt-=6100;renderMemory();
-    assert($('test-gpu-memory').textContent==='—' && $('test-memory').textContent==='—' && $('test-gpu-memory').title==='Stale measurement','cached counters expire without a status response');
-    assert(JSON.stringify($('transcript').getBoundingClientRect().toJSON())===JSON.stringify(beforeMemoryLayout),'memory updates do not move transcript');
-    stateReceivedAt=performance.now();
-    state = {...savedState, hardware:{...savedState.hardware, known:false, ram:0}}; renderPerformance();
-    assert($('performance-ram').textContent === '—', 'failed system memory read is unknown, not zero');
-    openMeasurements(); await tick();
-    render({...savedState, active:'another model', performance_history:[],performance_profile:null});
-    assert(lastReply === null && $('history-cpu-tokens').textContent === '—' && !$('performance').open, 'model change closes old details and invalidates last reply metrics');
-    render(savedState); lastReply = measuredReply; renderPerformance();
+    { const measuredReply = lastReply, savedState = state;
+      render({...savedState, active:'another model', performance_history:[], performance_profile:null});
+      assert(lastReply === null, 'model change invalidates last reply metrics');
+      render(savedState); lastReply = measuredReply; renderPerformance(); }
     window.chatChecksStage = 'session';
     input('Which word?'); key(); await tick();
     assert(calls[1].messages.length === 3 && calls[1].messages[1].content === conversation[1].content, 'follow-up includes history without truncation');
@@ -1294,34 +1261,6 @@ $$
     assert(!$('chat-help').open, 'outside click dismisses help');
     showPage('models-page');
     window.chatChecksStage = 'model-details';
-    closeMeasurements(); await tick();
-    const draft=$('prompt'); draft.value='A multiline\ndraft with selection';resizeComposer();draft.focus();draft.setSelectionRange(2,12);
-    const filler=Array.from({length:50},(_,i)=>{const p=document.createElement('p');p.textContent=`Retained message ${i}`;return p;});
-    $('result').append(...filler);$('result').hidden=false;chatLayout();
-    $('transcript').scrollTop=80;followLatest=false;
-    const sheetTranscript=$('transcript'), composerBefore=$('task-form').getBoundingClientRect();
-    const transcriptBefore=sheetTranscript.getBoundingClientRect(), scrollBefore=sheetTranscript.scrollTop;
-    const summary=$('open-measurements'), footers=[...document.querySelectorAll('.reply-metrics')].map(n=>n.textContent);
-    for(let iteration=0;iteration<10;iteration++) {
-      window.chatChecksStage=`measurements-${iteration}-open`;
-      summary.focus();summary.click();
-      assert($('performance').open && document.activeElement===$('close-measurements'), 'sheet gives focus to its visible Close action');
-      const panel=document.querySelector('.performance-content');panel.focus();panel.scrollTop=panel.scrollHeight;
-      const bounds=$('performance').getBoundingClientRect();
-      assert(panel.scrollTop>0 && panel.scrollHeight>panel.clientHeight, 'sheet content has an independent scroll region');
-      assert(bounds.left>=-1 && bounds.right<=innerWidth+1 && bounds.top>=-1 && bounds.bottom<=innerHeight+1, 'sheet stays inside viewport');
-      render(state);
-      assert(document.activeElement===panel && $('performance').open, 'polling retains sheet and focus');
-      assert(Math.abs($('task-form').getBoundingClientRect().top-composerBefore.top)<=1 && Math.abs(sheetTranscript.getBoundingClientRect().top-transcriptBefore.top)<=1, 'sheet and polling never move composer/transcript');
-      window.chatChecksStage=`measurements-${iteration}-close`;
-      const closed=new Promise(resolve=>$('performance').addEventListener('close',resolve,{once:true}));
-      document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));await closed;
-      assert(!$('performance').open && document.activeElement===summary, 'Escape returns focus to its invoker');
-      assert(draft.value==='A multiline\ndraft with selection' && draft.selectionStart===2 && draft.selectionEnd===12, 'draft and selection survive inspection');
-      assert(sheetTranscript.scrollTop===scrollBefore && !followLatest, 'inspection preserves the reader scroll anchor');
-      assert(JSON.stringify([...document.querySelectorAll('.reply-metrics')].map(n=>n.textContent))===JSON.stringify(footers), 'answer footers are immutable');
-    }
-    filler.forEach(n=>n.remove());draft.value='';resizeComposer();
     showPage('test-page');
     $('prompt').focus();
     { // #124: light and dark both readable: text 7:1 on its background, symbols 3:1 on the model panel.
