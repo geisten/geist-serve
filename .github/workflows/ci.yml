@@ -172,6 +172,39 @@ jobs:
             build/coverage/lcov.info
           if-no-files-found: ignore
 
+  # #142: the Connect-page snippets run unchanged with the current OpenAI SDKs.
+  # Not a required check: a new SDK release must show up here, not block merges.
+  snippets:
+    needs: [build-macos]
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: deps
+        run: brew install libomp
+      - name: build
+        run: make && make geist-app
+      - name: cache reference model
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf
+          key: geist-model-smollm2-360m-q8-48ab3034d0dd
+      - name: fetch reference model (SHA-verified)
+        run: make fetch-model
+      - name: SDKs
+        run: |
+          brew install go openjdk@21
+          echo "$(brew --prefix openjdk@21)/bin" >> "$GITHUB_PATH"
+          python3 -m venv "$RUNNER_TEMP/sdk" && "$RUNNER_TEMP/sdk/bin/pip" install -q openai
+          npm install -s --prefix "$RUNNER_TEMP/sdknode" openai
+      - name: run every snippet
+        env:
+          GEIST_TEST_MODEL: ${{ github.workspace }}/geistlib/gguf_artifacts/smollm2-360m-instruct-q8_0.gguf
+          GEIST_SNIPPETS_REQUIRED: terminal,python,javascript,go,java
+        run: |
+          export PATH="$RUNNER_TEMP/sdk/bin:$PATH" GEIST_SNIPPETS_NODE_MODULES="$RUNNER_TEMP/sdknode/node_modules"
+          python3 tests/app/snippets_test.py
+
   installers:
     uses: ./.github/workflows/installers.yml
     with:

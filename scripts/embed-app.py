@@ -3,7 +3,7 @@
 from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 out = ['/* Generated from web/ by scripts/embed-app.py. */']
-for symbol, filename in [('page', 'index.html'), ('style', 'app.css'), ('script', 'app.js'), ('translations', 'i18n.js'), ('marked_js', 'vendor/marked.umd.js'), ('katex_js', 'vendor/katex.min.js'), ('markdown_js', 'markdown.js')]:
+for symbol, filename in [('page', 'index.html'), ('style', 'app.css'), ('script', 'app.js'), ('translations', 'i18n.js'), ('marked_js', 'vendor/marked.umd.js'), ('katex_js', 'vendor/katex.min.js'), ('markdown_js', 'markdown.js'), ('snippets_js', 'snippets.js')]:
     data = (root / 'web' / filename).read_bytes()
     out.append(f'static const unsigned char {symbol}[] = {{')
     for offset in range(0, len(data), 24):
