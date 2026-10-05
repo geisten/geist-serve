@@ -3,7 +3,7 @@
 # and App.mk (geist-app links only the part without the engine).
 ifndef GEISTR_CORE
 RUNTIME_REPO ?= https://github.com/geisten/geist-runtime.git
-RUNTIME_REF  ?= caebbc27bc029d6c1da039cf09ee6f2b26da128d
+RUNTIME_REF  ?= 3c8f00a9037f9a75c5a9d84ff481f9e321426b80
 GEISTR       ?= geist-runtime
 ifeq (,$(filter clean distclean,$(MAKECMDGOALS)))
 RUNTIME_SYNC := $(shell GEIST_REPO='$(RUNTIME_REPO)' GEIST_REF='$(RUNTIME_REF)' GEISTLIB='$(GEISTR)' \
